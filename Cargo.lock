@@ -1510,6 +1510,7 @@ name = "lbl"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "clap",
  "image",
  "lbl-catalog",
@@ -1518,6 +1519,7 @@ dependencies = [
  "lbl-device",
  "lbl-dither",
  "lbl-driver-api",
+ "lbl-driver-file",
  "lbl-encode",
  "lbl-render",
  "lbl-spool",
@@ -1618,6 +1620,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-file"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-tspl"
 version = "0.1.0"
 dependencies = [
@@ -1643,6 +1654,7 @@ dependencies = [
  "lbl-driver-api",
  "lbl-driver-dymo",
  "lbl-driver-escpos",
+ "lbl-driver-file",
  "lbl-driver-tspl",
  "lbl-driver-zpl",
  "thiserror 2.0.18",

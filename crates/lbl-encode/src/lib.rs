@@ -55,6 +55,7 @@ impl Registry {
         registry.register(Box::new(lbl_driver_escpos::EscPosDriver::new()));
         registry.register(Box::new(lbl_driver_zpl::ZplDriver::new()));
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
+        registry.register(Box::new(lbl_driver_file::FileDriver::default()));
         registry
     }
 
@@ -87,6 +88,7 @@ mod tests {
             Protocol::EscPos,
             Protocol::Zpl,
             Protocol::Tspl,
+            Protocol::Virtual,
         ] {
             assert!(registry.get(p).is_some(), "missing driver for {p:?}");
         }

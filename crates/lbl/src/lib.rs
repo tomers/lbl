@@ -5,8 +5,10 @@
 //! chaining logic used by the `lbl` binary's high-level `print` and `preview`
 //! flows.
 
+pub mod debug;
 pub mod pipeline;
 
 pub use pipeline::{
-    authoring_labels, encode_label, resolve_media, AuthoringLabel, PipelineOptions, Source,
+    authoring_labels, encode_label, encode_label_traced, resolve_media, AuthoringLabel,
+    PipelineOptions, Source,
 };

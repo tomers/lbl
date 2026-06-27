@@ -19,6 +19,7 @@ members = [
     "crates/drivers/lbl-driver-escpos",
     "crates/drivers/lbl-driver-zpl",
     "crates/drivers/lbl-driver-tspl",
+    "crates/drivers/lbl-driver-file",
 ]
 
 [workspace.package]
@@ -44,6 +45,7 @@ lbl-driver-dymo = { path = "crates/drivers/lbl-driver-dymo" }
 lbl-driver-escpos = { path = "crates/drivers/lbl-driver-escpos" }
 lbl-driver-zpl = { path = "crates/drivers/lbl-driver-zpl" }
 lbl-driver-tspl = { path = "crates/drivers/lbl-driver-tspl" }
+lbl-driver-file = { path = "crates/drivers/lbl-driver-file" }
 lbl-encode = { path = "crates/lbl-encode" }
 lbl-device = { path = "crates/lbl-device" }
 lbl-spool = { path = "crates/lbl-spool" }
@@ -61,6 +63,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1", features = ["full"] }
 figment = { version = "0.10", features = ["toml", "env"] }
 image = "0.25"
+base64 = "0.22"
 directories = "5"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
 

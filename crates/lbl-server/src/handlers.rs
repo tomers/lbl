@@ -210,6 +210,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "escpos" | "esc/pos" => Protocol::EscPos,
         "zpl" => Protocol::Zpl,
         "tspl" => Protocol::Tspl,
+        "virtual" | "file" => Protocol::Virtual,
         other => {
             return Err(ApiError(
                 StatusCode::BAD_REQUEST,
@@ -240,6 +241,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        media_type: None,
     };
 
     let labels = authoring_labels(source).map_err(ApiError::from)?;

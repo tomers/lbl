@@ -9,11 +9,12 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, encode_label, resolve_media, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_media, PipelineOptions, Source};
 use lbl_catalog::Catalog;
 use lbl_core::job::OutputMode;
 use lbl_core::printer::Protocol;
 use lbl_dither::Algorithm;
+use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
 use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
@@ -103,6 +104,9 @@ enum ProtocolArg {
     Escpos,
     Zpl,
     Tspl,
+    /// Virtual printer: render to an image file instead of hardware.
+    #[value(alias = "file")]
+    Virtual,
 }
 
 impl From<ProtocolArg> for Protocol {
@@ -113,6 +117,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Escpos => Protocol::EscPos,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
+            ProtocolArg::Virtual => Protocol::Virtual,
         }
     }
 }
@@ -137,6 +142,11 @@ struct PrintArgs {
     /// Target protocol.
     #[arg(long, value_enum)]
     protocol: ProtocolArg,
+
+    /// For `--protocol virtual`: the output image format ("media type"):
+    /// png | bmp | tiff | gif | pbm. Defaults to png.
+    #[arg(long)]
+    media_type: Option<String>,
 
     /// Supersample factor for rendering.
     #[arg(long, default_value_t = 3)]
@@ -173,6 +183,16 @@ struct PrintArgs {
     /// Instead of printing, write encoded bytes to this directory.
     #[arg(long)]
     out_dir: Option<std::path::PathBuf>,
+
+    /// Print to a file (the virtual-printer target). For multiple labels,
+    /// siblings are numbered (out.png, out-01.png, ...).
+    #[arg(long)]
+    file: Option<std::path::PathBuf>,
+
+    /// Write an HTML report documenting every pipeline stage (command-line
+    /// equivalents plus before/after views) to this path.
+    #[arg(long)]
+    debug_html: Option<std::path::PathBuf>,
 }
 
 fn run_print(args: PrintArgs) -> Result<()> {
@@ -184,8 +204,23 @@ fn run_print(args: PrintArgs) -> Result<()> {
         args.media.length_mm,
         args.media.dpi,
     )?;
+    let protocol: Protocol = args.protocol.into();
+
+    // The virtual printer's "media type" is its output file format.
+    let media_type = if protocol == Protocol::Virtual {
+        Some(match &args.media_type {
+            Some(name) => MediaType::parse(name).map_err(|e| anyhow!(e))?,
+            None => MediaType::Png,
+        })
+    } else {
+        if args.media_type.is_some() {
+            bail!("--media-type only applies to --protocol virtual");
+        }
+        None
+    };
+
     let opts = PipelineOptions {
-        protocol: args.protocol.into(),
+        protocol,
         media,
         supports_cut: args.supports_cut,
         cut: args.cut,
@@ -193,22 +228,45 @@ fn run_print(args: PrintArgs) -> Result<()> {
         dither: Algorithm::parse(&args.dither)?,
         supersample: args.supersample,
         assets_base: AssetsBase::Cdn,
+        media_type,
     };
 
     let labels = authoring_labels(read_source(&args.source)?)?;
-    let registry = Registry::with_builtin_drivers();
 
-    // Encode every label, then dispatch.
-    let encoded: Vec<(String, Vec<u8>)> = match args.backend {
-        BackendArg::Chromium => {
-            let backend = ChromiumBackend::launch()?;
-            encode_all(&backend, &registry, &labels, &opts)?
+    // The virtual driver carries its selected media type, so register an
+    // instance configured for this run (overriding the PNG default).
+    let mut registry = Registry::with_builtin_drivers();
+    if let Some(mt) = media_type {
+        registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
+    }
+
+    let extension = media_type.map(|mt| mt.extension()).unwrap_or("bin");
+
+    // Encode every label (capturing per-stage traces when a debug report is
+    // requested), then dispatch.
+    let want_trace = args.debug_html.is_some();
+    let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
+        match args.backend {
+            BackendArg::Chromium => {
+                let backend = ChromiumBackend::launch()?;
+                encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+            }
+            BackendArg::Sidecar => {
+                let backend = SidecarBackend::node_default();
+                encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+            }
+        };
+
+    if let Some(path) = &args.debug_html {
+        let html = lbl::debug::render_report(&traces);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
         }
-        BackendArg::Sidecar => {
-            let backend = SidecarBackend::node_default();
-            encode_all(&backend, &registry, &labels, &opts)?
-        }
-    };
+        std::fs::write(path, html)?;
+        eprintln!("wrote pipeline debug report to {}", path.display());
+    }
 
     if let Some(dir) = &args.out_dir {
         std::fs::create_dir_all(dir)?;
@@ -223,22 +281,41 @@ fn run_print(args: PrintArgs) -> Result<()> {
         return Ok(());
     }
 
+    if let Some(file) = &args.file {
+        let mut t = lbl_device::FileTransport::new(file.clone());
+        return dispatch_with(encoded, &mut t);
+    }
+
+    if protocol == Protocol::Virtual {
+        bail!("virtual printer needs an output target; pass --file or --out-dir");
+    }
+
     dispatch(encoded, args.network, args.usb)
 }
 
+#[allow(clippy::type_complexity)]
 fn encode_all<B: RenderBackend>(
     backend: &B,
     registry: &Registry,
     labels: &[lbl::pipeline::AuthoringLabel],
     opts: &PipelineOptions,
-) -> Result<Vec<(String, Vec<u8>)>> {
+    extension: &str,
+    want_trace: bool,
+) -> Result<(Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>)> {
     let mut out = Vec::new();
+    let mut traces = Vec::new();
     for label in labels {
-        let bytes = encode_label(backend, registry, &label.html, opts)
+        let trace = lbl::encode_label_traced(backend, registry, label.index, &label.html, opts)
             .with_context(|| format!("encoding label {}", label.index))?;
-        out.push((format!("label-{:04}.bin", label.index), bytes));
+        out.push((
+            format!("label-{:04}.{extension}", label.index),
+            trace.encoded.clone(),
+        ));
+        if want_trace {
+            traces.push(trace);
+        }
     }
-    Ok(out)
+    Ok((out, traces))
 }
 
 fn dispatch(
@@ -246,18 +323,12 @@ fn dispatch(
     network: Option<String>,
     usb: Option<String>,
 ) -> Result<()> {
-    use lbl_spool::Spooler;
-    let mut spool = Spooler::new();
-    for (name, bytes) in encoded {
-        spool.enqueue(name, bytes, None);
-    }
-
-    let report = if let Some(target) = network {
+    if let Some(target) = network {
         let (host, port) = target
             .rsplit_once(':')
             .ok_or_else(|| anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
-        spool.run(&mut t)
+        dispatch_with(encoded, &mut t)
     } else if let Some(target) = usb {
         let (vid, pid) = target
             .split_once(':')
@@ -267,11 +338,22 @@ fn dispatch(
             u16::from_str_radix(pid, 16)?,
             None,
         );
-        spool.run(&mut t)
+        dispatch_with(encoded, &mut t)
     } else {
-        bail!("no target; pass --network, --usb, or --out-dir");
-    };
+        bail!("no target; pass --network, --usb, --file, or --out-dir");
+    }
+}
 
+fn dispatch_with<T: lbl_device::Transport>(
+    encoded: Vec<(String, Vec<u8>)>,
+    transport: &mut T,
+) -> Result<()> {
+    use lbl_spool::Spooler;
+    let mut spool = Spooler::new();
+    for (name, bytes) in encoded {
+        spool.enqueue(name, bytes, None);
+    }
+    let report = spool.run(transport);
     println!(
         "completed={} remaining={} disconnected={}",
         report.completed, report.remaining, report.disconnected

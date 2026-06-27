@@ -19,6 +19,12 @@ pub enum Protocol {
     Zpl,
     /// TSC Printer Language.
     Tspl,
+    /// A virtual printer that "prints" to an image file instead of hardware.
+    ///
+    /// The concrete output format (PNG, BMP, ...) is the printer's selected
+    /// *media type*, configured on the driver rather than encoded in the
+    /// protocol itself.
+    Virtual,
 }
 
 /// How the toolchain reaches a printer.

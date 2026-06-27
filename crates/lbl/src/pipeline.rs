@@ -8,6 +8,7 @@ use lbl_core::printer::{PrinterCapabilities, Protocol};
 use lbl_core::units::Dpi;
 use lbl_dither::{dither, Algorithm};
 use lbl_driver_api::EncodeContext;
+use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
@@ -120,6 +121,9 @@ pub struct PipelineOptions {
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
     pub assets_base: AssetsBase,
+    /// For the virtual (`Protocol::Virtual`) printer, the output file format
+    /// ("media type"). Ignored by hardware protocols.
+    pub media_type: Option<MediaType>,
 }
 
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
@@ -130,6 +134,20 @@ pub fn encode_label<B: RenderBackend>(
     authoring_html: &str,
     opts: &PipelineOptions,
 ) -> Result<Vec<u8>> {
+    let trace = encode_label_traced(backend, registry, 0, authoring_html, opts)?;
+    Ok(trace.encoded)
+}
+
+/// Like [`encode_label`], but captures every stage's input and output into a
+/// [`LabelTrace`] for the debug report. The final protocol bytes are available
+/// as [`LabelTrace::encoded`].
+pub fn encode_label_traced<B: RenderBackend>(
+    backend: &B,
+    registry: &Registry,
+    index: usize,
+    authoring_html: &str,
+    opts: &PipelineOptions,
+) -> Result<crate::debug::LabelTrace> {
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -147,9 +165,9 @@ pub fn encode_label<B: RenderBackend>(
         height_dots,
         supersample: opts.supersample,
     };
-    let image = render_two_pass(backend, &transpiled, &req).context("rendering")?;
+    let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
 
-    let bitmap = dither(&image, opts.dither);
+    let dithered = dither(&rendered, opts.dither);
 
     let mut job = JobSpec::new(opts.media.clone());
     job.cut = opts.cut;
@@ -164,8 +182,24 @@ pub fn encode_label<B: RenderBackend>(
         .get(opts.protocol)
         .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
     let ctx = EncodeContext::new(&job, &caps);
-    let bytes = driver.encode(&bitmap, &ctx).context("encoding")?;
-    Ok(bytes)
+    let encoded = driver.encode(&dithered, &ctx).context("encoding")?;
+
+    Ok(crate::debug::LabelTrace {
+        index,
+        authoring_html: authoring_html.to_string(),
+        transpiled_html: transpiled,
+        assets_base: opts.assets_base.clone(),
+        width_dots,
+        height_dots,
+        supersample: opts.supersample,
+        rendered,
+        dither: opts.dither,
+        dithered,
+        protocol: opts.protocol,
+        driver_name: driver.name().to_string(),
+        media_type: opts.media_type,
+        encoded,
+    })
 }
 
 #[cfg(test)]

@@ -20,6 +20,9 @@ enum ProtocolArg {
     Escpos,
     Zpl,
     Tspl,
+    /// Virtual printer: encode to an image file ("media type" via --media-type).
+    #[value(alias = "file")]
+    Virtual,
 }
 
 impl From<ProtocolArg> for Protocol {
@@ -30,6 +33,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Escpos => Protocol::EscPos,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
+            ProtocolArg::Virtual => Protocol::Virtual,
         }
     }
 }
@@ -46,6 +50,11 @@ struct Cli {
     /// Target protocol / driver.
     #[arg(long, value_enum)]
     protocol: ProtocolArg,
+
+    /// For `--protocol virtual`: output image format ("media type"):
+    /// png | bmp | tiff | gif | pbm. Defaults to png.
+    #[arg(long)]
+    media_type: Option<String>,
 
     /// Media width in millimeters.
     #[arg(long, default_value_t = 25.0)]
@@ -105,8 +114,19 @@ fn main() -> Result<()> {
         reports_media: false,
     };
 
-    let registry = Registry::with_builtin_drivers();
+    let mut registry = Registry::with_builtin_drivers();
     let protocol: Protocol = cli.protocol.into();
+    if protocol == Protocol::Virtual {
+        let mt = match &cli.media_type {
+            Some(name) => {
+                lbl_driver_file::MediaType::parse(name).map_err(|e| anyhow::anyhow!(e))?
+            }
+            None => lbl_driver_file::MediaType::Png,
+        };
+        registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
+    } else if cli.media_type.is_some() {
+        bail!("--media-type only applies to --protocol virtual");
+    }
     let driver = match registry.get(protocol) {
         Some(d) => d,
         None => bail!("no driver for protocol {protocol:?}"),

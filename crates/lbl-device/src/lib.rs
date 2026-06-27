@@ -17,7 +17,7 @@ pub mod transport;
 
 pub use discovery::{discover_usb, DiscoveredPrinter};
 pub use media::{resolve_media, MediaSource};
-pub use transport::{NetworkTransport, Transport};
+pub use transport::{FileTransport, NetworkTransport, Transport};
 
 #[cfg(feature = "usb")]
 pub use transport::UsbTransport;
