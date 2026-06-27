@@ -188,6 +188,12 @@ pub struct PrintReq {
     usb: Option<String>,
     #[serde(default)]
     use_sidecar: bool,
+    /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
+    #[serde(default)]
+    media_type: Option<String>,
+    /// Also build the HTML pipeline debug report.
+    #[serde(default)]
+    debug: bool,
 }
 
 fn default_dpi() -> f64 {
@@ -279,6 +285,139 @@ fn encode_all<B: RenderBackend>(
         out.push((format!("label-{:04}.bin", label.index), bytes));
     }
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// print to file (virtual printer) / debug report
+// ---------------------------------------------------------------------------
+
+/// "Print" to image files (the virtual printer) and/or build the HTML pipeline
+/// debug report, returning the artifacts inline so the browser can download
+/// them. No physical device is contacted.
+pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>) -> ApiResult {
+    use base64::Engine as _;
+
+    let source = req.source.clone().into_source()?;
+    let media = resolve_media(
+        &state.catalog,
+        req.media.as_deref(),
+        req.width_mm,
+        req.length_mm,
+        req.dpi,
+    )
+    .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    let protocol = parse_protocol(&req.protocol)?;
+    let media_type = if protocol == Protocol::Virtual {
+        Some(match &req.media_type {
+            Some(name) => lbl_driver_file::MediaType::parse(name)
+                .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?,
+            None => lbl_driver_file::MediaType::Png,
+        })
+    } else {
+        None
+    };
+
+    let opts = PipelineOptions {
+        protocol,
+        media,
+        supports_cut: req.supports_cut,
+        cut: req.cut,
+        copies: req.copies,
+        dither: Algorithm::parse(&req.dither)
+            .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
+        supersample: req.supersample,
+        assets_base: AssetsBase::Cdn,
+        media_type,
+    };
+
+    let labels = authoring_labels(source).map_err(ApiError::from)?;
+    let use_sidecar = req.use_sidecar;
+    let want_debug = req.debug;
+    let (extension, mime) = match media_type {
+        Some(mt) => (mt.extension().to_string(), mt.mime().to_string()),
+        None => ("bin".to_string(), "application/octet-stream".to_string()),
+    };
+
+    let result = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
+        let mut registry = Registry::with_builtin_drivers();
+        if let Some(mt) = media_type {
+            registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
+        }
+
+        let encode = |backend: &dyn DynBackend| -> anyhow::Result<serde_json::Value> {
+            let mut out_labels = Vec::new();
+            let mut traces = Vec::new();
+            for label in &labels {
+                let trace = backend.encode_traced(&registry, label.index, &label.html, &opts)?;
+                let data_url = format!(
+                    "data:{mime};base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(&trace.encoded)
+                );
+                out_labels.push(json!({
+                    "index": label.index,
+                    "filename": format!("label-{:04}.{extension}", label.index),
+                    "mime": mime,
+                    "size": trace.encoded.len(),
+                    "data_url": data_url,
+                }));
+                if want_debug {
+                    traces.push(trace);
+                }
+            }
+            let debug_html = if want_debug {
+                Some(lbl::debug::render_report(&traces))
+            } else {
+                None
+            };
+            Ok(json!({
+                "count": out_labels.len(),
+                "protocol": opts_protocol_name(opts.protocol),
+                "media_type": media_type.map(|mt| mt.name()),
+                "labels": out_labels,
+                "debug_html": debug_html,
+            }))
+        };
+
+        if use_sidecar {
+            encode(&SidecarBackend::node_default())
+        } else {
+            encode(&ChromiumBackend::launch()?)
+        }
+    })
+    .await
+    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(result).into_response())
+}
+
+/// The CLI/display name of a protocol (matches the `--protocol` value).
+fn opts_protocol_name(protocol: Protocol) -> &'static str {
+    lbl::debug::protocol_cli_name(protocol)
+}
+
+/// A render backend object-safe enough to trace one label through the pipeline.
+trait DynBackend {
+    fn encode_traced(
+        &self,
+        registry: &Registry,
+        index: usize,
+        html: &str,
+        opts: &PipelineOptions,
+    ) -> anyhow::Result<lbl::debug::LabelTrace>;
+}
+
+impl<B: RenderBackend> DynBackend for B {
+    fn encode_traced(
+        &self,
+        registry: &Registry,
+        index: usize,
+        html: &str,
+        opts: &PipelineOptions,
+    ) -> anyhow::Result<lbl::debug::LabelTrace> {
+        lbl::pipeline::encode_label_traced(self, registry, index, html, opts)
+    }
 }
 
 fn dispatch(
