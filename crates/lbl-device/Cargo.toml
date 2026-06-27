@@ -1,0 +1,29 @@
+[package]
+name = "lbl-device"
+description = "Printer discovery and transport (USB via nusb, network via TCP) for lbl."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-device"
+path = "src/bin/lbl-device.rs"
+
+[features]
+default = ["usb"]
+usb = ["dep:nusb", "dep:pollster"]
+
+[dependencies]
+lbl-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+nusb = { version = "0.1", optional = true }
+pollster = { version = "0.3", optional = true }
