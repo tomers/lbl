@@ -13,6 +13,7 @@ members = [
     "crates/lbl-device",
     "crates/lbl-spool",
     "crates/lbl",
+    "crates/lbl-server",
     "crates/drivers/lbl-driver-api",
     "crates/drivers/lbl-driver-dymo",
     "crates/drivers/lbl-driver-escpos",
