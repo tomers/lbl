@@ -1,0 +1,27 @@
+//! Transpile *authoring HTML* into *browser-ready HTML*.
+//!
+//! Authoring HTML uses compact custom concepts:
+//! - `<qr>PAYLOAD</qr>` — a QR code
+//! - `<barcode type="CODE128">DATA</barcode>` — a barcode
+//! - flex utility classes (`lbl-row`, `lbl-col`, `lbl-center`, `lbl-grow`, ...)
+//!
+//! Transpilation rewrites those custom elements into placeholder `<div>`s,
+//! injects the flex/base CSS, and pulls in the third-party JS libraries that
+//! draw the QR/barcodes in the browser (or headless Chromium during rendering).
+//!
+//! Two output modes are supported (see [`lbl_core::job::OutputMode`]):
+//! - **Print**: a bare, deterministic document for the rasterizer.
+//! - **Preview**: a screen-oriented, gallery-friendly document wrapped in an
+//!   addressable `.lbl-preview[data-label-index]` container.
+//!
+//! ```
+//! use lbl_transpile_html::{transpile, TranspileOptions};
+//! let html = transpile("<qr>hello</qr>", &TranspileOptions::default());
+//! assert!(html.contains("class=\"lbl-qr\""));
+//! ```
+
+mod assets;
+mod transpile;
+
+pub use assets::AssetsBase;
+pub use transpile::{transpile, TranspileOptions};
