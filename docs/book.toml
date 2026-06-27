@@ -1,0 +1,14 @@
+[book]
+title = "lbl — the modular label toolchain"
+authors = ["lbl contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "rust"
+git-repository-url = "https://github.com/labelle-org/lbl"
+edit-url-template = "https://github.com/labelle-org/lbl/edit/main/docs/{path}"
+
+[output.html.fold]
+enable = true
+level = 1
