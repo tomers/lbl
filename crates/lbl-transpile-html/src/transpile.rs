@@ -155,7 +155,10 @@ mod tests {
         assert!(out.contains("class=\"lbl-qr\""));
         assert!(out.contains("data-qr=\"https://x.y\""));
         assert!(out.contains("qrcode.min.js"));
-        assert!(out.contains("JsBarcode.all.min.js") == false, "barcode lib should not be injected");
+        assert!(
+            !out.contains("JsBarcode.all.min.js"),
+            "barcode lib should not be injected"
+        );
     }
 
     #[test]

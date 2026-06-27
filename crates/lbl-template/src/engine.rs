@@ -184,7 +184,9 @@ mod tests {
             .render(
                 "<div>{{ name }} of {{ count }}</div>",
                 Some(json!({"items":[{"name":"X"},{"name":"Y"}]})),
-                &RenderOptions { each: Some("/items".into()) },
+                &RenderOptions {
+                    each: Some("/items".into()),
+                },
             )
             .unwrap();
         assert_eq!(labels.len(), 2);

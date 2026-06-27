@@ -1,0 +1,10 @@
+[tools]
+just = "latest"
+pre-commit = "latest"
+jq = "latest"
+ripgrep = "latest"
+shellcheck = "latest"
+"cargo:cargo-nextest" = "latest"
+
+[tasks]
+"*" = "just {{task}} {{args}}"

@@ -55,9 +55,9 @@ impl RenderBackend for SidecarBackend {
             cmd.env("LBL_RENDER_HEIGHT", h.to_string());
         }
 
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| RenderError::Backend(format!("spawning sidecar '{}': {e}", self.program)))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            RenderError::Backend(format!("spawning sidecar '{}': {e}", self.program))
+        })?;
 
         child
             .stdin

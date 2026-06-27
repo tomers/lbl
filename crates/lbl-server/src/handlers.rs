@@ -94,9 +94,7 @@ pub async fn upsert_profile(
 }
 
 pub async fn delete_profile(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
-    state
-        .profiles
-        .remove(&lbl_core::printer::PrinterId(id))?;
+    state.profiles.remove(&lbl_core::printer::PrinterId(id))?;
     Ok((StatusCode::OK, Json(json!({ "ok": true }))).into_response())
 }
 
@@ -123,7 +121,10 @@ pub struct SourceReq {
 impl SourceReq {
     fn into_source(self) -> Result<Source, ApiError> {
         if let Some(text) = self.text {
-            return Ok(Source::Text { text, raw: self.raw });
+            return Ok(Source::Text {
+                text,
+                raw: self.raw,
+            });
         }
         if let Some(html) = self.html {
             return Ok(Source::Html(html));
@@ -235,7 +236,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         supports_cut: req.supports_cut,
         cut: req.cut,
         copies: req.copies,
-        dither: Algorithm::parse(&req.dither).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
+        dither: Algorithm::parse(&req.dither)
+            .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
     };

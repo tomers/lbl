@@ -131,7 +131,10 @@ mod tests {
         store.upsert(updated).unwrap();
         let loaded = store.load().unwrap();
         assert_eq!(loaded.len(), 2);
-        assert_eq!(loaded.iter().find(|p| p.id.0 == "a").unwrap().name, "Renamed");
+        assert_eq!(
+            loaded.iter().find(|p| p.id.0 == "a").unwrap().name,
+            "Renamed"
+        );
 
         store.remove(&PrinterId("a".into())).unwrap();
         assert_eq!(store.load().unwrap().len(), 1);

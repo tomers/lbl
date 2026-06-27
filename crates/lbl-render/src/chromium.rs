@@ -58,10 +58,7 @@ impl ChromiumBackend {
 impl RenderBackend for ChromiumBackend {
     fn rasterize(&self, html: &str, width: u32, height: Option<u32>) -> Result<RgbaImage> {
         let bytes = self.rt.block_on(async {
-            let data_url = format!(
-                "data:text/html;charset=utf-8,{}",
-                urlencoding::encode(html)
-            );
+            let data_url = format!("data:text/html;charset=utf-8,{}", urlencoding::encode(html));
             let page = self
                 .browser
                 .new_page(data_url.as_str())
@@ -86,7 +83,9 @@ impl RenderBackend for ChromiumBackend {
                 .map_err(|e| RenderError::Backend(e.to_string()))?;
 
             // Allow webfonts and the QR/barcode scripts to settle.
-            let _ = page.evaluate("document.fonts && document.fonts.ready").await;
+            let _ = page
+                .evaluate("document.fonts && document.fonts.ready")
+                .await;
             tokio::time::sleep(Duration::from_millis(200)).await;
 
             let params = ScreenshotParams::builder()

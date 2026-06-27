@@ -99,9 +99,9 @@ impl CatalogEntry {
     /// Whether this media is compatible with the given printer model string.
     pub fn is_compatible_with(&self, printer_model: &str) -> bool {
         let needle = printer_model.to_ascii_lowercase();
-        self.compatible
-            .iter()
-            .any(|c| needle.contains(&c.to_ascii_lowercase()) || c.eq_ignore_ascii_case(printer_model))
+        self.compatible.iter().any(|c| {
+            needle.contains(&c.to_ascii_lowercase()) || c.eq_ignore_ascii_case(printer_model)
+        })
     }
 }
 

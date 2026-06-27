@@ -7,7 +7,10 @@ use clap::{Parser, Subcommand};
 use lbl_device::{discover_usb, NetworkTransport, Transport};
 
 #[derive(Parser)]
-#[command(name = "lbl-device", about = "Discover printers and send bytes to them")]
+#[command(
+    name = "lbl-device",
+    about = "Discover printers and send bytes to them"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

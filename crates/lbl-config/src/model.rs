@@ -17,20 +17,12 @@ pub struct Config {
 /// General, top-level settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct GeneralConfig {
     /// Id of the default printer (matches a persisted `PrinterProfile.id`).
     pub default_printer: Option<String>,
     /// Override for the cache directory (catalog images, render scratch).
     pub cache_dir: Option<String>,
-}
-
-impl Default for GeneralConfig {
-    fn default() -> Self {
-        Self {
-            default_printer: None,
-            cache_dir: None,
-        }
-    }
 }
 
 /// Default rendering/dithering parameters.

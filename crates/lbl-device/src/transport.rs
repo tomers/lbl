@@ -28,8 +28,10 @@ impl NetworkTransport {
 impl Transport for NetworkTransport {
     fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
         use std::io::Write;
-        let mut stream = std::net::TcpStream::connect((self.host.as_str(), self.port))
-            .map_err(|e| DeviceError::Transport(format!("connect {}:{}: {e}", self.host, self.port)))?;
+        let mut stream =
+            std::net::TcpStream::connect((self.host.as_str(), self.port)).map_err(|e| {
+                DeviceError::Transport(format!("connect {}:{}: {e}", self.host, self.port))
+            })?;
         stream
             .write_all(data)
             .map_err(|e| DeviceError::Transport(format!("write: {e}")))?;

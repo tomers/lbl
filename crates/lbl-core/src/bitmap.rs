@@ -36,7 +36,7 @@ impl MonoBitmap {
 
     /// Bytes per row for a given width.
     pub fn stride_for(width: u32) -> usize {
-        ((width + 7) / 8) as usize
+        width.div_ceil(8) as usize
     }
 
     /// Get the pixel at `(x, y)`. Out-of-bounds reads return `false`.

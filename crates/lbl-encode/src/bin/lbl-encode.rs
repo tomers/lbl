@@ -35,7 +35,10 @@ impl From<ProtocolArg> for Protocol {
 }
 
 #[derive(Parser)]
-#[command(name = "lbl-encode", about = "Encode a 1-bit PBM into printer protocol bytes")]
+#[command(
+    name = "lbl-encode",
+    about = "Encode a 1-bit PBM into printer protocol bytes"
+)]
 struct Cli {
     /// Input PBM (P4) file. If omitted, read from stdin.
     input: Option<std::path::PathBuf>,

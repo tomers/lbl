@@ -77,7 +77,8 @@ impl Catalog {
     }
 
     fn merge_toml(&mut self, text: &str) -> Result<()> {
-        let file: CatalogFile = toml::from_str(text).map_err(|e| CatalogError::Parse(e.to_string()))?;
+        let file: CatalogFile =
+            toml::from_str(text).map_err(|e| CatalogError::Parse(e.to_string()))?;
         self.merge_entries(file.entries);
         Ok(())
     }

@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(&bytes[12..16], &[ESC, b'D', 0x01, 0x02]);
         assert_eq!(&bytes[16..20], &[2, 0, 0, 0]); // width = lines
         assert_eq!(&bytes[20..24], &[8, 0, 0, 0]); // height = dots
-        // data: 2 bytes (first line 0x80, second 0x00)
+                                                   // data: 2 bytes (first line 0x80, second 0x00)
         assert_eq!(&bytes[24..26], &[0x80, 0x00]);
         // trailer: ESC E (feed to tear, last label) then ESC Q
         assert_eq!(&bytes[26..30], &[ESC, b'E', ESC, b'Q']);

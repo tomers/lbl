@@ -34,7 +34,7 @@ impl ZplDriver {
         }
         zpl.push_str("^FO0,0\n");
         // ^GFA,bytesTotal,bytesTotal,bytesPerRow,data
-        let _ = write!(zpl, "^GFA,{total},{total},{stride},{hex}\n");
+        let _ = writeln!(zpl, "^GFA,{total},{total},{stride},{hex}");
         zpl.push_str("^FS\n");
         zpl.push_str("^XZ\n");
         zpl
@@ -92,8 +92,10 @@ mod tests {
             b.set(1, 0, true);
             b
         };
-        let mut caps = PrinterCapabilities::default();
-        caps.supports_cut = true;
+        let caps = PrinterCapabilities {
+            supports_cut: true,
+            ..Default::default()
+        };
         let mut job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
         job.cut = true;
         let ctx = EncodeContext::new(&job, &caps);

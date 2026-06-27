@@ -113,7 +113,12 @@ impl Spooler {
     }
 
     /// Enqueue a job, returning its id.
-    pub fn enqueue(&mut self, name: impl Into<String>, payload: Vec<u8>, cut_command: Option<Vec<u8>>) -> u64 {
+    pub fn enqueue(
+        &mut self,
+        name: impl Into<String>,
+        payload: Vec<u8>,
+        cut_command: Option<Vec<u8>>,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.queue.push_back(SpoolJob {
@@ -265,7 +270,10 @@ mod tests {
     fn retries_then_succeeds() {
         let mut spool = Spooler::with_policy(fast_policy());
         spool.enqueue("a", vec![1], None);
-        let mut t = FailsThenOk { fail_times: 2, calls: 0 };
+        let mut t = FailsThenOk {
+            fail_times: 2,
+            calls: 0,
+        };
         let report = spool.run(&mut t);
         assert_eq!(report.completed, 1);
         assert_eq!(t.calls, 3);

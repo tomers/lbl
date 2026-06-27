@@ -2,19 +2,14 @@
 //! and third-party library references for QR/barcode rendering.
 
 /// Where third-party JS libraries are loaded from.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum AssetsBase {
     /// Load libraries from a public CDN (jsDelivr).
+    #[default]
     Cdn,
     /// Load libraries from a base URL/path serving the vendored assets, e.g.
     /// `/assets` or `file:///opt/lbl/assets`.
     Local(String),
-}
-
-impl Default for AssetsBase {
-    fn default() -> Self {
-        Self::Cdn
-    }
 }
 
 impl AssetsBase {
@@ -32,7 +27,9 @@ impl AssetsBase {
             AssetsBase::Cdn => {
                 "https://cdn.jsdelivr.net/npm/jsbarcode@3/dist/JsBarcode.all.min.js".into()
             }
-            AssetsBase::Local(base) => format!("{}/JsBarcode.all.min.js", base.trim_end_matches('/')),
+            AssetsBase::Local(base) => {
+                format!("{}/JsBarcode.all.min.js", base.trim_end_matches('/'))
+            }
         }
     }
 }

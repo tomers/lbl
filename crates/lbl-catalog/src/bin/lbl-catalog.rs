@@ -5,7 +5,10 @@ use clap::{Parser, Subcommand};
 use lbl_catalog::Catalog;
 
 #[derive(Parser)]
-#[command(name = "lbl-catalog", about = "Browse known media and printer compatibility")]
+#[command(
+    name = "lbl-catalog",
+    about = "Browse known media and printer compatibility"
+)]
 struct Cli {
     /// Additional catalog files to overlay (TOML/JSON).
     #[arg(long = "catalog", value_name = "FILE", global = true)]

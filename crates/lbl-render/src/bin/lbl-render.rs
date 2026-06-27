@@ -15,7 +15,10 @@ enum Backend {
 }
 
 #[derive(Parser)]
-#[command(name = "lbl-render", about = "Render HTML to a raster image (two-pass)")]
+#[command(
+    name = "lbl-render",
+    about = "Render HTML to a raster image (two-pass)"
+)]
 struct Cli {
     /// Input HTML file. If omitted, read from stdin.
     input: Option<std::path::PathBuf>,

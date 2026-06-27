@@ -19,7 +19,11 @@ use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
 use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
 
 #[derive(Parser)]
-#[command(name = "lbl", version, about = "Orchestrate the lbl label-printing pipeline")]
+#[command(
+    name = "lbl",
+    version,
+    about = "Orchestrate the lbl label-printing pipeline"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -211,7 +215,11 @@ fn run_print(args: PrintArgs) -> Result<()> {
         for (name, bytes) in &encoded {
             std::fs::write(dir.join(name), bytes)?;
         }
-        eprintln!("wrote {} encoded label(s) to {}", encoded.len(), dir.display());
+        eprintln!(
+            "wrote {} encoded label(s) to {}",
+            encoded.len(),
+            dir.display()
+        );
         return Ok(());
     }
 
@@ -233,7 +241,11 @@ fn encode_all<B: RenderBackend>(
     Ok(out)
 }
 
-fn dispatch(encoded: Vec<(String, Vec<u8>)>, network: Option<String>, usb: Option<String>) -> Result<()> {
+fn dispatch(
+    encoded: Vec<(String, Vec<u8>)>,
+    network: Option<String>,
+    usb: Option<String>,
+) -> Result<()> {
     use lbl_spool::Spooler;
     let mut spool = Spooler::new();
     for (name, bytes) in encoded {
@@ -352,7 +364,10 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
         args.out_dir.join("gallery.json"),
         serde_json::to_string_pretty(&serde_json::json!({"count": count, "labels": manifest}))?,
     )?;
-    eprintln!("wrote {count} preview label(s) to {}", args.out_dir.display());
+    eprintln!(
+        "wrote {count} preview label(s) to {}",
+        args.out_dir.display()
+    );
     Ok(())
 }
 
@@ -447,9 +462,16 @@ struct CatalogArgs {
 #[derive(Subcommand)]
 enum CatalogCommand {
     List,
-    Show { key: String },
-    Compatible { #[arg(long)] printer: String },
-    Search { query: String },
+    Show {
+        key: String,
+    },
+    Compatible {
+        #[arg(long)]
+        printer: String,
+    },
+    Search {
+        query: String,
+    },
 }
 
 fn run_catalog(args: CatalogArgs) -> Result<()> {

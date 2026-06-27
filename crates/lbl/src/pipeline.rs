@@ -93,7 +93,8 @@ pub fn resolve_media(
             .ok_or_else(|| anyhow!("unknown media SKU '{sku}'"))?;
         return Ok(entry.media.to_media(dpi));
     }
-    let width = width_mm.ok_or_else(|| anyhow!("media required: pass --media SKU or --width-mm"))?;
+    let width =
+        width_mm.ok_or_else(|| anyhow!("media required: pass --media SKU or --width-mm"))?;
     Ok(match length_mm {
         Some(len) => Media::fixed(width, len, dpi),
         None => Media::continuous(width, dpi),

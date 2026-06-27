@@ -51,7 +51,10 @@ fn main() -> Result<()> {
         report.completed, report.failed, report.remaining, report.disconnected
     );
     if report.disconnected {
-        bail!("device disconnected; {} job(s) retained in queue", report.remaining);
+        bail!(
+            "device disconnected; {} job(s) retained in queue",
+            report.remaining
+        );
     }
     Ok(())
 }

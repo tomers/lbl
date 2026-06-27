@@ -60,7 +60,7 @@ impl Driver for DymoDriver {
         if bitmap.height == 0 || bitmap.width == 0 {
             return Err(DriverError::Unsupported("empty bitmap".into()));
         }
-        let bytes_per_line = ((bitmap.height + 7) / 8) as usize;
+        let bytes_per_line = bitmap.height.div_ceil(8) as usize;
         if bytes_per_line > 0xFF {
             return Err(DriverError::Unsupported(format!(
                 "tape too tall: {} dots (max 2040)",
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(&bytes[3..6], &[ESC, b'D', 0x01]);
         assert_eq!(bytes[6], SYN);
         assert_eq!(bytes[7], 0x80); // column 0, y=0 set
-        // ends with form feed
+                                    // ends with form feed
         assert_eq!(&bytes[bytes.len() - 2..], &[ESC, b'E']);
     }
 

@@ -31,7 +31,9 @@ pub fn parse(text: &str, format: DataFormat) -> Result<serde_json::Value, Templa
     let value = match format {
         DataFormat::Json => serde_json::from_str(text).map_err(de)?,
         DataFormat::Toml => toml::from_str(text).map_err(|e| TemplateError::Data(e.to_string()))?,
-        DataFormat::Yaml => serde_yaml::from_str(text).map_err(|e| TemplateError::Data(e.to_string()))?,
+        DataFormat::Yaml => {
+            serde_yaml::from_str(text).map_err(|e| TemplateError::Data(e.to_string()))?
+        }
     };
     Ok(value)
 }

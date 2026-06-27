@@ -218,8 +218,14 @@ mod tests {
         assert_eq!(
             doc.blocks,
             vec![
-                Block::Barcode { symbology: "EAN13".into(), data: "123".into() },
-                Block::Barcode { symbology: "CODE128".into(), data: "456".into() },
+                Block::Barcode {
+                    symbology: "EAN13".into(),
+                    data: "123".into()
+                },
+                Block::Barcode {
+                    symbology: "CODE128".into(),
+                    data: "456".into()
+                },
             ]
         );
     }
@@ -227,14 +233,20 @@ mod tests {
     #[test]
     fn raw_mode_keeps_braces_literal() {
         let doc = Document::parse("price {{qr:x}} tag", true);
-        assert_eq!(doc.blocks, vec![Block::Text("price {{qr:x}} tag".to_string())]);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Text("price {{qr:x}} tag".to_string())]
+        );
         assert!(doc.to_authoring_html().contains("{{qr:x}}"));
     }
 
     #[test]
     fn unrecognized_directive_kept_literal() {
         let doc = Document::parse("a {{unknown:y}} b", false);
-        assert_eq!(doc.blocks, vec![Block::Text("a {{unknown:y}} b".to_string())]);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Text("a {{unknown:y}} b".to_string())]
+        );
     }
 
     #[test]
