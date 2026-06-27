@@ -1,0 +1,13 @@
+[package]
+name = "lbl-driver-tspl"
+description = "TSPL (TSC) driver for lbl."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core = { workspace = true }
+lbl-driver-api = { workspace = true }

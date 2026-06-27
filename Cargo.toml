@@ -11,6 +11,9 @@ members = [
     "crates/lbl-dither",
     "crates/drivers/lbl-driver-api",
     "crates/drivers/lbl-driver-dymo",
+    "crates/drivers/lbl-driver-escpos",
+    "crates/drivers/lbl-driver-zpl",
+    "crates/drivers/lbl-driver-tspl",
 ]
 
 [workspace.package]

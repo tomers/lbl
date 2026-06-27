@@ -1464,6 +1464,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-escpos"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
+name = "lbl-driver-tspl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
+name = "lbl-driver-zpl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-render"
 version = "0.1.0"
 dependencies = [
