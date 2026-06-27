@@ -1456,6 +1456,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-dymo"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-render"
 version = "0.1.0"
 dependencies = [

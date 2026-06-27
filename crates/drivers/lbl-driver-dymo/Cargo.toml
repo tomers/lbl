@@ -1,0 +1,13 @@
+[package]
+name = "lbl-driver-dymo"
+description = "DYMO LabelManager reference driver for lbl (proprietary tape protocol)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core = { workspace = true }
+lbl-driver-api = { workspace = true }
