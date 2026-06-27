@@ -1,7 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
-exclude = ["crates/drivers"]
+members = [
+    "crates/lbl-core",
+    "crates/lbl-config",
+    "crates/lbl-catalog",
+    "crates/lbl-text",
+    "crates/lbl-template",
+    "crates/lbl-transpile-html",
+    "crates/lbl-render",
+    "crates/lbl-dither",
+    "crates/drivers/lbl-driver-api",
+]
 
 [workspace.package]
 version = "0.1.0"

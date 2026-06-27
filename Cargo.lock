@@ -1448,6 +1448,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-api"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "lbl-render"
 version = "0.1.0"
 dependencies = [
