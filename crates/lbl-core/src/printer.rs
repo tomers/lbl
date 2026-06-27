@@ -1,0 +1,108 @@
+//! Printer models, transports, capabilities, and persisted profiles.
+
+use serde::{Deserialize, Serialize};
+
+use crate::units::Dpi;
+
+/// A recognized printing protocol/language. Proprietary protocols (e.g. DYMO)
+/// and industry-standard ones (ESC/POS, ZPL, TSPL) are both first-class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Protocol {
+    /// DYMO LabelManager/LabelWriter proprietary protocol.
+    Dymo,
+    /// ESC/POS thermal protocol.
+    EscPos,
+    /// Zebra Programming Language.
+    Zpl,
+    /// TSC Printer Language.
+    Tspl,
+}
+
+/// How the toolchain reaches a printer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum Transport {
+    /// A USB device, addressed by vendor/product id and optional serial.
+    Usb {
+        /// USB vendor id.
+        vendor_id: u16,
+        /// USB product id.
+        product_id: u16,
+        /// Optional serial number for disambiguation/persistence.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        serial: Option<String>,
+    },
+    /// A network printer reachable over TCP.
+    Network {
+        /// Host or IP address.
+        host: String,
+        /// TCP port (commonly 9100 for raw printing).
+        port: u16,
+    },
+}
+
+/// A stable identifier for a printer the user owns, used as the config key so
+/// configuration persists across disconnects.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PrinterId(pub String);
+
+/// A known printer model definition (independent of any physical instance).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrinterModel {
+    /// Manufacturer, e.g. "DYMO".
+    pub brand: String,
+    /// Model name, e.g. "LabelWriter 550".
+    pub model: String,
+    /// Protocol the model speaks.
+    pub protocol: Protocol,
+    /// Static capabilities of the model.
+    pub capabilities: PrinterCapabilities,
+}
+
+/// What a printer can do; used by drivers and the spooler.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrinterCapabilities {
+    /// Native print resolution.
+    pub dpi: Dpi,
+    /// Maximum printable width across the head, in millimeters.
+    pub max_width_mm: f64,
+    /// Whether the printer can cut between jobs/items.
+    pub supports_cut: bool,
+    /// Whether the printer reports loaded media for auto-detection.
+    pub reports_media: bool,
+}
+
+impl Default for PrinterCapabilities {
+    fn default() -> Self {
+        Self {
+            dpi: Dpi(300.0),
+            max_width_mm: 56.0,
+            supports_cut: false,
+            reports_media: false,
+        }
+    }
+}
+
+/// A user-owned printer instance plus its desired (persisted) configuration.
+///
+/// This is what `lbl-config` stores so that a disconnected printer keeps its
+/// settings and is restored on reconnect.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrinterProfile {
+    /// Stable identifier (config key).
+    pub id: PrinterId,
+    /// Human-friendly name.
+    pub name: String,
+    /// Which known model this instance is.
+    pub model: PrinterModel,
+    /// How to reach it.
+    pub transport: Transport,
+    /// Whether this is the user's default printer.
+    #[serde(default)]
+    pub default: bool,
+    /// Default media SKU/key (resolved via `lbl-catalog`), if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_media: Option<String>,
+}

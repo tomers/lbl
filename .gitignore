@@ -1,0 +1,19 @@
+/target
+**/*.rs.bk
+Cargo.lock.orig
+
+# Editor / OS
+.DS_Store
+*.swp
+
+# Sidecar
+sidecar/node_modules
+
+# Local caches / work dirs
+.lbl-cache/
+.lint-cache/
+*.log
+
+# Dev tooling
+runtime/
+.mise.local.toml

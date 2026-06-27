@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+exclude = ["crates/drivers"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["lbl contributors"]
+repository = "https://github.com/labelle-org/lbl"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Internal crates
+lbl-core = { path = "crates/lbl-core" }
+lbl-config = { path = "crates/lbl-config" }
+lbl-catalog = { path = "crates/lbl-catalog" }
+lbl-text = { path = "crates/lbl-text" }
+lbl-template = { path = "crates/lbl-template" }
+lbl-transpile-html = { path = "crates/lbl-transpile-html" }
+lbl-render = { path = "crates/lbl-render" }
+lbl-dither = { path = "crates/lbl-dither" }
+lbl-driver-api = { path = "crates/drivers/lbl-driver-api" }
+lbl-driver-dymo = { path = "crates/drivers/lbl-driver-dymo" }
+lbl-driver-escpos = { path = "crates/drivers/lbl-driver-escpos" }
+lbl-driver-zpl = { path = "crates/drivers/lbl-driver-zpl" }
+lbl-driver-tspl = { path = "crates/drivers/lbl-driver-tspl" }
+lbl-encode = { path = "crates/lbl-encode" }
+lbl-device = { path = "crates/lbl-device" }
+lbl-spool = { path = "crates/lbl-spool" }
+
+# Shared third-party dependencies
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+serde_yaml = "0.9"
+thiserror = "2"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["full"] }
+figment = { version = "0.10", features = ["toml", "env"] }
+image = "0.25"
+directories = "5"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+
+[profile.release]
+lto = "thin"
