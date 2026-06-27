@@ -11,6 +11,7 @@ members = [
     "crates/lbl-dither",
     "crates/lbl-encode",
     "crates/lbl-device",
+    "crates/lbl-spool",
     "crates/drivers/lbl-driver-api",
     "crates/drivers/lbl-driver-dymo",
     "crates/drivers/lbl-driver-escpos",

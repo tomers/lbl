@@ -1561,6 +1561,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-spool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "lbl-core",
+ "lbl-device",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "lbl-template"
 version = "0.1.0"
 dependencies = [
