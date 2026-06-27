@@ -1,0 +1,33 @@
+[package]
+name = "lbl-render"
+description = "Render HTML to a raster image fit to printer media, two-pass (high-res then downscale) for photo quality."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-render"
+path = "src/bin/lbl-render.rs"
+
+[features]
+default = ["chromium"]
+# In-process headless Chromium backend via chromiumoxide (requires a Chromium
+# binary at runtime).
+chromium = ["dep:chromiumoxide", "dep:futures", "dep:urlencoding"]
+
+[dependencies]
+lbl-core = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+image = { workspace = true }
+tracing = { workspace = true }
+
+chromiumoxide = { version = "0.7", optional = true }
+futures = { version = "0.3", optional = true }
+urlencoding = { version = "2", optional = true }
