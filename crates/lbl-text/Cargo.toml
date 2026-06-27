@@ -1,0 +1,21 @@
+[package]
+name = "lbl-text"
+description = "Convert plain text / CLI arguments into lbl authoring HTML (inline mini-syntax for QR, barcode, images)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-text"
+path = "src/bin/lbl-text.rs"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
