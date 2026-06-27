@@ -1,0 +1,64 @@
+# Bundled media catalog for lbl.
+#
+# Each [[entries]] describes a known media SKU. `keys` lists all SKUs/aliases
+# that resolve to the entry (the first is canonical). Dimensions are physical
+# (millimeters); device resolution is applied at resolve time.
+#
+# Image policy: only set image.redistributable = true when the license clearly
+# permits bundling/redistribution. Otherwise the URL is hotlinked for display.
+
+[[entries]]
+brand = "DYMO"
+keys = ["99010", "S0722370"]
+name = "DYMO 99010 28x89mm Standard Address Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 28.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99012", "S0722400"]
+name = "DYMO 99012 36x89mm Large Address Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99014", "S0722430"]
+name = "DYMO 99014 54x101mm Shipping / Name Badge Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["11352", "S0722520"]
+name = "DYMO 11352 25x54mm Return Address Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["11354", "S0722540"]
+name = "DYMO 11354 32x57mm Removable Multi-Purpose Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, material = "paper", adhesive = "removable", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112283"]
+name = "DYMO 2112283 Durable LabelWriter Labels 25x54mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2191636"]
+name = "DYMO 2191636 Continuous Thermal Paper 57mm (non-adhesive)"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter 550"]
+media = { width_mm = 57.0, length = { kind = "continuous" }, material = "paper", adhesive = "none", color = "white" }
