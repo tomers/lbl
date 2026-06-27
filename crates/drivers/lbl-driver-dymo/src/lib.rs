@@ -1,19 +1,23 @@
-//! DYMO LabelManager reference driver (proprietary tape protocol).
+//! DYMO drivers for `lbl`.
 //!
-//! This is the toolchain's reference *proprietary* driver, modeled on the
-//! command set used by the [labelle](https://github.com/labelle-org/labelle)
-//! project (itself derived from dymoprint). DYMO tape printers have a vertical
-//! print head: each transmitted "line" is one **column** of dots across the
-//! tape, and the tape feeds horizontally. The encoder therefore transposes the
-//! bitmap into columns.
+//! This crate hosts two DYMO drivers, because DYMO uses two very different
+//! protocols:
 //!
-//! The command stream is:
-//! - `ESC C 0` — set tape color
-//! - `ESC D n` — bytes per line (`ceil(height / 8)`)
-//! - for each column: `SYN` (0x16) followed by `n` column bytes
-//! - `ESC E` — form feed (and cut on cutter-equipped models)
+//! - [`DymoDriver`] — the **LabelManager** tape protocol (this module). DYMO
+//!   tape printers have a vertical print head: each transmitted "line" is one
+//!   **column** of dots across the tape, and the tape feeds horizontally, so the
+//!   encoder transposes the bitmap into columns. Modeled on the command set used
+//!   by [labelle](https://github.com/labelle-org/labelle) (derived from
+//!   dymoprint). Its command stream is `ESC C 0`, `ESC D n`, a `SYN`-prefixed
+//!   line per column, then `ESC E`.
+//! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
+//!   (see [`lw550`]), per DYMO's LW 550 Technical Reference.
 //!
 //! `lbl` is not affiliated with DYMO; see the repository disclaimer.
+
+pub mod lw550;
+
+pub use lw550::LabelWriter550Driver;
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 

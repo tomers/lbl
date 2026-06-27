@@ -28,6 +28,29 @@ pub const KNOWN_USB_PRINTERS: &[KnownUsbPrinter] = &[
         model: "LabelManager PnP",
         protocol: Protocol::Dymo,
     },
+    // LabelWriter 550 series (raster protocol). VID/PIDs per the LW 550
+    // Technical Reference.
+    KnownUsbPrinter {
+        vendor_id: 0x0922,
+        product_id: Some(0x0028),
+        brand: "DYMO",
+        model: "LabelWriter 550",
+        protocol: Protocol::DymoLw,
+    },
+    KnownUsbPrinter {
+        vendor_id: 0x0922,
+        product_id: Some(0x0029),
+        brand: "DYMO",
+        model: "LabelWriter 550 Turbo",
+        protocol: Protocol::DymoLw,
+    },
+    KnownUsbPrinter {
+        vendor_id: 0x0922,
+        product_id: Some(0x002A),
+        brand: "DYMO",
+        model: "LabelWriter 5XL",
+        protocol: Protocol::DymoLw,
+    },
     KnownUsbPrinter {
         vendor_id: 0x0922,
         product_id: None,

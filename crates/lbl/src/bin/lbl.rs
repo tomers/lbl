@@ -1,4 +1,4 @@
-//! `lbl` — the orchestrator. A GCC-style driver for the label pipeline.
+//! `lbl` — the orchestrator for the label pipeline.
 //!
 //! High-level flows (`print`, `preview`) chain the stages together; individual
 //! stage subcommands (`text`, `transpile`, `render`, `dither`, `encode`,
@@ -94,6 +94,8 @@ struct MediaArgs {
 #[derive(Clone, Copy, ValueEnum)]
 enum ProtocolArg {
     Dymo,
+    #[value(name = "dymo-lw", alias = "lw550")]
+    DymoLw,
     Escpos,
     Zpl,
     Tspl,
@@ -103,6 +105,7 @@ impl From<ProtocolArg> for Protocol {
     fn from(p: ProtocolArg) -> Self {
         match p {
             ProtocolArg::Dymo => Protocol::Dymo,
+            ProtocolArg::DymoLw => Protocol::DymoLw,
             ProtocolArg::Escpos => Protocol::EscPos,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,

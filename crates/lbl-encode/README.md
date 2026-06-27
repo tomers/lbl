@@ -4,7 +4,8 @@ Select a printer driver by protocol and encode a 1-bit `MonoBitmap` (read as
 PBM) into printer-native protocol bytes.
 
 `lbl-encode` owns the `Registry` of drivers. `Registry::with_builtin_drivers()`
-includes every bundled driver: DYMO, ESC/POS, ZPL, and TSPL. Additional drivers
+includes every bundled driver: DYMO LabelManager tape (`dymo`), DYMO
+LabelWriter 550 raster (`dymo-lw`), ESC/POS, ZPL, and TSPL. Additional drivers
 can be registered into a custom `Registry`.
 
 ## CLI

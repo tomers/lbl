@@ -18,7 +18,7 @@ lbl device    Discover printers (list)
 ```text
 --text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
---protocol <dymo|escpos|zpl|tspl>
+--protocol <dymo|dymo-lw|escpos|zpl|tspl>   (dymo-lw = LabelWriter 550 series)
 --supersample <N>  --dither <auto|floyd-steinberg|ordered|none>
 --cut  --supports-cut  --copies <N>
 --backend <chromium|sidecar>

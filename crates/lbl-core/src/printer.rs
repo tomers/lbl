@@ -9,8 +9,10 @@ use crate::units::Dpi;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
-    /// DYMO LabelManager/LabelWriter proprietary protocol.
+    /// DYMO LabelManager proprietary tape protocol (vertical print head).
     Dymo,
+    /// DYMO LabelWriter 550-series raster protocol (structured print job).
+    DymoLw,
     /// ESC/POS thermal protocol.
     EscPos,
     /// Zebra Programming Language.

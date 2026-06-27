@@ -51,6 +51,7 @@ impl Registry {
     pub fn with_builtin_drivers() -> Self {
         let mut registry = Self::new();
         registry.register(Box::new(lbl_driver_dymo::DymoDriver::new()));
+        registry.register(Box::new(lbl_driver_dymo::LabelWriter550Driver::new()));
         registry.register(Box::new(lbl_driver_escpos::EscPosDriver::new()));
         registry.register(Box::new(lbl_driver_zpl::ZplDriver::new()));
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
@@ -80,7 +81,13 @@ mod tests {
     #[test]
     fn builtin_registry_has_all_protocols() {
         let registry = Registry::with_builtin_drivers();
-        for p in [Protocol::Dymo, Protocol::EscPos, Protocol::Zpl, Protocol::Tspl] {
+        for p in [
+            Protocol::Dymo,
+            Protocol::DymoLw,
+            Protocol::EscPos,
+            Protocol::Zpl,
+            Protocol::Tspl,
+        ] {
             assert!(registry.get(p).is_some(), "missing driver for {p:?}");
         }
     }

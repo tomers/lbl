@@ -205,6 +205,7 @@ fn default_dither() -> String {
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     Ok(match s.to_ascii_lowercase().as_str() {
         "dymo" => Protocol::Dymo,
+        "dymolw" | "dymo-lw" | "lw550" => Protocol::DymoLw,
         "escpos" | "esc/pos" => Protocol::EscPos,
         "zpl" => Protocol::Zpl,
         "tspl" => Protocol::Tspl,
