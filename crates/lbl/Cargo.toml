@@ -1,0 +1,36 @@
+[package]
+name = "lbl"
+description = "The lbl orchestrator: a GCC-style driver that runs the label-printing pipeline and its individual stages."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl"
+path = "src/bin/lbl.rs"
+
+[dependencies]
+lbl-core = { workspace = true }
+lbl-config = { workspace = true }
+lbl-catalog = { workspace = true }
+lbl-text = { workspace = true }
+lbl-template = { workspace = true }
+lbl-transpile-html = { workspace = true }
+lbl-render = { workspace = true }
+lbl-dither = { workspace = true }
+lbl-encode = { workspace = true }
+lbl-driver-api = { workspace = true }
+lbl-device = { workspace = true }
+lbl-spool = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+image = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
