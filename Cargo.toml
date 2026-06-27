@@ -9,6 +9,7 @@ members = [
     "crates/lbl-transpile-html",
     "crates/lbl-render",
     "crates/lbl-dither",
+    "crates/lbl-encode",
     "crates/drivers/lbl-driver-api",
     "crates/drivers/lbl-driver-dymo",
     "crates/drivers/lbl-driver-escpos",

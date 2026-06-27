@@ -1,0 +1,24 @@
+[package]
+name = "lbl-encode"
+description = "Select a printer driver by protocol and encode a 1-bit bitmap into protocol bytes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-encode"
+path = "src/bin/lbl-encode.rs"
+
+[dependencies]
+lbl-core = { workspace = true }
+lbl-driver-api = { workspace = true }
+lbl-driver-dymo = { workspace = true }
+lbl-driver-escpos = { workspace = true }
+lbl-driver-zpl = { workspace = true }
+lbl-driver-tspl = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }

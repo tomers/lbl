@@ -6,7 +6,7 @@ use crate::units::Dpi;
 
 /// A recognized printing protocol/language. Proprietary protocols (e.g. DYMO)
 /// and industry-standard ones (ESC/POS, ZPL, TSPL) are both first-class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     /// DYMO LabelManager/LabelWriter proprietary protocol.

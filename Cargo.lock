@@ -1488,6 +1488,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-encode"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "lbl-core",
+ "lbl-driver-api",
+ "lbl-driver-dymo",
+ "lbl-driver-escpos",
+ "lbl-driver-tspl",
+ "lbl-driver-zpl",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "lbl-render"
 version = "0.1.0"
 dependencies = [
