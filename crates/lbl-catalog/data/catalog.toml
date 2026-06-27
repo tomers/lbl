@@ -6,6 +6,10 @@
 #
 # Image policy: only set image.redistributable = true when the license clearly
 # permits bundling/redistribution. Otherwise the URL is hotlinked for display.
+#
+# DYMO LabelWriter data sourced from https://dymo.eu/en/labels-tapes/labelwriter-labels.html
+
+# --- Address / Multi-Purpose / Name Badge / Shipping (paper) ---------------
 
 [[entries]]
 brand = "DYMO"
@@ -25,11 +29,51 @@ media = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "p
 
 [[entries]]
 brand = "DYMO"
+keys = ["99013", "S0722410"]
+name = "DYMO 99013 36x89mm Transparent Plastic Large Address Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand = "DYMO"
 keys = ["99014", "S0722430"]
 name = "DYMO 99014 54x101mm Shipping / Name Badge Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 compatible = ["LabelWriter"]
 media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99015", "S0722440"]
+name = "DYMO 99015 54x70mm Large Multifunctional Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 54.0, length = { kind = "fixed", mm = 70.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99017", "S0722460"]
+name = "DYMO 99017 12x50mm Suspension File Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99018", "S0722470"]
+name = "DYMO 99018 38x190mm Small Lever Arch File Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 38.0, length = { kind = "fixed", mm = 190.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["99019", "S0722480"]
+name = "DYMO 99019 59x190mm Large Lever Arch File Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 59.0, length = { kind = "fixed", mm = 190.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand = "DYMO"
@@ -41,6 +85,14 @@ media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "p
 
 [[entries]]
 brand = "DYMO"
+keys = ["11353", "S0722530"]
+name = "DYMO 11353 13x25mm 2-in-1 Multi-Purpose Labels (removable)"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 13.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "removable", color = "white" }
+
+[[entries]]
+brand = "DYMO"
 keys = ["11354", "S0722540"]
 name = "DYMO 11354 32x57mm Removable Multi-Purpose Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
@@ -49,11 +101,95 @@ media = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, material = "p
 
 [[entries]]
 brand = "DYMO"
+keys = ["11355", "S0722550"]
+name = "DYMO 11355 19x51mm Multi-Purpose Removable Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 19.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "removable", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2133399"]
+name = "DYMO 2133399 54x101mm Name Badge Labels, Red (EOL)"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2133400"]
+name = "DYMO 2133400 54x101mm Name Badge Labels, Yellow"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2166659"]
+name = "DYMO 2166659 102x210mm XL DHL Shipping Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter 4XL", "LabelWriter 5XL"]
+media = { width_mm = 102.0, length = { kind = "fixed", mm = 210.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+# --- Durable (polypropylene, strong adhesive) ------------------------------
+
+[[entries]]
+brand = "DYMO"
 keys = ["2112283"]
 name = "DYMO 2112283 Durable LabelWriter Labels 25x54mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 compatible = ["LabelWriter"]
 media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112284"]
+name = "DYMO 2112284 Durable LabelWriter Labels 19x64mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 19.0, length = { kind = "fixed", mm = 64.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112285"]
+name = "DYMO 2112285 Durable LabelWriter Labels 25x89mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 25.0, length = { kind = "fixed", mm = 89.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112286"]
+name = "DYMO 2112286 Durable LabelWriter Labels 25x25mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 25.0, length = { kind = "fixed", mm = 25.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112287"]
+name = "DYMO 2112287 Durable 4XL/5XL Labels 104x159mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter 4XL", "LabelWriter 5XL"]
+media = { width_mm = 104.0, length = { kind = "fixed", mm = 159.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112289"]
+name = "DYMO 2112289 Durable LabelWriter Labels 32x57mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand = "DYMO"
+keys = ["2112290"]
+name = "DYMO 2112290 Durable LabelWriter Labels 59x102mm"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+compatible = ["LabelWriter"]
+media = { width_mm = 59.0, length = { kind = "fixed", mm = 102.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
+
+# --- Continuous (non-adhesive thermal paper) -------------------------------
 
 [[entries]]
 brand = "DYMO"
