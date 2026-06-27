@@ -1,6 +1,6 @@
 [package]
 name = "lbl"
-description = "The lbl orchestrator: a GCC-style driver that runs the label-printing pipeline and its individual stages."
+description = "The lbl orchestrator: runs the label-printing pipeline and its individual stages."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

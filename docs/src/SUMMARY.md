@@ -30,7 +30,7 @@
 # Decisions
 
 - [ADR Index](./adr/README.md)
-  - [0001 — GCC-style modular pipeline](./adr/0001-gcc-style-pipeline.md)
+  - [0001 — Modular pipeline of composable tools](./adr/0001-modular-pipeline.md)
   - [0002 — HTML as the input format](./adr/0002-html-input.md)
   - [0003 — Chromium for rendering](./adr/0003-chromium-rendering.md)
   - [0004 — Two-pass render + photo-aware dither](./adr/0004-two-pass-dither.md)

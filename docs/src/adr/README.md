@@ -5,7 +5,7 @@ short and immutable once accepted; supersede rather than edit.
 
 | # | Title | Status |
 | - | ----- | ------ |
-| [0001](./0001-gcc-style-pipeline.md) | GCC-style modular pipeline | Accepted |
+| [0001](./0001-modular-pipeline.md) | Modular pipeline of composable tools | Accepted |
 | [0002](./0002-html-input.md) | HTML as the input format | Accepted |
 | [0003](./0003-chromium-rendering.md) | Chromium for rendering | Accepted |
 | [0004](./0004-two-pass-dither.md) | Two-pass render + photo-aware dither | Accepted |

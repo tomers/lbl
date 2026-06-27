@@ -1,8 +1,8 @@
 # lbl
 
-The orchestrator: a GCC-style driver for the label-printing pipeline. Just as
-`gcc` runs `cpp`, `cc1`, `as`, and `ld`, `lbl` runs the pipeline stages — each
-of which is also a standalone `lbl-*` binary and a reusable library.
+The orchestrator for the label-printing pipeline. `lbl` runs the pipeline stages
+in sequence — each of which is also a standalone `lbl-*` binary and a reusable
+library — so a single command can take you from content to a printed label.
 
 ## High-level flows
 

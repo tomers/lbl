@@ -3,11 +3,11 @@
 //! `lbl-core` is the foundational crate every pipeline stage and binary depends
 //! on. It defines the vocabulary of the toolchain: physical [`units`], page
 //! [`geometry`], [`media`] descriptions, [`printer`] models/transports, and the
-//! [`job`] specification that flows through the GCC-style pipeline
+//! [`job`] specification that flows through the pipeline
 //! (`text -> template -> transpile -> render -> dither -> encode -> spool`).
 //!
-//! See the architecture document in `docs/architecture/ARCHITECTURE.md` for how
-//! these types connect the stages together.
+//! See the architecture document in `docs/src/architecture.md` for how these
+//! types connect the stages together.
 
 pub mod bitmap;
 pub mod error;

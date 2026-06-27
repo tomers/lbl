@@ -1,4 +1,4 @@
-# 0001 — GCC-style modular pipeline
+# 0001 — Modular pipeline of composable tools
 
 - Status: Accepted
 
@@ -11,10 +11,10 @@ and replaceable, and we want power users to script the flow with Unix pipes.
 
 ## Decision
 
-Model the toolchain after `gcc`: a top-level `lbl` orchestrator drives a set of
-single-purpose stages. Each stage is **both** a library crate (`lbl-*`) and a
-standalone binary (`lbl-*`) that reads stdin and writes stdout. The orchestrator
-composes them into `print`/`preview` flows and also exposes them as
+Split the toolchain into a pipeline of small, single-purpose stages driven by a
+top-level `lbl` orchestrator. Each stage is **both** a library crate (`lbl-*`)
+and a standalone binary (`lbl-*`) that reads stdin and writes stdout. The
+orchestrator composes them into `print`/`preview` flows and also exposes them as
 subcommands.
 
 ## Consequences
