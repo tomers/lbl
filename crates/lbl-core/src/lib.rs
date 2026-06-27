@@ -9,6 +9,7 @@
 //! See the architecture document in `docs/architecture/ARCHITECTURE.md` for how
 //! these types connect the stages together.
 
+pub mod bitmap;
 pub mod error;
 pub mod geometry;
 pub mod job;
@@ -16,6 +17,7 @@ pub mod media;
 pub mod printer;
 pub mod units;
 
+pub use bitmap::MonoBitmap;
 pub use error::{CoreError, Result};
 pub use geometry::{Margins, Size};
 pub use job::{JobSpec, OutputMode};
