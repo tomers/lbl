@@ -1,0 +1,27 @@
+[package]
+name = "lbl-template"
+description = "Templating preprocessor: render data (JSON/TOML/YAML) through an HTML template into N labels, with resource fetching."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-template"
+path = "src/bin/lbl-template.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+minijinja = { version = "2", features = ["loader"] }
+base64 = "0.22"
+regex = "1"
+mime_guess = "2"
