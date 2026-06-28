@@ -16,7 +16,7 @@ path = "src/bin/lbl-render.rs"
 default = ["chromium"]
 # In-process headless Chromium backend via chromiumoxide (requires a Chromium
 # binary at runtime).
-chromium = ["dep:chromiumoxide", "dep:futures", "dep:urlencoding"]
+chromium = ["dep:chromiumoxide", "dep:futures", "dep:urlencoding", "dep:tempfile"]
 
 [dependencies]
 lbl-core = { workspace = true }
@@ -31,3 +31,4 @@ tracing = { workspace = true }
 chromiumoxide = { version = "0.7", optional = true }
 futures = { version = "0.3", optional = true }
 urlencoding = { version = "2", optional = true }
+tempfile = { workspace = true, optional = true }
