@@ -5,6 +5,7 @@ members = [
     "crates/lbl-config",
     "crates/lbl-catalog",
     "crates/lbl-text",
+    "crates/lbl-markdown",
     "crates/lbl-template",
     "crates/lbl-transpile-html",
     "crates/lbl-render",
@@ -36,6 +37,7 @@ lbl-core = { path = "crates/lbl-core" }
 lbl-config = { path = "crates/lbl-config" }
 lbl-catalog = { path = "crates/lbl-catalog" }
 lbl-text = { path = "crates/lbl-text" }
+lbl-markdown = { path = "crates/lbl-markdown" }
 lbl-template = { path = "crates/lbl-template" }
 lbl-transpile-html = { path = "crates/lbl-transpile-html" }
 lbl-render = { path = "crates/lbl-render" }

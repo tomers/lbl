@@ -28,7 +28,7 @@
 
 mod parse;
 
-pub use parse::{Block, Document};
+pub use parse::{barcode_from_spec, parse_directive, Block, Document};
 
 /// The default barcode symbology when one isn't specified.
 pub const DEFAULT_SYMBOLOGY: &str = "CODE128";

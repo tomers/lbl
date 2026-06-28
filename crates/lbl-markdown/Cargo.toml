@@ -1,0 +1,21 @@
+[package]
+name = "lbl-markdown"
+description = "Convert Markdown (with lbl inline directives for QR, barcode, images) into lbl authoring HTML."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "lbl-markdown"
+path = "src/bin/lbl-markdown.rs"
+
+[dependencies]
+lbl-text = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+
+[dev-dependencies]

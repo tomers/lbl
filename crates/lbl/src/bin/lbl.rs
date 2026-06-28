@@ -38,6 +38,8 @@ enum Command {
     Preview(PreviewArgs),
     /// Convert text/CLI directives into authoring HTML.
     Text(TextArgs),
+    /// Convert Markdown (with inline directives) into authoring HTML.
+    Markdown(MarkdownArgs),
     /// Transpile authoring HTML into browser-ready HTML.
     Transpile(TranspileArgs),
     /// Browse the media catalog.
@@ -59,6 +61,10 @@ struct SourceArgs {
     /// Treat --text literally (no inline directives).
     #[arg(long)]
     raw: bool,
+
+    /// Markdown input (run through lbl-markdown; inline directives still apply).
+    #[arg(long, group = "src")]
+    markdown: Option<String>,
 
     /// Authoring HTML file (or `-` for stdin).
     #[arg(long, group = "src")]
@@ -498,6 +504,44 @@ fn run_text(args: TextArgs) -> Result<()> {
 }
 
 #[derive(Args)]
+struct MarkdownArgs {
+    /// Markdown (joined with spaces). If omitted, read from stdin.
+    markdown: Vec<String>,
+    #[arg(long = "qr")]
+    qr: Vec<String>,
+    #[arg(long = "barcode")]
+    barcode: Vec<String>,
+    #[arg(long = "image")]
+    image: Vec<String>,
+    #[arg(long)]
+    fragment: bool,
+}
+
+fn run_markdown(args: MarkdownArgs) -> Result<()> {
+    let markdown = if args.markdown.is_empty() {
+        read_stdin_string()?
+    } else {
+        args.markdown.join(" ")
+    };
+    let mut doc = lbl_markdown::MarkdownDocument::parse(&markdown);
+    for q in args.qr {
+        doc.push_qr(q);
+    }
+    for b in args.barcode {
+        doc.push_barcode(&b);
+    }
+    for i in args.image {
+        doc.push_image(i);
+    }
+    if args.fragment {
+        println!("{}", doc.to_authoring_html());
+    } else {
+        print!("{}", doc.to_authoring_document());
+    }
+    Ok(())
+}
+
+#[derive(Args)]
 struct TranspileArgs {
     /// Authoring HTML file (or stdin).
     input: Option<std::path::PathBuf>,
@@ -616,6 +660,16 @@ fn read_source(args: &SourceArgs) -> Result<Source> {
             raw: args.raw,
         });
     }
+    if let Some(markdown) = &args.markdown {
+        let content = if markdown == "-" {
+            read_stdin_string()?
+        } else if std::path::Path::new(markdown).is_file() {
+            std::fs::read_to_string(markdown)?
+        } else {
+            markdown.clone()
+        };
+        return Ok(Source::Markdown(content));
+    }
     if let Some(html) = &args.html {
         let content = if html == "-" {
             read_stdin_string()?
@@ -636,7 +690,7 @@ fn read_source(args: &SourceArgs) -> Result<Source> {
             each: args.each.clone(),
         });
     }
-    bail!("no input; pass --text, --html, or --template")
+    bail!("no input; pass --text, --markdown, --html, or --template")
 }
 
 fn load_data(src: &str) -> Result<serde_json::Value> {
@@ -668,6 +722,7 @@ fn main() -> Result<()> {
         Command::Print(a) => run_print(a),
         Command::Preview(a) => run_preview(a),
         Command::Text(a) => run_text(a),
+        Command::Markdown(a) => run_markdown(a),
         Command::Transpile(a) => run_transpile(a),
         Command::Catalog(a) => run_catalog(a),
         Command::Device(a) => run_device(a),

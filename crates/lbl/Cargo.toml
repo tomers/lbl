@@ -17,6 +17,7 @@ lbl-core = { workspace = true }
 lbl-config = { workspace = true }
 lbl-catalog = { workspace = true }
 lbl-text = { workspace = true }
+lbl-markdown = { workspace = true }
 lbl-template = { workspace = true }
 lbl-transpile-html = { workspace = true }
 lbl-render = { workspace = true }

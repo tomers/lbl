@@ -33,6 +33,8 @@ pub enum Source {
         /// Disable inline mini-syntax.
         raw: bool,
     },
+    /// Markdown run through `lbl-markdown` (inline directives still apply).
+    Markdown(String),
     /// Already-authoring HTML content.
     Html(String),
     /// A template rendered against optional data, optionally batched.
@@ -51,6 +53,13 @@ pub fn authoring_labels(source: Source) -> Result<Vec<AuthoringLabel>> {
     match source {
         Source::Text { text, raw } => {
             let doc = lbl_text::Document::parse(&text, raw);
+            Ok(vec![AuthoringLabel {
+                index: 0,
+                html: doc.to_authoring_document(),
+            }])
+        }
+        Source::Markdown(markdown) => {
+            let doc = lbl_markdown::MarkdownDocument::parse(&markdown);
             Ok(vec![AuthoringLabel {
                 index: 0,
                 html: doc.to_authoring_document(),

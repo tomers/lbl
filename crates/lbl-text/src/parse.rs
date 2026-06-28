@@ -20,6 +20,30 @@ pub enum Block {
     Image(String),
 }
 
+impl Block {
+    /// Render this single block to its authoring HTML.
+    ///
+    /// Text blocks are wrapped in `<div class="lbl-text">` (with newlines
+    /// turned into `<br>`); directive blocks render their custom element
+    /// (`<qr>`, `<barcode>`, `<img>`). This is the per-block building block of
+    /// [`Document::to_authoring_html`], and is reused by other front-ends (such
+    /// as `lbl-markdown`) that need to emit the same directive elements.
+    pub fn to_authoring_html(&self) -> String {
+        match self {
+            Block::Text(t) => {
+                format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
+            }
+            Block::Qr(payload) => format!("<qr>{}</qr>", escape(payload)),
+            Block::Barcode { symbology, data } => format!(
+                "<barcode type=\"{}\">{}</barcode>",
+                escape(symbology),
+                escape(data)
+            ),
+            Block::Image(uri) => format!("<img src=\"{}\" />", escape(uri)),
+        }
+    }
+}
+
 /// A parsed label document: an ordered list of [`Block`]s.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Document {
@@ -64,30 +88,7 @@ impl Document {
     pub fn to_authoring_html(&self) -> String {
         let mut out = String::from("<div class=\"lbl-label\">");
         for block in &self.blocks {
-            match block {
-                Block::Text(t) => {
-                    out.push_str("<div class=\"lbl-text\">");
-                    out.push_str(&text_to_html(t));
-                    out.push_str("</div>");
-                }
-                Block::Qr(payload) => {
-                    out.push_str("<qr>");
-                    out.push_str(&escape(payload));
-                    out.push_str("</qr>");
-                }
-                Block::Barcode { symbology, data } => {
-                    out.push_str("<barcode type=\"");
-                    out.push_str(&escape(symbology));
-                    out.push_str("\">");
-                    out.push_str(&escape(data));
-                    out.push_str("</barcode>");
-                }
-                Block::Image(uri) => {
-                    out.push_str("<img src=\"");
-                    out.push_str(&escape(uri));
-                    out.push_str("\" />");
-                }
-            }
+            out.push_str(&block.to_authoring_html());
         }
         out.push_str("</div>");
         out
@@ -102,7 +103,9 @@ impl Document {
     }
 }
 
-fn barcode_from_spec(spec: &str) -> Block {
+/// Parse a barcode `spec` (`SYMBOLOGY:data` or just `data`) into a
+/// [`Block::Barcode`], defaulting the symbology when none is given.
+pub fn barcode_from_spec(spec: &str) -> Block {
     match spec.split_once(':') {
         Some((sym, data)) if !sym.is_empty() && !data.is_empty() => Block::Barcode {
             symbology: sym.to_string(),
@@ -153,6 +156,17 @@ fn flush_text(buf: &mut String, blocks: &mut Vec<Block>) {
         blocks.push(Block::Text(trimmed.to_string()));
     }
     buf.clear();
+}
+
+/// Parse the inside of an inline `{{...}}` directive (e.g. `qr:https://x.y`,
+/// `barcode:EAN13:123`, `image:./a.png`) into a [`Block`].
+///
+/// Returns `None` for unrecognized or empty directives, so callers can leave
+/// the original text untouched. This is the same matcher used by the inline
+/// scanner, exposed so other front-ends (such as `lbl-markdown`) apply
+/// identical directive syntax.
+pub fn parse_directive(inner: &str) -> Option<Block> {
+    directive_from_inner(inner)
 }
 
 fn directive_from_inner(inner: &str) -> Option<Block> {
