@@ -9,8 +9,9 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_media, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_media, resolve_style, PipelineOptions, Source};
 use lbl_catalog::Catalog;
+use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
 use lbl_core::printer::Protocol;
 use lbl_dither::Algorithm;
@@ -102,6 +103,68 @@ struct MediaArgs {
     dpi: f64,
 }
 
+/// CLI overrides for label sizing, in millimetres. Any value left unset falls
+/// back to the loaded configuration (`[style]`), which itself defaults to
+/// readable sizes.
+#[derive(Args, Clone, Default)]
+struct StyleArgs {
+    /// Base text size, in mm (overrides config `style.font_size_mm`).
+    #[arg(long)]
+    font_size_mm: Option<f64>,
+
+    /// QR code edge length, in mm (overrides config `style.qr_size_mm`).
+    #[arg(long)]
+    qr_size_mm: Option<f64>,
+
+    /// Barcode bar height, in mm (overrides config `style.barcode_height_mm`).
+    #[arg(long)]
+    barcode_height_mm: Option<f64>,
+
+    /// Barcode narrowest-bar width, in mm (overrides config
+    /// `style.barcode_module_width_mm`).
+    #[arg(long)]
+    barcode_module_mm: Option<f64>,
+
+    /// Inner padding between the label edge and its content, in mm (overrides
+    /// config `style.padding_mm`).
+    #[arg(long)]
+    padding_mm: Option<f64>,
+
+    /// Border drawn around the label, in mm; 0 disables it (overrides config
+    /// `style.border_width_mm`).
+    #[arg(long)]
+    border_mm: Option<f64>,
+}
+
+impl StyleArgs {
+    /// Merge these CLI overrides over the loaded configuration's style section.
+    fn resolve(&self) -> StyleConfig {
+        let mut style = lbl_config::Loader::new()
+            .load()
+            .map(|cfg| cfg.style)
+            .unwrap_or_default();
+        if let Some(v) = self.font_size_mm {
+            style.font_size_mm = v;
+        }
+        if let Some(v) = self.qr_size_mm {
+            style.qr_size_mm = v;
+        }
+        if let Some(v) = self.barcode_height_mm {
+            style.barcode_height_mm = v;
+        }
+        if let Some(v) = self.barcode_module_mm {
+            style.barcode_module_width_mm = v;
+        }
+        if let Some(v) = self.padding_mm {
+            style.padding_mm = v;
+        }
+        if let Some(v) = self.border_mm {
+            style.border_width_mm = v;
+        }
+        style
+    }
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum ProtocolArg {
     Dymo,
@@ -144,6 +207,8 @@ struct PrintArgs {
     source: SourceArgs,
     #[command(flatten)]
     media: MediaArgs,
+    #[command(flatten)]
+    style: StyleArgs,
 
     /// Target protocol.
     #[arg(long, value_enum)]
@@ -225,6 +290,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
         None
     };
 
+    let style = resolve_style(&args.style.resolve(), media.dpi.0, args.supersample);
+
     let opts = PipelineOptions {
         protocol,
         media,
@@ -234,6 +301,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         dither: Algorithm::parse(&args.dither)?,
         supersample: args.supersample,
         assets_base: AssetsBase::Cdn,
+        style,
         media_type,
     };
 
@@ -375,6 +443,8 @@ fn dispatch_with<T: lbl_device::Transport>(
 struct PreviewArgs {
     #[command(flatten)]
     source: SourceArgs,
+    #[command(flatten)]
+    style: StyleArgs,
 
     /// Output directory for preview HTML (and PNGs with --render).
     #[arg(long)]
@@ -392,6 +462,9 @@ struct PreviewArgs {
     media: MediaArgs,
 }
 
+/// Supersample factor used when rasterizing previews to PNG.
+const PREVIEW_SUPERSAMPLE: u32 = 2;
+
 fn run_preview(args: PreviewArgs) -> Result<()> {
     let labels = authoring_labels(read_source(&args.source)?)?;
     let count = labels.len();
@@ -402,6 +475,10 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
         .clone()
         .map(AssetsBase::Local)
         .unwrap_or(AssetsBase::Cdn);
+
+    // Preview rasterization uses a fixed supersample factor (see below); resolve
+    // the physical style sizes against it so previews match print sizing.
+    let style = resolve_style(&args.style.resolve(), args.media.dpi, PREVIEW_SUPERSAMPLE);
 
     let backend = if args.render {
         Some(ChromiumBackend::launch()?)
@@ -418,6 +495,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 assets_base: assets_base.clone(),
                 index: Some(label.index),
                 count: Some(count),
+                style: style.clone(),
             },
         );
         let html_name = format!("preview-{:04}.html", label.index);
@@ -437,7 +515,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
             let req = lbl_render::RenderRequest {
                 width_dots: media.width_dots().0,
                 height_dots: media.length_dots().map(|d| d.0),
-                supersample: 2,
+                supersample: PREVIEW_SUPERSAMPLE,
             };
             let img = lbl_render::render_two_pass(backend, &html, &req)?;
             let png_name = format!("preview-{:04}.png", label.index);
@@ -549,6 +627,25 @@ struct TranspileArgs {
     mode: ModeArg,
     #[arg(long)]
     assets_base: Option<String>,
+
+    /// Base text size, in pixels.
+    #[arg(long)]
+    font_size_px: Option<f64>,
+    /// QR code edge length, in pixels.
+    #[arg(long)]
+    qr_size_px: Option<f64>,
+    /// Barcode bar height, in pixels.
+    #[arg(long)]
+    barcode_height_px: Option<f64>,
+    /// Barcode narrowest-bar width, in pixels.
+    #[arg(long)]
+    barcode_module_px: Option<f64>,
+    /// Inner padding between the label edge and its content, in pixels.
+    #[arg(long)]
+    padding_px: Option<f64>,
+    /// Border drawn around the label, in pixels (0 = none).
+    #[arg(long)]
+    border_px: Option<f64>,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -566,6 +663,25 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         ModeArg::Print => OutputMode::Print,
         ModeArg::Preview => OutputMode::Preview,
     };
+    let mut style = lbl_transpile_html::LabelStyle::default();
+    if let Some(v) = args.font_size_px {
+        style.font_size_px = v;
+    }
+    if let Some(v) = args.qr_size_px {
+        style.qr_size_px = v;
+    }
+    if let Some(v) = args.barcode_height_px {
+        style.barcode_height_px = v;
+    }
+    if let Some(v) = args.barcode_module_px {
+        style.barcode_module_width_px = v;
+    }
+    if let Some(v) = args.padding_px {
+        style.padding_px = v;
+    }
+    if let Some(v) = args.border_px {
+        style.border_width_px = v;
+    }
     let opts = TranspileOptions {
         mode,
         assets_base: args
@@ -574,6 +690,7 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
             .unwrap_or(AssetsBase::Cdn),
         index: None,
         count: None,
+        style,
     };
     print!("{}", transpile(&input, &opts));
     Ok(())

@@ -7,7 +7,9 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
 
-use lbl::pipeline::{authoring_labels, encode_label, resolve_media, PipelineOptions, Source};
+use lbl::pipeline::{
+    authoring_labels, encode_label, resolve_media, resolve_style, PipelineOptions, Source,
+};
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_dither::Algorithm;
 use lbl_encode::Registry;
@@ -143,9 +145,13 @@ impl SourceReq {
     }
 }
 
-pub async fn preview(State(_state): State<AppState>, Json(req): Json<SourceReq>) -> ApiResult {
+pub async fn preview(State(state): State<AppState>, Json(req): Json<SourceReq>) -> ApiResult {
     let labels = authoring_labels(req.into_source()?).map_err(ApiError::from)?;
     let count = labels.len();
+    // Resolve the configured physical sizes against the standard preview DPI and
+    // supersample factor so the browser preview matches printed sizing.
+    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style = resolve_style(&style_cfg, default_dpi(), 2);
     let out: Vec<_> = labels
         .into_iter()
         .map(|l| {
@@ -156,6 +162,7 @@ pub async fn preview(State(_state): State<AppState>, Json(req): Json<SourceReq>)
                     assets_base: AssetsBase::Cdn,
                     index: Some(l.index),
                     count: Some(count),
+                    style: style.clone(),
                 },
             );
             json!({ "index": l.index, "html": html })
@@ -237,6 +244,9 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
+    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+
     let opts = PipelineOptions {
         protocol: parse_protocol(&req.protocol)?,
         media,
@@ -247,6 +257,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        style,
         media_type: None,
     };
 
@@ -318,6 +329,9 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         None
     };
 
+    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+
     let opts = PipelineOptions {
         protocol,
         media,
@@ -328,6 +342,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        style,
         media_type,
     };
 

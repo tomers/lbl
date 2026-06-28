@@ -57,16 +57,22 @@ body{background:#e9e9ee;display:flex;align-items:center;justify-content:center;m
 "#;
 
 /// JS that renders QR placeholders (`.lbl-qr[data-qr]`) into canvases.
+///
+/// Honors `window.__LBL_STYLE.qr.width` (pixels) when present, so the rendered
+/// QR matches the configured physical size.
 pub const QR_INIT_JS: &str = r#"
 (function(){
   function render(){
+    var st=(window.__LBL_STYLE&&window.__LBL_STYLE.qr)||{};
     document.querySelectorAll('.lbl-qr').forEach(function(el){
       if(el.dataset.rendered) return;
       var value = el.getAttribute('data-qr') || '';
       var canvas = document.createElement('canvas');
       el.appendChild(canvas);
       if(window.QRCode && QRCode.toCanvas){
-        QRCode.toCanvas(canvas, value, {margin:0}, function(){});
+        var opts={margin:0};
+        if(st.width){opts.width=st.width;}
+        QRCode.toCanvas(canvas, value, opts, function(){});
       }
       el.dataset.rendered = '1';
     });
@@ -76,15 +82,23 @@ pub const QR_INIT_JS: &str = r#"
 "#;
 
 /// JS that renders barcode placeholders (`.lbl-barcode[data-value]`).
+///
+/// Honors `window.__LBL_STYLE.barcode` (`width`/`height`/`fontSize`, all in
+/// pixels) when present, so the rendered barcode matches the configured size.
 pub const BARCODE_INIT_JS: &str = r#"
 (function(){
   function render(){
+    var st=(window.__LBL_STYLE&&window.__LBL_STYLE.barcode)||{};
     document.querySelectorAll('.lbl-barcode').forEach(function(el){
       if(el.dataset.rendered) return;
       var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
       el.appendChild(svg);
       if(window.JsBarcode){
-        try{ JsBarcode(svg, el.getAttribute('data-value')||'', {format: el.getAttribute('data-symbology')||'CODE128', margin:0}); }catch(e){}
+        var opts={format: el.getAttribute('data-symbology')||'CODE128', margin:0};
+        if(st.width){opts.width=st.width;}
+        if(st.height){opts.height=st.height;}
+        if(st.fontSize){opts.fontSize=st.fontSize;}
+        try{ JsBarcode(svg, el.getAttribute('data-value')||'', opts); }catch(e){}
       }
       el.dataset.rendered = '1';
     });

@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use lbl_core::job::OutputMode;
-use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Mode {
@@ -48,6 +48,30 @@ struct Cli {
     /// Total labels in the batch (preview addressing).
     #[arg(long)]
     count: Option<usize>,
+
+    /// Base text size, in pixels.
+    #[arg(long)]
+    font_size_px: Option<f64>,
+
+    /// QR code edge length, in pixels.
+    #[arg(long)]
+    qr_size_px: Option<f64>,
+
+    /// Barcode bar height, in pixels.
+    #[arg(long)]
+    barcode_height_px: Option<f64>,
+
+    /// Barcode single-module (narrowest bar) width, in pixels.
+    #[arg(long)]
+    barcode_module_px: Option<f64>,
+
+    /// Inner padding between the label edge and its content, in pixels.
+    #[arg(long)]
+    padding_px: Option<f64>,
+
+    /// Border drawn around the label, in pixels (0 = none).
+    #[arg(long)]
+    border_px: Option<f64>,
 }
 
 fn main() -> Result<()> {
@@ -62,6 +86,26 @@ fn main() -> Result<()> {
         }
     };
 
+    let mut style = LabelStyle::default();
+    if let Some(v) = cli.font_size_px {
+        style.font_size_px = v;
+    }
+    if let Some(v) = cli.qr_size_px {
+        style.qr_size_px = v;
+    }
+    if let Some(v) = cli.barcode_height_px {
+        style.barcode_height_px = v;
+    }
+    if let Some(v) = cli.barcode_module_px {
+        style.barcode_module_width_px = v;
+    }
+    if let Some(v) = cli.padding_px {
+        style.padding_px = v;
+    }
+    if let Some(v) = cli.border_px {
+        style.border_width_px = v;
+    }
+
     let opts = TranspileOptions {
         mode: cli.mode.into(),
         assets_base: cli
@@ -70,6 +114,7 @@ fn main() -> Result<()> {
             .unwrap_or(AssetsBase::Cdn),
         index: cli.index,
         count: cli.count,
+        style,
     };
 
     let out = transpile(&input, &opts);

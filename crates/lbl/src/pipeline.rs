@@ -12,7 +12,7 @@ use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
-use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
 
 /// A single authoring-HTML label with its batch index.
 #[derive(Debug, Clone)]
@@ -111,6 +111,26 @@ pub fn resolve_media(
     })
 }
 
+/// Resolve a configured (millimetre) [`lbl_config::StyleConfig`] into the
+/// pixel-based [`LabelStyle`] used by transpilation, given the render `dpi` and
+/// `supersample` factor.
+pub fn resolve_style(
+    style: &lbl_config::StyleConfig,
+    dpi: f64,
+    supersample: u32,
+) -> LabelStyle {
+    LabelStyle::from_mm(
+        style.font_size_mm,
+        style.qr_size_mm,
+        style.barcode_height_mm,
+        style.barcode_module_width_mm,
+        style.padding_mm,
+        style.border_width_mm,
+        dpi,
+        supersample,
+    )
+}
+
 /// Options for encoding a label all the way to protocol bytes.
 #[derive(Debug, Clone)]
 pub struct PipelineOptions {
@@ -130,6 +150,9 @@ pub struct PipelineOptions {
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
     pub assets_base: AssetsBase,
+    /// Font / QR / barcode sizing (already resolved to pixels for this run's
+    /// DPI and supersample factor; see [`resolve_style`]).
+    pub style: LabelStyle,
     /// For the virtual (`Protocol::Virtual`) printer, the output file format
     /// ("media type"). Ignored by hardware protocols.
     pub media_type: Option<MediaType>,
@@ -164,6 +187,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             assets_base: opts.assets_base.clone(),
             index: None,
             count: None,
+            style: opts.style.clone(),
         },
     );
 

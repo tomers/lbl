@@ -24,4 +24,4 @@ mod assets;
 mod transpile;
 
 pub use assets::AssetsBase;
-pub use transpile::{transpile, TranspileOptions};
+pub use transpile::{transpile, LabelStyle, TranspileOptions};

@@ -10,6 +10,8 @@ pub struct Config {
     pub general: GeneralConfig,
     /// Rendering/dithering defaults.
     pub render: RenderConfig,
+    /// Default label visual sizing (fonts, codes).
+    pub style: StyleConfig,
     /// Media catalog settings.
     pub catalog: CatalogConfig,
 }
@@ -43,6 +45,41 @@ impl Default for RenderConfig {
             supersample: 3,
             dither: "floyd-steinberg".to_string(),
             use_sidecar: false,
+        }
+    }
+}
+
+/// Default label visual sizing, in millimetres.
+///
+/// These are physical sizes on the printed label; the pipeline converts them
+/// to pixels using the target DPI and supersample factor, so they stay
+/// consistent regardless of resolution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleConfig {
+    /// Base text size, in mm.
+    pub font_size_mm: f64,
+    /// QR code edge length, in mm.
+    pub qr_size_mm: f64,
+    /// Barcode bar height, in mm.
+    pub barcode_height_mm: f64,
+    /// Barcode single-module (narrowest bar) width, in mm.
+    pub barcode_module_width_mm: f64,
+    /// Inner padding between the label edge and its content, in mm.
+    pub padding_mm: f64,
+    /// Border drawn around the label, in mm (0 = no border).
+    pub border_width_mm: f64,
+}
+
+impl Default for StyleConfig {
+    fn default() -> Self {
+        Self {
+            font_size_mm: 2.0,
+            qr_size_mm: 15.0,
+            barcode_height_mm: 12.0,
+            barcode_module_width_mm: 0.33,
+            padding_mm: 2.0,
+            border_width_mm: 0.0,
         }
     }
 }
