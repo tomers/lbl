@@ -11,7 +11,7 @@
 
 use std::io::Cursor;
 
-use image::{GrayImage, ImageFormat, Luma};
+use image::{DynamicImage, GrayImage, ImageFormat, Luma};
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 /// The output file format the virtual printer emits — its "media type".
@@ -114,10 +114,18 @@ pub fn encode_image(bitmap: &MonoBitmap, media_type: MediaType) -> Result<Vec<u8
     let format = media_type
         .image_format()
         .expect("non-pbm media types map to an image format");
-    let img = mono_to_luma(bitmap);
+    let luma = mono_to_luma(bitmap);
     let mut out = Cursor::new(Vec::new());
-    img.write_to(&mut out, format)
-        .map_err(|e| DriverError::Encode(format!("{}: {e}", media_type.name())))?;
+    // GIF's encoder doesn't accept the 8-bit grayscale (`L8`) color type, so
+    // promote to RGBA for it. The other formats encode grayscale directly.
+    let result = if let MediaType::Gif = media_type {
+        DynamicImage::ImageLuma8(luma)
+            .to_rgba8()
+            .write_to(&mut out, format)
+    } else {
+        luma.write_to(&mut out, format)
+    };
+    result.map_err(|e| DriverError::Encode(format!("{}: {e}", media_type.name())))?;
     Ok(out.into_inner())
 }
 
@@ -185,6 +193,13 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = FileDriver::new(MediaType::Png).encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    }
+
+    #[test]
+    fn gif_encodes_grayscale_bitmap() {
+        let bmp = ctx_bitmap();
+        let bytes = encode_image(&bmp, MediaType::Gif).unwrap();
+        assert!(bytes.starts_with(b"GIF"), "expected GIF magic");
     }
 
     #[test]
