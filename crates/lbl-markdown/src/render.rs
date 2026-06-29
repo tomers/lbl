@@ -150,6 +150,25 @@ mod tests {
     }
 
     #[test]
+    fn size_directive_renders_inline() {
+        let doc = MarkdownDocument::parse("Hello, {{size:1.5:World}}!");
+        let html = doc.to_authoring_html();
+        // The sized span stays inline within the paragraph alongside the text.
+        assert!(
+            html.contains("Hello, <span class=\"lbl-text\" style=\"font-size:1.5em\">World</span>!"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn size_directive_inside_heading() {
+        let doc = MarkdownDocument::parse("# Order {{size:2:#42}}");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<h1>Order <span"), "{html}");
+        assert!(html.contains("font-size:2em\">#42</span></h1>"), "{html}");
+    }
+
+    #[test]
     fn barcode_with_and_without_symbology() {
         let doc = MarkdownDocument::parse("{{barcode:EAN13:123}} {{barcode:456}}");
         let html = doc.to_authoring_html();

@@ -3,10 +3,18 @@
 use crate::DEFAULT_SYMBOLOGY;
 
 /// A content block in a label.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     /// Literal text (may contain newlines).
     Text(String),
+    /// A run of text rendered at a font size relative to the base (`scale` is
+    /// an `em` multiplier, e.g. `1.5` = 150%).
+    Sized {
+        /// Font-size multiplier relative to the base text size.
+        scale: f64,
+        /// The text to render at this size.
+        text: String,
+    },
     /// A QR code carrying the given payload.
     Qr(String),
     /// A barcode of the given symbology carrying the given data.
@@ -33,6 +41,11 @@ impl Block {
             Block::Text(t) => {
                 format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
             }
+            Block::Sized { scale, text } => format!(
+                "<span class=\"lbl-text\" style=\"font-size:{}em\">{}</span>",
+                fmt_scale(*scale),
+                text_to_html(text)
+            ),
             Block::Qr(payload) => format!("<qr>{}</qr>", escape(payload)),
             Block::Barcode { symbology, data } => format!(
                 "<barcode type=\"{}\">{}</barcode>",
@@ -45,7 +58,7 @@ impl Block {
 }
 
 /// A parsed label document: an ordered list of [`Block`]s.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Document {
     /// The content blocks, in order.
     pub blocks: Vec<Block>,
@@ -180,8 +193,47 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         "qr" => Some(Block::Qr(rest.to_string())),
         "barcode" => Some(barcode_from_spec(rest)),
         "image" | "img" => Some(Block::Image(rest.to_string())),
+        "size" | "font-size" | "fs" => sized_from_spec(rest),
         _ => None,
     }
+}
+
+/// Parse a sizing spec `SCALE:TEXT` (e.g. `1.5:World`) into a [`Block::Sized`].
+/// `SCALE` accepts a bare multiplier (`1.5`), an explicit `x` suffix (`1.5x`),
+/// or a percentage (`150%`). Returns `None` if the scale is invalid or the text
+/// is empty, so the original `{{...}}` is left literal.
+fn sized_from_spec(spec: &str) -> Option<Block> {
+    let (scale_str, text) = spec.split_once(':')?;
+    let scale = parse_scale(scale_str.trim())?;
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    Some(Block::Sized {
+        scale,
+        text: text.to_string(),
+    })
+}
+
+/// Parse a font-size multiplier: `1.5`, `1.5x`, or `150%`. Must be positive.
+fn parse_scale(s: &str) -> Option<f64> {
+    let s = s.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        return pct
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .map(|v| v / 100.0)
+            .filter(|v| *v > 0.0);
+    }
+    let s = s.strip_suffix(['x', 'X']).unwrap_or(s);
+    s.parse::<f64>().ok().filter(|v| *v > 0.0)
+}
+
+/// Format a scale for CSS. `f64`'s `Display` already trims trailing zeros
+/// (e.g. `2.0` -> `2`, `1.5` -> `1.5`).
+fn fmt_scale(scale: f64) -> String {
+    format!("{scale}")
 }
 
 fn text_to_html(text: &str) -> String {
@@ -261,6 +313,52 @@ mod tests {
             doc.blocks,
             vec![Block::Text("a {{unknown:y}} b".to_string())]
         );
+    }
+
+    #[test]
+    fn inline_size_directive_is_parsed() {
+        let doc = Document::parse("Hello, {{size:1.5:World}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Hello,".to_string()),
+                Block::Sized {
+                    scale: 1.5,
+                    text: "World".to_string()
+                },
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains("font-size:1.5em"), "{html}");
+        assert!(html.contains(">World</span>"), "{html}");
+    }
+
+    #[test]
+    fn size_accepts_x_and_percent_and_aliases() {
+        for spec in ["size:2x:Big", "font-size:200%:Big", "fs:2:Big"] {
+            let doc = Document::parse(&format!("{{{{{spec}}}}}"), false);
+            assert_eq!(
+                doc.blocks,
+                vec![Block::Sized {
+                    scale: 2.0,
+                    text: "Big".to_string()
+                }],
+                "spec: {spec}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_size_is_kept_literal() {
+        // Missing text, non-numeric scale, and non-positive scale all fall back.
+        for inner in ["size:1.5", "size:big:x", "size:0:x", "size:-1:x"] {
+            let doc = Document::parse(&format!("a {{{{{inner}}}}} b"), false);
+            assert_eq!(
+                doc.blocks,
+                vec![Block::Text(format!("a {{{{{inner}}}}} b"))],
+                "inner: {inner}"
+            );
+        }
     }
 
     #[test]

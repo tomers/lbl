@@ -12,6 +12,8 @@
 //! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
 //!   CODE128, so `{{barcode:12345}}` also works)
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
+//! - `{{size:1.5:World}}` -> text at 1.5x the base font size (aliases:
+//!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
 //!
 //! ```
 //! use lbl_text::Document;
