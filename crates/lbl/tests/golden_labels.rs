@@ -1,0 +1,347 @@
+//! End-to-end golden-image tests for the label pipeline.
+//!
+//! Each case authors a label (via `lbl-text`, `lbl-markdown`, `lbl-template`, or
+//! raw HTML), runs it through transpile -> render -> dither -> encode, and
+//! compares the produced image bytes against a checked-in reference under
+//! `tests/golden/`. Together the cases cover the project's user-visible
+//! functionality: every authoring front-end, the QR/barcode/image/sizing/flex
+//! directives, configurable styling, all dithering algorithms, fixed and
+//! continuous media, catalog-resolved media, and every output image format.
+//!
+//! The whole suite shares a single headless-Chromium instance. If Chromium
+//! cannot be launched (e.g. no browser installed in CI), the test logs a notice
+//! and passes rather than failing — the pipeline below it is independently unit
+//! tested.
+//!
+//! Regenerate references with `LBL_BLESS=1 cargo test -p lbl --test golden_labels`.
+
+mod common;
+
+use common::*;
+use lbl::{authoring_labels, resolve_media, Source};
+use lbl_catalog::Catalog;
+use lbl_core::media::Media;
+use lbl_core::units::Dpi;
+use lbl_dither::Algorithm;
+use lbl_driver_file::{encode_image, MediaType};
+use lbl_render::ChromiumBackend;
+use lbl_transpile_html::LabelStyle;
+
+/// Render resolution for the suite. Kept modest so references stay small and
+/// rendering is fast, while still leaving room for legible QR/barcodes.
+const DPI: f64 = 150.0;
+const SUPERSAMPLE: u32 = 2;
+
+#[test]
+fn golden_labels() {
+    let backend = match ChromiumBackend::launch() {
+        Ok(backend) => backend,
+        Err(err) => {
+            eprintln!("skipping golden_labels: could not launch Chromium: {err}");
+            return;
+        }
+    };
+
+    let style = default_style(DPI, SUPERSAMPLE);
+    let small = Media::fixed(40.0, 30.0, Dpi(DPI));
+    let wide = Media::fixed(60.0, 28.0, Dpi(DPI));
+    let strip = Media::continuous(50.0, Dpi(DPI));
+
+    let mut failures: Vec<String> = Vec::new();
+
+    // --- Authoring front-ends ------------------------------------------------
+
+    // Plain text (lbl-text).
+    failures.extend(run_case(
+        &backend,
+        "text_plain",
+        Source::Text {
+            text: "Hello, lbl!".into(),
+            raw: false,
+        },
+        &small,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Raw text: inline directives are kept literal.
+    failures.extend(run_case(
+        &backend,
+        "text_raw",
+        Source::Text {
+            text: "Keep {{qr:x}} literal".into(),
+            raw: true,
+        },
+        &small,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Multi-line text (newlines -> <br>).
+    failures.extend(run_case(
+        &backend,
+        "text_multiline",
+        Source::Text {
+            text: "Aisle 4\nBin 12\nQty 60".into(),
+            raw: false,
+        },
+        &strip,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Inline size directive (relative font scaling).
+    failures.extend(run_case(
+        &backend,
+        "text_size",
+        Source::Text {
+            text: "Order {{size:2:#44}} now".into(),
+            raw: false,
+        },
+        &small,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Markdown front-end (lbl-markdown) with an inline QR directive. Continuous
+    // media auto-sizes the height so the heading, paragraph, and QR all fit.
+    failures.extend(run_case(
+        &backend,
+        "markdown",
+        Source::Markdown("# Order 44\n\nShip **fast** to dock 4\n\n{{qr:https://track/42}}".into()),
+        &strip,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Template front-end (lbl-template) batched over a data array -> 2 labels.
+    failures.extend(run_case(
+        &backend,
+        "template_batch",
+        Source::Template {
+            template:
+                "<div class=\"lbl-label\"><div class=\"lbl-text\">{{ name }} - #{{ id }}</div></div>"
+                    .into(),
+            data: Some(serde_json::json!([
+                {"name": "Alpha", "id": 1},
+                {"name": "Beta", "id": 2}
+            ])),
+            each: None,
+        },
+        &small,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // --- Directives ----------------------------------------------------------
+
+    // QR code.
+    failures.extend(run_case(
+        &backend,
+        "qr",
+        Source::Text {
+            text: "{{qr:https://lbl.example/42}}".into(),
+            raw: false,
+        },
+        &small,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Barcode, default symbology (CODE128).
+    failures.extend(run_case(
+        &backend,
+        "barcode_code128",
+        Source::Text {
+            text: "{{barcode:LBL-128}}".into(),
+            raw: false,
+        },
+        &wide,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Barcode, explicit EAN-13 symbology.
+    failures.extend(run_case(
+        &backend,
+        "barcode_ean13",
+        Source::Text {
+            text: "{{barcode:EAN13:0123456789012}}".into(),
+            raw: false,
+        },
+        &wide,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Image directive (embedded data URI, kept hermetic). Continuous media so
+    // the stretched image is fully contained.
+    failures.extend(run_case(
+        &backend,
+        "image",
+        Source::Text {
+            text: format!("Logo {{{{image:{}}}}}", checkerboard_data_uri()),
+            raw: false,
+        },
+        &strip,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // --- Layout & styling ----------------------------------------------------
+
+    // Flex layout utilities (row + space-between) combining text and a QR.
+    failures.extend(run_case(
+        &backend,
+        "flex_layout",
+        Source::Html(
+            "<div class=\"lbl-label\"><div class=\"lbl-row lbl-between lbl-center\">\
+             <div class=\"lbl-text\">SKU 7788</div><qr>https://lbl.example/7788</qr>\
+             </div></div>"
+                .into(),
+        ),
+        &wide,
+        &style,
+        Algorithm::Auto,
+    ));
+
+    // Border + padding styling.
+    failures.extend(run_case(
+        &backend,
+        "style_border",
+        Source::Text {
+            text: "Fragile".into(),
+            raw: false,
+        },
+        &small,
+        &bordered_style(DPI, SUPERSAMPLE),
+        Algorithm::Auto,
+    ));
+
+    // --- Media ---------------------------------------------------------------
+
+    // Catalog-resolved media (DYMO 11352 address label).
+    match resolve_media(
+        &Catalog::bundled().expect("bundled catalog"),
+        Some("11352"),
+        None,
+        None,
+        DPI,
+    ) {
+        Ok(catalog_media) => failures.extend(run_case(
+            &backend,
+            "catalog_sku",
+            Source::Text {
+                text: "From the catalog".into(),
+                raw: false,
+            },
+            &catalog_media,
+            &style,
+            Algorithm::Auto,
+        )),
+        Err(err) => failures.push(format!("catalog_sku: resolve_media failed: {err}")),
+    }
+
+    // --- Dithering algorithms ------------------------------------------------
+    // A gradient makes the differences between algorithms visible (and stable).
+    let gradient_html = format!(
+        "<div class=\"lbl-label\"><img src=\"{}\" style=\"width:100%\" /></div>",
+        gradient_data_uri(240, 80)
+    );
+    for (name, algorithm) in [
+        ("dither_auto", Algorithm::Auto),
+        ("dither_floyd", Algorithm::FloydSteinberg),
+        ("dither_ordered", Algorithm::Ordered),
+        ("dither_threshold", Algorithm::Threshold(128)),
+    ] {
+        let bitmap = render_bitmap(
+            &backend,
+            &gradient_html,
+            &small,
+            &style,
+            SUPERSAMPLE,
+            algorithm,
+        );
+        match encode_image(&bitmap, MediaType::Png) {
+            Ok(png) => {
+                if let Err(err) = check_png(name, &png) {
+                    failures.push(err);
+                }
+            }
+            Err(err) => failures.push(format!("{name}: encode failed: {err}")),
+        }
+    }
+
+    // --- Output image formats ------------------------------------------------
+    // Render once, then encode the same bitmap to every supported media type.
+    let formats_bitmap = render_bitmap(
+        &backend,
+        "<div class=\"lbl-label\"><div class=\"lbl-text\">Formats</div></div>",
+        &small,
+        &style,
+        SUPERSAMPLE,
+        Algorithm::Auto,
+    );
+    for media_type in MediaType::ALL {
+        match encode_image(&formats_bitmap, media_type) {
+            Ok(bytes) => {
+                let name = format!("formats_{}", media_type.name());
+                // The 1-bit PBM is exact; raster formats get the usual tolerance.
+                let result = if media_type == MediaType::Pbm {
+                    check_image(&name, media_type.extension(), &bytes, 0.0)
+                } else {
+                    check_image(&name, media_type.extension(), &bytes, 0.02)
+                };
+                if let Err(err) = result {
+                    failures.push(err);
+                }
+            }
+            Err(err) => failures.push(format!("formats_{}: {err}", media_type.name())),
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "golden image mismatches:\n  - {}",
+        failures.join("\n  - ")
+    );
+}
+
+/// Author `source` into one or more labels, render each, and compare the PNG
+/// output against `tests/golden/<name>.png` (suffixing `-<index>` when the
+/// source expands into a batch). Returns a list of failure messages.
+fn run_case(
+    backend: &ChromiumBackend,
+    name: &str,
+    source: Source,
+    media: &Media,
+    style: &LabelStyle,
+    algorithm: Algorithm,
+) -> Vec<String> {
+    let labels = match authoring_labels(source) {
+        Ok(labels) => labels,
+        Err(err) => return vec![format!("{name}: authoring failed: {err}")],
+    };
+
+    let mut failures = Vec::new();
+    let batched = labels.len() > 1;
+    for label in &labels {
+        let bitmap = render_bitmap(backend, &label.html, media, style, SUPERSAMPLE, algorithm);
+        let png = match encode_image(&bitmap, MediaType::Png) {
+            Ok(png) => png,
+            Err(err) => {
+                failures.push(format!("{name}: encode failed: {err}"));
+                continue;
+            }
+        };
+        let golden = if batched {
+            format!("{name}-{}", label.index)
+        } else {
+            name.to_string()
+        };
+        if let Err(err) = check_png(&golden, &png) {
+            failures.push(err);
+        }
+    }
+    failures
+}

@@ -37,3 +37,14 @@ image = { workspace = true }
 base64 = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+lbl-core = { workspace = true }
+lbl-catalog = { workspace = true }
+lbl-transpile-html = { workspace = true }
+lbl-render = { workspace = true }
+lbl-dither = { workspace = true }
+lbl-driver-file = { workspace = true }
+image = { workspace = true }
+base64 = { workspace = true }
+serde_json = { workspace = true }
