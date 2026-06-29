@@ -21,16 +21,19 @@
 
 #![allow(dead_code)]
 
+use std::fs;
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
 use image::{DynamicImage, ImageFormat, RgbaImage};
+use lbl::AuthoringLabel;
 use lbl_core::media::Media;
 use lbl_core::MonoBitmap;
 use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
 use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
+use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
 use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
 
 /// Vendored QR library (exposes the global `QRCode`).
@@ -134,16 +137,16 @@ pub fn check_image(
     max_diff_fraction: f64,
 ) -> Result<(), String> {
     let dir = golden_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("create golden dir: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("create golden dir: {e}"))?;
     let path = dir.join(format!("{name}.{ext}"));
 
     if blessing() || !path.exists() {
-        std::fs::write(&path, bytes).map_err(|e| format!("write {}: {e}", path.display()))?;
+        fs::write(&path, bytes).map_err(|e| format!("write {}: {e}", path.display()))?;
         eprintln!("blessed reference {}", path.display());
         return Ok(());
     }
 
-    let expected = std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let expected = fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     compare_images(&expected, bytes, max_diff_fraction)
         .map_err(|e| format!("{name}.{ext}: {e} (re-run with LBL_BLESS=1 to update)"))
 }
@@ -182,6 +185,82 @@ fn compare_images(expected: &[u8], actual: &[u8], max_diff_fraction: f64) -> Res
         ));
     }
     Ok(())
+}
+
+/// Path to the portrait identity-card batch fixture (`.lbl` single-file source).
+pub fn identity_cards_lbl_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/identity_cards/identity_cards.lbl")
+}
+
+/// Load a `.lbl` single-file source the way `lbl-template --template PATH
+/// --inline-resources` does: frontmatter data + template body, with `<img src>`
+/// paths resolved relative to the fixture directory (or fetched over HTTP).
+pub fn authoring_labels_from_lbl(lbl_path: &Path) -> Result<Vec<AuthoringLabel>, String> {
+    let fixture_dir = lbl_path.parent().ok_or_else(|| {
+        format!(
+            "lbl fixture has no parent directory: {}",
+            lbl_path.display()
+        )
+    })?;
+    let source = fs::read_to_string(lbl_path)
+        .map_err(|e| format!("read {}: {e}", lbl_path.display()))?;
+
+    let labels = Engine::new()
+        .render_with_resources(
+            &source,
+            None,
+            &RenderOptions::default(),
+            &FixtureResolver {
+                base: fixture_dir.to_path_buf(),
+            },
+        )
+        .map_err(|e| format!("render {}: {e}", lbl_path.display()))?;
+
+    Ok(labels
+        .into_iter()
+        .map(|label| AuthoringLabel {
+            index: label.index,
+            html: label.html,
+        })
+        .collect())
+}
+
+/// Resolve `<img src>` references relative to a fixture directory (mirrors local
+/// paths passed to `lbl-template --inline-resources` when run from that folder),
+/// or fetch remote URLs via HTTP.
+struct FixtureResolver {
+    base: PathBuf,
+}
+
+impl ResourceResolver for FixtureResolver {
+    fn fetch(&self, reference: &str) -> Result<(Vec<u8>, String), TemplateError> {
+        if reference.starts_with("http://") || reference.starts_with("https://") {
+            return DefaultResolver.fetch(reference);
+        }
+        let path = self.base.join(reference);
+        let bytes = fs::read(&path)
+            .map_err(|e| TemplateError::Resource(format!("{}: {e}", path.display())))?;
+        Ok((bytes, guess_image_mime(&path)))
+    }
+}
+
+fn guess_image_mime(path: &Path) -> String {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream",
+    }
+    .to_string()
+}
+
+/// Like [`bordered_style`] but tuned for portrait name-badge / ID cards on
+/// DYMO 99014 (54×101 mm) at print resolution.
+pub fn identity_card_style(dpi: f64, supersample: u32) -> LabelStyle {
+    // font, qr, barcode height, barcode module, padding, border (all mm).
+    LabelStyle::from_mm(3.0, 11.0, 9.0, 0.32, 2.0, 0.5, dpi, supersample)
 }
 
 /// A small grayscale checkerboard, embedded as a `data:` URI, for the image

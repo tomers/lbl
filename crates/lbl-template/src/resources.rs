@@ -6,9 +6,13 @@
 //! receives a self-contained document.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
+use std::time::Duration;
 
 use base64::Engine;
 use regex::Regex;
+use reqwest::blocking::Client;
+use reqwest::header::CONTENT_TYPE;
 
 use crate::TemplateError;
 
@@ -22,15 +26,33 @@ pub trait ResourceResolver {
 #[derive(Debug, Default, Clone)]
 pub struct DefaultResolver;
 
+fn http_client() -> &'static Client {
+    static CLIENT: OnceLock<Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        Client::builder()
+            .user_agent(format!(
+                "{}/{} ({})",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                env!("CARGO_PKG_REPOSITORY")
+            ))
+            .timeout(Duration::from_secs(120))
+            .build()
+            .expect("reqwest client")
+    })
+}
+
 impl ResourceResolver for DefaultResolver {
     fn fetch(&self, reference: &str) -> Result<(Vec<u8>, String), TemplateError> {
         if reference.starts_with("http://") || reference.starts_with("https://") {
-            let resp = reqwest::blocking::get(reference)
+            let resp = http_client()
+                .get(reference)
+                .send()
                 .and_then(|r| r.error_for_status())
                 .map_err(|e| TemplateError::Resource(format!("{reference}: {e}")))?;
             let mime = resp
                 .headers()
-                .get(reqwest::header::CONTENT_TYPE)
+                .get(CONTENT_TYPE)
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.split(';').next().unwrap_or(s).trim().to_string())
                 .unwrap_or_else(|| guess_mime(reference));

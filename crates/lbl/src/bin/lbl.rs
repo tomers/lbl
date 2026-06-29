@@ -219,9 +219,11 @@ struct PrintArgs {
     #[arg(long)]
     media_type: Option<String>,
 
-    /// Supersample factor for rendering.
-    #[arg(long, default_value_t = 3)]
-    supersample: u32,
+    /// Supersample factor for the high-resolution render pass (>= 1). Controls
+    /// the two-pass downscale in `lbl-render` and CSS pixel sizing during
+    /// transpilation. Overrides config `render.supersample` when set.
+    #[arg(long)]
+    supersample: Option<u32>,
 
     /// Dithering algorithm.
     #[arg(long, default_value = "auto")]
@@ -290,7 +292,13 @@ fn run_print(args: PrintArgs) -> Result<()> {
         None
     };
 
-    let style = resolve_style(&args.style.resolve(), media.dpi.0, args.supersample);
+    let render_cfg = lbl_config::Loader::new()
+        .load()
+        .map(|c| c.render)
+        .unwrap_or_default();
+    let supersample = args.supersample.unwrap_or(render_cfg.supersample);
+
+    let style = resolve_style(&args.style.resolve(), media.dpi.0, supersample);
 
     let opts = PipelineOptions {
         protocol,
@@ -299,7 +307,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         cut: args.cut,
         copies: args.copies,
         dither: Algorithm::parse(&args.dither)?,
-        supersample: args.supersample,
+        supersample,
         assets_base: AssetsBase::Cdn,
         style,
         media_type,

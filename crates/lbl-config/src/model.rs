@@ -31,7 +31,8 @@ pub struct GeneralConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct RenderConfig {
-    /// Supersample factor for the high-resolution first pass (>= 1).
+    /// Supersample factor for the high-resolution first pass (>= 1). See
+    /// `docs/src/guides/rendering-quality.md` and ADR-0004.
     pub supersample: u32,
     /// Default dithering algorithm (`floyd-steinberg` | `ordered` | `none`).
     pub dither: String,

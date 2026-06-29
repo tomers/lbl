@@ -19,7 +19,9 @@ lbl device    Discover printers (list)
 --text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
 --protocol <dymo|dymo-lw|escpos|zpl|tspl>   (dymo-lw = LabelWriter 550 series)
---supersample <N>  --dither <auto|floyd-steinberg|ordered|none>
+--supersample <N>   High-res render factor before downscale (default: 3, or
+                    `[render] supersample` from config). See Rendering Quality guide.
+--dither <auto|floyd-steinberg|ordered|none>
 --cut  --supports-cut  --copies <N>
 --backend <chromium|sidecar>
 --network <host:port> | --usb <vid:pid> | --out-dir <DIR>
@@ -38,7 +40,10 @@ lbl device    Discover printers (list)
 | `lbl-text` | text/CLI → authoring HTML (`--raw`, `--qr/--barcode/--image`, `--fragment`) |
 | `lbl-template` | data + template → labels (`--data`, `--each`, `--inline-resources`, `--out-dir`) |
 | `lbl-transpile-html` | `--mode print|preview`, `--assets-base`, `--index/--count` |
-| `lbl-render` | `--width-dots`, `--height-dots`, `--supersample`, `--backend`, `--out` |
+| `lbl-render` | `--width-dots`, `--height-dots`, `--supersample` (default 3), `--backend`, `--out` |
+
+See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
+`--supersample` controls and how to choose a value.
 | `lbl-dither` | `--algorithm`, `--threshold`, `--preview-png`, `--out` |
 | `lbl-encode` | `--protocol`, `--width-mm`, `--length-mm`, `--dpi`, `--cut`, `--supports-cut` |
 | `lbl-device` | `list`; `send --network host:port | --usb vid:pid` |

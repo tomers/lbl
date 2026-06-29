@@ -46,7 +46,8 @@ html,body{margin:0;padding:0}
 .lbl-grow{flex:1 1 auto}
 .lbl-wrap{flex-wrap:wrap}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
-.lbl-qr canvas,.lbl-qr img,.lbl-barcode svg{max-width:100%;height:auto}
+.lbl-qr canvas,.lbl-qr img{max-width:100%;height:auto}
+.lbl-barcode svg{display:block;max-width:100%;height:auto}
 "#;
 
 /// Additional CSS for preview mode: a neutral backdrop and a label boundary so

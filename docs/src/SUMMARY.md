@@ -14,6 +14,7 @@
 - [Printing Text](./guides/printing-text.md)
 - [Batch Printing](./guides/batch-printing.md)
 - [Previewing & the Gallery](./guides/preview.md)
+- [Rendering Quality & Supersampling](./guides/rendering-quality.md)
 - [Configuration](./guides/configuration.md)
 - [Managing Printers & Media](./guides/printers-media.md)
 

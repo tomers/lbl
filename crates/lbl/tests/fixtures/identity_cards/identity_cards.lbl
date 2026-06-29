@@ -1,0 +1,64 @@
+---json
+[
+  {
+    "name": "Tony Soprano",
+    "role": "Boss",
+    "department": "DiMeo Crime Family",
+    "employee_id": "NJ-BOSS-001",
+    "event": "The Sopranos",
+    "access": "CAPO DI TUTTI CAPI",
+    "badge_number": "001",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Tony_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  },
+  {
+    "name": "Carmela Soprano",
+    "role": "First Lady",
+    "department": "Soprano Household",
+    "employee_id": "NJ-CARM-002",
+    "event": "The Sopranos",
+    "access": "NORTH CALDWELL",
+    "badge_number": "002",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Carmela_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  },
+  {
+    "name": "Christopher Moltisanti",
+    "role": "Soldier",
+    "department": "Soprano Crew",
+    "employee_id": "NJ-CHR-003",
+    "event": "The Sopranos",
+    "access": "SCREENWRITER",
+    "badge_number": "003",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/7/74/Christopher_Moltisanti_%28Tony_Soprano%27s_Family_Captains%29.jpg"
+  },
+  {
+    "name": "Paulie Gualtieri",
+    "role": "Made Man",
+    "department": "DiMeo Crime Family",
+    "employee_id": "NJ-PAUL-004",
+    "event": "The Sopranos",
+    "access": "BADA BING",
+    "badge_number": "004",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/6/63/Paulie_Gualtieri_%28The_Sopranos_Family_Tree%29.jpg"
+  }
+]
+---
+<style>html,body{height:100%;width:100%;margin:0}</style>
+<div class="lbl-label lbl-col lbl-center" style="height:100%;justify-content:space-between;align-items:center;text-align:center">
+  <div class="lbl-text" style="font-size:0.62em;letter-spacing:0.12em;text-transform:uppercase;width:100%;border-bottom:0.1em solid #000;padding-bottom:0.2em">
+    {{ event }}
+  </div>
+  <div class="lbl-col lbl-center" style="align-items:center;width:100%;gap:0.2em;flex-shrink:0">
+    <img src="{{ photo }}" alt="" style="width:14.7em;height:17.3em;flex-shrink:0;object-fit:cover;border:0.13em solid #000" />
+    <span class="lbl-text" style="font-size:1.42em;font-weight:bold;line-height:1.1">{{ name }}</span>
+    <span class="lbl-text" style="font-size:0.88em;line-height:1.15">{{ role }} · {{ department }}</span>
+  </div>
+  <div class="lbl-col lbl-center" style="align-items:center;width:100%;gap:0.17em;flex-shrink:0">
+    <qr>https://id.lbl.example/{{ employee_id }}</qr>
+    <span class="lbl-text" style="font-size:0.62em;letter-spacing:0.05em">{{ employee_id }}</span>
+    <div style="width:92%;display:flex;justify-content:center"><barcode type="CODE128">{{ employee_id }}</barcode></div>
+  </div>
+  <div class="lbl-row lbl-between lbl-center" style="width:100%;border-top:0.1em solid #000;padding-top:0.2em;flex-shrink:0">
+    <span class="lbl-text" style="font-size:0.55em;letter-spacing:0.04em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.55em">BADGE #{{ badge_number }}</span>
+  </div>
+</div>

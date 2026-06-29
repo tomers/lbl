@@ -29,7 +29,12 @@ base/flex CSS is inlined, and only the needed JS libraries are referenced.
 ## Raster (PNG)
 
 `lbl-render` emits an RGBA PNG. The two-pass strategy renders at
-`supersample×` and downscales to the exact device dots.
+`supersample×` the target device dots, then downscales with a Lanczos3 filter
+to the exact width/height before dithering. The same factor is used when
+converting millimetre style sizes (font, QR, barcode, padding) to CSS pixels
+during transpilation.
+
+See [Rendering Quality & Supersampling](../guides/rendering-quality.md).
 
 ## MonoBitmap / PBM (P4)
 

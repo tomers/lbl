@@ -114,11 +114,7 @@ pub fn resolve_media(
 /// Resolve a configured (millimetre) [`lbl_config::StyleConfig`] into the
 /// pixel-based [`LabelStyle`] used by transpilation, given the render `dpi` and
 /// `supersample` factor.
-pub fn resolve_style(
-    style: &lbl_config::StyleConfig,
-    dpi: f64,
-    supersample: u32,
-) -> LabelStyle {
+pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32) -> LabelStyle {
     LabelStyle::from_mm(
         style.font_size_mm,
         style.qr_size_mm,

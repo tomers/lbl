@@ -5,9 +5,13 @@ Render HTML to a raster image sized for printer media.
 ## Two-pass rendering
 
 To preserve photographic quality through the eventual 1-bit dithering, the page
-is rendered at high resolution (`supersample` x the target) and then downscaled
+is rendered at high resolution (`supersample` × the target) and then downscaled
 with a high-quality Lanczos3 filter to the exact device dimensions. Render big,
 shrink smoothly.
+
+The same factor scales millimetre style sizes (font, QR, barcode, padding) into
+CSS pixels during transpilation. See `docs/src/guides/rendering-quality.md` for
+defaults, tuning, and template-authoring notes.
 
 ## Backends
 

@@ -6,7 +6,10 @@
 //! `tests/golden/`. Together the cases cover the project's user-visible
 //! functionality: every authoring front-end, the QR/barcode/image/sizing/flex
 //! directives, configurable styling, all dithering algorithms, fixed and
-//! continuous media, catalog-resolved media, and every output image format.
+//! continuous media, catalog-resolved media, every output image format, and a
+//! batched portrait identity-card showcase on DYMO 99014 (LabelWriter 550).
+//! Identity-card photos are fetched from Wikimedia Commons at test time (network
+//! required for that case).
 //!
 //! The whole suite shares a single headless-Chromium instance. If Chromium
 //! cannot be launched (e.g. no browser installed in CI), the test logs a notice
@@ -31,6 +34,10 @@ use lbl_transpile_html::LabelStyle;
 /// rendering is fast, while still leaving room for legible QR/barcodes.
 const DPI: f64 = 150.0;
 const SUPERSAMPLE: u32 = 2;
+
+/// Print resolution for the identity-card showcase (DYMO 99014 portrait badges).
+const ID_CARDS_DPI: f64 = 300.0;
+const ID_CARDS_SUPERSAMPLE: u32 = 3;
 
 #[test]
 fn golden_labels() {
@@ -62,6 +69,7 @@ fn golden_labels() {
         &small,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Raw text: inline directives are kept literal.
@@ -75,6 +83,7 @@ fn golden_labels() {
         &small,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Multi-line text (newlines -> <br>).
@@ -88,6 +97,7 @@ fn golden_labels() {
         &strip,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Inline size directive (relative font scaling).
@@ -101,6 +111,7 @@ fn golden_labels() {
         &small,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Markdown front-end (lbl-markdown) with an inline QR directive. Continuous
@@ -112,6 +123,7 @@ fn golden_labels() {
         &strip,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Template front-end (lbl-template) batched over a data array -> 2 labels.
@@ -131,7 +143,31 @@ fn golden_labels() {
         &small,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
+
+    // Portrait identity badges on DYMO 99014 (54×101 mm), batched from a single
+    // `.lbl` fixture (Sopranos character IDs with Wikimedia Commons photos), as with:
+    //   lbl-template --template identity_cards.lbl --inline-resources
+    let id_card_style = identity_card_style(ID_CARDS_DPI, ID_CARDS_SUPERSAMPLE);
+    match resolve_media(
+        &Catalog::bundled().expect("bundled catalog"),
+        Some("99014"),
+        None,
+        None,
+        ID_CARDS_DPI,
+    ) {
+        Ok(id_media) => failures.extend(run_lbl_fixture_case(
+            &backend,
+            "identity_cards",
+            &identity_cards_lbl_fixture(),
+            &id_media,
+            &id_card_style,
+            Algorithm::Auto,
+            ID_CARDS_SUPERSAMPLE,
+        )),
+        Err(err) => failures.push(format!("identity_cards: resolve_media failed: {err}")),
+    }
 
     // --- Directives ----------------------------------------------------------
 
@@ -146,6 +182,7 @@ fn golden_labels() {
         &small,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Barcode, default symbology (CODE128).
@@ -159,6 +196,7 @@ fn golden_labels() {
         &wide,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Barcode, explicit EAN-13 symbology.
@@ -172,6 +210,7 @@ fn golden_labels() {
         &wide,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Image directive (embedded data URI, kept hermetic). Continuous media so
@@ -186,6 +225,7 @@ fn golden_labels() {
         &strip,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // --- Layout & styling ----------------------------------------------------
@@ -203,6 +243,7 @@ fn golden_labels() {
         &wide,
         &style,
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // Border + padding styling.
@@ -216,6 +257,7 @@ fn golden_labels() {
         &small,
         &bordered_style(DPI, SUPERSAMPLE),
         Algorithm::Auto,
+        SUPERSAMPLE,
     ));
 
     // --- Media ---------------------------------------------------------------
@@ -238,6 +280,7 @@ fn golden_labels() {
             &catalog_media,
             &style,
             Algorithm::Auto,
+            SUPERSAMPLE,
         )),
         Err(err) => failures.push(format!("catalog_sku: resolve_media failed: {err}")),
     }
@@ -317,6 +360,7 @@ fn run_case(
     media: &Media,
     style: &LabelStyle,
     algorithm: Algorithm,
+    supersample: u32,
 ) -> Vec<String> {
     let labels = match authoring_labels(source) {
         Ok(labels) => labels,
@@ -326,7 +370,46 @@ fn run_case(
     let mut failures = Vec::new();
     let batched = labels.len() > 1;
     for label in &labels {
-        let bitmap = render_bitmap(backend, &label.html, media, style, SUPERSAMPLE, algorithm);
+        let bitmap = render_bitmap(backend, &label.html, media, style, supersample, algorithm);
+        let png = match encode_image(&bitmap, MediaType::Png) {
+            Ok(png) => png,
+            Err(err) => {
+                failures.push(format!("{name}: encode failed: {err}"));
+                continue;
+            }
+        };
+        let golden = if batched {
+            format!("{name}-{}", label.index)
+        } else {
+            name.to_string()
+        };
+        if let Err(err) = check_png(&golden, &png) {
+            failures.push(err);
+        }
+    }
+    failures
+}
+
+/// Like [`run_case`], but authors labels from a `.lbl` single-file fixture
+/// (mirrors `lbl-template --template PATH --inline-resources`).
+fn run_lbl_fixture_case(
+    backend: &ChromiumBackend,
+    name: &str,
+    lbl_path: &std::path::Path,
+    media: &Media,
+    style: &LabelStyle,
+    algorithm: Algorithm,
+    supersample: u32,
+) -> Vec<String> {
+    let labels = match authoring_labels_from_lbl(lbl_path) {
+        Ok(labels) => labels,
+        Err(err) => return vec![format!("{name}: {err}")],
+    };
+
+    let mut failures = Vec::new();
+    let batched = labels.len() > 1;
+    for label in &labels {
+        let bitmap = render_bitmap(backend, &label.html, media, style, supersample, algorithm);
         let png = match encode_image(&bitmap, MediaType::Png) {
             Ok(png) => png,
             Err(err) => {

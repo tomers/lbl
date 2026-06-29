@@ -31,7 +31,10 @@ struct Cli {
     #[arg(long)]
     height_dots: Option<u32>,
 
-    /// Supersample factor for the high-resolution first pass.
+    /// Supersample factor for the high-resolution first pass (>= 1). The page
+    /// is rasterized at this multiple of the target device dots, then
+    /// downscaled before dithering. Also scales mm→px style conversion during
+    /// transpilation.
     #[arg(long, default_value_t = 3)]
     supersample: u32,
 
