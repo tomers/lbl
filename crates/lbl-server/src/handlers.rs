@@ -57,6 +57,27 @@ pub async fn list_catalog(State(state): State<AppState>) -> ApiResult {
     Ok(Json(state.catalog.entries()).into_response())
 }
 
+pub async fn list_catalog_printers(State(state): State<AppState>) -> ApiResult {
+    Ok(Json(state.catalog.printers()).into_response())
+}
+
+pub async fn show_catalog_printer(
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+) -> ApiResult {
+    match state
+        .catalog
+        .lookup_printer(&key)
+        .or_else(|| state.catalog.match_printer(&key))
+    {
+        Some(p) => Ok(Json(p).into_response()),
+        None => Err(ApiError(
+            StatusCode::NOT_FOUND,
+            format!("no printer entry '{key}'"),
+        )),
+    }
+}
+
 pub async fn show_catalog(State(state): State<AppState>, Path(key): Path<String>) -> ApiResult {
     match state.catalog.lookup(&key) {
         Some(e) => Ok(Json(e).into_response()),

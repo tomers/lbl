@@ -1,6 +1,7 @@
 //! Data model for catalog entries.
 
 use lbl_core::media::{Adhesive, Material, Media, MediaColor, MediaLength};
+use lbl_core::printer::{PrinterCapabilities, PrinterModel, Protocol};
 use lbl_core::units::Dpi;
 use serde::{Deserialize, Serialize};
 
@@ -79,10 +80,6 @@ pub struct CatalogEntry {
     /// Optional purchase URL (an affiliate tag may be appended at display time).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purchase_url: Option<String>,
-    /// Printer models this media is compatible with (matched case-insensitively
-    /// as substrings, e.g. "LabelWriter 550", "LabelWriter").
-    #[serde(default)]
-    pub compatible: Vec<String>,
 }
 
 impl CatalogEntry {
@@ -95,13 +92,163 @@ impl CatalogEntry {
     pub fn matches_key(&self, key: &str) -> bool {
         self.keys.iter().any(|k| k.eq_ignore_ascii_case(key))
     }
+}
 
-    /// Whether this media is compatible with the given printer model string.
-    pub fn is_compatible_with(&self, printer_model: &str) -> bool {
+/// How to reach a printer model. The first entry is the preferred default when
+/// no explicit transport flag is passed on the CLI. USB entries also identify
+/// the model during device discovery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ConnectionHint {
+    /// Bluetooth Low Energy (NIIMBOT D-series and similar).
+    Ble {
+        /// Advertised name or address substring for `--bluetooth`.
+        name: String,
+    },
+    /// USB serial / CDC-ACM (NIIMBOT B-series and similar).
+    Serial {
+        /// Optional fixed device path; when omitted, discovery picks the first
+        /// matching serial port at print time.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+    },
+    /// USB bulk transfer.
+    Usb {
+        /// USB vendor id.
+        vendor_id: u16,
+        /// USB product id.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        product_id: Option<u16>,
+    },
+    /// Raw TCP socket (typically port 9100).
+    Network {
+        /// Host or IP address.
+        host: String,
+        /// TCP port.
+        port: u16,
+    },
+}
+
+/// Resolved transport targets for dispatch.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ResolvedTransport {
+    /// Bluetooth LE target (`--bluetooth`).
+    pub bluetooth: Option<String>,
+    /// Serial port target (`--serial`).
+    pub serial: Option<String>,
+    /// USB bulk target (`vid:pid` hex, `--usb`).
+    pub usb: Option<String>,
+    /// Network target (`host:port`, `--network`).
+    pub network: Option<String>,
+}
+
+impl ConnectionHint {
+    /// Apply this hint to a [`ResolvedTransport`], overwriting any field it sets.
+    pub fn apply_to(&self, out: &mut ResolvedTransport) {
+        match self {
+            Self::Ble { name } => out.bluetooth = Some(name.clone()),
+            Self::Serial { path } => out.serial = path.clone(),
+            Self::Usb {
+                vendor_id,
+                product_id,
+            } => {
+                out.usb = Some(match product_id {
+                    Some(pid) => format!("{vendor_id:04x}:{pid:04x}"),
+                    None => format!("{vendor_id:04x}"),
+                });
+            }
+            Self::Network { host, port } => out.network = Some(format!("{host}:{port}")),
+        }
+    }
+
+    /// Whether this is an exact USB product match (not a vendor wildcard).
+    pub fn is_exact_usb_match(&self, vendor_id: u16, product_id: u16) -> bool {
+        matches!(
+            self,
+            Self::Usb {
+                vendor_id: vid,
+                product_id: Some(pid),
+            } if *vid == vendor_id && *pid == product_id
+        )
+    }
+}
+
+/// A known printer model in the catalog.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrinterEntry {
+    /// Manufacturer brand, e.g. "DYMO".
+    pub brand: String,
+    /// One or more keys/aliases that resolve to this entry (the first is
+    /// canonical).
+    pub keys: Vec<String>,
+    /// Human-friendly display name.
+    pub name: String,
+    /// Protocol the model speaks.
+    pub protocol: Protocol,
+    /// Native print resolution in dots per inch.
+    pub dpi: f64,
+    /// Maximum printable width across the head, in millimeters.
+    pub max_width_mm: f64,
+    /// Whether the printer can cut between jobs/items.
+    #[serde(default)]
+    pub supports_cut: bool,
+    /// Whether the printer reports loaded media for auto-detection.
+    #[serde(default)]
+    pub reports_media: bool,
+    /// Media catalog keys this printer can use.
+    #[serde(default)]
+    pub supported_media: Vec<String>,
+    /// Default media catalog key, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_media: Option<String>,
+    /// How to connect to this model (and, for USB, how to recognize it).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connections: Vec<ConnectionHint>,
+}
+
+impl PrinterEntry {
+    /// The canonical key (first in `keys`).
+    pub fn canonical_key(&self) -> &str {
+        self.keys.first().map(String::as_str).unwrap_or("")
+    }
+
+    /// Whether any of this entry's keys matches `key` (case-insensitive).
+    pub fn matches_key(&self, key: &str) -> bool {
+        self.keys.iter().any(|k| k.eq_ignore_ascii_case(key))
+    }
+
+    /// Whether this printer matches a free-form model string (case-insensitive
+    /// substring match on keys, or exact key match).
+    pub fn matches_model(&self, printer_model: &str) -> bool {
         let needle = printer_model.to_ascii_lowercase();
-        self.compatible.iter().any(|c| {
-            needle.contains(&c.to_ascii_lowercase()) || c.eq_ignore_ascii_case(printer_model)
+        self.keys.iter().any(|k| {
+            let key = k.to_ascii_lowercase();
+            needle.contains(&key) || key.contains(&needle) || k.eq_ignore_ascii_case(printer_model)
         })
+    }
+
+    /// Convert to a [`PrinterModel`] for profiles and drivers.
+    pub fn to_printer_model(&self) -> PrinterModel {
+        PrinterModel {
+            brand: self.brand.clone(),
+            model: self.canonical_key().to_string(),
+            protocol: self.protocol,
+            capabilities: PrinterCapabilities {
+                dpi: Dpi(self.dpi),
+                max_width_mm: self.max_width_mm,
+                supports_cut: self.supports_cut,
+                reports_media: self.reports_media,
+            },
+        }
+    }
+
+    /// Build transport targets from the first catalog connection hint.
+    pub fn default_transport(&self) -> ResolvedTransport {
+        let mut out = ResolvedTransport::default();
+        if let Some(conn) = self.connections.first() {
+            conn.apply_to(&mut out);
+        }
+        out
     }
 }
 
@@ -109,4 +256,6 @@ impl CatalogEntry {
 pub(crate) struct CatalogFile {
     #[serde(default)]
     pub entries: Vec<CatalogEntry>,
+    #[serde(default)]
+    pub printers: Vec<PrinterEntry>,
 }

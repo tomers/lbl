@@ -1,8 +1,11 @@
-# Bundled media catalog for lbl.
+# Bundled catalog for lbl.
 #
-# Each [[entries]] describes a known media SKU. `keys` lists all SKUs/aliases
-# that resolve to the entry (the first is canonical). Dimensions are physical
-# (millimeters); device resolution is applied at resolve time.
+# [[entries]] describe known media SKUs. `keys` lists all SKUs/aliases that
+# resolve to the entry (the first is canonical). Dimensions are physical
+# (millimeters); device resolution comes from the target printer.
+#
+# [[printers]] describe known printer models: protocol, native DPI, head width,
+# `supported_media`, and `connections` (USB, serial, Bluetooth, network).
 #
 # Image policy: only set image.redistributable = true when the license clearly
 # permits bundling/redistribution. Otherwise the URL is hotlinked for display.
@@ -16,7 +19,6 @@ brand = "DYMO"
 keys = ["99010", "S0722370"]
 name = "DYMO 99010 28x89mm Standard Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 28.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -24,7 +26,6 @@ brand = "DYMO"
 keys = ["99012", "S0722400"]
 name = "DYMO 99012 36x89mm Large Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -32,7 +33,6 @@ brand = "DYMO"
 keys = ["99013", "S0722410"]
 name = "DYMO 99013 36x89mm Transparent Plastic Large Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
 
 [[entries]]
@@ -40,7 +40,6 @@ brand = "DYMO"
 keys = ["99014", "S0722430"]
 name = "DYMO 99014 54x101mm Shipping / Name Badge Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -48,7 +47,6 @@ brand = "DYMO"
 keys = ["99015", "S0722440"]
 name = "DYMO 99015 54x70mm Large Multifunctional Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 54.0, length = { kind = "fixed", mm = 70.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -56,7 +54,6 @@ brand = "DYMO"
 keys = ["99017", "S0722460"]
 name = "DYMO 99017 12x50mm Suspension File Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -64,7 +61,6 @@ brand = "DYMO"
 keys = ["99018", "S0722470"]
 name = "DYMO 99018 38x190mm Small Lever Arch File Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 38.0, length = { kind = "fixed", mm = 190.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -72,7 +68,6 @@ brand = "DYMO"
 keys = ["99019", "S0722480"]
 name = "DYMO 99019 59x190mm Large Lever Arch File Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 59.0, length = { kind = "fixed", mm = 190.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -80,7 +75,6 @@ brand = "DYMO"
 keys = ["11352", "S0722520"]
 name = "DYMO 11352 25x54mm Return Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -88,7 +82,6 @@ brand = "DYMO"
 keys = ["11353", "S0722530"]
 name = "DYMO 11353 13x25mm 2-in-1 Multi-Purpose Labels (removable)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 13.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "removable", color = "white" }
 
 [[entries]]
@@ -96,7 +89,6 @@ brand = "DYMO"
 keys = ["11354", "S0722540"]
 name = "DYMO 11354 32x57mm Removable Multi-Purpose Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, material = "paper", adhesive = "removable", color = "white" }
 
 [[entries]]
@@ -104,7 +96,6 @@ brand = "DYMO"
 keys = ["11355", "S0722550"]
 name = "DYMO 11355 19x51mm Multi-Purpose Removable Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 19.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "removable", color = "white" }
 
 [[entries]]
@@ -112,7 +103,6 @@ brand = "DYMO"
 keys = ["2133399"]
 name = "DYMO 2133399 54x101mm Name Badge Labels, Red (EOL)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "red" }
 
 [[entries]]
@@ -120,7 +110,6 @@ brand = "DYMO"
 keys = ["2133400"]
 name = "DYMO 2133400 54x101mm Name Badge Labels, Yellow"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "yellow" }
 
 [[entries]]
@@ -128,7 +117,6 @@ brand = "DYMO"
 keys = ["2166659"]
 name = "DYMO 2166659 102x210mm XL DHL Shipping Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter 4XL", "LabelWriter 5XL"]
 media = { width_mm = 102.0, length = { kind = "fixed", mm = 210.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 # --- Durable (polypropylene, strong adhesive) ------------------------------
@@ -138,7 +126,6 @@ brand = "DYMO"
 keys = ["2112283"]
 name = "DYMO 2112283 Durable LabelWriter Labels 25x54mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -146,7 +133,6 @@ brand = "DYMO"
 keys = ["2112284"]
 name = "DYMO 2112284 Durable LabelWriter Labels 19x64mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 19.0, length = { kind = "fixed", mm = 64.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -154,7 +140,6 @@ brand = "DYMO"
 keys = ["2112285"]
 name = "DYMO 2112285 Durable LabelWriter Labels 25x89mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 25.0, length = { kind = "fixed", mm = 89.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -162,7 +147,6 @@ brand = "DYMO"
 keys = ["2112286"]
 name = "DYMO 2112286 Durable LabelWriter Labels 25x25mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 25.0, length = { kind = "fixed", mm = 25.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -170,7 +154,6 @@ brand = "DYMO"
 keys = ["2112287"]
 name = "DYMO 2112287 Durable 4XL/5XL Labels 104x159mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter 4XL", "LabelWriter 5XL"]
 media = { width_mm = 104.0, length = { kind = "fixed", mm = 159.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -178,7 +161,6 @@ brand = "DYMO"
 keys = ["2112289"]
 name = "DYMO 2112289 Durable LabelWriter Labels 32x57mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 [[entries]]
@@ -186,7 +168,6 @@ brand = "DYMO"
 keys = ["2112290"]
 name = "DYMO 2112290 Durable LabelWriter Labels 59x102mm"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter"]
 media = { width_mm = 59.0, length = { kind = "fixed", mm = 102.0 }, material = "polypropylene", adhesive = "strong", color = "white" }
 
 # --- Continuous (non-adhesive thermal paper) -------------------------------
@@ -196,7 +177,6 @@ brand = "DYMO"
 keys = ["2191636"]
 name = "DYMO 2191636 Continuous Thermal Paper 57mm (non-adhesive)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
-compatible = ["LabelWriter 550"]
 media = { width_mm = 57.0, length = { kind = "continuous" }, material = "paper", adhesive = "none", color = "white" }
 
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
@@ -212,7 +192,6 @@ brand = "NIIMBOT"
 keys = ["12x22", "niimbot-12x22"]
 name = "NIIMBOT 12x22mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 22.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -220,7 +199,6 @@ brand = "NIIMBOT"
 keys = ["12x30", "niimbot-12x30"]
 name = "NIIMBOT 12x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -228,7 +206,6 @@ brand = "NIIMBOT"
 keys = ["12x40", "niimbot-12x40"]
 name = "NIIMBOT 12x40mm White Thermal Labels (D110 default roll)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -236,7 +213,6 @@ brand = "NIIMBOT"
 keys = ["12x50", "niimbot-12x50"]
 name = "NIIMBOT 12x50mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -244,7 +220,6 @@ brand = "NIIMBOT"
 keys = ["12x40-clear", "niimbot-12x40-transparent"]
 name = "NIIMBOT 12x40mm Transparent Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
 
 [[entries]]
@@ -252,7 +227,6 @@ brand = "NIIMBOT"
 keys = ["14x30", "niimbot-14x30"]
 name = "NIIMBOT 14x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -260,5 +234,109 @@ brand = "NIIMBOT"
 keys = ["15x30", "niimbot-15x30"]
 name = "NIIMBOT 15x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-compatible = ["D110", "D11"]
 media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+# --- Known printers ----------------------------------------------------------
+#
+# `supported_media` lists canonical media keys from [[entries]] above.
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 550", "LW550"]
+name = "DYMO LabelWriter 550"
+protocol = "dymolw"
+dpi = 300.0
+max_width_mm = 57.0
+reports_media = true
+default_media = "11352"
+supported_media = [
+  "99010", "99012", "99013", "99014", "99015", "99017", "99018", "99019",
+  "11352", "11353", "11354", "11355", "2133399", "2133400",
+  "2112283", "2112284", "2112285", "2112286", "2112289", "2112290",
+  "2191636",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0028 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 550 Turbo"]
+name = "DYMO LabelWriter 550 Turbo"
+protocol = "dymolw"
+dpi = 300.0
+max_width_mm = 57.0
+reports_media = true
+default_media = "11352"
+supported_media = [
+  "99010", "99012", "99013", "99014", "99015", "99017", "99018", "99019",
+  "11352", "11353", "11354", "11355", "2133399", "2133400",
+  "2112283", "2112284", "2112285", "2112286", "2112289", "2112290",
+  "2191636",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0029 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 5XL", "LabelWriter 4XL"]
+name = "DYMO LabelWriter 5XL"
+protocol = "dymolw"
+dpi = 300.0
+max_width_mm = 104.0
+reports_media = true
+default_media = "11352"
+supported_media = [
+  "99010", "99012", "99013", "99014", "99015", "99017", "99018", "99019",
+  "11352", "11353", "11354", "11355", "2133399", "2133400",
+  "2112283", "2112284", "2112285", "2112286", "2112289", "2112290",
+  "2166659", "2112287",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x002A }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter"]
+name = "DYMO LabelWriter (legacy)"
+protocol = "dymo"
+dpi = 300.0
+max_width_mm = 56.0
+default_media = "11352"
+supported_media = [
+  "99010", "99012", "99013", "99014", "99015", "99017", "99018", "99019",
+  "11352", "11353", "11354", "11355", "2133399", "2133400",
+  "2112283", "2112284", "2112285", "2112286", "2112289", "2112290",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelManager PnP", "LabelManager"]
+name = "DYMO LabelManager PnP"
+protocol = "dymo"
+dpi = 300.0
+max_width_mm = 24.0
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1001 }]
+
+[[printers]]
+brand = "NIIMBOT"
+keys = ["D110", "D11"]
+name = "NIIMBOT D110"
+protocol = "niimbot"
+dpi = 203.0
+max_width_mm = 12.0
+default_media = "12x40"
+supported_media = [
+  "12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30",
+]
+connections = [{ kind = "ble", name = "D110" }]
+
+[[printers]]
+brand = "NIIMBOT"
+keys = ["B1", "B21", "B18", "B203", "B3S"]
+name = "NIIMBOT B1"
+protocol = "niimbot"
+dpi = 203.0
+max_width_mm = 12.0
+default_media = "12x40"
+supported_media = [
+  "12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30",
+]
+connections = [{ kind = "serial" }]

@@ -1,43 +1,48 @@
 # lbl-catalog
 
-A curated, versioned database of known label/tape media (keyed by SKU) and their
-compatibility with known printers.
+Curated database of known label/tape media and printer models.
 
-Refer to media by a stable key instead of raw dimensions: `--media 11352` (or its
-alias `--media S0722520`) resolves to "DYMO 11352 25x54mm Return Address Labels".
+## Bundled catalog
 
-## Data
+`data/catalog.toml` ships with the crate and contains:
 
-The bundled catalog lives in [`data/catalog.toml`](data/catalog.toml). Users can
-overlay additional TOML/JSON catalog files; later entries that share a key
-replace earlier ones.
+- **`[[entries]]`** — media SKUs keyed by part number or alias. Each entry
+  describes physical dimensions (`width_mm`, fixed or continuous `length`),
+  material, adhesive, and color. Device resolution is applied from the target
+  printer at resolve time.
+- **`[[printers]]`** — known printer models with native DPI, head width,
+  protocol, and a `supported_media` list naming the media keys each model can use.
+  `connections` declares how to reach the printer (and USB entries double as
+  discovery hints).
 
-Each entry carries: brand, keys/aliases, display name, a physical `MediaSpec`
-(width, fixed/continuous length, material, adhesive, color), an optional
-license-aware `image`, an optional `purchase_url` (affiliate tag applied at
-display time), and a list of compatible printer models.
+Users can overlay additional TOML/JSON catalog files; later entries that share
+a key replace earlier ones.
 
-## Image / copyright policy
-
-Each `image` records a `url`, a `license`, optional `attribution`, and a
-`redistributable` flag. Images may be downloaded and cached locally regardless;
-only `redistributable = true` images may be bundled/redistributed with the
-catalog. Others are hotlinked for display only.
-
-## Library
+## Usage
 
 ```rust
 use lbl_catalog::Catalog;
+
 let catalog = Catalog::bundled().unwrap();
-let entry = catalog.lookup("11352").unwrap();
+let media = catalog.lookup("11352").unwrap();
+let printer = catalog.lookup_printer("LabelWriter 550").unwrap();
 let compatible = catalog.compatible_with("LabelWriter 550");
+let dpi = catalog.resolve_dpi(Some("D110"), lbl_core::printer::Protocol::Niimbot, 300.0);
 ```
 
-## Binary
+## CLI
 
 ```bash
 lbl-catalog list
 lbl-catalog show 11352
 lbl-catalog compatible --printer "LabelWriter 550"
-lbl-catalog search durable
+lbl-catalog printers list
+lbl-catalog printers show D110
+lbl-catalog search dymo
+```
+
+Overlays:
+
+```bash
+lbl-catalog --catalog my-extra.toml list
 ```

@@ -1516,6 +1516,7 @@ dependencies = [
  "clap",
  "dbus",
  "futures",
+ "lbl-catalog",
  "lbl-cli",
  "lbl-core",
  "nusb",

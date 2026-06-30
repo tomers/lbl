@@ -1,7 +1,7 @@
 //! Pipeline chaining used by the orchestrator's high-level flows.
 
-use anyhow::{anyhow, Context, Result};
-use lbl_catalog::Catalog;
+use anyhow::{anyhow, bail, Context, Result};
+use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
@@ -110,6 +110,64 @@ pub fn resolve_media(
         Some(len) => Media::fixed(width, len, dpi),
         None => Media::continuous(width, dpi),
     })
+}
+
+/// Resolve transport targets for printing, filling in catalog defaults when the
+/// caller did not pass explicit `--network`, `--usb`, `--serial`, or
+/// `--bluetooth` flags.
+pub fn resolve_print_transport(
+    printer: Option<&PrinterEntry>,
+    network: Option<String>,
+    usb: Option<String>,
+    serial: Option<String>,
+    bluetooth: Option<String>,
+) -> Result<(Option<String>, Option<String>, Option<String>, Option<String>)> {
+    let mut network = network;
+    let mut usb = usb;
+    let mut serial = serial;
+    let mut bluetooth = bluetooth;
+
+    if network.is_none() && usb.is_none() && serial.is_none() && bluetooth.is_none() {
+        let Some(printer) = printer else {
+            return Ok((network, usb, serial, bluetooth));
+        };
+        let defaults = printer.default_transport();
+        network = defaults.network;
+        usb = defaults.usb;
+        serial = defaults.serial;
+        bluetooth = defaults.bluetooth;
+
+        if serial.is_none()
+            && printer
+                .connections
+                .iter()
+                .any(|c| matches!(c, ConnectionHint::Serial { path: None }))
+        {
+            serial = discover_serial_port(printer);
+        }
+
+        if network.is_none() && usb.is_none() && serial.is_none() && bluetooth.is_none() {
+            bail!(
+                "no transport for printer '{}'; pass --network, --usb, --serial, or --bluetooth",
+                printer.canonical_key()
+            );
+        }
+    }
+
+    Ok((network, usb, serial, bluetooth))
+}
+
+fn discover_serial_port(printer: &PrinterEntry) -> Option<String> {
+    lbl_device::discover_serial()
+        .into_iter()
+        .find(|d| {
+            d.path.is_some()
+                && d.protocol == Some(Protocol::Niimbot)
+                && d.model
+                    .as_ref()
+                    .is_none_or(|model| printer.matches_model(model))
+        })
+        .and_then(|d| d.path)
 }
 
 /// Resolve a configured (millimetre) [`lbl_config::StyleConfig`] into the

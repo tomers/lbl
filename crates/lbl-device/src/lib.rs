@@ -18,7 +18,6 @@
 //! `libdbus` on Linux).
 
 pub mod discovery;
-pub mod known;
 pub mod media;
 pub mod transport;
 

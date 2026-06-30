@@ -9,7 +9,7 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_media, resolve_style, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_media, resolve_print_transport, resolve_style, PipelineOptions, Source};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -101,8 +101,8 @@ struct MediaArgs {
     #[arg(long)]
     length_mm: Option<f64>,
 
-    /// Device resolution in DPI.
-    #[arg(long, default_value_t = 300.0)]
+    /// Device resolution in DPI (defaults to the selected printer's native DPI).
+    #[arg(long, default_value_t = lbl_catalog::CLI_DEFAULT_DPI)]
     dpi: f64,
 }
 
@@ -279,6 +279,12 @@ struct PrintArgs {
     #[arg(long, value_enum)]
     protocol: Option<ProtocolArg>,
 
+    /// Printer model key from the catalog (e.g. `LabelWriter 550`, `D110`).
+    /// Sets protocol, native DPI, default media, and transport when the
+    /// corresponding flags are omitted.
+    #[arg(long)]
+    printer: Option<String>,
+
     /// For `--protocol virtual`: the output image format ("media type"):
     /// png | bmp | tiff | gif | pbm. Defaults to png.
     #[arg(long)]
@@ -394,12 +400,27 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .unwrap_or_else(|_| lbl_config::Config::default());
     let print_cfg = &config.print;
 
+    let catalog = Catalog::bundled()?;
+    let printer_entry = args.printer.as_deref().and_then(|key| {
+        catalog
+            .lookup_printer(key)
+            .or_else(|| catalog.match_printer(key))
+    });
+
     let protocol: Protocol = match args.protocol {
         Some(p) => p.into(),
-        None => match &print_cfg.protocol {
-            Some(name) => config_enum::<ProtocolArg>("print.protocol", name)?.into(),
-            None => bail!("protocol required: pass --protocol or set [print] protocol / LBL_PRINT__PROTOCOL"),
-        },
+        None => {
+            if let Some(printer) = printer_entry {
+                printer.protocol
+            } else {
+                match &print_cfg.protocol {
+                    Some(name) => config_enum::<ProtocolArg>("print.protocol", name)?.into(),
+                    None => bail!(
+                        "protocol required: pass --protocol, --printer, or set [print] protocol / LBL_PRINT__PROTOCOL"
+                    ),
+                }
+            }
+        }
     };
 
     let confirm = args.confirm.unwrap_or(print_cfg.confirm);
@@ -418,22 +439,29 @@ fn run_print(args: PrintArgs) -> Result<()> {
         Some(t) => t,
         None => config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?,
     };
-    let network = args.network.or_else(|| print_cfg.network.clone());
-    let usb = args.usb.or_else(|| print_cfg.usb.clone());
-    let serial = args.serial.or_else(|| print_cfg.serial.clone());
-    let bluetooth = args.bluetooth.or_else(|| print_cfg.bluetooth.clone());
+    let (network, usb, serial, bluetooth) = resolve_print_transport(
+        printer_entry,
+        args.network.or_else(|| print_cfg.network.clone()),
+        args.usb.or_else(|| print_cfg.usb.clone()),
+        args.serial.or_else(|| print_cfg.serial.clone()),
+        args.bluetooth.or_else(|| print_cfg.bluetooth.clone()),
+    )?;
     let media_type_name = args.media_type.or_else(|| print_cfg.media_type.clone());
 
-    let catalog = Catalog::bundled()?;
-    // NIIMBOT heads are 203 dpi; the generic --dpi default (300) oversizes labels.
-    let dpi = if protocol == Protocol::Niimbot && args.media.dpi == 300.0 {
-        203.0
-    } else {
-        args.media.dpi
-    };
+    let dpi = catalog.resolve_dpi(args.printer.as_deref(), protocol, args.media.dpi);
+    let media_sku = args
+        .media
+        .media
+        .clone()
+        .or_else(|| printer_entry.and_then(|p| p.default_media.clone()));
+    if let (Some(printer), Some(media_key)) = (&args.printer, &media_sku) {
+        if !catalog.supports_media(printer, &media_key) {
+            bail!("media '{media_key}' is not supported by printer '{printer}'");
+        }
+    }
     let media = resolve_media(
         &catalog,
-        args.media.media.as_deref(),
+        media_sku.as_deref(),
         args.media.width_mm,
         args.media.length_mm,
         dpi,
@@ -980,6 +1008,18 @@ enum CatalogCommand {
     Search {
         query: String,
     },
+    Printers {
+        #[command(subcommand)]
+        command: CatalogPrinterCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum CatalogPrinterCommand {
+    List,
+    Show {
+        key: String,
+    },
 }
 
 fn run_catalog(args: CatalogArgs) -> Result<()> {
@@ -1003,9 +1043,26 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
         }
         CatalogCommand::Search { query } => {
             for e in catalog.search(&query) {
-                println!("{:<12} {}", e.canonical_key(), e.name);
+                println!("media  {:<12} {}", e.canonical_key(), e.name);
+            }
+            for p in catalog.search_printers(&query) {
+                println!("printer {:<20} {}", p.canonical_key(), p.name);
             }
         }
+        CatalogCommand::Printers { command } => match command {
+            CatalogPrinterCommand::List => {
+                for p in catalog.printers() {
+                    println!("{:<20} {}", p.canonical_key(), p.name);
+                }
+            }
+            CatalogPrinterCommand::Show { key } => {
+                let p = catalog
+                    .lookup_printer(&key)
+                    .or_else(|| catalog.match_printer(&key))
+                    .ok_or_else(|| anyhow!("no printer entry for '{key}'"))?;
+                println!("{}", serde_json::to_string_pretty(p)?);
+            }
+        },
     }
     Ok(())
 }

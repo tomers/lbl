@@ -1,5 +1,6 @@
 //! Discovery of connected printers.
 
+use lbl_catalog::Catalog;
 use lbl_core::printer::Protocol;
 use serde::{Deserialize, Serialize};
 
@@ -28,12 +29,20 @@ pub struct DiscoveredPrinter {
     pub path: Option<String>,
 }
 
-/// Enumerate connected USB printers, matching against the known-printer table.
+/// Enumerate connected USB printers, matching against the bundled catalog.
 ///
 /// Returns an empty list when the `usb` feature is disabled or no devices are
 /// present.
 #[cfg(feature = "usb")]
 pub fn discover_usb() -> Vec<DiscoveredPrinter> {
+    let catalog = match Catalog::bundled() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("catalog load failed: {e}");
+            return Vec::new();
+        }
+    };
+
     let devices = match nusb::list_devices() {
         Ok(d) => d,
         Err(e) => {
@@ -46,13 +55,13 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
         .filter_map(|d| {
             let vid = d.vendor_id();
             let pid = d.product_id();
-            let known = crate::known::match_usb(vid, pid)?;
+            let known = catalog.match_usb(vid, pid)?;
             Some(DiscoveredPrinter {
                 vendor_id: Some(vid),
                 product_id: Some(pid),
                 serial: d.serial_number().map(|s| s.to_string()),
-                brand: Some(known.brand.to_string()),
-                model: Some(known.model.to_string()),
+                brand: Some(known.brand.clone()),
+                model: Some(known.canonical_key().to_string()),
                 protocol: Some(known.protocol),
                 connection: "usb".to_string(),
                 path: None,
