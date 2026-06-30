@@ -53,8 +53,14 @@ impl From<ProtocolArg> for Protocol {
     styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
-    /// Input PBM (P4) file. If omitted, read from stdin.
+    /// Input PBM (P4) file. If omitted, read from stdin (unless --sample-pattern).
     input: Option<std::path::PathBuf>,
+
+    /// Generate a calibration sample pattern instead of reading a PBM. Omit the
+    /// value to use `--width-mm` at `--dpi`; pass a number to override the head
+    /// height in dots. The raster is not dithered or rescaled.
+    #[arg(long, num_args = 0..=1, conflicts_with = "input")]
+    sample_pattern: Option<Option<u32>>,
 
     /// Target protocol / driver.
     #[arg(long, value_enum)]
@@ -97,22 +103,32 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let pbm = match &cli.input {
-        Some(path) => std::fs::read(path).with_context(|| format!("reading {}", path.display()))?,
-        None => {
-            let mut buf = Vec::new();
-            std::io::stdin().read_to_end(&mut buf)?;
-            buf
-        }
-    };
-    let bitmap = MonoBitmap::from_pbm(&pbm).map_err(|e| anyhow::anyhow!("parsing PBM: {e}"))?;
-
     let dpi = Dpi(cli.dpi);
     let media = match cli.length_mm {
         Some(len) => Media::fixed(cli.width_mm, len, dpi),
         None => Media::continuous(cli.width_mm, dpi),
     };
-    let mut job = JobSpec::new(media);
+    let protocol: Protocol = cli.protocol.into();
+
+    let bitmap = if cli.sample_pattern.is_some() {
+        let head_dots = lbl_pattern::resolve_head_dots(cli.sample_pattern.flatten(), &media)
+            .map_err(|e| anyhow!(e))?;
+        lbl_pattern::sample_pattern_for_media(head_dots, &media, protocol)
+    } else {
+        let pbm = match &cli.input {
+            Some(path) => {
+                std::fs::read(path).with_context(|| format!("reading {}", path.display()))?
+            }
+            None => {
+                let mut buf = Vec::new();
+                std::io::stdin().read_to_end(&mut buf)?;
+                buf
+            }
+        };
+        MonoBitmap::from_pbm(&pbm).map_err(|e| anyhow::anyhow!("parsing PBM: {e}"))?
+    };
+
+    let mut job = JobSpec::new(media.clone());
     job.cut = cli.cut;
     job.copies = cli.copies;
 
@@ -124,7 +140,6 @@ fn main() -> Result<()> {
     };
 
     let mut registry = Registry::with_builtin_drivers();
-    let protocol: Protocol = cli.protocol.into();
     if protocol == Protocol::Virtual {
         let mt = match &cli.media_type {
             Some(name) => {

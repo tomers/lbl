@@ -28,6 +28,7 @@ lbl-template = { workspace = true }
 lbl-transpile-html = { workspace = true }
 lbl-render = { workspace = true }
 lbl-dither = { workspace = true }
+lbl-pattern = { workspace = true }
 lbl-encode = { workspace = true }
 lbl-driver-api = { workspace = true }
 lbl-driver-file = { workspace = true }

@@ -44,6 +44,15 @@ impl Protocol {
     pub fn targets_print_head(self) -> bool {
         !matches!(self, Protocol::Virtual | Protocol::Console)
     }
+
+    /// Whether [`MonoBitmap::width`] runs along the feed direction.
+    ///
+    /// DYMO drivers consume the bitmap with width = feed and height = head (the
+    /// Labelle sample-pattern layout). Row-oriented drivers (NIIMBOT, ESC/POS,
+    /// ZPL, …) use width = head and height = feed instead.
+    pub fn bitmap_width_is_feed(self) -> bool {
+        matches!(self, Protocol::Dymo | Protocol::DymoLw)
+    }
 }
 
 /// How the toolchain reaches a printer.

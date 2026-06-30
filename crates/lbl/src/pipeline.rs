@@ -11,6 +11,7 @@ use lbl_dither::{dither, Algorithm};
 use lbl_driver_api::EncodeContext;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
+use lbl_pattern::sample_pattern_for_media;
 use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
 use lbl_transpile_html::{
@@ -389,6 +390,77 @@ pub fn encode_label_traced<B: RenderBackend>(
     })
 }
 
+/// Encode a calibration sample pattern straight to protocol bytes (no render,
+/// dither, rotation, or rescaling). `head_dots` is the pattern height across
+/// the print head, matching Labelle's `--sample-pattern`.
+pub fn encode_sample_pattern(
+    registry: &Registry,
+    head_dots: u32,
+    opts: &PipelineOptions,
+) -> Result<Vec<u8>> {
+    let trace = encode_sample_pattern_traced(registry, 0, head_dots, opts)?;
+    Ok(trace.encoded)
+}
+
+/// Like [`encode_sample_pattern`], but captures a [`LabelTrace`] for previews
+/// and debug output.
+pub fn encode_sample_pattern_traced(
+    registry: &Registry,
+    index: usize,
+    head_dots: u32,
+    opts: &PipelineOptions,
+) -> Result<crate::debug::LabelTrace> {
+    if head_dots == 0 {
+        bail!("sample pattern height must be at least 1 dot");
+    }
+    let bitmap = sample_pattern_for_media(head_dots, &opts.media, opts.protocol);
+
+    let mut job = JobSpec::new(opts.media.clone());
+    job.cut = opts.cut;
+    job.copies = opts.copies;
+    let caps = PrinterCapabilities {
+        dpi: opts.media.dpi,
+        max_width_mm: opts.media.width_mm,
+        supports_cut: opts.supports_cut,
+        reports_media: false,
+    };
+    let driver = registry
+        .get(opts.protocol)
+        .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
+    let ctx = EncodeContext::new(&job, &caps);
+    let encoded = driver.encode(&bitmap, &ctx).context("encoding")?;
+
+    Ok(crate::debug::LabelTrace {
+        index,
+        authoring_html: format!("(sample pattern, head={head_dots} dots)"),
+        transpiled_html: String::new(),
+        assets_base: opts.assets_base.clone(),
+        width_dots: Some(bitmap.width),
+        height_dots: Some(bitmap.height),
+        rotation: Rotation::None,
+        supersample: 1,
+        rendered: mono_preview_rgba(&bitmap),
+        dither: Algorithm::Threshold(128),
+        dithered: bitmap,
+        protocol: opts.protocol,
+        driver_name: driver.name().to_string(),
+        media_type: opts.media_type,
+        encoded,
+    })
+}
+
+fn mono_preview_rgba(bmp: &lbl_core::bitmap::MonoBitmap) -> image::RgbaImage {
+    use image::{Rgba, RgbaImage};
+    let mut img = RgbaImage::new(bmp.width, bmp.height);
+    for y in 0..bmp.height {
+        for x in 0..bmp.width {
+            let v = if bmp.get(x, y) { 0 } else { 255 };
+            img.put_pixel(x, y, Rgba([v, v, v, 255]));
+        }
+    }
+    img
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,5 +572,68 @@ mod tests {
     fn resolve_media_requires_something() {
         let catalog = Catalog::bundled().unwrap();
         assert!(resolve_media(&catalog, None, None, None, 300.0).is_err());
+    }
+
+    #[test]
+    fn resolve_head_dots_from_media_width() {
+        use lbl_pattern::resolve_head_dots;
+        let media = Media::fixed(12.0, 30.0, Dpi(203.0));
+        assert_eq!(resolve_head_dots(None, &media).unwrap(), 96);
+        assert_eq!(resolve_head_dots(Some(64), &media).unwrap(), 64);
+    }
+
+    #[test]
+    fn sample_pattern_encodes_without_render_or_dither() {
+        let registry = Registry::with_builtin_drivers();
+        let opts = PipelineOptions {
+            protocol: Protocol::Dymo,
+            media: Media::continuous(12.0, Dpi(180.0)),
+            supports_cut: false,
+            cut: false,
+            copies: 1,
+            dither: Algorithm::Auto,
+            rotation: Rotation::Cw90,
+            supersample: 3,
+            assets_base: AssetsBase::Cdn,
+            style: LabelStyle::default(),
+            media_type: None,
+            label_fit: LabelFit::Fill,
+            label_align: LabelAlign::default(),
+            label_valign: LabelValign::default(),
+            label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
+        };
+        let trace = encode_sample_pattern_traced(&registry, 0, 64, &opts).unwrap();
+        assert_eq!(trace.dithered.height, 64);
+        assert_eq!(trace.dithered.width, 191);
+        assert_eq!(trace.rotation, Rotation::None);
+        assert!(trace.transpiled_html.is_empty());
+        assert!(!trace.encoded.is_empty());
+    }
+
+    #[test]
+    fn sample_pattern_fills_fixed_niimbot_label() {
+        let registry = Registry::with_builtin_drivers();
+        let opts = PipelineOptions {
+            protocol: Protocol::Niimbot,
+            media: Media::fixed(12.0, 30.0, Dpi(203.0)),
+            supports_cut: false,
+            cut: false,
+            copies: 1,
+            dither: Algorithm::Auto,
+            rotation: Rotation::Cw90,
+            supersample: 3,
+            assets_base: AssetsBase::Cdn,
+            style: LabelStyle::default(),
+            media_type: None,
+            label_fit: LabelFit::Fill,
+            label_align: LabelAlign::default(),
+            label_valign: LabelValign::default(),
+            label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
+        };
+        let trace = encode_sample_pattern_traced(&registry, 0, 96, &opts).unwrap();
+        assert_eq!(trace.dithered.width, 96);
+        assert_eq!(trace.dithered.height, 240);
     }
 }

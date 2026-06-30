@@ -42,4 +42,6 @@ Because the contracts are explicit, you can start anywhere:
 
 - Already have authoring HTML? Pipe it straight into `lbl-transpile-html`.
 - Already have a 1-bit PBM? Pipe it into `lbl-encode`.
+- Calibrating margins? Use `lbl-pattern` (or `lbl print --sample-pattern`) to
+  emit a fixed test raster straight into `lbl-encode` — no render or dither.
 - Want only an image? Stop after `lbl-render` or `lbl-dither --preview-png`.

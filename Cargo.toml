@@ -11,6 +11,7 @@ members = [
     "crates/lbl-transpile-html",
     "crates/lbl-render",
     "crates/lbl-dither",
+    "crates/lbl-pattern",
     "crates/lbl-encode",
     "crates/lbl-device",
     "crates/lbl-spool",
@@ -46,6 +47,7 @@ lbl-template = { path = "crates/lbl-template" }
 lbl-transpile-html = { path = "crates/lbl-transpile-html" }
 lbl-render = { path = "crates/lbl-render" }
 lbl-dither = { path = "crates/lbl-dither" }
+lbl-pattern = { path = "crates/lbl-pattern" }
 lbl-driver-api = { path = "crates/drivers/lbl-driver-api" }
 lbl-driver-dymo = { path = "crates/drivers/lbl-driver-dymo" }
 lbl-driver-escpos = { path = "crates/drivers/lbl-driver-escpos" }

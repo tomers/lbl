@@ -26,3 +26,4 @@ thiserror = { workspace = true }
 clap = { workspace = true }
 lbl-cli = { workspace = true }
 anyhow = { workspace = true }
+lbl-pattern = { workspace = true }

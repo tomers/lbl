@@ -36,6 +36,11 @@ lbl device    Discover printers (list)
 --debug     Dump every pipeline stage to stderr (highlighted HTML, the dithered
             raster as terminal art, an encoded-byte preview)
 --debug-html <FILE>   Write a standalone HTML report of every pipeline stage
+--sample-pattern [<DOTS>]   Print a calibration pattern (no label input/render/dither).
+                    Omit DOTS to use the media width in device dots from
+                    `--media` / `--width-mm` at `--dpi` (e.g. 96 for NIIMBOT 12 mm
+                    @ 203 dpi). Pass an explicit value to override (e.g. 64 on a
+                    64-dot DYMO head).
 ```
 
 Most `lbl print` flags have config/env equivalents under `[print]` /
@@ -85,7 +90,8 @@ landscape.
 See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
 `--supersample` controls and how to choose a value.
 | `lbl-dither` | `--algorithm`, `--threshold`, `--preview-png`, `--out` |
-| `lbl-encode` | `--protocol`, `--width-mm`, `--length-mm`, `--dpi`, `--cut`, `--supports-cut` |
+| `lbl-pattern` | `--height [<DOTS>]`, `--width-mm`, `--dpi`, `--out` (calibration PBM) |
+| `lbl-encode` | `--protocol`, `--sample-pattern [<DOTS>]`, `--width-mm`, `--length-mm`, `--dpi`, `--cut`, `--supports-cut` |
 | `lbl-device` | `list`; `send --network host:port | --usb vid:pid | --serial path[:baud]` |
 | `lbl-spool` | `--network|--usb|--serial` plus encoded files to queue |
 | `lbl-config` | `show`, `sources`, `paths` |

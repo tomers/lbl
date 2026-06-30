@@ -10,6 +10,7 @@ use std::io::Read;
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use lbl::pipeline::{authoring_labels, resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset, resolve_print_transport, resolve_style, render_viewport_px, PipelineOptions, Source};
+use lbl_pattern::resolve_head_dots;
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -85,6 +86,15 @@ struct SourceArgs {
     /// JSON-pointer to a batch array within the data.
     #[arg(long)]
     each: Option<String>,
+}
+
+impl SourceArgs {
+    fn is_set(&self) -> bool {
+        self.text.is_some()
+            || self.markdown.is_some()
+            || self.html.is_some()
+            || self.template.is_some()
+    }
 }
 
 #[derive(Args, Clone)]
@@ -512,6 +522,13 @@ struct PrintArgs {
     /// Overrides config `[print] confirm` / `LBL_PRINT__CONFIRM`.
     #[arg(long, action = clap::ArgAction::SetTrue)]
     confirm: Option<bool>,
+
+    /// Print a calibration sample pattern. Omit the value to use the resolved
+    /// media width in device dots (`--media` / `--width-mm` at `--dpi`); pass a
+    /// number to override the head height (e.g. 64 on a 64-dot DYMO head).
+    /// Skips label input, rendering, and dithering.
+    #[arg(long, num_args = 0..=1)]
+    sample_pattern: Option<Option<u32>>,
 }
 
 fn config_enum<E: ValueEnum>(name: &str, value: &str) -> Result<E> {
@@ -627,6 +644,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
     let media_inset = resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample);
 
+    let sample_head_dots = if args.sample_pattern.is_some() {
+        Some(
+            resolve_head_dots(args.sample_pattern.flatten(), &media).map_err(|e| anyhow!(e))?,
+        )
+    } else {
+        None
+    };
+
     let opts = PipelineOptions {
         protocol,
         media,
@@ -646,7 +671,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
         media_inset,
     };
 
-    let labels = authoring_labels(read_source(&args.source)?)?;
+    if args.source.is_set() && args.sample_pattern.is_some() {
+        bail!("--sample-pattern cannot be combined with label input (--text, --markdown, --html, --template)");
+    }
 
     // The virtual driver carries its selected media type, so register an
     // instance configured for this run (overriding the PNG default).
@@ -664,22 +691,32 @@ fn run_print(args: PrintArgs) -> Result<()> {
         media_type.map(|mt| mt.extension()).unwrap_or("bin")
     };
 
-    // Encode every label, capturing per-stage traces when any feature needs the
-    // intermediate artifacts (HTML report, console output, preview, or debug
-    // dump), then dispatch.
     let want_trace = args.debug_html.is_some()
         || debug
         || confirm
         || protocol == Protocol::Console;
+
     let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
-        match backend {
-            BackendArg::Chromium => {
-                let backend = ChromiumBackend::launch()?;
-                encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
-            }
-            BackendArg::Sidecar => {
-                let backend = SidecarBackend::node_default();
-                encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+        if let Some(head_dots) = sample_head_dots {
+            let trace = lbl::encode_sample_pattern_traced(&registry, 0, head_dots, &opts)
+                .context("encoding sample pattern")?;
+            let encoded = vec![(
+                format!("sample-pattern-{head_dots:04}.{extension}"),
+                trace.encoded.clone(),
+            )];
+            let traces = if want_trace { vec![trace] } else { vec![] };
+            (encoded, traces)
+        } else {
+            let labels = authoring_labels(read_source(&args.source)?)?;
+            match backend {
+                BackendArg::Chromium => {
+                    let backend = ChromiumBackend::launch()?;
+                    encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+                }
+                BackendArg::Sidecar => {
+                    let backend = SidecarBackend::node_default();
+                    encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+                }
             }
         };
 
