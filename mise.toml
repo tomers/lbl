@@ -1,6 +1,7 @@
 [tools]
 just = "latest"
 pre-commit = "latest"
+"cargo:cargo-edit" = "latest"
 jq = "latest"
 ripgrep = "latest"
 shellcheck = "latest"

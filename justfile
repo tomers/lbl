@@ -13,6 +13,12 @@ default:
 help:
     @just --list
 
+alias pc := pre-commit
+alias pca := pre-commit-all
+
+# Repo-wide dependency maintenance (Cargo).
+mod maintenance './justfiles/maintenance.just'
+
 # Run the lbl-server API on the host.
 serve *args:
     cargo run -p lbl-server -- --bind 127.0.0.1:8787 {{ args }}
@@ -21,13 +27,19 @@ serve *args:
 lbl *args:
     cargo run -q -p lbl --bin lbl -- {{ args }}
 
-# Lint the Rust workspace.
+# Lint the Rust workspace (rustc warnings-as-errors + clippy + rustfmt check).
 lint:
     @just rust-lint
 
-# Apply Rust autofixes.
+# Apply Rust autofixes (clippy --fix + rustfmt).
 lint-fix:
     @just rust-lint-fix
+
+lint-fix-allow-dirty:
+    @just clippy-fix --allow-dirty
+    @just format-fix
+
+rust-lint-fix-allow-dirty: lint-fix-allow-dirty
 
 # Run the Rust workspace test suite (cargo-nextest).
 test *args:
@@ -57,3 +69,18 @@ pre-commit:
 
 pre-commit-all:
     @pre-commit run --all-files
+
+# Lint markdown files with markdownlint.
+#
+# Usage:
+#   just markdownlint docs/src/guides/configuration.md
+#   just markdownlint-fix docs/src/guides/configuration.md
+markdownlint *files:
+    @pre-commit run markdownlint --hook-stage manual --files {{files}}
+
+markdownlint-fix *files:
+    @pre-commit run markdownlint-fix --hook-stage manual --files {{files}} || \
+      pre-commit run markdownlint --hook-stage manual --files {{files}}
+
+alias mdlint-fix := markdownlint-fix
+alias mdlint := markdownlint

@@ -55,10 +55,13 @@ pre-commit install --install-hooks
 Common recipes (run `just` for the full list):
 
 ```bash
-just serve            # run the lbl-server API on the host (127.0.0.1:8787)
-just lint             # lint the Rust workspace
-just lint-fix         # apply autofixes
-just test             # run the Rust test suite (cargo-nextest)
+just serve                          # run the lbl-server API on the host (127.0.0.1:8787)
+just lint                           # lint the Rust workspace (rustc + clippy + rustfmt)
+just lint-fix                       # apply autofixes (clippy --fix + rustfmt)
+just lint-fix-allow-dirty           # same, but allow a dirty working tree
+just test                           # run the Rust test suite (cargo-nextest)
+just maintenance cargo-upgrade      # bump Cargo.toml deps + refresh Cargo.lock
+just pre-commit-all                 # run the full pre-commit suite on all files
 ```
 
 ## Building
