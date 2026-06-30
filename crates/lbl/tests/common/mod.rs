@@ -34,7 +34,7 @@ use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
 use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
-use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelStyle, TranspileOptions};
 
 /// Vendored QR library (exposes the global `QRCode`).
 const QR_JS: &str = include_str!("../assets/qrcode.min.js");
@@ -93,6 +93,11 @@ pub fn render_bitmap(
             index: None,
             count: None,
             style: style.clone(),
+            label_fit: if media.length_dots().is_some() {
+                LabelFit::Fill
+            } else {
+                LabelFit::Content
+            },
         },
     );
     let html = inline_assets(&transpiled);

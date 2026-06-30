@@ -50,6 +50,13 @@ html,body{margin:0;padding:0}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
 "#;
 
+/// CSS injected when [`LabelFit::Fill`] is active: stretch `.lbl-label` to the
+/// render viewport and center its content on the main axis.
+pub const LABEL_FIT_FILL_CSS: &str = r#"
+html,body{height:100%;width:100%;margin:0}
+.lbl-label{height:100%;width:100%;justify-content:center}
+"#;
+
 /// Additional CSS for preview mode: a neutral backdrop and a label boundary so
 /// the document reads well in a browser/gallery.
 pub const PREVIEW_CSS: &str = r#"

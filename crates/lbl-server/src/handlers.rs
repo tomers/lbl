@@ -8,13 +8,14 @@ use serde::Deserialize;
 use serde_json::json;
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, resolve_media, resolve_style, PipelineOptions, Source,
+    authoring_labels, encode_label, resolve_label_fit, resolve_media, resolve_style, PipelineOptions,
+    Source,
 };
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_dither::Algorithm;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelFitSetting, TranspileOptions};
 
 use crate::AppState;
 
@@ -173,6 +174,11 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<SourceReq>) 
     // supersample factor so the browser preview matches printed sizing.
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
     let style = resolve_style(&style_cfg, default_dpi(), 2);
+    let label_fit = match LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto)
+    {
+        LabelFitSetting::Auto | LabelFitSetting::Content => LabelFit::Content,
+        LabelFitSetting::Fill => LabelFit::Fill,
+    };
     let out: Vec<_> = labels
         .into_iter()
         .map(|l| {
@@ -184,6 +190,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<SourceReq>) 
                     index: Some(l.index),
                     count: Some(count),
                     style: style.clone(),
+                    label_fit,
                 },
             );
             json!({ "index": l.index, "html": html })
@@ -295,6 +302,10 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
 
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+    let label_fit = resolve_label_fit(
+        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        &media,
+    );
 
     let protocol = parse_protocol(&req.protocol)?;
     let rotation = req.rotation(&state);
@@ -311,6 +322,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         assets_base: AssetsBase::Cdn,
         style,
         media_type: None,
+        label_fit,
     };
 
     let labels = authoring_labels(source).map_err(ApiError::from)?;
@@ -384,6 +396,10 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
 
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+    let label_fit = resolve_label_fit(
+        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        &media,
+    );
 
     let rotation = req.rotation(&state);
     let opts = PipelineOptions {
@@ -399,6 +415,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         assets_base: AssetsBase::Cdn,
         style,
         media_type,
+        label_fit,
     };
 
     let labels = authoring_labels(source).map_err(ApiError::from)?;

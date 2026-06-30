@@ -125,6 +125,54 @@ impl LabelStyle {
     }
 }
 
+/// How `.lbl-label` is sized within the render viewport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelFit {
+    /// Size to content (typical for continuous media).
+    Content,
+    /// Fill the viewport and center content on the main axis (typical for
+    /// fixed die-cut labels).
+    Fill,
+}
+
+/// Configurable label-fit policy before media is known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LabelFitSetting {
+    /// Fill fixed-length media; shrink on continuous media.
+    #[default]
+    Auto,
+    Fill,
+    Content,
+}
+
+impl LabelFitSetting {
+    /// Parse a config / CLI value (`auto`, `fill`, `content`).
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Self::Auto),
+            "fill" => Some(Self::Fill),
+            "content" => Some(Self::Content),
+            _ => None,
+        }
+    }
+
+    /// Resolve to a concrete [`LabelFit`] given whether the media has a fixed
+    /// length.
+    pub fn resolve(self, fixed_media_length: bool) -> LabelFit {
+        match self {
+            Self::Auto => {
+                if fixed_media_length {
+                    LabelFit::Fill
+                } else {
+                    LabelFit::Content
+                }
+            }
+            Self::Fill => LabelFit::Fill,
+            Self::Content => LabelFit::Content,
+        }
+    }
+}
+
 /// Options controlling transpilation.
 #[derive(Debug, Clone)]
 pub struct TranspileOptions {
@@ -138,6 +186,8 @@ pub struct TranspileOptions {
     pub count: Option<usize>,
     /// Font / QR / barcode sizing.
     pub style: LabelStyle,
+    /// How the label root fills the render viewport.
+    pub label_fit: LabelFit,
 }
 
 impl Default for TranspileOptions {
@@ -148,6 +198,7 @@ impl Default for TranspileOptions {
             index: None,
             count: None,
             style: LabelStyle::default(),
+            label_fit: LabelFit::Content,
         }
     }
 }
@@ -238,6 +289,9 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     head.push_str("<style>");
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
+    if opts.label_fit == LabelFit::Fill {
+        head.push_str(assets::LABEL_FIT_FILL_CSS);
+    }
     if opts.mode == OutputMode::Preview {
         head.push_str(assets::PREVIEW_CSS);
     }
@@ -340,6 +394,26 @@ mod tests {
     fn print_mode_has_no_preview_chrome() {
         let out = transpile("<div>hi</div>", &TranspileOptions::default());
         assert!(!out.contains("lbl-preview"));
+    }
+
+    #[test]
+    fn fill_mode_injects_viewport_css() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains("height:100%"), "{out}");
+        assert!(out.contains("justify-content:center"), "{out}");
+    }
+
+    #[test]
+    fn content_mode_omits_viewport_css() {
+        let out = transpile(
+            "<div class=\"lbl-label\">hi</div>",
+            &TranspileOptions::default(),
+        );
+        assert!(!out.contains("justify-content:center"), "{out}");
     }
 
     #[test]

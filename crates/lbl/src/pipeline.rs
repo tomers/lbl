@@ -13,7 +13,7 @@ use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
-use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, QrErrorCorrection, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelFitSetting, LabelStyle, QrErrorCorrection, TranspileOptions};
 
 /// A single authoring-HTML label with its batch index.
 #[derive(Debug, Clone)]
@@ -220,6 +220,13 @@ pub struct PipelineOptions {
     /// For the virtual (`Protocol::Virtual`) printer, the output file format
     /// ("media type"). Ignored by hardware protocols.
     pub media_type: Option<MediaType>,
+    /// How the label root fills the render viewport (resolved from config/CLI).
+    pub label_fit: LabelFit,
+}
+
+/// Resolve a [`LabelFitSetting`] against the target media.
+pub fn resolve_label_fit(setting: LabelFitSetting, media: &Media) -> LabelFit {
+    setting.resolve(media.length_dots().is_some())
 }
 
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
@@ -252,6 +259,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             index: None,
             count: None,
             style: opts.style.clone(),
+            label_fit: opts.label_fit,
         },
     );
 
@@ -354,6 +362,7 @@ mod tests {
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
             media_type: None,
+            label_fit: LabelFit::Fill,
         }
     }
 

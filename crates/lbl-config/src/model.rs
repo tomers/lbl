@@ -87,6 +87,9 @@ pub struct StyleConfig {
     pub padding_mm: f64,
     /// Border drawn around the label, in mm (0 = no border).
     pub border_width_mm: f64,
+    /// How `.lbl-label` fills the render viewport: `auto` (fill fixed-length
+    /// media, shrink on continuous), `fill`, or `content`.
+    pub label_fit: String,
 }
 
 impl Default for StyleConfig {
@@ -102,6 +105,7 @@ impl Default for StyleConfig {
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,
             border_width_mm: 0.0,
+            label_fit: "auto".into(),
         }
     }
 }

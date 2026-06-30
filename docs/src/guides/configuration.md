@@ -67,10 +67,13 @@ qr_dark = "#000000"
 qr_light = "#ffffff"
 padding_mm = 2.0
 border_width_mm = 0.0
+# How the label root fills the media: auto (fill fixed-length media), fill, content
+label_fit = "auto"
 ```
 
 Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
-`--qr-dark`, and `--qr-light`. Per-code overrides in authoring HTML:
+`--qr-dark`, `--qr-light`, and `--label-fit` (`auto`, `fill`, or `content`).
+Per-code overrides in authoring HTML:
 `<qr ec="H" margin="2">payload</qr>`.
 
 ## Print defaults (`lbl print`)

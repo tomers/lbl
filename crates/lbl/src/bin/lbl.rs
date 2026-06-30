@@ -9,7 +9,7 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_media, resolve_print_transport, resolve_style, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_label_fit, resolve_media, resolve_print_transport, resolve_style, PipelineOptions, Source};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -19,7 +19,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelFitSetting, TranspileOptions};
 
 #[derive(Parser)]
 #[command(
@@ -154,6 +154,19 @@ struct StyleArgs {
     /// `style.border_width_mm`).
     #[arg(long)]
     border_mm: Option<f64>,
+
+    /// How the label root fills the media viewport: `auto` fills fixed-length
+    /// media and shrinks on continuous; `fill` or `content` force a mode
+    /// (overrides config `style.label_fit`).
+    #[arg(long, value_enum)]
+    label_fit: Option<LabelFitArg>,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LabelFitArg {
+    Auto,
+    Fill,
+    Content,
 }
 
 impl StyleArgs {
@@ -192,6 +205,14 @@ impl StyleArgs {
         }
         if let Some(v) = self.border_mm {
             style.border_width_mm = v;
+        }
+        if let Some(v) = self.label_fit {
+            style.label_fit = match v {
+                LabelFitArg::Auto => "auto",
+                LabelFitArg::Fill => "fill",
+                LabelFitArg::Content => "content",
+            }
+            .into();
         }
         style
     }
@@ -492,7 +513,12 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .unwrap_or(render_cfg.orientation);
     let rotation = Rotation::for_print(orientation, args.rotate_cw as u32, args.rotate_ccw as u32);
 
-    let style = resolve_style(&args.style.resolve(), media.dpi.0, supersample);
+    let style_cfg = args.style.resolve();
+    let style = resolve_style(&style_cfg, media.dpi.0, supersample);
+    let label_fit = resolve_label_fit(
+        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        &media,
+    );
 
     let opts = PipelineOptions {
         protocol,
@@ -506,6 +532,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         assets_base: AssetsBase::Cdn,
         style,
         media_type,
+        label_fit,
     };
 
     let labels = authoring_labels(read_source(&args.source)?)?;
@@ -746,7 +773,20 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
 
     // Preview rasterization uses a fixed supersample factor (see below); resolve
     // the physical style sizes against it so previews match print sizing.
-    let style = resolve_style(&args.style.resolve(), args.media.dpi, PREVIEW_SUPERSAMPLE);
+    let style_cfg = args.style.resolve();
+    let style = resolve_style(&style_cfg, args.media.dpi, PREVIEW_SUPERSAMPLE);
+    let catalog = Catalog::bundled()?;
+    let media = resolve_media(
+        &catalog,
+        args.media.media.as_deref(),
+        args.media.width_mm.or(Some(50.0)),
+        args.media.length_mm,
+        args.media.dpi,
+    )?;
+    let label_fit = resolve_label_fit(
+        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        &media,
+    );
 
     let backend = if args.render {
         Some(ChromiumBackend::launch()?)
@@ -764,6 +804,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 index: Some(label.index),
                 count: Some(count),
                 style: style.clone(),
+                label_fit,
             },
         );
         let html_name = format!("preview-{:04}.html", label.index);
@@ -772,14 +813,6 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
         let mut entry = serde_json::json!({"index": label.index, "html": html_name});
 
         if let Some(backend) = &backend {
-            let catalog = Catalog::bundled()?;
-            let media = resolve_media(
-                &catalog,
-                args.media.media.as_deref(),
-                args.media.width_mm.or(Some(50.0)),
-                args.media.length_mm,
-                args.media.dpi,
-            )?;
             let req = lbl_render::RenderRequest {
                 width_dots: Some(media.width_dots().0),
                 height_dots: media.length_dots().map(|d| d.0),
@@ -984,6 +1017,7 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         index: None,
         count: None,
         style,
+        label_fit: LabelFit::Content,
     };
     print!("{}", transpile(&input, &opts));
     Ok(())
