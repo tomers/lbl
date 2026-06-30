@@ -256,6 +256,11 @@ struct PrintArgs {
     #[arg(long)]
     usb: Option<String>,
 
+    /// Serial (USB CDC-ACM) target: a device path, optionally with a baud rate
+    /// (`/dev/ttyACM0` or `/dev/ttyACM0:115200`). Used by NIIMBOT D-series.
+    #[arg(long)]
+    serial: Option<String>,
+
     /// Instead of printing, write encoded bytes to this directory.
     #[arg(long)]
     out_dir: Option<std::path::PathBuf>,
@@ -368,14 +373,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     if let Some(file) = &args.file {
         let mut t = lbl_device::FileTransport::new(file.clone());
-        return dispatch_with(encoded, &mut t);
+        return dispatch_with(encoded, protocol, &mut t);
     }
 
     if protocol == Protocol::Virtual {
         bail!("virtual printer needs an output target; pass --file or --out-dir");
     }
 
-    dispatch(encoded, args.network, args.usb)
+    dispatch(encoded, protocol, args.network, args.usb, args.serial)
 }
 
 #[allow(clippy::type_complexity)]
@@ -405,15 +410,17 @@ fn encode_all<B: RenderBackend>(
 
 fn dispatch(
     encoded: Vec<(String, Vec<u8>)>,
+    protocol: Protocol,
     network: Option<String>,
     usb: Option<String>,
+    serial: Option<String>,
 ) -> Result<()> {
     if let Some(target) = network {
         let (host, port) = target
             .rsplit_once(':')
             .ok_or_else(|| anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
-        dispatch_with(encoded, &mut t)
+        dispatch_with(encoded, protocol, &mut t)
     } else if let Some(target) = usb {
         let (vid, pid) = target
             .split_once(':')
@@ -423,22 +430,22 @@ fn dispatch(
             u16::from_str_radix(pid, 16)?,
             None,
         );
-        dispatch_with(encoded, &mut t)
+        dispatch_with(encoded, protocol, &mut t)
+    } else if let Some(target) = serial {
+        let (path, baud) = lbl::dispatch::parse_serial_target(&target);
+        let mut t = lbl_device::SerialTransport::new(path, baud);
+        dispatch_with(encoded, protocol, &mut t)
     } else {
-        bail!("no target; pass --network, --usb, --file, or --out-dir");
+        bail!("no target; pass --network, --usb, --serial, --file, or --out-dir");
     }
 }
 
 fn dispatch_with<T: lbl_device::Transport>(
     encoded: Vec<(String, Vec<u8>)>,
+    protocol: Protocol,
     transport: &mut T,
 ) -> Result<()> {
-    use lbl_spool::Spooler;
-    let mut spool = Spooler::new();
-    for (name, bytes) in encoded {
-        spool.enqueue(name, bytes, None);
-    }
-    let report = spool.run(transport);
+    let report = lbl::dispatch::dispatch_encoded(encoded, protocol, transport);
     println!(
         "completed={} remaining={} disconnected={}",
         report.completed, report.remaining, report.disconnected

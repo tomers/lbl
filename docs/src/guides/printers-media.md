@@ -47,11 +47,21 @@ bundled catalog under the `NIIMBOT` brand:
 
 ```bash
 lbl-catalog compatible --printer "D110"
-lbl print --media 12x40 --dpi 203 ...
+# Print over the USB-C cable (serial / CDC-ACM):
+lbl print --media 12x40 --dpi 203 --protocol niimbot --serial /dev/ttyACM0
 # or by dimensions:
-lbl print --width-mm 12 --length-mm 40 --dpi 203 --protocol niimbot ...
+lbl print --width-mm 12 --length-mm 40 --dpi 203 --protocol niimbot --serial /dev/ttyACM0
 ```
 
-D-series printers connect over Bluetooth LE or a USB CDC-ACM serial port
-(e.g. `/dev/ttyACM0`) rather than USB bulk transfer, so they aren't listed by
-USB discovery — adopt one manually and select `niimbot` as the protocol.
+D-series printers connect over a USB CDC-ACM **serial** port (e.g.
+`/dev/ttyACM0`, or `COM3` on Windows) rather than USB bulk transfer, so they
+aren't listed by USB discovery. Pass `--serial <path>` (optionally
+`<path>:<baud>`, default 115200) and select `niimbot` as the protocol.
+
+NIIMBOT is a request/response protocol, so the serial transport is
+**bidirectional**: after each label's bytes are sent, `lbl` polls the printer's
+status and waits for the page to finish before dispatching the next one. (Over a
+write-only transport — a file or raw socket — the job is still emitted, just
+without the completion handshake.)
+
+Bluetooth LE is not yet supported as a transport; use the USB cable.

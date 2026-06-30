@@ -2,8 +2,9 @@
 //!
 //! - [`discovery`] enumerates connected printers (USB via
 //!   [nusb](https://docs.rs/nusb)) and maps them to known models/protocols.
-//! - [`transport`] delivers encoded bytes to a printer over USB bulk transfer
-//!   or a raw TCP socket (network printers, typically port 9100).
+//! - [`transport`] delivers encoded bytes to a printer over USB bulk transfer,
+//!   a raw TCP socket (network printers, typically port 9100), or a
+//!   bidirectional serial port (USB CDC-ACM, e.g. NIIMBOT D-series).
 //! - [`media`] resolves the media loaded in a printer: auto-detection when the
 //!   device reports it, otherwise an explicit override.
 //!
@@ -21,6 +22,9 @@ pub use transport::{FileTransport, NetworkTransport, Transport};
 
 #[cfg(feature = "usb")]
 pub use transport::UsbTransport;
+
+#[cfg(feature = "serial")]
+pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};
 
 /// Errors produced by the device layer.
 #[derive(Debug, thiserror::Error)]

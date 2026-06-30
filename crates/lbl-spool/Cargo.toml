@@ -13,12 +13,13 @@ name = "lbl-spool"
 path = "src/bin/lbl-spool.rs"
 
 [features]
-default = ["usb"]
+default = ["usb", "serial"]
 usb = ["lbl-device/usb"]
+serial = ["lbl-device/serial"]
 
 [dependencies]
 lbl-core = { workspace = true }
-lbl-device = { workspace = true, default-features = false }
+lbl-device = { path = "../lbl-device", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

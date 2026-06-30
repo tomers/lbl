@@ -160,6 +160,22 @@ impl Spooler {
     /// later. Non-abort failures are not used here because all transport errors
     /// are treated as potential disconnects.
     pub fn run<T: Transport>(&mut self, transport: &mut T) -> SpoolReport {
+        self.run_with(transport, |_| Ok(()))
+    }
+
+    /// Like [`Spooler::run`], but calls `after_send` once after each job's bytes
+    /// are delivered, before the job is marked complete.
+    ///
+    /// This is the seam for protocols that confirm completion over a
+    /// bidirectional [`Transport`] — e.g. NIIMBOT, where `after_send` polls the
+    /// printer's status and waits for the page to finish before the next label
+    /// is dispatched. An `Err` from `after_send` is treated exactly like a send
+    /// failure (retried, then a disconnect), so the job is never lost.
+    pub fn run_with<T, F>(&mut self, transport: &mut T, mut after_send: F) -> SpoolReport
+    where
+        T: Transport,
+        F: FnMut(&mut T) -> Result<(), DeviceError>,
+    {
         let mut report = SpoolReport::default();
 
         while let Some(job) = self.queue.pop_front() {
@@ -171,7 +187,10 @@ impl Spooler {
                 if attempt > 0 && !self.policy.backoff.is_zero() {
                     std::thread::sleep(self.policy.backoff);
                 }
-                match self.send_job(transport, &job) {
+                match self
+                    .send_job(transport, &job)
+                    .and_then(|()| after_send(transport))
+                {
                     Ok(()) => {
                         sent = true;
                         break;
@@ -292,6 +311,39 @@ mod tests {
         // The failed job remains queued (not lost) for a later retry.
         assert_eq!(spool.state(a), Some(JobState::Queued));
         assert_eq!(spool.pending(), 2);
+    }
+
+    #[test]
+    fn after_send_probe_runs_per_job_and_can_fail() {
+        // Probe succeeds: called once per completed job.
+        let mut spool = Spooler::with_policy(fast_policy());
+        spool.enqueue("a", vec![1], None);
+        spool.enqueue("b", vec![2], None);
+        let mut t = AlwaysOk { sent: 0 };
+        let mut probes = 0;
+        let report = spool.run_with(&mut t, |_| {
+            probes += 1;
+            Ok(())
+        });
+        assert_eq!(report.completed, 2);
+        assert_eq!(probes, 2);
+
+        // Probe failure is retried like a send failure.
+        let mut spool = Spooler::with_policy(fast_policy());
+        let id = spool.enqueue("a", vec![1], None);
+        let mut t = AlwaysOk { sent: 0 };
+        let mut calls = 0;
+        let report = spool.run_with(&mut t, |_| {
+            calls += 1;
+            if calls < 2 {
+                Err(DeviceError::Transport("not done".into()))
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(report.completed, 1);
+        assert_eq!(calls, 2);
+        assert_eq!(spool.state(id), Some(JobState::Completed));
     }
 
     #[test]

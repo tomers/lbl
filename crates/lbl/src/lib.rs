@@ -6,6 +6,7 @@
 //! flows.
 
 pub mod debug;
+pub mod dispatch;
 pub mod pipeline;
 
 pub use pipeline::{

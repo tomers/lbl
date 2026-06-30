@@ -17,8 +17,15 @@ Row payloads pack `ceil(width / 8)` bytes MSB-first with `1` = ink — exactly t
 `MonoBitmap` layout — so no conversion is needed. Copies are handled by
 `SetQuantity` (the printer repeats the page) rather than re-emitting rows.
 
-D110-family printers reach the host over Bluetooth LE or a USB CDC-ACM serial
-port, not USB bulk transfer, so they are adopted manually rather than via USB
-discovery. Protocol reference: the
+D110-family printers reach the host over a USB CDC-ACM serial port, not USB bulk
+transfer, so they are driven through `lbl-device`'s bidirectional
+`SerialTransport` (`lbl print --protocol niimbot --serial /dev/ttyACM0`).
+
+Because NIIMBOT handshakes, this crate also exposes `status_query()` and
+`parse_status()` (plus `frame_packet()` for arbitrary commands): after a page is
+sent, the caller polls `GetPrintStatus` and waits for the printer to report the
+page complete before sending the next label.
+
+Protocol reference: the
 [NIIMBOT community docs](https://printers.niim.blue/interfacing/proto/). `lbl`
 is not affiliated with NIIMBOT.

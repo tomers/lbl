@@ -13,8 +13,9 @@ name = "lbl-device"
 path = "src/bin/lbl-device.rs"
 
 [features]
-default = ["usb"]
+default = ["usb", "serial"]
 usb = ["dep:nusb", "dep:pollster"]
+serial = ["dep:serialport"]
 
 [dependencies]
 lbl-core = { workspace = true }
@@ -27,3 +28,4 @@ tracing = { workspace = true }
 
 nusb = { version = "0.1", optional = true }
 pollster = { version = "0.3", optional = true }
+serialport = { workspace = true, optional = true }

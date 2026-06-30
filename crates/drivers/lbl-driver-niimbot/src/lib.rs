@@ -53,6 +53,10 @@ const PRINT_BITMAP_ROW: u8 = 0x85;
 const END_PAGE_PRINT: u8 = 0xE3;
 const END_PRINT: u8 = 0xF3;
 
+// Status handshake (only meaningful over a bidirectional transport).
+const GET_PRINT_STATUS: u8 = 0xA3;
+const PRINT_STATUS_RESPONSE: u8 = 0xB3;
+
 // Label type 1 = gap-sensed die-cut labels (the common case for D-series tape).
 const LABEL_TYPE_GAP: u8 = 0x01;
 
@@ -187,6 +191,72 @@ impl Driver for NiimbotDriver {
     }
 }
 
+/// Frame an arbitrary NIIMBOT command packet
+/// (`55 55 <cmd> <len> <data> <csum> AA AA`). Exposed for callers that drive
+/// the bidirectional handshake (status polling) outside the encode path.
+pub fn frame_packet(command: u8, data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(data.len() + 7);
+    NiimbotDriver::push_packet(&mut out, command, data);
+    out
+}
+
+/// The `GetPrintStatus` query packet. Send this over a bidirectional transport
+/// and parse the reply with [`parse_status`] to track a running print.
+pub fn status_query() -> Vec<u8> {
+    frame_packet(GET_PRINT_STATUS, &[0x01])
+}
+
+/// A decoded print-status reply from the printer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PrintStatus {
+    /// The page (label) currently being printed.
+    pub page: u16,
+    /// Primary progress percentage (0–100).
+    pub progress1: u8,
+    /// Secondary progress percentage (0–100).
+    pub progress2: u8,
+}
+
+impl PrintStatus {
+    /// Whether the current page has finished printing.
+    pub fn is_complete(&self) -> bool {
+        self.progress1 >= 100 && self.progress2 >= 100
+    }
+}
+
+/// Parse the first `PrintStatusResponse` (`0xB3`) packet found in `bytes`.
+///
+/// Scans for the `55 55` frame header so it tolerates leading noise or other
+/// packets in the buffer. Returns `None` if no well-formed status reply is
+/// present (e.g. the printer is idle and the session has ended).
+pub fn parse_status(bytes: &[u8]) -> Option<PrintStatus> {
+    let mut i = 0;
+    while i + 4 <= bytes.len() {
+        if bytes[i] != 0x55 || bytes[i + 1] != 0x55 {
+            i += 1;
+            continue;
+        }
+        let command = bytes[i + 2];
+        let len = bytes[i + 3] as usize;
+        let data_start = i + 4;
+        let data_end = data_start + len;
+        // Need the data plus checksum + 2-byte tail to be a complete packet.
+        if data_end + 3 > bytes.len() {
+            break;
+        }
+        if command == PRINT_STATUS_RESPONSE && len >= 4 {
+            let data = &bytes[data_start..data_end];
+            return Some(PrintStatus {
+                page: u16::from_be_bytes([data[0], data[1]]),
+                progress1: data[2],
+                progress2: data[3],
+            });
+        }
+        i = data_end + 3; // skip this packet (checksum + tail)
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,6 +369,30 @@ mod tests {
             .filter(|w| w[0] == 0x55 && w[1] == 0x55 && w[2] == PRINT_BITMAP_ROW)
             .count();
         assert_eq!(rows, 1);
+    }
+
+    #[test]
+    fn status_query_is_a_framed_get_status_packet() {
+        let q = status_query();
+        assert!(checksum_ok(&q));
+        assert_eq!(q[2], GET_PRINT_STATUS);
+        assert_eq!(find_packet(&q, GET_PRINT_STATUS).unwrap(), &[0x01]);
+    }
+
+    #[test]
+    fn parses_status_reply_and_detects_completion() {
+        // page = 1, progress 100/100 → complete.
+        let done = frame_packet(PRINT_STATUS_RESPONSE, &[0x00, 0x01, 100, 100]);
+        let s = parse_status(&done).unwrap();
+        assert_eq!(s.page, 1);
+        assert!(s.is_complete());
+
+        // page = 0, progress 40/0 → still printing.
+        let mid = frame_packet(PRINT_STATUS_RESPONSE, &[0x00, 0x00, 40, 0]);
+        assert!(!parse_status(&mid).unwrap().is_complete());
+
+        // No status packet present.
+        assert!(parse_status(&[0x55, 0x55, 0x01, 0x01, 0x01]).is_none());
     }
 
     #[test]

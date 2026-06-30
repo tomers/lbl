@@ -24,8 +24,12 @@ lbl device    Discover printers (list)
 --dither <auto|floyd-steinberg|ordered|none>
 --cut  --supports-cut  --copies <N>
 --backend <chromium|sidecar>
---network <host:port> | --usb <vid:pid> | --out-dir <DIR>
+--network <host:port> | --usb <vid:pid> | --serial <path[:baud]> | --out-dir <DIR>
 ```
+
+`--serial` reaches USB CDC-ACM printers (e.g. NIIMBOT D-series on
+`/dev/ttyACM0`, default baud 115200). It is bidirectional, so NIIMBOT prints
+wait for the printer's status to confirm completion between labels.
 
 ### `lbl preview`
 
@@ -46,8 +50,8 @@ See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
 `--supersample` controls and how to choose a value.
 | `lbl-dither` | `--algorithm`, `--threshold`, `--preview-png`, `--out` |
 | `lbl-encode` | `--protocol`, `--width-mm`, `--length-mm`, `--dpi`, `--cut`, `--supports-cut` |
-| `lbl-device` | `list`; `send --network host:port | --usb vid:pid` |
-| `lbl-spool` | `--network|--usb` plus encoded files to queue |
+| `lbl-device` | `list`; `send --network host:port | --usb vid:pid | --serial path[:baud]` |
+| `lbl-spool` | `--network|--usb|--serial` plus encoded files to queue |
 | `lbl-config` | `show`, `sources`, `paths` |
 | `lbl-catalog` | `list`, `show <key>`, `compatible --printer <m>`, `search <q>` |
 | `lbl-server` | `--bind <addr>` (HTTP API) |

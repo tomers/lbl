@@ -193,6 +193,7 @@ pub struct PrintReq {
     dither: String,
     network: Option<String>,
     usb: Option<String>,
+    serial: Option<String>,
     #[serde(default)]
     use_sidecar: bool,
     /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
@@ -248,8 +249,9 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
 
+    let protocol = parse_protocol(&req.protocol)?;
     let opts = PipelineOptions {
-        protocol: parse_protocol(&req.protocol)?,
+        protocol,
         media,
         supports_cut: req.supports_cut,
         cut: req.cut,
@@ -266,6 +268,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let use_sidecar = req.use_sidecar;
     let network = req.network.clone();
     let usb = req.usb.clone();
+    let serial = req.serial.clone();
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
     let report = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
@@ -276,7 +279,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             let backend = ChromiumBackend::launch()?;
             encode_all(&backend, &registry, &labels, &opts)?
         };
-        dispatch(encoded, network, usb)
+        dispatch(encoded, protocol, network, usb, serial)
     })
     .await
     .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -438,22 +441,20 @@ impl<B: RenderBackend> DynBackend for B {
 
 fn dispatch(
     encoded: Vec<(String, Vec<u8>)>,
+    protocol: Protocol,
     network: Option<String>,
     usb: Option<String>,
+    serial: Option<String>,
 ) -> anyhow::Result<serde_json::Value> {
-    use lbl_spool::Spooler;
+    use lbl::dispatch::{dispatch_encoded, parse_serial_target};
     let total = encoded.len();
-    let mut spool = Spooler::new();
-    for (name, bytes) in encoded {
-        spool.enqueue(name, bytes, None);
-    }
 
     let report = if let Some(target) = network {
         let (host, port) = target
             .rsplit_once(':')
             .ok_or_else(|| anyhow::anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
-        spool.run(&mut t)
+        dispatch_encoded(encoded, protocol, &mut t)
     } else if let Some(target) = usb {
         let (vid, pid) = target
             .split_once(':')
@@ -463,9 +464,13 @@ fn dispatch(
             u16::from_str_radix(pid, 16)?,
             None,
         );
-        spool.run(&mut t)
+        dispatch_encoded(encoded, protocol, &mut t)
+    } else if let Some(target) = serial {
+        let (path, baud) = parse_serial_target(&target);
+        let mut t = lbl_device::SerialTransport::new(path, baud);
+        dispatch_encoded(encoded, protocol, &mut t)
     } else {
-        anyhow::bail!("no target; provide network or usb");
+        anyhow::bail!("no target; provide network, usb, or serial");
     };
 
     Ok(json!({

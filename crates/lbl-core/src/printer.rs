@@ -50,6 +50,20 @@ pub enum Transport {
         /// TCP port (commonly 9100 for raw printing).
         port: u16,
     },
+    /// A bidirectional serial port (USB CDC-ACM, e.g. `/dev/ttyACM0`), used by
+    /// printers that handshake — such as the NIIMBOT D-series.
+    Serial {
+        /// Serial device path (`/dev/ttyACM0`, `COM3`, ...).
+        path: String,
+        /// Baud rate (NIIMBOT printers use 115200).
+        #[serde(default = "default_serial_baud")]
+        baud: u32,
+    },
+}
+
+/// Default baud rate for serial printers (NIIMBOT family).
+fn default_serial_baud() -> u32 {
+    115_200
 }
 
 /// A stable identifier for a printer the user owns, used as the config key so

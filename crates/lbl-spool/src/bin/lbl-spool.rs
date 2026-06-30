@@ -19,6 +19,11 @@ struct Cli {
     #[arg(long)]
     usb: Option<String>,
 
+    /// Serial target: a device path with optional baud (`/dev/ttyACM0` or
+    /// `/dev/ttyACM0:115200`).
+    #[arg(long)]
+    serial: Option<String>,
+
     /// Encoded files to print, in order.
     #[arg(required = true)]
     files: Vec<std::path::PathBuf>,
@@ -42,8 +47,10 @@ fn main() -> Result<()> {
         spool.run(&mut t)
     } else if let Some(target) = cli.usb {
         run_usb(&mut spool, &target)?
+    } else if let Some(target) = cli.serial {
+        run_serial(&mut spool, &target)?
     } else {
-        bail!("no target; use --network host:port or --usb vid:pid")
+        bail!("no target; use --network host:port, --usb vid:pid, or --serial path[:baud]")
     };
 
     println!(
@@ -75,4 +82,22 @@ fn run_usb(spool: &mut Spooler, target: &str) -> Result<lbl_spool::SpoolReport> 
 #[cfg(not(feature = "usb"))]
 fn run_usb(_spool: &mut Spooler, _target: &str) -> Result<lbl_spool::SpoolReport> {
     bail!("USB support not compiled in")
+}
+
+#[cfg(feature = "serial")]
+fn run_serial(spool: &mut Spooler, target: &str) -> Result<lbl_spool::SpoolReport> {
+    let (path, baud) = match target.rsplit_once(':') {
+        Some((p, b)) if !b.is_empty() && b.chars().all(|c| c.is_ascii_digit()) => (
+            p.to_string(),
+            b.parse().unwrap_or(lbl_device::DEFAULT_SERIAL_BAUD),
+        ),
+        _ => (target.to_string(), lbl_device::DEFAULT_SERIAL_BAUD),
+    };
+    let mut t = lbl_device::SerialTransport::new(path, baud);
+    Ok(spool.run(&mut t))
+}
+
+#[cfg(not(feature = "serial"))]
+fn run_serial(_spool: &mut Spooler, _target: &str) -> Result<lbl_spool::SpoolReport> {
+    bail!("serial support not compiled in")
 }

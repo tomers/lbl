@@ -17,4 +17,9 @@ jobs and dispatches them sequentially over a `Transport`.
 ```bash
 lbl-spool --network 192.168.1.50:9100 label1.zpl label2.zpl
 lbl-spool --usb 0922:1001 label.bin
+lbl-spool --serial /dev/ttyACM0 label.niimbot
 ```
+
+`run_with` lets a caller confirm each job over a bidirectional `Transport`
+(e.g. the orchestrator polls NIIMBOT print status before dispatching the next
+label); a failing probe is retried like a send failure, so jobs are never lost.

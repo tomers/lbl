@@ -1,13 +1,38 @@
 //! Transports that deliver encoded bytes to a printer.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use crate::DeviceError;
 
-/// A transport sends a finished protocol byte stream to a printer.
+/// A transport sends a finished protocol byte stream to a printer, and — for
+/// bidirectional links — can read responses back.
+///
+/// Most printer languages (DYMO, ESC/POS, ZPL, TSPL) are write-only streams, so
+/// [`Transport::receive`] and [`Transport::is_bidirectional`] have defaults that
+/// model a one-way link. Transports over a duplex link (e.g. a serial port)
+/// override them so protocols that handshake (e.g. NIIMBOT status polling) can
+/// read device replies.
 pub trait Transport {
     /// Send all bytes to the device.
     fn send(&mut self, data: &[u8]) -> Result<(), DeviceError>;
+
+    /// Whether this transport can read responses back from the device.
+    ///
+    /// Defaults to `false` (write-only).
+    fn is_bidirectional(&self) -> bool {
+        false
+    }
+
+    /// Read bytes the device has sent back, waiting up to `timeout` for the
+    /// first byte to arrive.
+    ///
+    /// Returns the bytes read (possibly empty if the device stayed silent).
+    /// Write-only transports return an empty vector without waiting.
+    fn receive(&mut self, timeout: Duration) -> Result<Vec<u8>, DeviceError> {
+        let _ = timeout;
+        Ok(Vec::new())
+    }
 }
 
 /// A "virtual printer" transport that writes each job's bytes to a file.
@@ -194,5 +219,96 @@ impl Transport for UsbTransport {
                 .status
                 .map_err(|e| DeviceError::Transport(format!("bulk out: {e}")))
         })
+    }
+}
+
+/// Default baud rate for NIIMBOT-style USB CDC-ACM serial printers.
+#[cfg(feature = "serial")]
+pub const DEFAULT_SERIAL_BAUD: u32 = 115_200;
+
+/// A bidirectional serial-port transport (USB CDC-ACM, e.g. `/dev/ttyACM0`).
+///
+/// Unlike the write-only transports, this keeps the port open across calls so a
+/// protocol can interleave writes and reads (e.g. send a print job, then poll
+/// the printer for status). The port is opened lazily on first use so that
+/// constructing the transport never fails.
+#[cfg(feature = "serial")]
+pub struct SerialTransport {
+    path: String,
+    baud: u32,
+    port: Option<Box<dyn serialport::SerialPort>>,
+}
+
+#[cfg(feature = "serial")]
+impl std::fmt::Debug for SerialTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerialTransport")
+            .field("path", &self.path)
+            .field("baud", &self.baud)
+            .field("open", &self.port.is_some())
+            .finish()
+    }
+}
+
+#[cfg(feature = "serial")]
+impl SerialTransport {
+    /// Create a serial transport for `path` at `baud` (use
+    /// [`DEFAULT_SERIAL_BAUD`] if unsure).
+    pub fn new(path: impl Into<String>, baud: u32) -> Self {
+        Self {
+            path: path.into(),
+            baud,
+            port: None,
+        }
+    }
+
+    /// Open (lazily) and return the underlying port.
+    fn port(&mut self) -> Result<&mut dyn serialport::SerialPort, DeviceError> {
+        if self.port.is_none() {
+            let port = serialport::new(&self.path, self.baud)
+                .timeout(Duration::from_millis(500))
+                .open()
+                .map_err(|e| DeviceError::Transport(format!("open serial {}: {e}", self.path)))?;
+            self.port = Some(port);
+        }
+        Ok(self.port.as_mut().expect("just opened").as_mut())
+    }
+}
+
+#[cfg(feature = "serial")]
+impl Transport for SerialTransport {
+    fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
+        let port = self.port()?;
+        port.write_all(data)
+            .map_err(|e| DeviceError::Transport(format!("serial write: {e}")))?;
+        port.flush()
+            .map_err(|e| DeviceError::Transport(format!("serial flush: {e}")))?;
+        Ok(())
+    }
+
+    fn is_bidirectional(&self) -> bool {
+        true
+    }
+
+    fn receive(&mut self, timeout: Duration) -> Result<Vec<u8>, DeviceError> {
+        let port = self.port()?;
+        // Wait up to `timeout` for the first byte, then drain the rest of the
+        // frame with a short inter-byte timeout.
+        port.set_timeout(timeout)
+            .map_err(|e| DeviceError::Transport(format!("serial set_timeout: {e}")))?;
+        let mut out = Vec::new();
+        let mut buf = [0u8; 256];
+        loop {
+            match port.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    out.extend_from_slice(&buf[..n]);
+                    port.set_timeout(Duration::from_millis(40)).ok();
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::TimedOut => break,
+                Err(e) => return Err(DeviceError::Transport(format!("serial read: {e}"))),
+            }
+        }
+        Ok(out)
     }
 }

@@ -30,6 +30,11 @@ enum Command {
         #[arg(long)]
         usb: Option<String>,
 
+        /// Serial target: a device path with optional baud (`/dev/ttyACM0` or
+        /// `/dev/ttyACM0:115200`).
+        #[arg(long)]
+        serial: Option<String>,
+
         /// Input file. If omitted, read from stdin.
         input: Option<std::path::PathBuf>,
     },
@@ -45,6 +50,7 @@ fn main() -> Result<()> {
         Command::Send {
             network,
             usb,
+            serial,
             input,
         } => {
             let data = match &input {
@@ -55,14 +61,19 @@ fn main() -> Result<()> {
                     buf
                 }
             };
-            send(network, usb, &data)?;
+            send(network, usb, serial, &data)?;
             eprintln!("sent {} bytes", data.len());
         }
     }
     Ok(())
 }
 
-fn send(network: Option<String>, usb: Option<String>, data: &[u8]) -> Result<()> {
+fn send(
+    network: Option<String>,
+    usb: Option<String>,
+    serial: Option<String>,
+    data: &[u8],
+) -> Result<()> {
     if let Some(target) = network {
         let (host, port) = target
             .rsplit_once(':')
@@ -86,5 +97,27 @@ fn send(network: Option<String>, usb: Option<String>, data: &[u8]) -> Result<()>
     #[cfg(not(feature = "usb"))]
     let _ = usb;
 
-    bail!("no target given; use --network host:port or --usb vid:pid")
+    #[cfg(feature = "serial")]
+    if let Some(target) = serial {
+        let (path, baud) = parse_serial(&target);
+        let mut t = lbl_device::SerialTransport::new(path, baud);
+        t.send(data)?;
+        return Ok(());
+    }
+    #[cfg(not(feature = "serial"))]
+    let _ = serial;
+
+    bail!("no target given; use --network host:port, --usb vid:pid, or --serial path[:baud]")
+}
+
+/// Parse a serial target (`path` or `path:baud`), defaulting the baud rate.
+#[cfg(feature = "serial")]
+fn parse_serial(target: &str) -> (String, u32) {
+    match target.rsplit_once(':') {
+        Some((path, baud)) if !baud.is_empty() && baud.chars().all(|c| c.is_ascii_digit()) => (
+            path.to_string(),
+            baud.parse().unwrap_or(lbl_device::DEFAULT_SERIAL_BAUD),
+        ),
+        _ => (target.to_string(), lbl_device::DEFAULT_SERIAL_BAUD),
+    }
 }

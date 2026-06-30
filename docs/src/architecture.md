@@ -53,7 +53,7 @@ and `preview` flows, and also exposes the individual stages as subcommands.
 | Encoder | `lbl-encode` | Select a driver by protocol, encode `MonoBitmap` → protocol bytes |
 | Drivers | `drivers/lbl-driver-*` | Protocol-specific encoders (DYMO, NIIMBOT, ESC/POS, ZPL, TSPL) |
 | Spooler | `lbl-spool` | Job queue, sequential dispatch, per-item cut, retry, disconnect handling |
-| Device | `lbl-device` | Discovery (USB) and transport (USB bulk / TCP) |
+| Device | `lbl-device` | Discovery (USB) and transport (USB bulk / TCP / bidirectional serial) |
 | Catalog | `lbl-catalog` | Known media SKUs and printer compatibility |
 | Config | `lbl-config` | Layered configuration + printer profile persistence |
 | Core | `lbl-core` | Shared types: units, geometry, media, printer, job, `MonoBitmap` |
