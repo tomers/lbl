@@ -43,7 +43,7 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
         }
     };
 
-    let devices = match nusb::list_devices() {
+    let devices = match pollster::block_on(nusb::list_devices()) {
         Ok(d) => d,
         Err(e) => {
             tracing::warn!("usb enumeration failed: {e}");

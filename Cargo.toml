@@ -63,7 +63,7 @@ lbl-spool = { path = "crates/lbl-spool" }
 # Shared third-party dependencies
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1.1"
 serde_yaml = "0.9"
 thiserror = "2"
 anyhow = "1"
@@ -75,8 +75,8 @@ tokio = { version = "1", features = ["full"] }
 figment = { version = "0.10", features = ["toml", "env"] }
 image = "0.25"
 base64 = "0.22"
-directories = "5"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+directories = "6"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
 tempfile = "3"
 console = "0.16"
 # Serial (USB CDC-ACM) transport. `libudev` (default) is only needed for port
