@@ -226,6 +226,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "tspl" => Protocol::Tspl,
         "niimbot" | "d110" | "d11" => Protocol::Niimbot,
         "virtual" | "file" => Protocol::Virtual,
+        "console" | "term" => Protocol::Console,
         other => {
             return Err(ApiError(
                 StatusCode::BAD_REQUEST,
