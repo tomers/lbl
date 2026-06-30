@@ -198,3 +198,67 @@ name = "DYMO 2191636 Continuous Thermal Paper 57mm (non-adhesive)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 compatible = ["LabelWriter 550"]
 media = { width_mm = 57.0, length = { kind = "continuous" }, material = "paper", adhesive = "none", color = "white" }
+
+# --- NIIMBOT D-series die-cut thermal labels --------------------------------
+#
+# D11/D110-family printers use a 12 mm (96-dot) thermal head at 203 dpi. Tape
+# is sold by physical size; the keys below are the WxL dimensions in mm. On
+# tape wider than 12 mm the printable area is still capped at the 12 mm head,
+# so `width_mm` is clamped to 12.0. Dimensions sourced from NIIMBOT product
+# listings (https://www.niimbot.com/).
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["12x22", "niimbot-12x22"]
+name = "NIIMBOT 12x22mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 22.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["12x30", "niimbot-12x30"]
+name = "NIIMBOT 12x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["12x40", "niimbot-12x40"]
+name = "NIIMBOT 12x40mm White Thermal Labels (D110 default roll)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["12x50", "niimbot-12x50"]
+name = "NIIMBOT 12x50mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["12x40-clear", "niimbot-12x40-transparent"]
+name = "NIIMBOT 12x40mm Transparent Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["14x30", "niimbot-14x30"]
+name = "NIIMBOT 14x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand = "NIIMBOT"
+keys = ["15x30", "niimbot-15x30"]
+name = "NIIMBOT 15x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+compatible = ["D110", "D11"]
+media = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }

@@ -18,7 +18,7 @@ lbl device    Discover printers (list)
 ```text
 --text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
---protocol <dymo|dymo-lw|escpos|zpl|tspl>   (dymo-lw = LabelWriter 550 series)
+--protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot>   (dymo-lw = LabelWriter 550 series; niimbot = D11/D110)
 --supersample <N>   High-res render factor before downscale (default: 3, or
                     `[render] supersample` from config). See Rendering Quality guide.
 --dither <auto|floyd-steinberg|ordered|none>

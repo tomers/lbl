@@ -19,6 +19,7 @@ makes sense.
 | `lbl-driver-escpos` | `crates/drivers/lbl-driver-escpos` | — | ESC/POS driver |
 | `lbl-driver-zpl` | `crates/drivers/lbl-driver-zpl` | — | ZPL driver |
 | `lbl-driver-tspl` | `crates/drivers/lbl-driver-tspl` | — | TSPL driver |
+| `lbl-driver-niimbot` | `crates/drivers/lbl-driver-niimbot` | — | NIIMBOT packet driver (`niimbot`; D11/D110 family) |
 | `lbl-device` | `crates/lbl-device` | `lbl-device` | USB/network discovery + transport |
 | `lbl-spool` | `crates/lbl-spool` | `lbl-spool` | Internal print spooler |
 | `lbl` | `crates/lbl` | `lbl` | Orchestrator |

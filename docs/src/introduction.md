@@ -4,7 +4,7 @@
 
 It turns content — plain text, an HTML template fed with data, or raw HTML —
 into crisp output on a wide range of label printers, spanning both proprietary
-protocols (DYMO) and industry standards (ESC/POS, ZPL, TSPL).
+protocols (DYMO, NIIMBOT) and industry standards (ESC/POS, ZPL, TSPL).
 
 ## Philosophy
 

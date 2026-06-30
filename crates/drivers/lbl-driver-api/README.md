@@ -23,5 +23,6 @@ impl Driver for MyDriver {
 `should_cut()` (job requested a cut AND the printer supports it) and `copies()`.
 
 Concrete drivers live alongside this crate under `crates/drivers/`:
-`lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`.
+`lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`,
+`lbl-driver-niimbot`.
 `lbl-encode` aggregates them and selects one by `Protocol`.

@@ -154,6 +154,18 @@ mod tests {
     }
 
     #[test]
+    fn niimbot_d110_media_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        // The D110's default 12x40 roll resolves and is head-width limited.
+        let roll = catalog.lookup("12x40").unwrap();
+        assert_eq!(roll.brand, "NIIMBOT");
+        assert_eq!(roll.media.width_mm, 12.0);
+        // Compatibility matches the D110 (and the D11 it shares tape with).
+        let d110 = catalog.compatible_with("NIIMBOT D110");
+        assert!(d110.iter().any(|e| e.matches_key("12x40")));
+    }
+
+    #[test]
     fn overlay_replaces_by_key() {
         let mut catalog = Catalog::bundled().unwrap();
         catalog

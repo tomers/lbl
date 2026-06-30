@@ -46,8 +46,8 @@ exactly onto the binary PBM (`P4`) format, so `lbl-dither` emits PBM and
 ## Protocol bytes
 
 The final printer-native stream produced by a driver (DYMO column data,
-ESC/POS `GS v 0` raster, ZPL `^GFA`, TSPL `BITMAP`, …). Delivered verbatim by
-`lbl-device`/`lbl-spool`.
+NIIMBOT row packets, ESC/POS `GS v 0` raster, ZPL `^GFA`, TSPL `BITMAP`, …).
+Delivered verbatim by `lbl-device`/`lbl-spool`.
 
 ## Batch manifests
 

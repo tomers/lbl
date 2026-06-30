@@ -19,6 +19,7 @@ lbl-driver-dymo = { workspace = true }
 lbl-driver-escpos = { workspace = true }
 lbl-driver-zpl = { workspace = true }
 lbl-driver-tspl = { workspace = true }
+lbl-driver-niimbot = { workspace = true }
 lbl-driver-file = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }

@@ -1,0 +1,312 @@
+//! NIIMBOT thermal label driver.
+//!
+//! NIIMBOT printers (D11, D110, B-series, ...) speak a small packet-framed
+//! protocol rather than a streaming page language. Every command is wrapped as:
+//!
+//! ```text
+//! 0x55 0x55 <command:u8> <len:u8> <data...> <checksum:u8> 0xAA 0xAA
+//! ```
+//!
+//! where `checksum` is the XOR of the command byte, the length byte, and every
+//! data byte. A print job is a fixed sequence of command packets framing a run
+//! of one-row bitmap packets:
+//!
+//! ```text
+//! SetDensity      (0x21) [density:u8]
+//! SetLabelType    (0x23) [type:u8]        1 = gap/die-cut labels
+//! StartPrint      (0x01) [0x01]
+//! StartPagePrint  (0x03) [0x01]
+//! SetDimension    (0x13) [rows:u16, cols:u16]   big-endian; rows = feed length
+//! SetQuantity     (0x15) [copies:u16]     big-endian; printer repeats the page
+//! per row (top → bottom):
+//!   PrintBitmapRow (0x85) [y:u16, c0:u8, c1:u8, c2:u8, repeat:u8, data...]
+//! EndPagePrint    (0xE3) [0x01]
+//! EndPrint        (0xF3) [0x01]
+//! ```
+//!
+//! The print head is horizontal (96 dots / 12 mm on the D110), so the printer
+//! consumes one raster line per row of the image: `cols` = dots across the head
+//! (bitmap width) and `rows` = lines in the feed direction (bitmap height). The
+//! row payload packs `ceil(width / 8)` bytes MSB-first with `1` = ink, exactly
+//! the [`MonoBitmap`] layout, so rows are emitted without conversion. The three
+//! `c0..c2` bytes are the count of ink pixels in each third of the row (some
+//! firmwares use them for progress/wear levelling; others ignore them).
+//!
+//! Protocol reference: the NIIMBOT community documentation
+//! (<https://printers.niim.blue/interfacing/proto/>) and the `niimprint` project.
+//! `lbl` is not affiliated with NIIMBOT; see the repository disclaimer.
+
+use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+
+// Packet framing.
+const HEAD: [u8; 2] = [0x55, 0x55];
+const TAIL: [u8; 2] = [0xAA, 0xAA];
+
+// Command identifiers.
+const SET_DENSITY: u8 = 0x21;
+const SET_LABEL_TYPE: u8 = 0x23;
+const START_PRINT: u8 = 0x01;
+const START_PAGE_PRINT: u8 = 0x03;
+const SET_DIMENSION: u8 = 0x13;
+const SET_QUANTITY: u8 = 0x15;
+const PRINT_BITMAP_ROW: u8 = 0x85;
+const END_PAGE_PRINT: u8 = 0xE3;
+const END_PRINT: u8 = 0xF3;
+
+// Label type 1 = gap-sensed die-cut labels (the common case for D-series tape).
+const LABEL_TYPE_GAP: u8 = 0x01;
+
+/// Driver for NIIMBOT thermal label printers (D11 / D110 family and
+/// compatibles).
+#[derive(Debug, Clone, Copy)]
+pub struct NiimbotDriver {
+    /// Print density / heat level. Valid ranges are model-specific (the D110
+    /// accepts 1–3; B-series printers accept 1–5). Higher is darker.
+    pub density: u8,
+}
+
+impl Default for NiimbotDriver {
+    fn default() -> Self {
+        // 3 is the darkest setting the D110 accepts and a safe mid value for
+        // models with a wider range.
+        Self { density: 3 }
+    }
+}
+
+impl NiimbotDriver {
+    /// Create a new driver with the default density.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a driver with an explicit print density.
+    pub fn with_density(density: u8) -> Self {
+        Self { density }
+    }
+
+    /// Append one framed packet (`55 55 <cmd> <len> <data> <csum> AA AA`).
+    fn push_packet(out: &mut Vec<u8>, command: u8, data: &[u8]) {
+        let len = data.len() as u8;
+        let mut checksum = command ^ len;
+        for &b in data {
+            checksum ^= b;
+        }
+        out.extend_from_slice(&HEAD);
+        out.push(command);
+        out.push(len);
+        out.extend_from_slice(data);
+        out.push(checksum);
+        out.extend_from_slice(&TAIL);
+    }
+
+    /// Count ink pixels in each (roughly equal) third of row `y`, saturating at
+    /// 255 to fit the single-byte header fields.
+    fn row_chunk_counts(bitmap: &MonoBitmap, y: u32) -> [u8; 3] {
+        let w = bitmap.width;
+        let bounds = [0, w / 3, (2 * w) / 3, w];
+        let mut counts = [0u8; 3];
+        for (chunk, count) in counts.iter_mut().enumerate() {
+            let mut n: u32 = 0;
+            for x in bounds[chunk]..bounds[chunk + 1] {
+                if bitmap.get(x, y) {
+                    n += 1;
+                }
+            }
+            *count = n.min(255) as u8;
+        }
+        counts
+    }
+}
+
+impl Driver for NiimbotDriver {
+    fn protocol(&self) -> Protocol {
+        Protocol::Niimbot
+    }
+
+    fn name(&self) -> &'static str {
+        "niimbot"
+    }
+
+    fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
+        if bitmap.width == 0 || bitmap.height == 0 {
+            return Err(DriverError::Unsupported("empty bitmap".into()));
+        }
+        // `rows`/`cols` and the row index are u16 fields.
+        if bitmap.width > 0xFFFF || bitmap.height > 0xFFFF {
+            return Err(DriverError::Unsupported(format!(
+                "bitmap {}x{} exceeds the 16-bit dimension fields",
+                bitmap.width, bitmap.height
+            )));
+        }
+        // Each row packet carries a 6-byte header plus the packed row; the
+        // packet length field is a single byte (max 255 data bytes).
+        let stride = bitmap.stride();
+        if stride + 6 > 0xFF {
+            return Err(DriverError::Unsupported(format!(
+                "row of {} dots is too wide for a niimbot packet (max 1992)",
+                bitmap.width
+            )));
+        }
+
+        let rows = bitmap.height as u16;
+        let cols = bitmap.width as u16;
+        let copies = ctx.copies().min(0xFFFF) as u16;
+
+        let mut out = Vec::with_capacity((bitmap.data.len()) + bitmap.height as usize * 12 + 64);
+
+        // --- Job / page setup ---
+        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
+        Self::push_packet(&mut out, START_PRINT, &[0x01]);
+        Self::push_packet(&mut out, START_PAGE_PRINT, &[0x01]);
+
+        let mut dimension = Vec::with_capacity(4);
+        dimension.extend_from_slice(&rows.to_be_bytes());
+        dimension.extend_from_slice(&cols.to_be_bytes());
+        Self::push_packet(&mut out, SET_DIMENSION, &dimension);
+
+        // Copies are handled by the printer repeating the page.
+        Self::push_packet(&mut out, SET_QUANTITY, &copies.to_be_bytes());
+
+        // --- One packet per raster line ---
+        let mut row_data = Vec::with_capacity(6 + stride);
+        for y in 0..bitmap.height {
+            row_data.clear();
+            row_data.extend_from_slice(&(y as u16).to_be_bytes());
+            row_data.extend_from_slice(&Self::row_chunk_counts(bitmap, y));
+            row_data.push(0x01); // repeat this line once
+            row_data.extend_from_slice(bitmap.row(y));
+            Self::push_packet(&mut out, PRINT_BITMAP_ROW, &row_data);
+        }
+
+        // --- Page / job teardown ---
+        Self::push_packet(&mut out, END_PAGE_PRINT, &[0x01]);
+        Self::push_packet(&mut out, END_PRINT, &[0x01]);
+
+        Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lbl_core::job::JobSpec;
+    use lbl_core::media::Media;
+    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::units::Dpi;
+
+    fn ctx_job(copies: u32) -> JobSpec {
+        let mut job = JobSpec::new(Media::fixed(12.0, 40.0, Dpi(203.0)));
+        job.copies = copies;
+        job
+    }
+
+    /// Locate the first framed packet of `command` and return its data slice.
+    fn find_packet(bytes: &[u8], command: u8) -> Option<&[u8]> {
+        let mut i = 0;
+        while i + 4 <= bytes.len() {
+            if bytes[i] == 0x55 && bytes[i + 1] == 0x55 {
+                let cmd = bytes[i + 2];
+                let len = bytes[i + 3] as usize;
+                let data = &bytes[i + 4..i + 4 + len];
+                if cmd == command {
+                    return Some(data);
+                }
+                i += 4 + len + 3; // checksum + tail
+            } else {
+                i += 1;
+            }
+        }
+        None
+    }
+
+    fn checksum_ok(bytes: &[u8]) -> bool {
+        let mut i = 0;
+        while i + 4 <= bytes.len() {
+            assert_eq!(&bytes[i..i + 2], &[0x55, 0x55], "bad head at {i}");
+            let cmd = bytes[i + 2];
+            let len = bytes[i + 3] as usize;
+            let data = &bytes[i + 4..i + 4 + len];
+            let mut cs = cmd ^ (len as u8);
+            for &b in data {
+                cs ^= b;
+            }
+            assert_eq!(bytes[i + 4 + len], cs, "bad checksum at {i}");
+            assert_eq!(&bytes[i + 5 + len..i + 7 + len], &[0xAA, 0xAA], "bad tail");
+            i += 7 + len;
+        }
+        i == bytes.len()
+    }
+
+    #[test]
+    fn emits_framed_setup_and_teardown() {
+        let bmp = MonoBitmap::new(96, 4);
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(1);
+        let bytes = NiimbotDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+
+        assert!(checksum_ok(&bytes), "every packet must frame and checksum");
+
+        // Dimension: rows = height (4), cols = width (96), big-endian.
+        let dim = find_packet(&bytes, SET_DIMENSION).unwrap();
+        assert_eq!(dim, &[0x00, 0x04, 0x00, 0x60]);
+
+        // Density and teardown present.
+        assert_eq!(find_packet(&bytes, SET_DENSITY).unwrap(), &[3]);
+        assert_eq!(find_packet(&bytes, END_PRINT).unwrap(), &[0x01]);
+    }
+
+    #[test]
+    fn one_row_packet_per_line_with_ink_data() {
+        let mut bmp = MonoBitmap::new(8, 2);
+        bmp.set(0, 0, true); // first row, MSB
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(1);
+        let bytes = NiimbotDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+
+        let rows = bytes
+            .windows(3)
+            .filter(|w| w[0] == 0x55 && w[1] == 0x55 && w[2] == PRINT_BITMAP_ROW)
+            .count();
+        assert_eq!(rows, 2);
+
+        // First row: index 0, one ink pixel in the first third, repeat 1, 0x80.
+        let row0 = find_packet(&bytes, PRINT_BITMAP_ROW).unwrap();
+        assert_eq!(row0[0..2], [0x00, 0x00]); // y = 0
+        assert_eq!(row0[2], 1); // first third has the single ink pixel
+        assert_eq!(row0[5], 1); // repeat count
+        assert_eq!(row0[6], 0x80); // packed row, MSB set
+    }
+
+    #[test]
+    fn copies_set_quantity_not_repeated_rows() {
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(5);
+        let bytes = NiimbotDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+
+        // Quantity carries the copy count...
+        assert_eq!(find_packet(&bytes, SET_QUANTITY).unwrap(), &[0x00, 0x05]);
+        // ...and the row stream is emitted exactly once.
+        let rows = bytes
+            .windows(3)
+            .filter(|w| w[0] == 0x55 && w[1] == 0x55 && w[2] == PRINT_BITMAP_ROW)
+            .count();
+        assert_eq!(rows, 1);
+    }
+
+    #[test]
+    fn rejects_rows_too_wide_for_a_packet() {
+        let bmp = MonoBitmap::new(2000, 1); // stride 250 > 249
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(1);
+        let err = NiimbotDriver::new().encode(&bmp, &EncodeContext::new(&job, &caps));
+        assert!(matches!(err, Err(DriverError::Unsupported(_))));
+    }
+}

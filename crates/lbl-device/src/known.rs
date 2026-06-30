@@ -58,6 +58,11 @@ pub const KNOWN_USB_PRINTERS: &[KnownUsbPrinter] = &[
         model: "LabelWriter/LabelManager",
         protocol: Protocol::Dymo,
     },
+    // NIIMBOT D11/D110-family printers (Protocol::Niimbot) connect over
+    // Bluetooth LE or a USB CDC-ACM serial port (e.g. /dev/ttyACM0), not the USB
+    // bulk-out path this table drives, and expose no stable bulk VID/PID. They
+    // are therefore adopted manually (pick "niimbot" as the protocol) rather
+    // than auto-suggested here; their media lives in the bundled catalog.
 ];
 
 /// Find the most specific known entry for a vendor/product id.

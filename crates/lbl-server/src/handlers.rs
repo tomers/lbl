@@ -223,6 +223,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "escpos" | "esc/pos" => Protocol::EscPos,
         "zpl" => Protocol::Zpl,
         "tspl" => Protocol::Tspl,
+        "niimbot" | "d110" | "d11" => Protocol::Niimbot,
         "virtual" | "file" => Protocol::Virtual,
         other => {
             return Err(ApiError(

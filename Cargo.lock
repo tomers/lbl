@@ -1630,6 +1630,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-niimbot"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-tspl"
 version = "0.1.0"
 dependencies = [
@@ -1656,6 +1664,7 @@ dependencies = [
  "lbl-driver-dymo",
  "lbl-driver-escpos",
  "lbl-driver-file",
+ "lbl-driver-niimbot",
  "lbl-driver-tspl",
  "lbl-driver-zpl",
  "thiserror 2.0.18",

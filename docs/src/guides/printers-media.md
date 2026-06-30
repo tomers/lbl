@@ -37,3 +37,21 @@ lbl print --width-mm 56 --dpi 203 ...                  # continuous
 
 The **Media** page in the web app browses the catalog with images, lets you
 filter by printer compatibility, and links out to purchase pages.
+
+## NIIMBOT D11 / D110
+
+NIIMBOT D-series printers use the `niimbot` protocol. The D110 has a 12 mm
+(96-dot) thermal head at 203 dpi, so labels are 96 dots wide regardless of tape
+width. Their die-cut tape sizes (`12x40`, `12x30`, `15x30`, …) ship in the
+bundled catalog under the `NIIMBOT` brand:
+
+```bash
+lbl-catalog compatible --printer "D110"
+lbl print --media 12x40 --dpi 203 ...
+# or by dimensions:
+lbl print --width-mm 12 --length-mm 40 --dpi 203 --protocol niimbot ...
+```
+
+D-series printers connect over Bluetooth LE or a USB CDC-ACM serial port
+(e.g. `/dev/ttyACM0`) rather than USB bulk transfer, so they aren't listed by
+USB discovery — adopt one manually and select `niimbot` as the protocol.

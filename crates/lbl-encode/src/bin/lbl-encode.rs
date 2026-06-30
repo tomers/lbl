@@ -20,6 +20,8 @@ enum ProtocolArg {
     Escpos,
     Zpl,
     Tspl,
+    /// NIIMBOT thermal label printers (D11 / D110 family).
+    Niimbot,
     /// Virtual printer: encode to an image file ("media type" via --media-type).
     #[value(alias = "file")]
     Virtual,
@@ -33,6 +35,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Escpos => Protocol::EscPos,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
+            ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::Virtual => Protocol::Virtual,
         }
     }

@@ -33,7 +33,7 @@ text/data/HTML
 | `lbl-transpile-html` | Custom elements + flex -> browser-ready HTML |
 | `lbl-render` | HTML -> raster (headless Chromium, two-pass) |
 | `lbl-dither` | Raster -> printer bit depth (photo-aware dithering) |
-| `crates/drivers/*` | Printer drivers: api, dymo, escpos, zpl, tspl, file (virtual) |
+| `crates/drivers/*` | Printer drivers: api, dymo, escpos, zpl, tspl, niimbot, file (virtual) |
 | `lbl-encode` | Bitmap -> protocol bytes (driver selection) |
 | `lbl-device` | Device discovery + USB/network transport |
 | `lbl-spool` | Internal print spooler |

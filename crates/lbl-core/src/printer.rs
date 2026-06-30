@@ -19,6 +19,8 @@ pub enum Protocol {
     Zpl,
     /// TSC Printer Language.
     Tspl,
+    /// NIIMBOT thermal label protocol (packet-framed; D11/D110 family).
+    Niimbot,
     /// A virtual printer that "prints" to an image file instead of hardware.
     ///
     /// The concrete output format (PNG, BMP, ...) is the printer's selected
