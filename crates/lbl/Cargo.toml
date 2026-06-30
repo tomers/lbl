@@ -25,6 +25,7 @@ lbl-dither = { workspace = true }
 lbl-encode = { workspace = true }
 lbl-driver-api = { workspace = true }
 lbl-driver-file = { workspace = true }
+lbl-driver-console = { workspace = true }
 lbl-driver-niimbot = { workspace = true }
 lbl-device = { workspace = true }
 lbl-spool = { workspace = true }

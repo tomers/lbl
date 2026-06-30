@@ -1,0 +1,365 @@
+//! Terminal-facing helpers for the `lbl print` flow.
+//!
+//! Three user-facing features share this module so they stay consistent:
+//!
+//! * `--protocol console` — dump the dithered raster to stdout as text.
+//! * `--confirm` — preview each label and ask before printing to a device/file.
+//! * `--debug` — print a per-stage dump (syntax-highlighted HTML, the dithered
+//!   raster as art, an encoded-byte preview) to stderr.
+//!
+//! Raster art is produced by [`lbl_driver_console::render_terminal`] so the
+//! preview matches `--protocol console` exactly. Color (ANSI) is used only when
+//! the destination stream is a TTY and `NO_COLOR` is unset.
+
+use std::io::{self, IsTerminal, Write};
+
+use lbl_driver_console::{render_terminal, TerminalOptions};
+
+use crate::debug::{protocol_cli_name, LabelTrace};
+
+// ANSI styling. Kept local and minimal so the crate stays dependency-light.
+const RESET: &str = "\x1b[0m";
+const BOLD: &str = "\x1b[1m";
+const DIM: &str = "\x1b[2m";
+const HEADER: &str = "\x1b[1;38;5;75m"; // bold blue
+const TAG: &str = "\x1b[38;5;75m"; // blue
+const ATTR: &str = "\x1b[38;5;180m"; // tan
+const VAL: &str = "\x1b[38;5;114m"; // green
+const PUNCT: &str = "\x1b[38;5;245m"; // gray
+const COMMENT: &str = "\x1b[38;5;102m"; // dim gray
+
+/// Whether to emit ANSI color, given a stream's TTY status. Honors `NO_COLOR`.
+pub fn color_for(is_tty: bool) -> bool {
+    is_tty && std::env::var_os("NO_COLOR").is_none()
+}
+
+/// Whether stdout should be colorized.
+pub fn stdout_color() -> bool {
+    color_for(io::stdout().is_terminal())
+}
+
+/// Whether stderr should be colorized.
+pub fn stderr_color() -> bool {
+    color_for(io::stderr().is_terminal())
+}
+
+/// Best-effort terminal width in columns (from `$COLUMNS`), clamped to a sane
+/// range, defaulting to 120 when unknown.
+fn term_cols() -> usize {
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .unwrap_or(120)
+        .clamp(40, 200)
+}
+
+/// [`TerminalOptions`] for a framed raster that fits the current terminal.
+pub fn raster_options(color: bool) -> TerminalOptions {
+    TerminalOptions {
+        // Leave room for the frame's two border columns.
+        max_width: term_cols().saturating_sub(2).max(16),
+        frame: true,
+        color,
+    }
+}
+
+/// Render a dithered bitmap as terminal art sized to the current terminal.
+pub fn render_raster(bitmap: &lbl_core::bitmap::MonoBitmap, color: bool) -> String {
+    render_terminal(bitmap, &raster_options(color))
+}
+
+/// Preview every label, then prompt on stdin for confirmation. Returns whether
+/// the user approved the print. The preview and prompt go to stderr so stdout
+/// stays clean for any piped output.
+pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
+    let color = stderr_color();
+    let mut err = io::stderr();
+    for t in traces {
+        writeln!(
+            err,
+            "Label #{} — {}×{} raster:",
+            t.index, t.dithered.width, t.dithered.height
+        )?;
+        write!(err, "{}", render_raster(&t.dithered, color))?;
+    }
+    let n = traces.len();
+    let plural = if n == 1 { "label" } else { "labels" };
+    write!(err, "\nPrint {n} {plural}? [y/N] ")?;
+    err.flush()?;
+
+    let mut line = String::new();
+    let read = io::stdin().read_line(&mut line)?;
+    // EOF (e.g. stdin not interactive) is treated as "no".
+    Ok(read > 0 && matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+}
+
+/// Write the dithered raster of every label to stdout (the `--protocol console`
+/// output). Color is used when stdout is a TTY.
+pub fn dump_rasters(traces: &[LabelTrace]) -> io::Result<()> {
+    let color = stdout_color();
+    let mut out = io::stdout().lock();
+    let many = traces.len() > 1;
+    for t in traces {
+        if many {
+            let (a, z) = if color { (HEADER, RESET) } else { ("", "") };
+            writeln!(out, "{a}── Label #{} ──{z}", t.index)?;
+        }
+        write!(out, "{}", render_raster(&t.dithered, color))?;
+    }
+    out.flush()
+}
+
+/// Print a per-stage debug dump for every label to stderr.
+pub fn dump_debug(traces: &[LabelTrace]) -> io::Result<()> {
+    let color = stderr_color();
+    let mut err = io::stderr();
+    for t in traces {
+        write!(err, "{}", render_label_debug(t, color))?;
+    }
+    err.flush()
+}
+
+/// Build the per-stage debug report for a single label.
+pub fn render_label_debug(t: &LabelTrace, color: bool) -> String {
+    let mut out = String::new();
+    out.push_str(&heading(&format!("═══ Label #{} ═══", t.index), color));
+    out.push('\n');
+
+    out.push_str(&stage_title(1, "Authoring HTML", color));
+    out.push_str(&highlight_html(&t.authoring_html, color));
+    out.push_str("\n\n");
+
+    out.push_str(&stage_title(2, "Transpile → browser-ready HTML", color));
+    out.push_str(&highlight_html(&t.transpiled_html, color));
+    out.push_str("\n\n");
+
+    let (rw, rh) = t.rendered.dimensions();
+    out.push_str(&stage_title(3, "Render", color));
+    out.push_str(&dimmed(&format!("{rw}×{rh} grayscale raster\n"), color));
+    out.push('\n');
+
+    out.push_str(&stage_title(
+        4,
+        &format!(
+            "Dither ({}) → {}×{} 1-bit raster",
+            dither_name(t.dither),
+            t.dithered.width,
+            t.dithered.height
+        ),
+        color,
+    ));
+    out.push_str(&render_raster(&t.dithered, color));
+    out.push('\n');
+
+    out.push_str(&stage_title(
+        5,
+        &format!(
+            "Encode → {} via {}: {} bytes",
+            protocol_cli_name(t.protocol),
+            t.driver_name,
+            t.encoded.len()
+        ),
+        color,
+    ));
+    out.push_str(&dimmed(&hex_preview(&t.encoded, 128), color));
+    out.push_str("\n\n");
+    out
+}
+
+fn dither_name(alg: lbl_dither::Algorithm) -> &'static str {
+    use lbl_dither::Algorithm::*;
+    match alg {
+        Auto => "auto",
+        FloydSteinberg => "floyd-steinberg",
+        Ordered => "ordered",
+        Threshold(_) => "threshold",
+    }
+}
+
+fn heading(text: &str, color: bool) -> String {
+    if color {
+        format!("{HEADER}{text}{RESET}\n")
+    } else {
+        format!("{text}\n")
+    }
+}
+
+fn stage_title(num: u8, title: &str, color: bool) -> String {
+    if color {
+        format!("{BOLD}[{num}] {title}{RESET}\n")
+    } else {
+        format!("[{num}] {title}\n")
+    }
+}
+
+fn dimmed(text: &str, color: bool) -> String {
+    if color {
+        format!("{DIM}{text}{RESET}")
+    } else {
+        text.to_string()
+    }
+}
+
+/// A short hex dump of the first `max` bytes of `data`.
+fn hex_preview(data: &[u8], max: usize) -> String {
+    let mut out = String::new();
+    for (i, byte) in data.iter().take(max).enumerate() {
+        if i > 0 && i % 16 == 0 {
+            out.push('\n');
+        } else if i > 0 {
+            out.push(' ');
+        }
+        out.push_str(&format!("{byte:02x}"));
+    }
+    if data.len() > max {
+        out.push_str(&format!("\n… ({} more bytes)", data.len() - max));
+    }
+    out.push('\n');
+    out
+}
+
+/// Colorize HTML for the terminal with a tiny tag-aware tokenizer. When `color`
+/// is false the source is returned unchanged.
+pub fn highlight_html(src: &str, color: bool) -> String {
+    if !color {
+        return src.to_string();
+    }
+    let mut out = String::new();
+    let mut rest = src;
+    while let Some(lt) = rest.find('<') {
+        out.push_str(&rest[..lt]);
+        let after = &rest[lt..];
+        if let Some(stripped) = after.strip_prefix("<!--") {
+            match stripped.find("-->") {
+                Some(end) => {
+                    let close = lt + 4 + end + 3;
+                    out.push_str(COMMENT);
+                    out.push_str(&rest[lt..close]);
+                    out.push_str(RESET);
+                    rest = &rest[close..];
+                }
+                None => {
+                    out.push_str(COMMENT);
+                    out.push_str(after);
+                    out.push_str(RESET);
+                    rest = "";
+                }
+            }
+            continue;
+        }
+        match after.find('>') {
+            Some(gt) => {
+                out.push_str(&highlight_tag(&after[..=gt]));
+                rest = &after[gt + 1..];
+            }
+            None => {
+                out.push_str(after);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Colorize a single `<...>` tag.
+fn highlight_tag(tag: &str) -> String {
+    let mut out = String::new();
+    out.push_str(PUNCT);
+    out.push('<');
+    out.push_str(RESET);
+
+    // Strip the surrounding angle brackets (both ASCII, so byte slicing is safe).
+    let inner: Vec<char> = tag[1..tag.len() - 1].chars().collect();
+    let mut i = 0;
+    let is_name = |c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':');
+
+    out.push_str(TAG);
+    while i < inner.len() && (is_name(inner[i]) || matches!(inner[i], '/' | '!')) {
+        out.push(inner[i]);
+        i += 1;
+    }
+    out.push_str(RESET);
+
+    while i < inner.len() {
+        let c = inner[i];
+        if c.is_whitespace() {
+            out.push(c);
+            i += 1;
+        } else if c == '"' || c == '\'' {
+            out.push_str(VAL);
+            out.push(c);
+            i += 1;
+            while i < inner.len() && inner[i] != c {
+                out.push(inner[i]);
+                i += 1;
+            }
+            if i < inner.len() {
+                out.push(inner[i]);
+                i += 1;
+            }
+            out.push_str(RESET);
+        } else if is_name(c) {
+            out.push_str(ATTR);
+            while i < inner.len() && is_name(inner[i]) {
+                out.push(inner[i]);
+                i += 1;
+            }
+            out.push_str(RESET);
+        } else {
+            out.push_str(PUNCT);
+            out.push(c);
+            out.push_str(RESET);
+            i += 1;
+        }
+    }
+
+    out.push_str(PUNCT);
+    out.push('>');
+    out.push_str(RESET);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_honors_no_color() {
+        // With a TTY but NO_COLOR set, color is disabled.
+        temp_env_no_color(|| assert!(!color_for(true)));
+    }
+
+    fn temp_env_no_color(f: impl FnOnce()) {
+        std::env::set_var("NO_COLOR", "1");
+        f();
+        std::env::remove_var("NO_COLOR");
+    }
+
+    #[test]
+    fn highlight_plain_when_disabled() {
+        let src = "<div class=\"x\">hi</div>";
+        assert_eq!(highlight_html(src, false), src);
+    }
+
+    #[test]
+    fn highlight_colorizes_tags_and_attrs() {
+        let src = "<div class=\"x\">hi<!-- c --></div>";
+        let out = highlight_html(src, true);
+        assert!(out.contains('\x1b'));
+        assert!(out.contains(TAG));
+        assert!(out.contains(ATTR));
+        assert!(out.contains(VAL));
+        assert!(out.contains(COMMENT));
+        // The visible text and tag names survive.
+        assert!(out.contains("div"));
+        assert!(out.contains("hi"));
+    }
+
+    #[test]
+    fn highlight_handles_unterminated_tag() {
+        let out = highlight_html("text <div ", true);
+        assert!(out.contains("text "));
+        assert!(out.contains("div"));
+    }
+}

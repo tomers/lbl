@@ -178,6 +178,9 @@ enum ProtocolArg {
     /// Virtual printer: render to an image file instead of hardware.
     #[value(alias = "file")]
     Virtual,
+    /// Console printer: render the raster to the terminal as text.
+    #[value(alias = "term")]
+    Console,
 }
 
 impl From<ProtocolArg> for Protocol {
@@ -190,6 +193,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::Virtual => Protocol::Virtual,
+            ProtocolArg::Console => Protocol::Console,
         }
     }
 }
@@ -274,6 +278,17 @@ struct PrintArgs {
     /// equivalents plus before/after views) to this path.
     #[arg(long)]
     debug_html: Option<std::path::PathBuf>,
+
+    /// Print a per-stage debug dump to stderr: the authoring and transpiled
+    /// HTML (syntax-highlighted when stderr is a TTY), the dithered raster as
+    /// terminal art, and an encoded-byte preview.
+    #[arg(long)]
+    debug: bool,
+
+    /// Before sending to a device or file, show a terminal preview of each
+    /// label and ask for confirmation. Ignored for `--protocol console`.
+    #[arg(long)]
+    confirm: bool,
 }
 
 fn run_print(args: PrintArgs) -> Result<()> {
@@ -330,11 +345,19 @@ fn run_print(args: PrintArgs) -> Result<()> {
         registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
     }
 
-    let extension = media_type.map(|mt| mt.extension()).unwrap_or("bin");
+    let extension = if protocol == Protocol::Console {
+        "txt"
+    } else {
+        media_type.map(|mt| mt.extension()).unwrap_or("bin")
+    };
 
-    // Encode every label (capturing per-stage traces when a debug report is
-    // requested), then dispatch.
-    let want_trace = args.debug_html.is_some();
+    // Encode every label, capturing per-stage traces when any feature needs the
+    // intermediate artifacts (HTML report, console output, preview, or debug
+    // dump), then dispatch.
+    let want_trace = args.debug_html.is_some()
+        || args.debug
+        || args.confirm
+        || protocol == Protocol::Console;
     let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
         match args.backend {
             BackendArg::Chromium => {
@@ -356,6 +379,24 @@ fn run_print(args: PrintArgs) -> Result<()> {
         }
         std::fs::write(path, html)?;
         eprintln!("wrote pipeline debug report to {}", path.display());
+    }
+
+    if args.debug {
+        lbl::terminal::dump_debug(&traces)?;
+    }
+
+    // Console "printer": render the dithered raster to the terminal. Unless a
+    // file target is given, this writes to stdout (in color when it is a TTY)
+    // rather than to a device, and never needs confirmation.
+    if protocol == Protocol::Console && args.out_dir.is_none() && args.file.is_none() {
+        lbl::terminal::dump_rasters(&traces)?;
+        return Ok(());
+    }
+
+    // Preview-and-confirm before committing to a non-console output.
+    if args.confirm && protocol != Protocol::Console && !lbl::terminal::confirm_print(&traces)? {
+        eprintln!("aborted.");
+        return Ok(());
     }
 
     if let Some(dir) = &args.out_dir {

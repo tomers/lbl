@@ -8,6 +8,7 @@
 pub mod debug;
 pub mod dispatch;
 pub mod pipeline;
+pub mod terminal;
 
 pub use pipeline::{
     authoring_labels, encode_label, encode_label_traced, resolve_media, AuthoringLabel,
