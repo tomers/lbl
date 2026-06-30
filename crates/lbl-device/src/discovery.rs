@@ -19,10 +19,11 @@ pub struct DiscoveredPrinter {
     /// Suggested protocol, if recognized.
     pub protocol: Option<Protocol>,
     /// How the device is connected (`"usb"` for USB bulk, `"serial"` for a USB
-    /// CDC-ACM / serial port).
+    /// CDC-ACM / serial port, `"ble"` for Bluetooth Low Energy).
     pub connection: String,
-    /// Serial device path to pass to `--serial` (serial connections only), e.g.
-    /// `/dev/ttyACM0` or `COM3`. `None` for USB bulk devices.
+    /// Identifier to hand to the matching transport flag: a serial device path
+    /// (e.g. `/dev/ttyACM0` or `COM3`) for `--serial`, or the advertised
+    /// name/address for `--bluetooth`. `None` for USB bulk devices.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 }
@@ -137,14 +138,107 @@ pub fn discover_serial() -> Vec<DiscoveredPrinter> {
     Vec::new()
 }
 
-/// Enumerate every connected printer candidate, both USB bulk devices
-/// ([`discover_usb`]) and USB serial ports ([`discover_serial`]).
+/// How long [`discover_ble`] scans for advertising peripherals.
+#[cfg(feature = "ble")]
+const BLE_DISCOVERY_SCAN_SECS: u64 = 10;
+
+/// Scan for nearby Bluetooth Low Energy label printers (NIIMBOT D-series).
+///
+/// Unlike USB/serial enumeration this performs a short radio scan (a few
+/// seconds) and reports peripherals whose advertised name looks like a NIIMBOT
+/// printer. The advertised name is returned in `path` to pass to `--bluetooth`.
+///
+/// Returns an empty list when the `ble` feature is disabled, no adapter is
+/// present, or the scan fails.
+#[cfg(feature = "ble")]
+pub fn discover_ble() -> Vec<DiscoveredPrinter> {
+    use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
+    use btleplug::platform::Manager;
+    use std::time::Duration;
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::warn!("ble runtime init failed: {e}");
+            return Vec::new();
+        }
+    };
+
+    rt.block_on(async {
+        let manager = match Manager::new().await {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("ble manager init failed: {e}");
+                return Vec::new();
+            }
+        };
+        let adapter = match manager.adapters().await {
+            Ok(a) => a.into_iter().next(),
+            Err(e) => {
+                tracing::warn!("ble adapter enumeration failed: {e}");
+                return Vec::new();
+            }
+        };
+        let Some(adapter) = adapter else {
+            return Vec::new();
+        };
+        if let Err(e) = adapter.start_scan(ScanFilter::default()).await {
+            tracing::warn!("ble scan failed: {e}");
+            return Vec::new();
+        }
+        tokio::time::sleep(Duration::from_secs(BLE_DISCOVERY_SCAN_SECS)).await;
+        let peripherals = adapter.peripherals().await.unwrap_or_default();
+        adapter.stop_scan().await.ok();
+
+        let mut out = Vec::new();
+        for p in peripherals {
+            let addr = p.address().to_string();
+            let props = match p.properties().await {
+                Ok(Some(props)) => props,
+                _ => continue,
+            };
+            if !crate::ble::props_look_like_niimbot(&props, &addr) {
+                continue;
+            }
+            let name = props
+                .local_name
+                .clone()
+                .filter(|n| !n.is_empty())
+                .unwrap_or_else(|| addr.clone());
+            out.push(DiscoveredPrinter {
+                vendor_id: None,
+                product_id: None,
+                serial: None,
+                brand: Some("NIIMBOT".to_string()),
+                model: Some(name.clone()),
+                protocol: Some(Protocol::Niimbot),
+                connection: "ble".to_string(),
+                path: Some(name),
+            });
+        }
+        out
+    })
+}
+
+/// Stub when BLE support is compiled out.
+#[cfg(not(feature = "ble"))]
+pub fn discover_ble() -> Vec<DiscoveredPrinter> {
+    Vec::new()
+}
+
+/// Enumerate every connected printer candidate: USB bulk devices
+/// ([`discover_usb`]), USB serial ports ([`discover_serial`]), and — when the
+/// `ble` feature is enabled — nearby Bluetooth LE printers ([`discover_ble`]).
 ///
 /// Recognized devices come first (those with a suggested `protocol`), so a
 /// caller picking the first entry favors a known printer.
+///
+/// Note: with the `ble` feature enabled this performs a short Bluetooth scan
+/// (a few seconds) on each call.
 pub fn discover() -> Vec<DiscoveredPrinter> {
     let mut all = discover_usb();
     all.extend(discover_serial());
+    all.extend(discover_ble());
     all.sort_by_key(|p| p.protocol.is_none());
     all
 }

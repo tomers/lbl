@@ -68,13 +68,20 @@ pub enum Transport {
         port: u16,
     },
     /// A bidirectional serial port (USB CDC-ACM, e.g. `/dev/ttyACM0`), used by
-    /// printers that handshake — such as the NIIMBOT D-series.
+    /// printers that handshake — such as the NIIMBOT B-series.
     Serial {
         /// Serial device path (`/dev/ttyACM0`, `COM3`, ...).
         path: String,
         /// Baud rate (NIIMBOT printers use 115200).
         #[serde(default = "default_serial_baud")]
         baud: u32,
+    },
+    /// A bidirectional Bluetooth Low Energy (GATT) link, used by cable-less
+    /// printers — such as the NIIMBOT pocket D-series (D11, D110, ...).
+    Ble {
+        /// Advertised local name or address substring used to find the device
+        /// (e.g. `D110` or `D110-1A2B3C4D`).
+        name: String,
     },
 }
 

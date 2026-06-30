@@ -5,6 +5,27 @@ use std::time::Duration;
 
 use crate::DeviceError;
 
+#[cfg(feature = "ble")]
+use std::time::Instant;
+
+#[cfg(feature = "ble")]
+use btleplug::api::{
+    CharPropFlags, Characteristic, Central, Manager as _, Peripheral as _, ScanFilter, WriteType,
+};
+#[cfg(feature = "ble")]
+use btleplug::platform::{Adapter, Manager, Peripheral};
+#[cfg(feature = "ble")]
+use futures::StreamExt;
+#[cfg(feature = "ble")]
+use tokio::runtime::Runtime;
+#[cfg(feature = "ble")]
+use tokio::time::{sleep, timeout as wait_for};
+#[cfg(feature = "ble")]
+use uuid::Uuid;
+
+#[cfg(feature = "ble")]
+use crate::ble::{NIIMBOT_CHAR, peripheral_label, peripheral_matches_target};
+
 /// A transport sends a finished protocol byte stream to a printer, and — for
 /// bidirectional links — can read responses back.
 ///
@@ -311,4 +332,381 @@ impl Transport for SerialTransport {
         }
         Ok(out)
     }
+}
+
+/// Default per-write payload size for BLE (ATT MTU minus overhead).
+#[cfg(feature = "ble")]
+pub const BLE_DEFAULT_CHUNK: usize = 20;
+
+/// Default time to scan for the target peripheral before giving up.
+#[cfg(feature = "ble")]
+pub const BLE_DEFAULT_SCAN_SECS: u64 = 15;
+
+/// Timeout for establishing a GATT connection.
+#[cfg(feature = "ble")]
+const BLE_CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// A bidirectional Bluetooth Low Energy (GATT) transport.
+///
+/// This is how cable-less label printers such as the NIIMBOT D-series (D11,
+/// D110, …) are reached: they expose no USB data port, only a BLE GATT service
+/// with a writable characteristic (for the job byte stream) and a notify
+/// characteristic (for status replies). The transport finds the printer by its
+/// advertised name (or address), connects, and — unless overridden — picks the
+/// write/notify characteristics automatically, so the same NIIMBOT byte stream
+/// used over serial works here too, including the status handshake.
+///
+/// The connection is opened lazily on first use and kept open across calls so a
+/// protocol can interleave writes and reads.
+#[cfg(feature = "ble")]
+pub struct BleTransport {
+    /// Advertised local-name or address substring used to find the device
+    /// (case-insensitive). Empty matches the first peripheral seen.
+    target: String,
+    /// Explicit write characteristic UUID (auto-detected when `None`).
+    write_uuid: Option<Uuid>,
+    /// Explicit notify characteristic UUID (auto-detected when `None`).
+    notify_uuid: Option<Uuid>,
+    /// Maximum bytes per BLE write.
+    chunk: usize,
+    /// How long to scan for the device before giving up.
+    scan: Duration,
+    rt: Option<Runtime>,
+    state: Option<BleConnection>,
+}
+
+/// A live BLE link: the connected peripheral, its chosen characteristics, and
+/// the notification stream subscribed for status replies.
+#[cfg(feature = "ble")]
+struct BleConnection {
+    peripheral: Peripheral,
+    write_char: Characteristic,
+    /// Notify characteristic we subscribed to, if any (for clean unsubscribe).
+    notify_char: Option<Characteristic>,
+    write_type: WriteType,
+    notifications: std::pin::Pin<Box<dyn futures::Stream<Item = btleplug::api::ValueNotification> + Send>>,
+}
+
+#[cfg(feature = "ble")]
+impl std::fmt::Debug for BleTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BleTransport")
+            .field("target", &self.target)
+            .field("chunk", &self.chunk)
+            .field("connected", &self.state.is_some())
+            .finish()
+    }
+}
+
+#[cfg(feature = "ble")]
+impl BleTransport {
+    /// Create a transport that connects to the first BLE peripheral whose
+    /// advertised name or address contains `target` (case-insensitive).
+    pub fn new(target: impl Into<String>) -> Self {
+        Self {
+            target: target.into(),
+            write_uuid: Some(NIIMBOT_CHAR),
+            notify_uuid: Some(NIIMBOT_CHAR),
+            chunk: BLE_DEFAULT_CHUNK,
+            scan: Duration::from_secs(BLE_DEFAULT_SCAN_SECS),
+            rt: None,
+            state: None,
+        }
+    }
+
+    /// Override the scan window used to find the device.
+    pub fn with_scan(mut self, scan: Duration) -> Self {
+        self.scan = scan;
+        self
+    }
+
+    /// Pin the write/notify characteristics by UUID instead of auto-detecting
+    /// them (each `None` keeps auto-detection for that characteristic).
+    pub fn with_characteristics(mut self, write: Option<Uuid>, notify: Option<Uuid>) -> Self {
+        self.write_uuid = write;
+        self.notify_uuid = notify;
+        self
+    }
+
+    /// Override the maximum bytes sent per BLE write.
+    pub fn with_chunk(mut self, chunk: usize) -> Self {
+        self.chunk = chunk.max(1);
+        self
+    }
+
+    /// Build (once) the Tokio runtime that drives `btleplug`'s async API.
+    fn runtime(&mut self) -> Result<(), DeviceError> {
+        if self.rt.is_none() {
+            self.rt = Some(
+                Runtime::new()
+                    .map_err(|e| DeviceError::Transport(format!("ble runtime: {e}")))?,
+            );
+        }
+        Ok(())
+    }
+
+    /// Connect (lazily) to the target peripheral and subscribe for status.
+    fn ensure_connected(&mut self) -> Result<(), DeviceError> {
+        if self.state.is_some() {
+            return Ok(());
+        }
+        self.runtime()?;
+        let rt = self.rt.as_ref().expect("runtime built");
+        let connection = rt.block_on(connect_ble(
+            &self.target,
+            self.write_uuid,
+            self.notify_uuid,
+            self.scan,
+        ))?;
+        self.state = Some(connection);
+        Ok(())
+    }
+}
+
+/// Disconnect and tear down a BLE session inside the Tokio runtime.
+///
+/// `bluez-async` (used by `btleplug` on Linux) expects D-Bus cleanup to run
+/// from a runtime context; dropping the connection synchronously after the
+/// runtime has shut down panics with "there is no reactor running".
+#[cfg(feature = "ble")]
+async fn teardown_ble(conn: BleConnection) {
+    drop(conn.notifications);
+    if let Some(nc) = &conn.notify_char {
+        let _ = conn.peripheral.unsubscribe(nc).await;
+    }
+    let _ = conn.peripheral.disconnect().await;
+}
+
+#[cfg(feature = "ble")]
+impl Drop for BleTransport {
+    fn drop(&mut self) {
+        let state = self.state.take();
+        let rt = self.rt.take();
+        if let (Some(rt), Some(conn)) = (rt, state) {
+            let _ = rt.block_on(teardown_ble(conn));
+        }
+    }
+}
+
+#[cfg(feature = "ble")]
+impl Transport for BleTransport {
+    fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
+        self.ensure_connected()?;
+        let rt = self.rt.as_ref().expect("connected");
+        let state = self.state.as_ref().expect("connected");
+        rt.block_on(async {
+            for frame in niimbot_frames(data) {
+                state
+                    .peripheral
+                    .write(&state.write_char, frame, state.write_type)
+                    .await
+                    .map_err(|e| DeviceError::Transport(format!("ble write: {e}")))?;
+            }
+            Ok(())
+        })
+    }
+
+    fn is_bidirectional(&self) -> bool {
+        true
+    }
+
+    fn receive(&mut self, timeout: Duration) -> Result<Vec<u8>, DeviceError> {
+        // Without a live connection there is nothing subscribed to read.
+        if self.state.is_none() {
+            return Ok(Vec::new());
+        }
+        let rt = self.rt.as_ref().expect("connected");
+        let state = self.state.as_mut().expect("connected");
+        rt.block_on(async {
+            let mut out = Vec::new();
+            // Wait up to `timeout` for the first notification, then drain any
+            // immediately-following ones with a short idle timeout.
+            match wait_for(timeout, state.notifications.next()).await {
+                Ok(Some(n)) => out.extend_from_slice(&n.value),
+                _ => return Ok(out),
+            }
+            loop {
+                match wait_for(
+                    Duration::from_millis(40),
+                    state.notifications.next(),
+                )
+                .await
+                {
+                    Ok(Some(n)) => out.extend_from_slice(&n.value),
+                    _ => break,
+                }
+            }
+            Ok(out)
+        })
+    }
+}
+
+/// Find, connect to, and prepare a BLE peripheral for printing.
+#[cfg(feature = "ble")]
+async fn connect_ble(
+    target: &str,
+    write_uuid: Option<Uuid>,
+    notify_uuid: Option<Uuid>,
+    scan: Duration,
+) -> Result<BleConnection, DeviceError> {
+    tracing::info!("ble: scanning for {target:?} (up to {scan:?})");
+    let adapter = ble_adapter().await?;
+    adapter
+        .start_scan(ScanFilter::default())
+        .await
+        .map_err(|e| DeviceError::Transport(format!("ble start_scan: {e}")))?;
+
+    let peripheral = find_peripheral(&adapter, target, scan).await?;
+    adapter.stop_scan().await.ok();
+    tracing::info!("ble: connecting to {}", peripheral.address());
+
+    wait_for(BLE_CONNECT_TIMEOUT, peripheral.connect())
+        .await
+        .map_err(|_| DeviceError::Transport("ble connect timed out".into()))?
+        .map_err(|e| DeviceError::Transport(format!("ble connect: {e}")))?;
+    wait_for(BLE_CONNECT_TIMEOUT, peripheral.discover_services())
+        .await
+        .map_err(|_| DeviceError::Transport("ble discover_services timed out".into()))?
+        .map_err(|e| DeviceError::Transport(format!("ble discover_services: {e}")))?;
+    tracing::info!("ble: connected");
+
+    let chars = peripheral.characteristics();
+    let write_char = pick_characteristic(&chars, write_uuid, true).ok_or_else(|| {
+        DeviceError::NotFound("no writable BLE characteristic on the device".into())
+    })?;
+    let write_type = WriteType::WithoutResponse;
+
+    // Subscribe for status notifications when the device offers a notify
+    // characteristic; printers that never reply just leave this stream empty.
+    let (notify_char, notifications): (
+        Option<Characteristic>,
+        std::pin::Pin<Box<dyn futures::Stream<Item = btleplug::api::ValueNotification> + Send>>,
+    ) = match pick_characteristic(&chars, notify_uuid, false) {
+        Some(nc) => {
+            peripheral
+                .subscribe(&nc)
+                .await
+                .map_err(|e| DeviceError::Transport(format!("ble subscribe: {e}")))?;
+            let stream = peripheral
+                .notifications()
+                .await
+                .map_err(|e| DeviceError::Transport(format!("ble notifications: {e}")))?;
+            (Some(nc), stream)
+        }
+        None => (None, Box::pin(futures::stream::empty())),
+    };
+
+    Ok(BleConnection {
+        peripheral,
+        write_char,
+        notify_char,
+        write_type,
+        notifications,
+    })
+}
+
+/// Split a NIIMBOT framed byte stream into individual packets (`55 55 … aa aa`).
+///
+/// Each packet is sent as one BLE write so the printer sees whole frames rather
+/// than arbitrary 20-byte chunks.
+#[cfg(feature = "ble")]
+fn niimbot_frames(data: &[u8]) -> Vec<&[u8]> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 4 <= data.len() {
+        if data[i] != 0x55 || data[i + 1] != 0x55 {
+            i += 1;
+            continue;
+        }
+        let len = data[i + 3] as usize;
+        let end = i + 4 + len + 3;
+        if end > data.len() {
+            break;
+        }
+        if data[end - 2] == 0xAA && data[end - 1] == 0xAA {
+            out.push(&data[i..end]);
+        }
+        i = end;
+    }
+    if out.is_empty() && !data.is_empty() {
+        out.push(data);
+    }
+    out
+}
+
+/// Get the first available Bluetooth adapter.
+#[cfg(feature = "ble")]
+async fn ble_adapter() -> Result<Adapter, DeviceError> {
+    let manager = Manager::new()
+        .await
+        .map_err(|e| DeviceError::Transport(format!("ble manager: {e}")))?;
+    manager
+        .adapters()
+        .await
+        .map_err(|e| DeviceError::Transport(format!("ble adapters: {e}")))?
+        .into_iter()
+        .next()
+        .ok_or_else(|| DeviceError::NotFound("no bluetooth adapter".into()))
+}
+
+/// Poll the scan results until a peripheral matching `target` appears or the
+/// scan window elapses.
+#[cfg(feature = "ble")]
+async fn find_peripheral(
+    adapter: &Adapter,
+    target: &str,
+    scan: Duration,
+) -> Result<Peripheral, DeviceError> {
+    let deadline = Instant::now() + scan;
+    let mut seen = Vec::new();
+    loop {
+        let peripherals = adapter
+            .peripherals()
+            .await
+            .map_err(|e| DeviceError::Transport(format!("ble peripherals: {e}")))?;
+        for p in &peripherals {
+            if peripheral_matches_target(p, target).await {
+                return Ok(p.clone());
+            }
+            let label = peripheral_label(p).await;
+            if !seen.iter().any(|s: &String| s == &label) {
+                seen.push(label);
+            }
+        }
+        if Instant::now() >= deadline {
+            let mut msg = format!("no BLE device matching {target:?} within {scan:?}");
+            if seen.is_empty() {
+                msg.push_str("; no peripherals seen — is the printer on and not connected to another device (e.g. the NIIMBOT phone app)?");
+            } else {
+                msg.push_str("; nearby: ");
+                msg.push_str(&seen.join(", "));
+            }
+            return Err(DeviceError::NotFound(msg));
+        }
+        sleep(Duration::from_millis(250)).await;
+    }
+}
+
+/// Choose a characteristic by explicit UUID, else by capability: for writing,
+/// prefer write-without-response then any writable; for reading, prefer notify
+/// then indicate.
+#[cfg(feature = "ble")]
+fn pick_characteristic(
+    chars: &std::collections::BTreeSet<Characteristic>,
+    want: Option<Uuid>,
+    writable: bool,
+) -> Option<Characteristic> {
+    if let Some(uuid) = want {
+        return chars.iter().find(|c| c.uuid == uuid).cloned();
+    }
+    let (primary, secondary) = if writable {
+        (CharPropFlags::WRITE_WITHOUT_RESPONSE, CharPropFlags::WRITE)
+    } else {
+        (CharPropFlags::NOTIFY, CharPropFlags::INDICATE)
+    };
+    chars
+        .iter()
+        .find(|c| c.properties.contains(primary))
+        .or_else(|| chars.iter().find(|c| c.properties.contains(secondary)))
+        .cloned()
 }

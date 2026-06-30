@@ -48,30 +48,17 @@ pub fn finalize_job<T: Transport>(
 fn wait_for_niimbot_completion<T: Transport>(transport: &mut T) -> Result<(), DeviceError> {
     const POLL_TIMEOUT: Duration = Duration::from_millis(500);
     const POLL_INTERVAL: Duration = Duration::from_millis(200);
-    const HARD_CAP: Duration = Duration::from_secs(60);
+    const HARD_CAP: Duration = Duration::from_secs(25);
 
     let query = lbl_driver_niimbot::status_query();
     let deadline = Instant::now() + HARD_CAP;
-    let mut saw_progress = false;
-    let mut quiet_polls = 0u32;
 
     loop {
         transport.send(&query)?;
         let resp = transport.receive(POLL_TIMEOUT)?;
-        match lbl_driver_niimbot::parse_status(&resp) {
-            Some(status) if status.is_complete() => return Ok(()),
-            Some(_) => {
-                saw_progress = true;
-                quiet_polls = 0;
-            }
-            None => {
-                // No status reply: the printer either finished (its session
-                // closed after EndPrint) or doesn't report. Once we've seen it
-                // working, or after a couple of quiet polls, consider it done.
-                quiet_polls += 1;
-                if saw_progress || quiet_polls >= 2 {
-                    return Ok(());
-                }
+        if let Some(status) = lbl_driver_niimbot::parse_status(&resp) {
+            if status.is_complete() {
+                return Ok(());
             }
         }
         if Instant::now() >= deadline {

@@ -53,12 +53,32 @@ const PRINT_BITMAP_ROW: u8 = 0x85;
 const END_PAGE_PRINT: u8 = 0xE3;
 const END_PRINT: u8 = 0xF3;
 
-// Status handshake (only meaningful over a bidirectional transport).
+// V4 task extras (D110M / 2025+ pocket printers over BLE).
 const GET_PRINT_STATUS: u8 = 0xA3;
+const HEARTBEAT: u8 = 0xDC;
+
+// Status handshake (only meaningful over a bidirectional transport).
 const PRINT_STATUS_RESPONSE: u8 = 0xB3;
 
 // Label type 1 = gap-sensed die-cut labels (the common case for D-series tape).
 const LABEL_TYPE_GAP: u8 = 0x01;
+
+/// Which NIIMBOT print-task sequence to emit.
+///
+/// Pocket D-series firmware (D110M V4, 2025+) uses [`NiimbotTask::V4`]: a
+/// 9-byte `PrintStart`, 13-byte `SetPageSize`, no `PageStart`, and a one-way
+/// `Heartbeat` after `PrintEnd`. B-series and older D110 units over USB serial
+/// use [`NiimbotTask::Standard`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NiimbotTask {
+    /// Legacy D110 / B-series: 1-byte PrintStart, PageStart, 4-byte dimensions
+    /// + separate PrintQuantity.
+    #[default]
+    Standard,
+    /// D110M V4 (typical for BLE): 9-byte PrintStart, 13-byte SetPageSize, no
+    /// PageStart, status + heartbeat extras.
+    V4,
+}
 
 /// Driver for NIIMBOT thermal label printers (D11 / D110 family and
 /// compatibles).
@@ -67,25 +87,46 @@ pub struct NiimbotDriver {
     /// Print density / heat level. Valid ranges are model-specific (the D110
     /// accepts 1–3; B-series printers accept 1–5). Higher is darker.
     pub density: u8,
+    /// Print-task variant (see [`NiimbotTask`]).
+    pub task: NiimbotTask,
 }
 
 impl Default for NiimbotDriver {
     fn default() -> Self {
         // 3 is the darkest setting the D110 accepts and a safe mid value for
         // models with a wider range.
-        Self { density: 3 }
+        Self {
+            density: 3,
+            task: NiimbotTask::Standard,
+        }
     }
 }
 
 impl NiimbotDriver {
-    /// Create a new driver with the default density.
+    /// Create a new driver with the default density and [`NiimbotTask::Standard`].
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Create a driver configured for the D110M V4 BLE print task.
+    pub fn v4() -> Self {
+        Self {
+            task: NiimbotTask::V4,
+            ..Self::default()
+        }
+    }
+
     /// Create a driver with an explicit print density.
     pub fn with_density(density: u8) -> Self {
-        Self { density }
+        Self {
+            density,
+            ..Self::default()
+        }
+    }
+
+    /// Create a driver with an explicit print task.
+    pub fn with_task(task: NiimbotTask) -> Self {
+        Self { task, ..Self::default() }
     }
 
     /// Append one framed packet (`55 55 <cmd> <len> <data> <csum> AA AA`).
@@ -156,9 +197,24 @@ impl Driver for NiimbotDriver {
         let cols = bitmap.width as u16;
         let copies = ctx.copies().min(0xFFFF) as u16;
 
-        let mut out = Vec::with_capacity((bitmap.data.len()) + bitmap.height as usize * 12 + 64);
+        match self.task {
+            NiimbotTask::Standard => self.encode_standard(bitmap, rows, cols, copies, stride),
+            NiimbotTask::V4 => self.encode_v4(bitmap, rows, cols, copies, stride),
+        }
+    }
+}
 
-        // --- Job / page setup ---
+impl NiimbotDriver {
+    fn encode_standard(
+        &self,
+        bitmap: &MonoBitmap,
+        rows: u16,
+        cols: u16,
+        copies: u16,
+        stride: usize,
+    ) -> Result<Vec<u8>, DriverError> {
+        let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 64);
+
         Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
         Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
         Self::push_packet(&mut out, START_PRINT, &[0x01]);
@@ -168,11 +224,63 @@ impl Driver for NiimbotDriver {
         dimension.extend_from_slice(&rows.to_be_bytes());
         dimension.extend_from_slice(&cols.to_be_bytes());
         Self::push_packet(&mut out, SET_DIMENSION, &dimension);
-
-        // Copies are handled by the printer repeating the page.
         Self::push_packet(&mut out, SET_QUANTITY, &copies.to_be_bytes());
 
-        // --- One packet per raster line ---
+        self.push_rows(&mut out, bitmap, stride);
+        Self::push_packet(&mut out, END_PAGE_PRINT, &[0x01]);
+        Self::push_packet(&mut out, END_PRINT, &[0x01]);
+        Ok(out)
+    }
+
+    /// D110M V4 print task (2025+ pocket printers, especially over BLE).
+    ///
+    /// Reference: <https://printers.niim.blue/interfacing/print-tasks/#d110m_v4>
+    fn encode_v4(
+        &self,
+        bitmap: &MonoBitmap,
+        rows: u16,
+        cols: u16,
+        copies: u16,
+        stride: usize,
+    ) -> Result<Vec<u8>, DriverError> {
+        let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 96);
+
+        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
+
+        // 9-byte PrintStart: pages(u16), 0×4, pageColor, speed, flag.
+        let mut start = [0u8; 9];
+        start[0..2].copy_from_slice(&1u16.to_be_bytes()); // one page in this job
+        Self::push_packet(&mut out, START_PRINT, &start);
+
+        // BLE firmware drops the first post-start packet; absorb it with a
+        // one-way status query (niimbluelib / community workaround).
+        Self::push_packet(&mut out, GET_PRINT_STATUS, &[0x01]);
+
+        // 13-byte SetPageSize: rows, cols, copies, cutHeight, cutType, 0, sendAll, partHeight.
+        let mut page_size = [0u8; 13];
+        page_size[0..2].copy_from_slice(&rows.to_be_bytes());
+        page_size[2..4].copy_from_slice(&cols.to_be_bytes());
+        page_size[4..6].copy_from_slice(&copies.to_be_bytes());
+        page_size[6..8].copy_from_slice(&0u16.to_be_bytes()); // cutHeight
+        // page_size[8] cutType = 0
+        // page_size[9] = 0
+        // page_size[10] sendAll = 0
+        page_size[11..13].copy_from_slice(&0u16.to_be_bytes()); // partHeight
+        Self::push_packet(&mut out, SET_DIMENSION, &page_size);
+
+        self.push_rows(&mut out, bitmap, stride);
+        Self::push_packet(&mut out, END_PAGE_PRINT, &[0x01]);
+        Self::push_packet(&mut out, END_PRINT, &[0x01]);
+
+        // One-way heartbeat after PrintEnd (BLE session cleanup; also absorbs a
+        // dropped-packet quirk on some firmwares).
+        Self::push_packet(&mut out, HEARTBEAT, &[0x01]);
+
+        Ok(out)
+    }
+
+    fn push_rows(&self, out: &mut Vec<u8>, bitmap: &MonoBitmap, stride: usize) {
         let mut row_data = Vec::with_capacity(6 + stride);
         for y in 0..bitmap.height {
             row_data.clear();
@@ -180,14 +288,8 @@ impl Driver for NiimbotDriver {
             row_data.extend_from_slice(&Self::row_chunk_counts(bitmap, y));
             row_data.push(0x01); // repeat this line once
             row_data.extend_from_slice(bitmap.row(y));
-            Self::push_packet(&mut out, PRINT_BITMAP_ROW, &row_data);
+            Self::push_packet(out, PRINT_BITMAP_ROW, &row_data);
         }
-
-        // --- Page / job teardown ---
-        Self::push_packet(&mut out, END_PAGE_PRINT, &[0x01]);
-        Self::push_packet(&mut out, END_PRINT, &[0x01]);
-
-        Ok(out)
     }
 }
 
@@ -402,5 +504,24 @@ mod tests {
         let job = ctx_job(1);
         let err = NiimbotDriver::new().encode(&bmp, &EncodeContext::new(&job, &caps));
         assert!(matches!(err, Err(DriverError::Unsupported(_))));
+    }
+
+    #[test]
+    fn v4_uses_nine_byte_print_start_and_thirteen_byte_page_size() {
+        let bmp = MonoBitmap::new(96, 4);
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(1);
+        let bytes = NiimbotDriver::v4()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+
+        assert!(checksum_ok(&bytes));
+        // 9-byte PrintStart, no PageStart (0x03), no PrintQuantity (0x15).
+        assert_eq!(find_packet(&bytes, START_PRINT).unwrap().len(), 9);
+        assert!(find_packet(&bytes, START_PAGE_PRINT).is_none());
+        assert!(find_packet(&bytes, SET_QUANTITY).is_none());
+        assert_eq!(find_packet(&bytes, SET_DIMENSION).unwrap().len(), 13);
+        assert!(find_packet(&bytes, GET_PRINT_STATUS).is_some());
+        assert!(find_packet(&bytes, HEARTBEAT).is_some());
     }
 }

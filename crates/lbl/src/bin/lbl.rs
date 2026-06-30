@@ -199,6 +199,14 @@ impl From<ProtocolArg> for Protocol {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum NiimbotTaskArg {
+    /// Legacy D110 / B-series (PageStart + separate PrintQuantity).
+    Standard,
+    /// D110M V4 (9-byte PrintStart, 13-byte SetPageSize, no PageStart).
+    V4,
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum BackendArg {
     Chromium,
@@ -295,9 +303,20 @@ struct PrintArgs {
     usb: Option<String>,
 
     /// Serial (USB CDC-ACM) target: a device path, optionally with a baud rate
-    /// (`/dev/ttyACM0` or `/dev/ttyACM0:115200`). Used by NIIMBOT D-series.
+    /// (`/dev/ttyACM0` or `/dev/ttyACM0:115200`). Used by NIIMBOT B-series.
     #[arg(long)]
     serial: Option<String>,
+
+    /// Bluetooth LE target: the printer's advertised name or address
+    /// (e.g. `D110`). Requires building with the `ble` feature. Used by the
+    /// cable-less NIIMBOT D-series.
+    #[arg(long)]
+    bluetooth: Option<String>,
+
+    /// NIIMBOT print-task variant. Use `v4` for 2025+ D110M firmware over BLE;
+    /// `standard` (default) for B-series USB and older D110 units.
+    #[arg(long, value_enum, default_value = "standard")]
+    niimbot_task: NiimbotTaskArg,
 
     /// Instead of printing, write encoded bytes to this directory.
     #[arg(long)]
@@ -327,14 +346,20 @@ struct PrintArgs {
 
 fn run_print(args: PrintArgs) -> Result<()> {
     let catalog = Catalog::bundled()?;
+    let protocol: Protocol = args.protocol.into();
+    // NIIMBOT heads are 203 dpi; the generic --dpi default (300) oversizes labels.
+    let dpi = if protocol == Protocol::Niimbot && args.media.dpi == 300.0 {
+        203.0
+    } else {
+        args.media.dpi
+    };
     let media = resolve_media(
         &catalog,
         args.media.media.as_deref(),
         args.media.width_mm,
         args.media.length_mm,
-        args.media.dpi,
+        dpi,
     )?;
-    let protocol: Protocol = args.protocol.into();
 
     // The virtual printer's "media type" is its output file format.
     let media_type = if protocol == Protocol::Virtual {
@@ -387,6 +412,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let mut registry = Registry::with_builtin_drivers();
     if let Some(mt) = media_type {
         registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
+    }
+    if protocol == Protocol::Niimbot && args.niimbot_task == NiimbotTaskArg::V4 {
+        registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::v4()));
     }
 
     let extension = if protocol == Protocol::Console {
@@ -465,7 +493,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
         bail!("virtual printer needs an output target; pass --file or --out-dir");
     }
 
-    dispatch(encoded, protocol, args.network, args.usb, args.serial)
+    dispatch(
+        encoded,
+        protocol,
+        args.network,
+        args.usb,
+        args.serial,
+        args.bluetooth,
+    )
 }
 
 #[allow(clippy::type_complexity)]
@@ -499,6 +534,7 @@ fn dispatch(
     network: Option<String>,
     usb: Option<String>,
     serial: Option<String>,
+    bluetooth: Option<String>,
 ) -> Result<()> {
     if let Some(target) = network {
         let (host, port) = target
@@ -520,9 +556,35 @@ fn dispatch(
         let (path, baud) = lbl::dispatch::parse_serial_target(&target);
         let mut t = lbl_device::SerialTransport::new(path, baud);
         dispatch_with(encoded, protocol, &mut t)
+    } else if let Some(target) = bluetooth {
+        dispatch_bluetooth(encoded, protocol, target)
     } else {
-        bail!("no target; pass --network, --usb, --serial, --file, or --out-dir");
+        bail!("no target; pass --network, --usb, --serial, --bluetooth, --file, or --out-dir");
     }
+}
+
+/// Dispatch over Bluetooth LE. Available only when built with the `ble`
+/// feature; otherwise it explains how to enable it.
+#[cfg(feature = "ble")]
+fn dispatch_bluetooth(
+    encoded: Vec<(String, Vec<u8>)>,
+    protocol: Protocol,
+    target: String,
+) -> Result<()> {
+    let mut t = lbl_device::BleTransport::new(target);
+    dispatch_with(encoded, protocol, &mut t)
+}
+
+#[cfg(not(feature = "ble"))]
+fn dispatch_bluetooth(
+    _encoded: Vec<(String, Vec<u8>)>,
+    _protocol: Protocol,
+    _target: String,
+) -> Result<()> {
+    bail!(
+        "Bluetooth LE support is not compiled in; rebuild with `--features ble` \
+         (e.g. `cargo install --path crates/lbl --features ble`)"
+    )
 }
 
 fn dispatch_with<T: lbl_device::Transport>(

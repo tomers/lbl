@@ -35,6 +35,11 @@ enum Command {
         #[arg(long)]
         serial: Option<String>,
 
+        /// Bluetooth LE target: the printer's advertised name or address
+        /// (e.g. `D110`). Requires the `ble` feature. Used by NIIMBOT D-series.
+        #[arg(long)]
+        bluetooth: Option<String>,
+
         /// Input file. If omitted, read from stdin.
         input: Option<std::path::PathBuf>,
     },
@@ -51,6 +56,7 @@ fn main() -> Result<()> {
             network,
             usb,
             serial,
+            bluetooth,
             input,
         } => {
             let data = match &input {
@@ -61,7 +67,7 @@ fn main() -> Result<()> {
                     buf
                 }
             };
-            send(network, usb, serial, &data)?;
+            send(network, usb, serial, bluetooth, &data)?;
             eprintln!("sent {} bytes", data.len());
         }
     }
@@ -72,6 +78,7 @@ fn send(
     network: Option<String>,
     usb: Option<String>,
     serial: Option<String>,
+    bluetooth: Option<String>,
     data: &[u8],
 ) -> Result<()> {
     if let Some(target) = network {
@@ -107,7 +114,23 @@ fn send(
     #[cfg(not(feature = "serial"))]
     let _ = serial;
 
-    bail!("no target given; use --network host:port, --usb vid:pid, or --serial path[:baud]")
+    #[cfg(feature = "ble")]
+    if let Some(target) = bluetooth {
+        let mut t = lbl_device::BleTransport::new(target);
+        t.send(data)?;
+        return Ok(());
+    }
+    #[cfg(not(feature = "ble"))]
+    if bluetooth.is_some() {
+        bail!(
+            "Bluetooth LE support is not compiled in; rebuild with `--features ble` \
+             (e.g. `cargo build -p lbl-device --features ble`)"
+        );
+    }
+    #[cfg(not(feature = "ble"))]
+    let _ = bluetooth;
+
+    bail!("no target given; use --network host:port, --usb vid:pid, --serial path[:baud], or --bluetooth name")
 }
 
 /// Parse a serial target (`path` or `path:baud`), defaulting the baud rate.

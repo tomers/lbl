@@ -1,6 +1,6 @@
 [package]
 name = "lbl-device"
-description = "Printer discovery and transport (USB via nusb, network via TCP) for lbl."
+description = "Printer discovery and transport (USB via nusb, serial, Bluetooth LE, network via TCP) for lbl."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -16,6 +16,12 @@ path = "src/bin/lbl-device.rs"
 default = ["usb", "serial"]
 usb = ["dep:nusb", "dep:pollster"]
 serial = ["dep:serialport"]
+# Bluetooth Low Energy transport (NIIMBOT D-series and other BLE printers).
+# Opt-in because, unlike the other transports, it pulls in `btleplug` and — on
+# Linux — `libdbus`. We vendor `libdbus` (built from source via `cc`) so that
+# enabling `ble` stays self-contained and needs no `libdbus-1-dev` system
+# package, matching the crate's no-system-dependency stance.
+ble = ["dep:btleplug", "dep:tokio", "dep:futures", "dep:uuid", "dep:dbus"]
 
 [dependencies]
 lbl-core = { workspace = true }
@@ -29,3 +35,15 @@ tracing = { workspace = true }
 nusb = { version = "0.1", optional = true }
 pollster = { version = "0.3", optional = true }
 serialport = { workspace = true, optional = true }
+
+# BLE transport (behind the `ble` feature).
+btleplug = { version = "0.12", optional = true }
+tokio = { workspace = true, optional = true }
+futures = { version = "0.3", optional = true }
+uuid = { version = "1", optional = true }
+
+# Force `libdbus` to be vendored (built from bundled C source) on Linux so the
+# `ble` feature needs no `libdbus-1-dev`. `btleplug` already depends on `dbus`
+# here; this just unifies its features to enable `vendored`.
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus = { version = "0.9", features = ["vendored"], optional = true }

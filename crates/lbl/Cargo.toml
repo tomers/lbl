@@ -12,6 +12,12 @@ rust-version.workspace = true
 name = "lbl"
 path = "src/bin/lbl.rs"
 
+[features]
+# Bluetooth Low Energy transport (NIIMBOT D-series). Opt-in; forwards to
+# `lbl-device`'s `ble` feature, which pulls in `btleplug` (and a vendored
+# `libdbus` on Linux).
+ble = ["lbl-device/ble"]
+
 [dependencies]
 lbl-core = { workspace = true }
 lbl-config = { workspace = true }

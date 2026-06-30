@@ -7,12 +7,15 @@ lbl device list           # via the orchestrator
 lbl-device list           # standalone
 ```
 
-This enumerates **both** kinds of connection and prints them as JSON:
+This enumerates **three** kinds of connection and prints them as JSON:
 
 - **USB bulk** devices (DYMO, ESC/POS, …), matched against a known-printer
   table to suggest a model and protocol.
 - **USB serial** ports (NIIMBOT B-series and other CDC-ACM printers). Each entry
   carries a `path` (e.g. `/dev/ttyACM0`) to hand straight to `--serial`.
+- **Bluetooth LE** printers (NIIMBOT D-series), when built with the `ble`
+  feature. Each entry carries the advertised name in `path` for `--bluetooth`.
+  Discovery performs a short radio scan (a few seconds).
 
 ```jsonc
 [
@@ -71,10 +74,20 @@ catalog under the `NIIMBOT` brand:
 
 ```bash
 lbl-catalog compatible --printer "D110"
-# Print over the USB cable (serial / CDC-ACM):
+# Print over USB cable (serial / CDC-ACM, B-series only):
 lbl print --media 12x40 --dpi 203 --protocol niimbot --serial /dev/ttyACM0
+# Print over Bluetooth LE (D-series, requires `ble` feature):
+lbl print --media 12x40 --dpi 203 --protocol niimbot --bluetooth D110
 # or by dimensions:
-lbl print --width-mm 12 --length-mm 40 --dpi 203 --protocol niimbot --serial /dev/ttyACM0
+lbl print --width-mm 12 --length-mm 40 --dpi 203 --protocol niimbot --bluetooth D110
+```
+
+Build with Bluetooth support:
+
+```bash
+cargo build -p lbl --features ble
+# or install:
+cargo install --path crates/lbl --features ble
 ```
 
 These printers talk over a USB CDC-ACM **serial** port (e.g. `/dev/ttyACM0`, or
@@ -89,7 +102,10 @@ status and waits for the page to finish before dispatching the next one. (Over a
 write-only transport — a file or raw socket — the job is still emitted, just
 without the completion handshake.)
 
-### Which models can print over USB?
+When printing over **Bluetooth** (`--bluetooth`), use the default `standard`
+task. For 2025+ D110M V4 firmware, pass `--niimbot-task v4`.
+
+### Which models can print over USB? Which over Bluetooth?
 
 > **Heads-up:** not every NIIMBOT prints over USB.
 >
@@ -97,12 +113,13 @@ without the completion handshake.)
 >   serial device — these work with `--serial`.
 > - **Pocket D-series (D11, D110, …)** are **Bluetooth-only**. Their USB-C port
 >   **only charges the battery**; it carries no print data, so the printer never
->   appears as a serial port no matter which cable you use.
+>   appears as a serial port no matter which cable you use. Use `--bluetooth`
+>   instead (requires building with the `ble` feature).
 >
-> If your D11/D110 doesn't show up below, that's expected — it isn't a wiring or
-> permissions problem. Bluetooth LE is not yet supported as an `lbl` transport,
-> so a USB-data-capable model (B-series) is currently required for cable
-> printing.
+> If your D11/D110 doesn't show up in `lbl device list` over USB, that's
+> expected — it isn't a wiring or permissions problem. Make sure the printer is
+> powered on, paired/visible over Bluetooth, and that you built `lbl` with
+> `--features ble`.
 
 ### Finding the right serial port
 
@@ -148,3 +165,20 @@ USB serial ports appear as `/dev/tty.usbmodemXXXX` (CDC-ACM) or
 
 Ports are named `COM3`, `COM4`, … Find the number under *Device Manager → Ports
 (COM & LPT)* and pass it as `--serial COM3`.
+
+### Finding a Bluetooth printer (D-series)
+
+First, let `lbl` scan for it (requires the `ble` feature):
+
+```bash
+lbl device list      # BLE entries appear with "connection": "ble" and a "path"
+```
+
+Use the `path` (the advertised name, e.g. `D110-1A2B3C4D`) with
+`--bluetooth`. A substring like `D110` is enough if only one matching printer
+is nearby.
+
+On Linux you need a working Bluetooth adapter and the BlueZ daemon running.
+`lbl` talks to BlueZ over D-Bus; the `ble` feature vendors `libdbus` so you
+don't need to install `libdbus-1-dev`, but you may need permission to use
+Bluetooth (often membership in the `bluetooth` group).
