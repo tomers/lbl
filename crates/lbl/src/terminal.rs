@@ -87,10 +87,31 @@ pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
     write!(err, "\nPrint {n} {plural}? [y/N] ")?;
     err.flush()?;
 
+    let line = read_prompt_line()?;
+    Ok(matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+}
+
+/// Read one line for an interactive prompt.
+///
+/// When label input comes from a pipe or heredoc, stdin is not a TTY and may
+/// already be fully consumed. On Unix, read from `/dev/tty` so `--confirm`
+/// still works in that case.
+fn read_prompt_line() -> io::Result<String> {
     let mut line = String::new();
+    #[cfg(unix)]
+    if !io::stdin().is_terminal() {
+        use std::io::BufRead;
+        if let Ok(tty) = std::fs::File::open("/dev/tty") {
+            io::BufReader::new(tty).read_line(&mut line)?;
+            return Ok(line);
+        }
+    }
     let read = io::stdin().read_line(&mut line)?;
-    // EOF (e.g. stdin not interactive) is treated as "no".
-    Ok(read > 0 && matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+    // EOF (e.g. no controlling terminal) is treated as "no".
+    if read == 0 {
+        line.clear();
+    }
+    Ok(line)
 }
 
 /// Write the dithered raster of every label to stdout (the `--protocol console`
