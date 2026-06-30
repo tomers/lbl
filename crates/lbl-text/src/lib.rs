@@ -8,7 +8,8 @@
 //!
 //! Directives are written inline with double braces:
 //!
-//! - `{{qr:https://example.com}}` -> a QR code
+//! - `{{qr:https://example.com}}` -> a QR code (payload only; use
+//!   `{{qr ec=low}}payload{{/qr}}` when options are needed)
 //! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
 //!   CODE128, so `{{barcode:12345}}` also works)
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
@@ -29,8 +30,10 @@
 //! directives still apply and are appended after the text.
 
 mod parse;
+mod qr;
 
-pub use parse::{barcode_from_spec, parse_directive, Block, Document};
+pub use parse::{barcode_from_spec, parse_directive, scan_directive_at, Block, Document};
+pub use qr::{QrErrorCorrection, QrOptions};
 
 /// The default barcode symbology when one isn't specified.
 pub const DEFAULT_SYMBOLOGY: &str = "CODE128";

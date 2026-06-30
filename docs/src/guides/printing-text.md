@@ -12,7 +12,8 @@ lbl-text "Photo {{image:./logo.png}} next to text"
 lbl-text "Total {{size:2:$42.00}}"
 ```
 
-- `{{qr:…}}` — QR code
+- `{{qr:…}}` — QR code (payload only; the entire value after `:` is encoded)
+- `{{qr ec=low}}…{{/qr}}` — QR with options (same attributes as `<qr ec="low">`)
 - `<qr ec="H" margin="2">…</qr>` — QR in authoring HTML with per-element
   overrides (`ec` / `error-correction`, `margin`, `dark`, `light`)
 - `{{barcode:[SYMBOLOGY:]data}}` — barcode (defaults to `CODE128`)

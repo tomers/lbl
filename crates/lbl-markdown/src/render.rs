@@ -1,6 +1,6 @@
 //! Markdown -> authoring HTML, with lbl inline directives applied.
 
-use lbl_text::{barcode_from_spec, parse_directive, Block};
+use lbl_text::{barcode_from_spec, scan_directive_at, Block};
 use pulldown_cmark::{html, Options, Parser};
 
 /// A parsed Markdown label: the Markdown body rendered to authoring HTML, plus
@@ -34,7 +34,10 @@ impl MarkdownDocument {
 
     /// Append a QR directive (from a flag).
     pub fn push_qr(&mut self, payload: impl Into<String>) {
-        self.appended.push(Block::Qr(payload.into()));
+        self.appended.push(Block::Qr {
+            payload: payload.into(),
+            options: lbl_text::QrOptions::default(),
+        });
     }
 
     /// Append a barcode directive (from a flag). `spec` may be
@@ -84,20 +87,16 @@ fn placeholder(n: usize) -> String {
 fn extract_directives(input: &str) -> (String, Vec<(String, Block)>) {
     let mut out = String::with_capacity(input.len());
     let mut directives = Vec::new();
-    let bytes = input.as_bytes();
     let mut i = 0;
 
     while i < input.len() {
-        if bytes[i] == b'{' && i + 1 < input.len() && bytes[i + 1] == b'{' {
-            if let Some(close) = input[i + 2..].find("}}") {
-                let inner = &input[i + 2..i + 2 + close];
-                if let Some(block) = parse_directive(inner) {
-                    let ph = placeholder(directives.len());
-                    out.push_str(&ph);
-                    directives.push((ph, block));
-                    i = i + 2 + close + 2;
-                    continue;
-                }
+        if input[i..].starts_with("{{") {
+            if let Some((block, end)) = scan_directive_at(input, i) {
+                let ph = placeholder(directives.len());
+                out.push_str(&ph);
+                directives.push((ph, block));
+                i = end;
+                continue;
             }
         }
         let ch = input[i..].chars().next().unwrap();
@@ -131,6 +130,14 @@ mod tests {
         let html = doc.to_authoring_html();
         assert!(html.contains("<h1>Title</h1>"), "{html}");
         assert!(html.contains("<strong>bold</strong>"), "{html}");
+    }
+
+    #[test]
+    fn inline_qr_directive_with_options() {
+        let doc = MarkdownDocument::parse("**Hello** {{qr ec=low}}hi{{/qr}}");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<strong>Hello</strong>"), "{html}");
+        assert!(html.contains(r#"<qr ec="L">hi</qr>"#), "{html}");
     }
 
     #[test]

@@ -11,7 +11,8 @@ echo "piped text" | lbl-text
 
 ## Inline mini-syntax (default)
 
-- `{{qr:https://example.com}}` — a QR code
+- `{{qr:https://example.com}}` — a QR code (payload only)
+- `{{qr ec=low}}payload{{/qr}}` — QR with options (mirrors `<qr ec="low">…</qr>`)
 - `{{barcode:CODE128:12345}}` — a barcode (symbology optional: `{{barcode:12345}}`)
 - `{{image:./photo.jpg}}` — an image (local path or remote URL)
 - `{{size:1.5:World}}` — text at 1.5× the base font size

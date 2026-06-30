@@ -8,7 +8,7 @@
 //! links, ...), but the same inline mini-syntax as `lbl-text` is **still
 //! applied** anywhere in the document:
 //!
-//! - `{{qr:https://example.com}}` -> a QR code (`<qr>`)
+//! - `{{qr:https://example.com}}` -> a QR code (`{{qr ec=low}}…{{/qr}}` for options)
 //! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
 //!   CODE128, so `{{barcode:12345}}` also works)
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL

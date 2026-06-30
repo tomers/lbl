@@ -1,5 +1,6 @@
 //! Parsing of text + inline directives into an authoring document.
 
+use crate::qr::{parse_qr_attrs, QrOptions};
 use crate::DEFAULT_SYMBOLOGY;
 
 /// A content block in a label.
@@ -15,8 +16,13 @@ pub enum Block {
         /// The text to render at this size.
         text: String,
     },
-    /// A QR code carrying the given payload.
-    Qr(String),
+    /// A QR code carrying the given payload and optional overrides.
+    Qr {
+        /// Encoded QR payload.
+        payload: String,
+        /// Per-code options (error correction, quiet zone, colors).
+        options: QrOptions,
+    },
     /// A barcode of the given symbology carrying the given data.
     Barcode {
         /// Symbology, e.g. `CODE128`, `EAN13`.
@@ -46,7 +52,9 @@ impl Block {
                 fmt_scale(*scale),
                 text_to_html(text)
             ),
-            Block::Qr(payload) => format!("<qr>{}</qr>", escape(payload)),
+            Block::Qr { payload, options } => {
+                format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
+            }
             Block::Barcode { symbology, data } => format!(
                 "<barcode type=\"{}\">{}</barcode>",
                 escape(symbology),
@@ -82,7 +90,10 @@ impl Document {
 
     /// Append a QR directive (from a flag).
     pub fn push_qr(&mut self, payload: impl Into<String>) {
-        self.blocks.push(Block::Qr(payload.into()));
+        self.blocks.push(Block::Qr {
+            payload: payload.into(),
+            options: QrOptions::default(),
+        });
     }
 
     /// Append a barcode directive (from a flag). `spec` may be
@@ -131,27 +142,42 @@ pub fn barcode_from_spec(spec: &str) -> Block {
     }
 }
 
+/// Try to parse a directive at `start` (the first `{` of `{{`).
+///
+/// Returns the parsed block and the index immediately after the consumed
+/// directive. Used by `lbl-text` and `lbl-markdown` so both front-ends share
+/// identical directive syntax.
+pub fn scan_directive_at(input: &str, start: usize) -> Option<(Block, usize)> {
+    if !input[start..].starts_with("{{") {
+        return None;
+    }
+
+    if let Some(result) = try_parse_qr_block(input, start) {
+        return Some(result);
+    }
+
+    let close = input[start + 2..].find("}}")?;
+    let inner = &input[start + 2..start + 2 + close];
+    let block = directive_from_inner(inner)?;
+    Some((block, start + 2 + close + 2))
+}
+
 /// Scan `input` for `{{type:...}}` directives, returning interleaved text and
 /// directive blocks. Unrecognized `{{...}}` is kept as literal text.
 fn parse_inline(input: &str) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut text_buf = String::new();
-    let bytes = input.as_bytes();
     let mut i = 0;
 
     while i < input.len() {
-        if bytes[i] == b'{' && i + 1 < input.len() && bytes[i + 1] == b'{' {
-            if let Some(close) = input[i + 2..].find("}}") {
-                let inner = &input[i + 2..i + 2 + close];
-                if let Some(block) = directive_from_inner(inner) {
-                    flush_text(&mut text_buf, &mut blocks);
-                    blocks.push(block);
-                    i = i + 2 + close + 2;
-                    continue;
-                }
+        if input[i..].starts_with("{{") {
+            if let Some((block, end)) = scan_directive_at(input, i) {
+                flush_text(&mut text_buf, &mut blocks);
+                blocks.push(block);
+                i = end;
+                continue;
             }
         }
-        // Not a recognized directive: consume one char as literal text.
         let ch = input[i..].chars().next().unwrap();
         text_buf.push(ch);
         i += ch.len_utf8();
@@ -159,6 +185,39 @@ fn parse_inline(input: &str) -> Vec<Block> {
 
     flush_text(&mut text_buf, &mut blocks);
     blocks
+}
+
+/// HTML-like block QR: `{{qr ec=low}}payload{{/qr}}`.
+fn try_parse_qr_block(input: &str, start: usize) -> Option<(Block, usize)> {
+    const OPEN: &str = "{{qr";
+    if !input[start..].starts_with(OPEN) {
+        return None;
+    }
+    let mut pos = start + OPEN.len();
+    // `{{qr:payload}}` is the colon shorthand, not a block opener.
+    if input.as_bytes().get(pos) == Some(&b':') {
+        return None;
+    }
+    let close_rel = input[pos..].find("}}")?;
+    let attrs = input[pos..pos + close_rel].trim();
+    pos += close_rel + 2;
+
+    const END: &str = "{{/qr}}";
+    let payload_rel = input[pos..].find(END)?;
+    let payload = &input[pos..pos + payload_rel];
+    pos += payload_rel + END.len();
+
+    if payload.is_empty() {
+        return None;
+    }
+
+    Some((
+        Block::Qr {
+            payload: payload.to_string(),
+            options: parse_qr_attrs(attrs),
+        },
+        pos,
+    ))
 }
 
 /// Push the accumulated text as a block, trimming surrounding whitespace (which
@@ -190,7 +249,16 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         return None;
     }
     match kind.as_str() {
-        "qr" => Some(Block::Qr(rest.to_string())),
+        "qr" => {
+            let payload = rest.trim();
+            if payload.is_empty() {
+                return None;
+            }
+            Some(Block::Qr {
+                payload: payload.to_string(),
+                options: QrOptions::default(),
+            })
+        }
         "barcode" => Some(barcode_from_spec(rest)),
         "image" | "img" => Some(Block::Image(rest.to_string())),
         "size" | "font-size" | "fs" => sized_from_spec(rest),
@@ -259,6 +327,7 @@ fn escape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::qr::{QrErrorCorrection, QrOptions};
 
     #[test]
     fn plain_text_becomes_single_block() {
@@ -273,9 +342,49 @@ mod tests {
             doc.blocks,
             vec![
                 Block::Text("ship to".to_string()),
-                Block::Qr("https://x.y".to_string()),
+                Block::Qr {
+                    payload: "https://x.y".to_string(),
+                    options: QrOptions::default(),
+                },
             ]
         );
+    }
+
+    #[test]
+    fn inline_qr_with_block_form() {
+        let doc = Document::parse("{{qr ec=low margin=2}}hi{{/qr}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Qr {
+                payload: "hi".to_string(),
+                options: QrOptions {
+                    error_correction: Some(QrErrorCorrection::L),
+                    margin: Some(2),
+                    ..QrOptions::default()
+                },
+            }]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"<qr ec="L" margin="2">hi</qr>"#), "{html}");
+    }
+
+    #[test]
+    fn colon_form_treats_entire_spec_as_payload() {
+        let doc = Document::parse("{{qr:hi ec=low}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Qr {
+                payload: "hi ec=low".to_string(),
+                options: QrOptions::default(),
+            }]
+        );
+    }
+
+    #[test]
+    fn block_form_allows_option_like_payload() {
+        let doc = Document::parse("{{qr ec=low}}hi ec=low{{/qr}}", false);
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"<qr ec="L">hi ec=low</qr>"#), "{html}");
     }
 
     #[test]
