@@ -58,6 +58,7 @@ pub fn protocol_cli_name(protocol: Protocol) -> &'static str {
         Protocol::Tspl => "tspl",
         Protocol::Niimbot => "niimbot",
         Protocol::Virtual => "virtual",
+        Protocol::Console => "console",
     }
 }
 

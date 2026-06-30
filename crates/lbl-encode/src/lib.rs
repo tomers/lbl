@@ -57,6 +57,7 @@ impl Registry {
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::new()));
         registry.register(Box::new(lbl_driver_file::FileDriver::default()));
+        registry.register(Box::new(lbl_driver_console::ConsoleDriver::new()));
         registry
     }
 
@@ -91,6 +92,7 @@ mod tests {
             Protocol::Tspl,
             Protocol::Niimbot,
             Protocol::Virtual,
+            Protocol::Console,
         ] {
             assert!(registry.get(p).is_some(), "missing driver for {p:?}");
         }

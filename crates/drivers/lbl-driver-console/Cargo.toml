@@ -1,0 +1,13 @@
+[package]
+name = "lbl-driver-console"
+description = "Console (terminal) preview driver for lbl: renders the dithered 1-bit raster as Unicode half-block art."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core = { workspace = true }
+lbl-driver-api = { workspace = true }

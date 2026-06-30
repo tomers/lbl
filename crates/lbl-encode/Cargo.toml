@@ -21,6 +21,7 @@ lbl-driver-zpl = { workspace = true }
 lbl-driver-tspl = { workspace = true }
 lbl-driver-niimbot = { workspace = true }
 lbl-driver-file = { workspace = true }
+lbl-driver-console = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }

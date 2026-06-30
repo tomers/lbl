@@ -22,6 +22,7 @@ members = [
     "crates/drivers/lbl-driver-tspl",
     "crates/drivers/lbl-driver-niimbot",
     "crates/drivers/lbl-driver-file",
+    "crates/drivers/lbl-driver-console",
 ]
 
 [workspace.package]
@@ -50,6 +51,7 @@ lbl-driver-zpl = { path = "crates/drivers/lbl-driver-zpl" }
 lbl-driver-tspl = { path = "crates/drivers/lbl-driver-tspl" }
 lbl-driver-niimbot = { path = "crates/drivers/lbl-driver-niimbot" }
 lbl-driver-file = { path = "crates/drivers/lbl-driver-file" }
+lbl-driver-console = { path = "crates/drivers/lbl-driver-console" }
 lbl-encode = { path = "crates/lbl-encode" }
 lbl-device = { path = "crates/lbl-device" }
 lbl-spool = { path = "crates/lbl-spool" }

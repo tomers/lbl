@@ -25,6 +25,9 @@ enum ProtocolArg {
     /// Virtual printer: encode to an image file ("media type" via --media-type).
     #[value(alias = "file")]
     Virtual,
+    /// Console printer: encode to terminal art (plain block glyphs).
+    #[value(alias = "term")]
+    Console,
 }
 
 impl From<ProtocolArg> for Protocol {
@@ -37,6 +40,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::Virtual => Protocol::Virtual,
+            ProtocolArg::Console => Protocol::Console,
         }
     }
 }

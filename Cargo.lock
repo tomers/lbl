@@ -1535,6 +1535,7 @@ dependencies = [
  "lbl-device",
  "lbl-dither",
  "lbl-driver-api",
+ "lbl-driver-console",
  "lbl-driver-file",
  "lbl-driver-niimbot",
  "lbl-encode",
@@ -1623,6 +1624,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-console"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-dymo"
 version = "0.1.0"
 dependencies = [
@@ -1679,6 +1688,7 @@ dependencies = [
  "clap",
  "lbl-core",
  "lbl-driver-api",
+ "lbl-driver-console",
  "lbl-driver-dymo",
  "lbl-driver-escpos",
  "lbl-driver-file",

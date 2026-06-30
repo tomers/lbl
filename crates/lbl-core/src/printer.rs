@@ -27,6 +27,11 @@ pub enum Protocol {
     /// *media type*, configured on the driver rather than encoded in the
     /// protocol itself.
     Virtual,
+    /// A virtual printer that "prints" the raster to the terminal as text.
+    ///
+    /// Like [`Virtual`](Protocol::Virtual) it targets a human rather than
+    /// hardware; the dithered bitmap is rendered as Unicode half-block art.
+    Console,
 }
 
 /// How the toolchain reaches a printer.
