@@ -9,6 +9,7 @@ use lbl_catalog::Catalog;
     name = "lbl-catalog",
     about = "Browse known media and printer compatibility",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// Additional catalog files to overlay (TOML/JSON).

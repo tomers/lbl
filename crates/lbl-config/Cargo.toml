@@ -21,6 +21,7 @@ toml = { workspace = true }
 thiserror = { workspace = true }
 directories = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]

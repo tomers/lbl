@@ -29,6 +29,7 @@ impl From<Mode> for OutputMode {
     name = "lbl-transpile-html",
     about = "Transpile authoring HTML (<qr>, <barcode>, flex) into browser-ready HTML",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// Input authoring HTML file. If omitted, read from stdin.

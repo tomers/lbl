@@ -27,6 +27,7 @@ use lbl_transpile_html::{transpile, AssetsBase, TranspileOptions};
     version,
     about = "Orchestrate the lbl label-printing pipeline",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     #[command(subcommand)]

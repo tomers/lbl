@@ -12,6 +12,7 @@ use lbl_template::{data, DataFormat, DefaultResolver, Engine, RenderOptions};
     name = "lbl-template",
     about = "Render data (JSON/TOML/YAML) through a template into one or more labels",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// Template file. If omitted, the template is read from stdin.

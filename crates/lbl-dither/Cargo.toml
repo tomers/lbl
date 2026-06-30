@@ -16,5 +16,6 @@ path = "src/bin/lbl-dither.rs"
 lbl-core = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }
 image = { workspace = true }

@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use lbl_config::{describe_sources, Loader};
 
 #[derive(Parser)]
-#[command(name = "lbl-config", about = "Inspect lbl's layered configuration", color = clap::ColorChoice::Auto)]
+#[command(name = "lbl-config", about = "Inspect lbl's layered configuration", color = clap::ColorChoice::Auto, styles = lbl_cli::CLAP_STYLING)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

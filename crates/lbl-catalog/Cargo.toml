@@ -19,4 +19,5 @@ serde_json = { workspace = true }
 toml = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }

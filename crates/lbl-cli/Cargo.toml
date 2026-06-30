@@ -1,0 +1,12 @@
+[package]
+name = "lbl-cli"
+description = "Shared CLI presentation (help styling) for lbl binaries."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+clap-cargo = { workspace = true }

@@ -14,6 +14,7 @@ use lbl_text::Document;
 from stdin. Emits authoring HTML on stdout for the rest of the pipeline.\n\n\
 Inline mini-syntax (default): {{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}.",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// The text to render. If omitted, text is read from stdin.

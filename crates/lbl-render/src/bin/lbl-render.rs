@@ -19,6 +19,7 @@ enum Backend {
     name = "lbl-render",
     about = "Render HTML to a raster image (two-pass)",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// Input HTML file. If omitted, read from stdin.

@@ -23,6 +23,7 @@ lbl-core = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 image = { workspace = true }

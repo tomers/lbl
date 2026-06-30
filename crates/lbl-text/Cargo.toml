@@ -16,6 +16,7 @@ path = "src/bin/lbl-text.rs"
 serde = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]

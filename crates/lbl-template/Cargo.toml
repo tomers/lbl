@@ -19,6 +19,7 @@ toml = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+lbl-cli = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true }
 minijinja = { version = "2", features = ["loader"] }

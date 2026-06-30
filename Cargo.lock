@@ -516,6 +516,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap-cargo"
+version = "0.18.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936551935c8258754bb8216aec040957d261f977303754b9bf1a213518388006"
+dependencies = [
+ "anstyle",
+ "clap",
+]
+
+[[package]]
 name = "clap_builder"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1429,6 +1439,7 @@ dependencies = [
  "clap",
  "image",
  "lbl-catalog",
+ "lbl-cli",
  "lbl-config",
  "lbl-core",
  "lbl-device",
@@ -1457,11 +1468,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "lbl-core",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "toml",
+]
+
+[[package]]
+name = "lbl-cli"
+version = "0.1.0"
+dependencies = [
+ "clap-cargo",
 ]
 
 [[package]]
@@ -1472,6 +1491,7 @@ dependencies = [
  "clap",
  "directories",
  "figment",
+ "lbl-cli",
  "lbl-core",
  "serde",
  "serde_json",
@@ -1496,6 +1516,7 @@ dependencies = [
  "clap",
  "dbus",
  "futures",
+ "lbl-cli",
  "lbl-core",
  "nusb",
  "pollster",
@@ -1515,6 +1536,7 @@ dependencies = [
  "anyhow",
  "clap",
  "image",
+ "lbl-cli",
  "lbl-core",
  "thiserror 2.0.18",
 ]
@@ -1590,6 +1612,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "lbl-core",
  "lbl-driver-api",
  "lbl-driver-console",
@@ -1608,6 +1631,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "lbl-text",
  "pulldown-cmark",
 ]
@@ -1621,6 +1645,7 @@ dependencies = [
  "clap",
  "futures",
  "image",
+ "lbl-cli",
  "lbl-core",
  "serde",
  "tempfile",
@@ -1641,6 +1666,7 @@ dependencies = [
  "http-body-util",
  "lbl",
  "lbl-catalog",
+ "lbl-cli",
  "lbl-config",
  "lbl-core",
  "lbl-device",
@@ -1665,6 +1691,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "lbl-core",
  "lbl-device",
  "serde",
@@ -1680,6 +1707,7 @@ dependencies = [
  "anyhow",
  "base64",
  "clap",
+ "lbl-cli",
  "mime_guess",
  "minijinja",
  "regex",
@@ -1697,6 +1725,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "serde",
  "thiserror 2.0.18",
 ]
@@ -1707,6 +1736,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "lbl-cli",
  "lbl-core",
  "once_cell",
  "regex",

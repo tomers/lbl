@@ -50,6 +50,7 @@ impl From<ProtocolArg> for Protocol {
     name = "lbl-encode",
     about = "Encode a 1-bit PBM into printer protocol bytes",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// Input PBM (P4) file. If omitted, read from stdin.

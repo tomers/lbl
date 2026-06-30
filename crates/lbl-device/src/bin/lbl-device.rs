@@ -11,6 +11,7 @@ use lbl_device::{discover, NetworkTransport, Transport};
     name = "lbl-device",
     about = "Discover printers and send bytes to them",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     #[command(subcommand)]

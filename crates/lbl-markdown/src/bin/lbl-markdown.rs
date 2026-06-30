@@ -16,6 +16,7 @@ Standard Markdown (headings, lists, emphasis, tables, ...) is supported, and the
 lbl inline mini-syntax is still applied anywhere in the document: \
 {{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}.",
     color = clap::ColorChoice::Auto,
+    styles = lbl_cli::CLAP_STYLING,
 )]
 struct Cli {
     /// The Markdown to render. If omitted, it is read from stdin.
