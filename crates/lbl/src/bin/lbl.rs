@@ -272,9 +272,10 @@ struct PrintArgs {
     #[command(flatten)]
     style: StyleArgs,
 
-    /// Target protocol.
+    /// Target protocol. May also be set in config (`[print] protocol`) or via
+    /// `LBL_PRINT__PROTOCOL`.
     #[arg(long, value_enum)]
-    protocol: ProtocolArg,
+    protocol: Option<ProtocolArg>,
 
     /// For `--protocol virtual`: the output image format ("media type"):
     /// png | bmp | tiff | gif | pbm. Defaults to png.
@@ -287,9 +288,10 @@ struct PrintArgs {
     #[arg(long)]
     supersample: Option<u32>,
 
-    /// Dithering algorithm.
-    #[arg(long, default_value = "auto")]
-    dither: String,
+    /// Dithering algorithm. Overrides config `[print] dither` /
+    /// `LBL_PRINT__DITHER` when set.
+    #[arg(long)]
+    dither: Option<String>,
 
     /// Lay content out in portrait or landscape. Landscape (the default) runs
     /// text along the feed — the longer dimension of typical stripe labels.
@@ -307,21 +309,25 @@ struct PrintArgs {
     #[arg(long, action = clap::ArgAction::Count)]
     rotate_ccw: u8,
 
-    /// Request a cut after each label.
+    /// Request a cut after each label. Overrides config `[print] cut` /
+    /// `LBL_PRINT__CUT`.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    cut: Option<bool>,
+
+    /// Mark target printer as cut-capable. Overrides config `[print]
+    /// supports_cut` / `LBL_PRINT__SUPPORTS_CUT`.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    supports_cut: Option<bool>,
+
+    /// Copies per label. Overrides config `[print] copies` /
+    /// `LBL_PRINT__COPIES`.
     #[arg(long)]
-    cut: bool,
+    copies: Option<u32>,
 
-    /// Mark target printer as cut-capable.
-    #[arg(long)]
-    supports_cut: bool,
-
-    /// Copies per label.
-    #[arg(long, default_value_t = 1)]
-    copies: u32,
-
-    /// Rendering backend.
-    #[arg(long, value_enum, default_value = "chromium")]
-    backend: BackendArg,
+    /// Rendering backend. Overrides config `[print] backend` /
+    /// `LBL_PRINT__BACKEND`.
+    #[arg(long, value_enum)]
+    backend: Option<BackendArg>,
 
     /// Network target host:port.
     #[arg(long)]
@@ -343,9 +349,10 @@ struct PrintArgs {
     bluetooth: Option<String>,
 
     /// NIIMBOT print-task variant. Use `v4` for 2025+ D110M firmware over BLE;
-    /// `standard` (default) for B-series USB and older D110 units.
-    #[arg(long, value_enum, default_value = "standard")]
-    niimbot_task: NiimbotTaskArg,
+    /// `standard` (default) for B-series USB and older D110 units. Overrides
+    /// config `[print] niimbot_task` / `LBL_PRINT__NIIMBOT_TASK`.
+    #[arg(long, value_enum)]
+    niimbot_task: Option<NiimbotTaskArg>,
 
     /// Instead of printing, write encoded bytes to this directory.
     #[arg(long)]
@@ -363,19 +370,59 @@ struct PrintArgs {
 
     /// Print a per-stage debug dump to stderr: the authoring and transpiled
     /// HTML (syntax-highlighted when stderr is a TTY), the dithered raster as
-    /// terminal art, and an encoded-byte preview.
-    #[arg(long)]
-    debug: bool,
+    /// terminal art, and an encoded-byte preview. Overrides config `[print]
+    /// debug` / `LBL_PRINT__DEBUG`.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    debug: Option<bool>,
 
     /// Before sending to a device or file, show a terminal preview of each
     /// label and ask for confirmation. Ignored for `--protocol console`.
-    #[arg(long)]
-    confirm: bool,
+    /// Overrides config `[print] confirm` / `LBL_PRINT__CONFIRM`.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    confirm: Option<bool>,
+}
+
+fn config_enum<E: ValueEnum>(name: &str, value: &str) -> Result<E> {
+    E::from_str(value, true).map_err(|e| anyhow!("invalid config {name}: {e}"))
 }
 
 fn run_print(args: PrintArgs) -> Result<()> {
+    let config = lbl_config::Loader::new()
+        .load()
+        .unwrap_or_else(|_| lbl_config::Config::default());
+    let print_cfg = &config.print;
+
+    let protocol: Protocol = match args.protocol {
+        Some(p) => p.into(),
+        None => match &print_cfg.protocol {
+            Some(name) => config_enum::<ProtocolArg>("print.protocol", name)?.into(),
+            None => bail!("protocol required: pass --protocol or set [print] protocol / LBL_PRINT__PROTOCOL"),
+        },
+    };
+
+    let confirm = args.confirm.unwrap_or(print_cfg.confirm);
+    let debug = args.debug.unwrap_or(print_cfg.debug);
+    let cut = args.cut.unwrap_or(print_cfg.cut);
+    let supports_cut = args.supports_cut.unwrap_or(print_cfg.supports_cut);
+    let copies = args.copies.unwrap_or(print_cfg.copies);
+    let dither = args
+        .dither
+        .unwrap_or_else(|| print_cfg.dither.clone());
+    let backend = match args.backend {
+        Some(b) => b,
+        None => config_enum::<BackendArg>("print.backend", &print_cfg.backend)?,
+    };
+    let niimbot_task = match args.niimbot_task {
+        Some(t) => t,
+        None => config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?,
+    };
+    let network = args.network.or_else(|| print_cfg.network.clone());
+    let usb = args.usb.or_else(|| print_cfg.usb.clone());
+    let serial = args.serial.or_else(|| print_cfg.serial.clone());
+    let bluetooth = args.bluetooth.or_else(|| print_cfg.bluetooth.clone());
+    let media_type_name = args.media_type.or_else(|| print_cfg.media_type.clone());
+
     let catalog = Catalog::bundled()?;
-    let protocol: Protocol = args.protocol.into();
     // NIIMBOT heads are 203 dpi; the generic --dpi default (300) oversizes labels.
     let dpi = if protocol == Protocol::Niimbot && args.media.dpi == 300.0 {
         203.0
@@ -392,21 +439,18 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     // The virtual printer's "media type" is its output file format.
     let media_type = if protocol == Protocol::Virtual {
-        Some(match &args.media_type {
+        Some(match &media_type_name {
             Some(name) => MediaType::parse(name).map_err(|e| anyhow!(e))?,
             None => MediaType::Png,
         })
     } else {
-        if args.media_type.is_some() {
+        if media_type_name.is_some() {
             bail!("--media-type only applies to --protocol virtual");
         }
         None
     };
 
-    let render_cfg = lbl_config::Loader::new()
-        .load()
-        .map(|c| c.render)
-        .unwrap_or_default();
+    let render_cfg = config.render;
     let supersample = args.supersample.unwrap_or(render_cfg.supersample);
 
     // Orientation: explicit CLI flag wins, otherwise the configured default
@@ -423,10 +467,10 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let opts = PipelineOptions {
         protocol,
         media,
-        supports_cut: args.supports_cut,
-        cut: args.cut,
-        copies: args.copies,
-        dither: Algorithm::parse(&args.dither)?,
+        supports_cut,
+        cut,
+        copies,
+        dither: Algorithm::parse(&dither)?,
         rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
@@ -442,7 +486,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     if let Some(mt) = media_type {
         registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
     }
-    if protocol == Protocol::Niimbot && args.niimbot_task == NiimbotTaskArg::V4 {
+    if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::V4 {
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::v4()));
     }
 
@@ -456,11 +500,11 @@ fn run_print(args: PrintArgs) -> Result<()> {
     // intermediate artifacts (HTML report, console output, preview, or debug
     // dump), then dispatch.
     let want_trace = args.debug_html.is_some()
-        || args.debug
-        || args.confirm
+        || debug
+        || confirm
         || protocol == Protocol::Console;
     let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
-        match args.backend {
+        match backend {
             BackendArg::Chromium => {
                 let backend = ChromiumBackend::launch()?;
                 encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
@@ -482,7 +526,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         eprintln!("wrote pipeline debug report to {}", path.display());
     }
 
-    if args.debug {
+    if debug {
         lbl::terminal::dump_debug(&traces)?;
     }
 
@@ -495,7 +539,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     }
 
     // Preview-and-confirm before committing to a non-console output.
-    if args.confirm && protocol != Protocol::Console && !lbl::terminal::confirm_print(&traces)? {
+    if confirm && protocol != Protocol::Console && !lbl::terminal::confirm_print(&traces)? {
         eprintln!("aborted.");
         return Ok(());
     }
@@ -525,10 +569,10 @@ fn run_print(args: PrintArgs) -> Result<()> {
     dispatch(
         encoded,
         protocol,
-        args.network,
-        args.usb,
-        args.serial,
-        args.bluetooth,
+        network,
+        usb,
+        serial,
+        bluetooth,
     )
 }
 

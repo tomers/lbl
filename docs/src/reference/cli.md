@@ -32,10 +32,16 @@ lbl device    Discover printers (list)
 --backend <chromium|sidecar>
 --network <host:port> | --usb <vid:pid> | --serial <path[:baud]> | --out-dir <DIR> | --file <FILE>
 --confirm   Preview each label as terminal art, then ask before printing
+            (or `[print] confirm` / `LBL_PRINT__CONFIRM=1` in config)
 --debug     Dump every pipeline stage to stderr (highlighted HTML, the dithered
             raster as terminal art, an encoded-byte preview)
 --debug-html <FILE>   Write a standalone HTML report of every pipeline stage
 ```
+
+Most `lbl print` flags have config/env equivalents under `[print]` /
+`LBL_PRINT__*` (see the Configuration guide). `--protocol`, transport targets
+(`--bluetooth`, `--serial`, …), `confirm`, `debug`, `cut`, `copies`, and
+`dither` are typical candidates for project or shell profile defaults.
 
 `--serial` reaches USB CDC-ACM printers (e.g. NIIMBOT D-series on
 `/dev/ttyACM0`, default baud 115200). It is bidirectional, so NIIMBOT prints

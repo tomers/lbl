@@ -23,7 +23,7 @@ mod paths;
 mod profiles;
 
 pub use loader::{describe_sources, Loader};
-pub use model::{CatalogConfig, Config, GeneralConfig, RenderConfig, StyleConfig};
+pub use model::{CatalogConfig, Config, GeneralConfig, PrintConfig, RenderConfig, StyleConfig};
 pub use paths::ConfigPaths;
 pub use profiles::ProfileStore;
 

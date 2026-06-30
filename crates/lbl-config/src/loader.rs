@@ -134,6 +134,20 @@ mod tests {
     }
 
     #[test]
+    fn print_settings_from_env() {
+        figment::Jail::expect_with(|jail| {
+            jail.set_env("LBL_PRINT__CONFIRM", "true");
+            jail.set_env("LBL_PRINT__BLUETOOTH", "D110");
+            jail.set_env("LBL_PRINT__PROTOCOL", "niimbot");
+            let cfg = Loader::with_paths(empty_paths()).load().unwrap();
+            assert!(cfg.print.confirm);
+            assert_eq!(cfg.print.bluetooth.as_deref(), Some("D110"));
+            assert_eq!(cfg.print.protocol.as_deref(), Some("niimbot"));
+            Ok(())
+        });
+    }
+
+    #[test]
     fn cli_overrides_win() {
         #[derive(serde::Serialize)]
         struct Over {

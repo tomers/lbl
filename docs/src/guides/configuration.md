@@ -73,6 +73,35 @@ Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`
 `--qr-dark`, and `--qr-light`. Per-code overrides in authoring HTML:
 `<qr ec="H" margin="2">payload</qr>`.
 
+## Print defaults (`lbl print`)
+
+Runtime options for `lbl print` can live in config or environment so scripts
+do not need long flag lists. CLI flags always win when explicitly passed.
+
+```toml
+[print]
+confirm = true
+protocol = "niimbot"
+bluetooth = "D110"
+dither = "auto"
+copies = 1
+backend = "chromium"
+# niimbot_task = "standard"
+```
+
+Environment (same keys, nested with `__`):
+
+```bash
+export LBL_PRINT__CONFIRM=1
+export LBL_PRINT__PROTOCOL=niimbot
+export LBL_PRINT__BLUETOOTH=D110
+lbl print --text "Hello" --media niimbot-12x22
+```
+
+Supported `[print]` / `LBL_PRINT__*` keys: `confirm`, `debug`, `cut`,
+`supports_cut`, `copies`, `dither`, `protocol`, `backend`, `bluetooth`,
+`serial`, `usb`, `network`, `niimbot_task`, `media_type`.
+
 ## Printer profiles
 
 User-owned printers are persisted separately (in `printers.toml`) so a

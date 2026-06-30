@@ -13,6 +13,8 @@ pub struct Config {
     pub render: RenderConfig,
     /// Default label visual sizing (fonts, codes).
     pub style: StyleConfig,
+    /// Default `lbl print` options (overridable per run on the CLI).
+    pub print: PrintConfig,
     /// Media catalog settings.
     pub catalog: CatalogConfig,
 }
@@ -100,6 +102,62 @@ impl Default for StyleConfig {
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,
             border_width_mm: 0.0,
+        }
+    }
+}
+
+/// Default options for `lbl print`. CLI flags win when explicitly passed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PrintConfig {
+    /// Preview each label on the terminal and ask before printing.
+    pub confirm: bool,
+    /// Dump every pipeline stage to stderr.
+    pub debug: bool,
+    /// Request a cut after each label.
+    pub cut: bool,
+    /// Mark the target printer as cut-capable.
+    pub supports_cut: bool,
+    /// Copies per label.
+    pub copies: u32,
+    /// Dithering algorithm (`auto`, `floyd-steinberg`, `ordered`, `none`).
+    pub dither: String,
+    /// Default protocol (`dymo`, `niimbot`, `virtual`, …) when `--protocol` is
+    /// omitted.
+    pub protocol: Option<String>,
+    /// Render backend (`chromium` or `sidecar`).
+    pub backend: String,
+    /// Default Bluetooth LE printer name/address.
+    pub bluetooth: Option<String>,
+    /// Default serial port (`/dev/ttyACM0` or `path:baud`).
+    pub serial: Option<String>,
+    /// Default USB target (`vid:pid` hex).
+    pub usb: Option<String>,
+    /// Default network target (`host:port`).
+    pub network: Option<String>,
+    /// NIIMBOT task variant (`standard` or `v4`).
+    pub niimbot_task: String,
+    /// Virtual-printer output format (`png`, `bmp`, …).
+    pub media_type: Option<String>,
+}
+
+impl Default for PrintConfig {
+    fn default() -> Self {
+        Self {
+            confirm: false,
+            debug: false,
+            cut: false,
+            supports_cut: false,
+            copies: 1,
+            dither: "auto".into(),
+            protocol: None,
+            backend: "chromium".into(),
+            bluetooth: None,
+            serial: None,
+            usb: None,
+            network: None,
+            niimbot_task: "standard".into(),
+            media_type: None,
         }
     }
 }
