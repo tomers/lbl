@@ -13,6 +13,13 @@ use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_pattern::sample_pattern_for_media;
 use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
+
+type PrintTransportTargets = (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
 use lbl_template::{Engine, RenderOptions};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
@@ -125,7 +132,7 @@ pub fn resolve_print_transport(
     usb: Option<String>,
     serial: Option<String>,
     bluetooth: Option<String>,
-) -> Result<(Option<String>, Option<String>, Option<String>, Option<String>)> {
+) -> Result<PrintTransportTargets> {
     let mut network = network;
     let mut usb = usb;
     let mut serial = serial;
@@ -477,7 +484,11 @@ mod tests {
         ) -> lbl_render::Result<image::RgbaImage> {
             let w = width.or(height).unwrap_or(1).max(1);
             let h = height.or(width).unwrap_or(1).max(1);
-            Ok(image::RgbaImage::from_pixel(w, h, image::Rgba([0, 0, 0, 255])))
+            Ok(image::RgbaImage::from_pixel(
+                w,
+                h,
+                image::Rgba([0, 0, 0, 255]),
+            ))
         }
     }
 

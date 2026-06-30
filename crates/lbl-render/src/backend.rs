@@ -14,12 +14,7 @@ pub trait RenderBackend {
     /// Rasterize `html` at the given pixel `width` and `height`. A `None` axis
     /// lets the content determine that dimension (continuous media). At most
     /// one axis is normally `None`.
-    fn rasterize(
-        &self,
-        html: &str,
-        width: Option<u32>,
-        height: Option<u32>,
-    ) -> Result<RgbaImage>;
+    fn rasterize(&self, html: &str, width: Option<u32>, height: Option<u32>) -> Result<RgbaImage>;
 }
 
 /// Drives an external renderer process (e.g. a Node + Playwright script) behind
@@ -50,12 +45,7 @@ impl SidecarBackend {
 }
 
 impl RenderBackend for SidecarBackend {
-    fn rasterize(
-        &self,
-        html: &str,
-        width: Option<u32>,
-        height: Option<u32>,
-    ) -> Result<RgbaImage> {
+    fn rasterize(&self, html: &str, width: Option<u32>, height: Option<u32>) -> Result<RgbaImage> {
         let mut cmd = Command::new(&self.program);
         cmd.args(&self.args)
             .stdin(Stdio::piped())

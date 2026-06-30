@@ -134,6 +134,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::result_large_err)]
     fn print_settings_from_env() {
         figment::Jail::expect_with(|jail| {
             jail.set_env("LBL_PRINT__CONFIRM", "true");

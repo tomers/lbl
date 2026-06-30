@@ -127,7 +127,11 @@ mod tests {
             // exercised in tests.
             let w = width.or(height).unwrap_or(1);
             let h = height.or(width).unwrap_or(1);
-            Ok(RgbaImage::from_pixel(w, h, image::Rgba([255, 255, 255, 255])))
+            Ok(RgbaImage::from_pixel(
+                w,
+                h,
+                image::Rgba([255, 255, 255, 255]),
+            ))
         }
     }
 
@@ -169,9 +173,18 @@ mod tests {
     #[test]
     fn rotation_swaps_axes_for_quarter_turns() {
         let img = RgbaImage::from_pixel(30, 10, image::Rgba([0, 0, 0, 255]));
-        assert_eq!(apply_rotation(img.clone(), Rotation::None).dimensions(), (30, 10));
-        assert_eq!(apply_rotation(img.clone(), Rotation::Cw90).dimensions(), (10, 30));
-        assert_eq!(apply_rotation(img.clone(), Rotation::Cw180).dimensions(), (30, 10));
+        assert_eq!(
+            apply_rotation(img.clone(), Rotation::None).dimensions(),
+            (30, 10)
+        );
+        assert_eq!(
+            apply_rotation(img.clone(), Rotation::Cw90).dimensions(),
+            (10, 30)
+        );
+        assert_eq!(
+            apply_rotation(img.clone(), Rotation::Cw180).dimensions(),
+            (30, 10)
+        );
         assert_eq!(apply_rotation(img, Rotation::Cw270).dimensions(), (10, 30));
     }
 }

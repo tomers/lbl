@@ -20,8 +20,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/config", get(handlers::get_config))
         .route("/api/config/sources", get(handlers::get_config_sources))
         .route("/api/catalog", get(handlers::list_catalog))
-        .route("/api/catalog/printers", get(handlers::list_catalog_printers))
-        .route("/api/catalog/printers/:key", get(handlers::show_catalog_printer))
+        .route(
+            "/api/catalog/printers",
+            get(handlers::list_catalog_printers),
+        )
+        .route(
+            "/api/catalog/printers/:key",
+            get(handlers::show_catalog_printer),
+        )
         .route("/api/catalog/compatible", get(handlers::compatible_catalog))
         .route("/api/catalog/:key", get(handlers::show_catalog))
         .route("/api/printers", get(handlers::list_printers))

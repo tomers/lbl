@@ -18,7 +18,9 @@
 
 mod model;
 
-pub use model::{CatalogEntry, ConnectionHint, ImageInfo, MediaSpec, PrinterEntry, ResolvedTransport};
+pub use model::{
+    CatalogEntry, ConnectionHint, ImageInfo, MediaSpec, PrinterEntry, ResolvedTransport,
+};
 
 use lbl_core::printer::Protocol;
 use model::CatalogFile;
@@ -199,8 +201,11 @@ impl Catalog {
 
     /// Whether a media key is supported by the given printer model.
     pub fn supports_media(&self, printer_model: &str, media_key: &str) -> bool {
-        self.match_printer(printer_model)
-            .is_some_and(|p| p.supported_media.iter().any(|k| k.eq_ignore_ascii_case(media_key)))
+        self.match_printer(printer_model).is_some_and(|p| {
+            p.supported_media
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(media_key))
+        })
     }
 
     /// Resolve the effective DPI for a print run.
@@ -208,12 +213,7 @@ impl Catalog {
     /// An explicit non-default `cli_dpi` wins. Otherwise the catalog supplies
     /// the printer's native DPI when `printer_key` or `protocol` identifies a
     /// known model.
-    pub fn resolve_dpi(
-        &self,
-        printer_key: Option<&str>,
-        protocol: Protocol,
-        cli_dpi: f64,
-    ) -> f64 {
+    pub fn resolve_dpi(&self, printer_key: Option<&str>, protocol: Protocol, cli_dpi: f64) -> f64 {
         if (cli_dpi - CLI_DEFAULT_DPI).abs() > f64::EPSILON {
             return cli_dpi;
         }
@@ -234,10 +234,7 @@ impl Catalog {
             .collect();
         if dpis.is_empty() {
             None
-        } else if dpis
-            .iter()
-            .all(|d| (*d - dpis[0]).abs() < f64::EPSILON)
-        {
+        } else if dpis.iter().all(|d| (*d - dpis[0]).abs() < f64::EPSILON) {
             Some(dpis[0])
         } else {
             None
@@ -340,7 +337,10 @@ mod tests {
     fn usb_vendor_wildcard_only_when_no_exact_product_match() {
         let catalog = Catalog::bundled().unwrap();
         // Known 550 PID → specific entry, not the legacy vendor wildcard.
-        assert!(catalog.match_usb(0x0922, 0x0028).unwrap().matches_key("LabelWriter 550"));
+        assert!(catalog
+            .match_usb(0x0922, 0x0028)
+            .unwrap()
+            .matches_key("LabelWriter 550"));
         // Unlisted DYMO PID → legacy fallback.
         let legacy = catalog.match_usb(0x0922, 0x0042).unwrap();
         assert!(legacy.matches_key("LabelWriter"));

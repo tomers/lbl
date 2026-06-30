@@ -130,10 +130,10 @@ fn apply_option(options: &mut QrOptions, token: &str) {
 }
 
 fn unquote(s: &str) -> &str {
-    if s.len() >= 2 {
-        if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
-            return &s[1..s.len() - 1];
-        }
+    if s.len() >= 2
+        && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))
+    {
+        return &s[1..s.len() - 1];
     }
     s
 }

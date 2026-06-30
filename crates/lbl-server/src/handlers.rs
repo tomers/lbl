@@ -8,9 +8,9 @@ use serde::Deserialize;
 use serde_json::json;
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, resolve_label_align, resolve_label_fit, resolve_label_fit_scale,
-    resolve_label_valign, resolve_media, resolve_media_inset, resolve_style, render_viewport_px,
-    PipelineOptions, Source,
+    authoring_labels, encode_label, render_viewport_px, resolve_label_align, resolve_label_fit,
+    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
+    resolve_style, PipelineOptions, Source,
 };
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;

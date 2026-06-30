@@ -145,7 +145,10 @@ mod tests {
         let doc = MarkdownDocument::parse("ship to {{qr:https://x.y}}");
         let html = doc.to_authoring_html();
         assert!(html.contains("<qr>https://x.y</qr>"), "{html}");
-        assert!(!html.contains("lblxdirective"), "placeholder leaked: {html}");
+        assert!(
+            !html.contains("lblxdirective"),
+            "placeholder leaked: {html}"
+        );
     }
 
     #[test]
@@ -162,7 +165,9 @@ mod tests {
         let html = doc.to_authoring_html();
         // The sized span stays inline within the paragraph alongside the text.
         assert!(
-            html.contains("Hello, <span class=\"lbl-text\" style=\"font-size:1.5em\">World</span>!"),
+            html.contains(
+                "Hello, <span class=\"lbl-text\" style=\"font-size:1.5em\">World</span>!"
+            ),
             "{html}"
         );
     }
@@ -179,8 +184,14 @@ mod tests {
     fn barcode_with_and_without_symbology() {
         let doc = MarkdownDocument::parse("{{barcode:EAN13:123}} {{barcode:456}}");
         let html = doc.to_authoring_html();
-        assert!(html.contains("<barcode type=\"EAN13\">123</barcode>"), "{html}");
-        assert!(html.contains("<barcode type=\"CODE128\">456</barcode>"), "{html}");
+        assert!(
+            html.contains("<barcode type=\"EAN13\">123</barcode>"),
+            "{html}"
+        );
+        assert!(
+            html.contains("<barcode type=\"CODE128\">456</barcode>"),
+            "{html}"
+        );
     }
 
     #[test]
@@ -206,12 +217,17 @@ mod tests {
         doc.push_barcode("EAN13:42");
         let html = doc.to_authoring_html();
         assert!(html.contains("<qr>https://x.y</qr>"), "{html}");
-        assert!(html.contains("<barcode type=\"EAN13\">42</barcode>"), "{html}");
+        assert!(
+            html.contains("<barcode type=\"EAN13\">42</barcode>"),
+            "{html}"
+        );
     }
 
     #[test]
     fn wrapped_in_label_root() {
         let doc = MarkdownDocument::parse("hi");
-        assert!(doc.to_authoring_html().starts_with("<div class=\"lbl-label\">"));
+        assert!(doc
+            .to_authoring_html()
+            .starts_with("<div class=\"lbl-label\">"));
     }
 }

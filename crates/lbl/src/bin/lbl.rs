@@ -9,8 +9,11 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset, resolve_print_transport, resolve_style, render_viewport_px, PipelineOptions, Source};
-use lbl_pattern::resolve_head_dots;
+use lbl::pipeline::{
+    authoring_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
+    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
+    resolve_print_transport, resolve_style, PipelineOptions, Source,
+};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -19,8 +22,12 @@ use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
+use lbl_pattern::resolve_head_dots;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign, MediaInsetPx, TranspileOptions};
+use lbl_transpile_html::{
+    parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign,
+    MediaInsetPx, TranspileOptions,
+};
 
 #[derive(Parser)]
 #[command(
@@ -38,9 +45,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Render text/template/HTML through the full pipeline and print it.
-    Print(PrintArgs),
+    Print(Box<PrintArgs>),
     /// Produce browser-ready preview HTML (and optional PNGs) for a gallery.
-    Preview(PreviewArgs),
+    Preview(Box<PreviewArgs>),
     /// Convert text/CLI directives into authoring HTML.
     Text(TextArgs),
     /// Convert Markdown (with inline directives) into authoring HTML.
@@ -569,9 +576,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let cut = args.cut.unwrap_or(print_cfg.cut);
     let supports_cut = args.supports_cut.unwrap_or(print_cfg.supports_cut);
     let copies = args.copies.unwrap_or(print_cfg.copies);
-    let dither = args
-        .dither
-        .unwrap_or_else(|| print_cfg.dither.clone());
+    let dither = args.dither.unwrap_or_else(|| print_cfg.dither.clone());
     let backend = match args.backend {
         Some(b) => b,
         None => config_enum::<BackendArg>("print.backend", &print_cfg.backend)?,
@@ -596,7 +601,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .clone()
         .or_else(|| printer_entry.and_then(|p| p.default_media.clone()));
     if let (Some(printer), Some(media_key)) = (&args.printer, &media_sku) {
-        if !catalog.supports_media(printer, &media_key) {
+        if !catalog.supports_media(printer, media_key) {
             bail!("media '{media_key}' is not supported by printer '{printer}'");
         }
     }
@@ -645,9 +650,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let media_inset = resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample);
 
     let sample_head_dots = if args.sample_pattern.is_some() {
-        Some(
-            resolve_head_dots(args.sample_pattern.flatten(), &media).map_err(|e| anyhow!(e))?,
-        )
+        Some(resolve_head_dots(args.sample_pattern.flatten(), &media).map_err(|e| anyhow!(e))?)
     } else {
         None
     };
@@ -691,10 +694,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         media_type.map(|mt| mt.extension()).unwrap_or("bin")
     };
 
-    let want_trace = args.debug_html.is_some()
-        || debug
-        || confirm
-        || protocol == Protocol::Console;
+    let want_trace = args.debug_html.is_some() || debug || confirm || protocol == Protocol::Console;
 
     let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
         if let Some(head_dots) = sample_head_dots {
@@ -771,14 +771,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         bail!("virtual printer needs an output target; pass --file or --out-dir");
     }
 
-    dispatch(
-        encoded,
-        protocol,
-        network,
-        usb,
-        serial,
-        bluetooth,
-    )
+    dispatch(encoded, protocol, network, usb, serial, bluetooth)
 }
 
 #[allow(clippy::type_complexity)]
@@ -1214,9 +1207,7 @@ enum CatalogCommand {
 #[derive(Subcommand)]
 enum CatalogPrinterCommand {
     List,
-    Show {
-        key: String,
-    },
+    Show { key: String },
 }
 
 fn run_catalog(args: CatalogArgs) -> Result<()> {
@@ -1355,8 +1346,8 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Command::Print(a) => run_print(a),
-        Command::Preview(a) => run_preview(a),
+        Command::Print(a) => run_print(*a),
+        Command::Preview(a) => run_preview(*a),
         Command::Text(a) => run_text(a),
         Command::Markdown(a) => run_markdown(a),
         Command::Transpile(a) => run_transpile(a),

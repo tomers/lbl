@@ -107,24 +107,42 @@ mod tests {
 
     #[test]
     fn portrait_is_identity_rotation() {
-        assert_eq!(Rotation::for_print(Orientation::Portrait, 0, 0), Rotation::None);
+        assert_eq!(
+            Rotation::for_print(Orientation::Portrait, 0, 0),
+            Rotation::None
+        );
     }
 
     #[test]
     fn landscape_is_a_single_clockwise_quarter_turn() {
-        assert_eq!(Rotation::for_print(Orientation::Landscape, 0, 0), Rotation::Cw90);
+        assert_eq!(
+            Rotation::for_print(Orientation::Landscape, 0, 0),
+            Rotation::Cw90
+        );
     }
 
     #[test]
     fn extra_turns_compose_and_wrap() {
         // Landscape (90) + one more cw = 180.
-        assert_eq!(Rotation::for_print(Orientation::Landscape, 1, 0), Rotation::Cw180);
+        assert_eq!(
+            Rotation::for_print(Orientation::Landscape, 1, 0),
+            Rotation::Cw180
+        );
         // Landscape (90) - one ccw = 0.
-        assert_eq!(Rotation::for_print(Orientation::Landscape, 0, 1), Rotation::None);
+        assert_eq!(
+            Rotation::for_print(Orientation::Landscape, 0, 1),
+            Rotation::None
+        );
         // Portrait - one ccw wraps to 270.
-        assert_eq!(Rotation::for_print(Orientation::Portrait, 0, 1), Rotation::Cw270);
+        assert_eq!(
+            Rotation::for_print(Orientation::Portrait, 0, 1),
+            Rotation::Cw270
+        );
         // Four cw turns wrap back to the base.
-        assert_eq!(Rotation::for_print(Orientation::Portrait, 4, 0), Rotation::None);
+        assert_eq!(
+            Rotation::for_print(Orientation::Portrait, 4, 0),
+            Rotation::None
+        );
     }
 
     #[test]

@@ -33,10 +33,7 @@ pub fn name_looks_like_niimbot(name: &str) -> bool {
 
 /// Whether advertisement data identifies a NIIMBOT printer (by name or service).
 #[cfg(feature = "ble")]
-pub fn props_look_like_niimbot(
-    props: &btleplug::api::PeripheralProperties,
-    address: &str,
-) -> bool {
+pub fn props_look_like_niimbot(props: &btleplug::api::PeripheralProperties, address: &str) -> bool {
     if props
         .local_name
         .as_deref()
@@ -74,10 +71,7 @@ pub async fn peripheral_label(p: &btleplug::platform::Peripheral) -> String {
 /// NIIMBOT-looking device; otherwise the advertised name or BLE address must
 /// contain `target` (case-insensitive).
 #[cfg(feature = "ble")]
-pub async fn peripheral_matches_target(
-    p: &btleplug::platform::Peripheral,
-    target: &str,
-) -> bool {
+pub async fn peripheral_matches_target(p: &btleplug::platform::Peripheral, target: &str) -> bool {
     use btleplug::api::Peripheral as _;
 
     let needle = target.to_ascii_lowercase();

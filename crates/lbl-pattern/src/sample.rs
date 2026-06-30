@@ -55,7 +55,8 @@ pub fn sample_pattern(height: u32) -> MonoBitmap {
 pub fn sample_pattern_sized(head_dots: u32, feed_dots: Option<u32>) -> MonoBitmap {
     assert!(head_dots > 0, "pattern height must be at least 1 dot");
     let height = head_dots as i32;
-    let font = Font::from_bytes(FONT_BYTES, FontSettings::default()).expect("embedded Carlito font");
+    let font =
+        Font::from_bytes(FONT_BYTES, FontSettings::default()).expect("embedded Carlito font");
 
     let core_width = STAGGER_BASE_WIDTH
         + vertical_lines(5, height).width

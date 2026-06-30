@@ -2,7 +2,7 @@
 
 use std::io::{Read, Write};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, ValueEnum};
 use lbl_core::bitmap::MonoBitmap;
 use lbl_core::job::JobSpec;

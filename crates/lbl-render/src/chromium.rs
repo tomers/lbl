@@ -108,12 +108,7 @@ impl Drop for ChromiumBackend {
 }
 
 impl RenderBackend for ChromiumBackend {
-    fn rasterize(
-        &self,
-        html: &str,
-        width: Option<u32>,
-        height: Option<u32>,
-    ) -> Result<RgbaImage> {
+    fn rasterize(&self, html: &str, width: Option<u32>, height: Option<u32>) -> Result<RgbaImage> {
         // A `None` axis is content-determined: pin the other axis and let a
         // full-page screenshot capture the laid-out extent of the free one.
         let auto = width.is_none() || height.is_none();
@@ -151,7 +146,9 @@ impl RenderBackend for ChromiumBackend {
                 wait_for_load(&page).await?;
 
                 // Allow webfonts and the QR/barcode scripts to settle.
-                let _ = page.evaluate("document.fonts && document.fonts.ready").await;
+                let _ = page
+                    .evaluate("document.fonts && document.fonts.ready")
+                    .await;
                 sleep(Duration::from_millis(200)).await;
 
                 let params = ScreenshotParams::builder()
@@ -178,11 +175,7 @@ impl RenderBackend for ChromiumBackend {
         // Full-page capture follows content bounds; expand to the pinned viewport
         // axes so fixed-width media shows the full tape even when the ink is narrow.
         if auto {
-            img = pad_to_min_size(
-                img,
-                width.unwrap_or(1),
-                height.unwrap_or(1),
-            );
+            img = pad_to_min_size(img, width.unwrap_or(1), height.unwrap_or(1));
         }
         Ok(img)
     }

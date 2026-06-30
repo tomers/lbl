@@ -34,7 +34,10 @@ use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
 use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
-use lbl_transpile_html::{transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx, TranspileOptions};
+use lbl_transpile_html::{
+    transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx,
+    TranspileOptions,
+};
 
 /// Authoring HTML for layout/fit golden cases: short text + QR on a tall label.
 pub const LAYOUT_FIXTURE_HTML: &str = include_str!("../fixtures/layout/short_label.html");
@@ -273,8 +276,8 @@ pub fn authoring_labels_from_lbl(lbl_path: &Path) -> Result<Vec<AuthoringLabel>,
             lbl_path.display()
         )
     })?;
-    let source = fs::read_to_string(lbl_path)
-        .map_err(|e| format!("read {}: {e}", lbl_path.display()))?;
+    let source =
+        fs::read_to_string(lbl_path).map_err(|e| format!("read {}: {e}", lbl_path.display()))?;
 
     let labels = Engine::new()
         .render_with_resources(

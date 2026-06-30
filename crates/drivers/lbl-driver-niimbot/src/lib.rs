@@ -126,7 +126,10 @@ impl NiimbotDriver {
 
     /// Create a driver with an explicit print task.
     pub fn with_task(task: NiimbotTask) -> Self {
-        Self { task, ..Self::default() }
+        Self {
+            task,
+            ..Self::default()
+        }
     }
 
     /// Append one framed packet (`55 55 <cmd> <len> <data> <csum> AA AA`).
@@ -263,9 +266,9 @@ impl NiimbotDriver {
         page_size[2..4].copy_from_slice(&cols.to_be_bytes());
         page_size[4..6].copy_from_slice(&copies.to_be_bytes());
         page_size[6..8].copy_from_slice(&0u16.to_be_bytes()); // cutHeight
-        // page_size[8] cutType = 0
-        // page_size[9] = 0
-        // page_size[10] sendAll = 0
+                                                              // page_size[8] cutType = 0
+                                                              // page_size[9] = 0
+                                                              // page_size[10] sendAll = 0
         page_size[11..13].copy_from_slice(&0u16.to_be_bytes()); // partHeight
         Self::push_packet(&mut out, SET_DIMENSION, &page_size);
 

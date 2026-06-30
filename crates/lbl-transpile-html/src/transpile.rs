@@ -148,7 +148,9 @@ impl ViewportPx {
         }
         if mode == OutputMode::Preview {
             if let Some(w) = self.width {
-                css.push_str(&format!(".lbl-preview{{width:{w:.2}px;box-sizing:border-box}}\n"));
+                css.push_str(&format!(
+                    ".lbl-preview{{width:{w:.2}px;box-sizing:border-box}}\n"
+                ));
             }
             if let Some(h) = self.height {
                 css.push_str(&format!(".lbl-preview{{height:{h:.2}px}}\n"));
@@ -374,7 +376,9 @@ fn label_layout_css(
     } else if !inset.is_zero() {
         // Continuous/content mode: inset the shell even without a fill box.
         let container = layout_shell_selector(mode);
-        css.push_str(&format!("{container}{{display:flex;flex-direction:column}}\n"));
+        css.push_str(&format!(
+            "{container}{{display:flex;flex-direction:column}}\n"
+        ));
     }
 
     let mut label_rules = Vec::new();
@@ -708,7 +712,10 @@ mod tests {
         assert!(out.contains(".lbl-preview{width:400.00px"), "{out}");
         assert!(out.contains(".lbl-preview{height:200.00px"), "{out}");
         assert!(out.contains("min-width:100%"), "{out}");
-        assert!(out.contains(".lbl-preview{width:100%;height:100%}"), "{out}");
+        assert!(
+            out.contains(".lbl-preview{width:100%;height:100%}"),
+            "{out}"
+        );
     }
 
     #[test]
@@ -741,7 +748,10 @@ mod tests {
             ..Default::default()
         };
         let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
-        assert!(out.contains("padding:10.00px 40.00px 20.00px 30.00px"), "{out}");
+        assert!(
+            out.contains("padding:10.00px 40.00px 20.00px 30.00px"),
+            "{out}"
+        );
         assert!(out.contains("body{display:flex"), "{out}");
     }
 
@@ -831,7 +841,10 @@ mod tests {
         assert!(out.contains("font-size:96.00px"), "{out}");
         assert!(out.contains("padding:24.00px"), "{out}");
         assert!(out.contains("border:6.00px solid #000"), "{out}");
-        assert!(out.contains(".lbl-qr{width:300.00px;height:300.00px}"), "{out}");
+        assert!(
+            out.contains(".lbl-qr{width:300.00px;height:300.00px}"),
+            "{out}"
+        );
         assert!(out.contains("window.__LBL_STYLE="), "{out}");
         assert!(out.contains(r#""errorCorrectionLevel":"M""#), "{out}");
         assert!(out.contains(r#""margin":0"#), "{out}");
@@ -841,7 +854,10 @@ mod tests {
 
     #[test]
     fn qr_element_attrs_become_data_attributes() {
-        let out = transpile(r#"<qr ec="H" margin="2">x</qr>"#, &TranspileOptions::default());
+        let out = transpile(
+            r#"<qr ec="H" margin="2">x</qr>"#,
+            &TranspileOptions::default(),
+        );
         assert!(out.contains(r#"data-ec="H""#), "{out}");
         assert!(out.contains(r#"data-margin="2""#), "{out}");
     }
