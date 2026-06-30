@@ -8,7 +8,8 @@ use lbl_spool::Spooler;
 #[derive(Parser)]
 #[command(
     name = "lbl-spool",
-    about = "Queue encoded label files and send them to a printer with retry"
+    about = "Queue encoded label files and send them to a printer with retry",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// Network target `host:port` (e.g. 192.168.1.50:9100).

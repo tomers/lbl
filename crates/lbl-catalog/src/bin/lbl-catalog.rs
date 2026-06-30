@@ -7,7 +7,8 @@ use lbl_catalog::Catalog;
 #[derive(Parser)]
 #[command(
     name = "lbl-catalog",
-    about = "Browse known media and printer compatibility"
+    about = "Browse known media and printer compatibility",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// Additional catalog files to overlay (TOML/JSON).

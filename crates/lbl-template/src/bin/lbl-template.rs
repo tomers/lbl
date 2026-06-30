@@ -10,7 +10,8 @@ use lbl_template::{data, DataFormat, DefaultResolver, Engine, RenderOptions};
 #[derive(Parser)]
 #[command(
     name = "lbl-template",
-    about = "Render data (JSON/TOML/YAML) through a template into one or more labels"
+    about = "Render data (JSON/TOML/YAML) through a template into one or more labels",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// Template file. If omitted, the template is read from stdin.

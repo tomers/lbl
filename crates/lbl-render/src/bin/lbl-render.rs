@@ -17,7 +17,8 @@ enum Backend {
 #[derive(Parser)]
 #[command(
     name = "lbl-render",
-    about = "Render HTML to a raster image (two-pass)"
+    about = "Render HTML to a raster image (two-pass)",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// Input HTML file. If omitted, read from stdin.

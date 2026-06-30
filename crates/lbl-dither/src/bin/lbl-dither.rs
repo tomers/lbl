@@ -9,7 +9,8 @@ use lbl_dither::{dither, Algorithm};
 #[derive(Parser)]
 #[command(
     name = "lbl-dither",
-    about = "Dither a raster image to a 1-bit bitmap (PBM) for printing"
+    about = "Dither a raster image to a 1-bit bitmap (PBM) for printing",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// Input image (PNG/JPEG/...). If omitted, read from stdin.

@@ -12,7 +12,8 @@ use lbl_text::Document;
     about = "Convert plain text and directives into lbl authoring HTML",
     long_about = "Reads text from positional arguments (joined with spaces) or, if none are given, \
 from stdin. Emits authoring HTML on stdout for the rest of the pipeline.\n\n\
-Inline mini-syntax (default): {{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}."
+Inline mini-syntax (default): {{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}.",
+    color = clap::ColorChoice::Auto,
 )]
 struct Cli {
     /// The text to render. If omitted, text is read from stdin.

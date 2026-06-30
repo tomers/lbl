@@ -5,7 +5,7 @@ use clap::Parser;
 use lbl_server::{router, AppState};
 
 #[derive(Parser)]
-#[command(name = "lbl-server", about = "HTTP API for the lbl pipeline")]
+#[command(name = "lbl-server", about = "HTTP API for the lbl pipeline", color = clap::ColorChoice::Auto)]
 struct Cli {
     /// Address to bind, e.g. 127.0.0.1:8787.
     #[arg(long, default_value = "127.0.0.1:8787")]
