@@ -13,6 +13,7 @@
 
 use std::io::{self, IsTerminal, Write};
 
+use console::{Key, Term};
 use lbl_driver_console::{render_terminal, TerminalOptions};
 
 use crate::debug::{protocol_cli_name, LabelTrace};
@@ -68,8 +69,9 @@ pub fn render_raster(bitmap: &lbl_core::bitmap::MonoBitmap, color: bool) -> Stri
     render_terminal(bitmap, &raster_options(color))
 }
 
-/// Preview every label, then prompt on stdin for confirmation. Returns whether
-/// the user approved the print. The preview and prompt go to stderr so stdout
+/// Preview every label, then prompt for confirmation with a single keypress
+/// (`y` to print, `n`/`q` or anything else to cancel). Returns whether the
+/// user approved the print. The preview and prompt go to stderr so stdout
 /// stays clean for any piped output.
 pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
     let color = stderr_color();
@@ -87,31 +89,52 @@ pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
     write!(err, "\nPrint {n} {plural}? [y/N] ")?;
     err.flush()?;
 
-    let line = read_prompt_line()?;
-    Ok(matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
+    let approved = match read_prompt_key()? {
+        Some(key) => prompt_key_confirms(key),
+        None => false,
+    };
+    writeln!(err)?;
+    Ok(approved)
 }
 
-/// Read one line for an interactive prompt.
-///
-/// When label input comes from a pipe or heredoc, stdin is not a TTY and may
-/// already be fully consumed. On Unix, read from `/dev/tty` so `--confirm`
-/// still works in that case.
-fn read_prompt_line() -> io::Result<String> {
+/// Whether a single prompt key means "yes".
+fn prompt_key_confirms(key: char) -> bool {
+    matches!(key, 'y' | 'Y')
+}
+
+/// Read one key for an interactive prompt. On a TTY this is a single keypress
+/// (no Enter). Falls back to a line read when no TTY is available.
+fn read_prompt_key() -> io::Result<Option<char>> {
+    let term = Term::stderr();
+    if term.is_term() {
+        return match term.read_key()? {
+            Key::Char(c) => Ok(Some(c)),
+            _ => Ok(None),
+        };
+    }
+
     let mut line = String::new();
-    #[cfg(unix)]
-    if !io::stdin().is_terminal() {
-        use std::io::BufRead;
-        if let Ok(tty) = std::fs::File::open("/dev/tty") {
-            io::BufReader::new(tty).read_line(&mut line)?;
-            return Ok(line);
+    let read = if io::stdin().is_terminal() {
+        io::stdin().read_line(&mut line)?
+    } else {
+        #[cfg(unix)]
+        {
+            use std::io::BufRead;
+            if let Ok(tty) = std::fs::File::open("/dev/tty") {
+                io::BufReader::new(tty).read_line(&mut line)?
+            } else {
+                io::stdin().read_line(&mut line)?
+            }
         }
-    }
-    let read = io::stdin().read_line(&mut line)?;
-    // EOF (e.g. no controlling terminal) is treated as "no".
+        #[cfg(not(unix))]
+        {
+            io::stdin().read_line(&mut line)?
+        }
+    };
     if read == 0 {
-        line.clear();
+        return Ok(None);
     }
-    Ok(line)
+    Ok(line.trim().chars().next())
 }
 
 /// Write the dithered raster of every label to stdout (the `--protocol console`
@@ -382,5 +405,15 @@ mod tests {
         let out = highlight_html("text <div ", true);
         assert!(out.contains("text "));
         assert!(out.contains("div"));
+    }
+
+    #[test]
+    fn prompt_key_confirms_y_only() {
+        assert!(prompt_key_confirms('y'));
+        assert!(prompt_key_confirms('Y'));
+        assert!(!prompt_key_confirms('n'));
+        assert!(!prompt_key_confirms('N'));
+        assert!(!prompt_key_confirms('q'));
+        assert!(!prompt_key_confirms('Q'));
     }
 }

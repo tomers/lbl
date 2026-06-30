@@ -57,8 +57,9 @@ half-block art (black ink on white media when stdout is a TTY) instead of
 sending it to a device — handy for a quick look without hardware or an image
 viewer. With `--file`/`--out-dir` it writes the plain (uncolored) art to a file.
 
-`--confirm` shows that same preview for each label and waits for a `y`
-confirmation before printing to any non-console output. `--debug` is a
+`--confirm` shows that same preview for each label and waits for a single
+`y` keypress (`n` or `q` cancels) before printing to any non-console output.
+`--debug` is a
 terminal-native companion to `--debug-html`: it prints each stage's artifacts
 (syntax-highlighted when stderr is a TTY) as the pipeline runs. Color for both
 follows the destination stream's TTY status and honors `NO_COLOR`.
