@@ -11,9 +11,15 @@ use crate::{RenderError, Result};
 /// dimensions. Implementations include in-process Chromium and an external
 /// sidecar process.
 pub trait RenderBackend {
-    /// Rasterize `html` at the given pixel `width` and optional `height`
-    /// (`None` = let the content determine the height).
-    fn rasterize(&self, html: &str, width: u32, height: Option<u32>) -> Result<RgbaImage>;
+    /// Rasterize `html` at the given pixel `width` and `height`. A `None` axis
+    /// lets the content determine that dimension (continuous media). At most
+    /// one axis is normally `None`.
+    fn rasterize(
+        &self,
+        html: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<RgbaImage>;
 }
 
 /// Drives an external renderer process (e.g. a Node + Playwright script) behind
@@ -44,13 +50,22 @@ impl SidecarBackend {
 }
 
 impl RenderBackend for SidecarBackend {
-    fn rasterize(&self, html: &str, width: u32, height: Option<u32>) -> Result<RgbaImage> {
+    fn rasterize(
+        &self,
+        html: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<RgbaImage> {
         let mut cmd = Command::new(&self.program);
         cmd.args(&self.args)
-            .env("LBL_RENDER_WIDTH", width.to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        // Each axis is passed only when fixed; an omitted axis tells the sidecar
+        // to let the content determine that dimension.
+        if let Some(w) = width {
+            cmd.env("LBL_RENDER_WIDTH", w.to_string());
+        }
         if let Some(h) = height {
             cmd.env("LBL_RENDER_HEIGHT", h.to_string());
         }

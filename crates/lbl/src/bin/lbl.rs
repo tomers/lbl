@@ -14,6 +14,7 @@ use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
 use lbl_core::printer::Protocol;
+use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
@@ -204,6 +205,23 @@ enum BackendArg {
     Sidecar,
 }
 
+#[derive(Clone, Copy, ValueEnum)]
+enum OrientationArg {
+    /// Content runs across the head (the media's natural width × length frame).
+    Portrait,
+    /// Content runs along the feed (transposed and turned onto the head).
+    Landscape,
+}
+
+impl From<OrientationArg> for Orientation {
+    fn from(o: OrientationArg) -> Self {
+        match o {
+            OrientationArg::Portrait => Orientation::Portrait,
+            OrientationArg::Landscape => Orientation::Landscape,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // print
 // ---------------------------------------------------------------------------
@@ -235,6 +253,22 @@ struct PrintArgs {
     /// Dithering algorithm.
     #[arg(long, default_value = "auto")]
     dither: String,
+
+    /// Lay content out in portrait or landscape. Landscape (the default) runs
+    /// text along the feed — the longer dimension of typical stripe labels.
+    /// Overrides config `render.orientation` when set.
+    #[arg(long, value_enum)]
+    orientation: Option<OrientationArg>,
+
+    /// Rotate the label an extra 90° clockwise (repeatable, and combines with
+    /// --orientation).
+    #[arg(long, action = clap::ArgAction::Count)]
+    rotate_cw: u8,
+
+    /// Rotate the label an extra 90° counter-clockwise (repeatable, and
+    /// combines with --orientation).
+    #[arg(long, action = clap::ArgAction::Count)]
+    rotate_ccw: u8,
 
     /// Request a cut after each label.
     #[arg(long)]
@@ -321,6 +355,15 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .unwrap_or_default();
     let supersample = args.supersample.unwrap_or(render_cfg.supersample);
 
+    // Orientation: explicit CLI flag wins, otherwise the configured default
+    // (which itself defaults to landscape). Extra --rotate-cw/--rotate-ccw
+    // quarter-turns compose on top to yield the net rotation.
+    let orientation = args
+        .orientation
+        .map(Orientation::from)
+        .unwrap_or(render_cfg.orientation);
+    let rotation = Rotation::for_print(orientation, args.rotate_cw as u32, args.rotate_ccw as u32);
+
     let style = resolve_style(&args.style.resolve(), media.dpi.0, supersample);
 
     let opts = PipelineOptions {
@@ -330,6 +373,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         cut: args.cut,
         copies: args.copies,
         dither: Algorithm::parse(&args.dither)?,
+        rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -572,7 +616,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 args.media.dpi,
             )?;
             let req = lbl_render::RenderRequest {
-                width_dots: media.width_dots().0,
+                width_dots: Some(media.width_dots().0),
                 height_dots: media.length_dots().map(|d| d.0),
                 supersample: PREVIEW_SUPERSAMPLE,
             };

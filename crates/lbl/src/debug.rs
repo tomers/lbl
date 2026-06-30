@@ -12,6 +12,7 @@ use base64::Engine as _;
 use image::RgbaImage;
 use lbl_core::bitmap::MonoBitmap;
 use lbl_core::printer::Protocol;
+use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_transpile_html::AssetsBase;
@@ -26,13 +27,17 @@ pub struct LabelTrace {
     pub transpiled_html: String,
     /// Where transpilation loaded JS libraries from.
     pub assets_base: AssetsBase,
-    /// Target raster width in device dots.
-    pub width_dots: u32,
-    /// Target raster height in device dots (None = content-determined).
+    /// Width of the render canvas in device dots (the *logical* reading frame;
+    /// `None` = content-determined). For landscape this is the media's feed
+    /// length, since the canvas is transposed before rotation.
+    pub width_dots: Option<u32>,
+    /// Height of the render canvas in device dots (`None` = content-determined).
     pub height_dots: Option<u32>,
+    /// Rotation applied to the rendered raster (after layout, before dither).
+    pub rotation: Rotation,
     /// Supersample factor used by the renderer.
     pub supersample: u32,
-    /// The rendered (pre-dither) raster.
+    /// The rendered (post-rotation, pre-dither) raster.
     pub rendered: RgbaImage,
     /// The dithering algorithm used.
     pub dither: Algorithm,
@@ -69,6 +74,16 @@ fn dither_cli(alg: Algorithm) -> String {
         Algorithm::FloydSteinberg => "--algorithm floyd-steinberg".to_string(),
         Algorithm::Ordered => "--algorithm ordered".to_string(),
         Algorithm::Threshold(t) => format!("--algorithm none --threshold {t}"),
+    }
+}
+
+/// A human-readable label for a non-identity rotation, e.g. `90° clockwise`.
+fn rotation_label(rotation: Rotation) -> Option<&'static str> {
+    match rotation {
+        Rotation::None => None,
+        Rotation::Cw90 => Some("90° clockwise"),
+        Rotation::Cw180 => Some("180°"),
+        Rotation::Cw270 => Some("90° counter-clockwise"),
     }
 }
 
@@ -176,21 +191,26 @@ fn render_label(t: &LabelTrace) -> String {
     ));
 
     // 3. Render.
-    let render_cmd = match t.height_dots {
-        Some(h) => format!(
-            "lbl-render --width-dots {} --height-dots {} --supersample {}",
-            t.width_dots, h, t.supersample
+    let dims = match (t.width_dots, t.height_dots) {
+        (Some(w), Some(h)) => format!(" --width-dots {w} --height-dots {h}"),
+        (Some(w), None) => format!(" --width-dots {w}"),
+        (None, Some(h)) => format!(" --height-dots {h}"),
+        (None, None) => String::new(),
+    };
+    let render_cmd = format!("lbl-render{dims} --supersample {}", t.supersample);
+    let render_desc = match rotation_label(t.rotation) {
+        Some(turn) => format!(
+            "Headless Chromium rasterizes the HTML (two-pass: hi-res then Lanczos \
+downscale), then the raster is rotated {turn} onto the print head."
         ),
-        None => format!(
-            "lbl-render --width-dots {} --supersample {}",
-            t.width_dots, t.supersample
-        ),
+        None => "Headless Chromium rasterizes the HTML (two-pass: hi-res then Lanczos downscale)."
+            .to_string(),
     };
     let (rw, rh) = t.rendered.dimensions();
     stages.push_str(&stage_card(
         "3",
         "Render",
-        "Headless Chromium rasterizes the HTML (two-pass: hi-res then Lanczos downscale).",
+        &render_desc,
         &render_cmd,
         &two_col(
             &code_panel("Input — browser-ready HTML", &t.transpiled_html),
@@ -322,8 +342,9 @@ mod tests {
             authoring_html: "<div>hello</div>".into(),
             transpiled_html: "<html><body>hello</body></html>".into(),
             assets_base: AssetsBase::Cdn,
-            width_dots: 8,
+            width_dots: Some(8),
             height_dots: Some(2),
+            rotation: Rotation::None,
             supersample: 3,
             rendered: RgbaImage::from_pixel(8, 2, Rgba([255, 255, 255, 255])),
             dither: Algorithm::Auto,
@@ -347,6 +368,28 @@ mod tests {
         assert!(html.contains("data:image/png;base64,"));
         // Authoring HTML is shown escaped, not as live markup.
         assert!(html.contains("&lt;div&gt;hello&lt;/div&gt;"));
+    }
+
+    #[test]
+    fn landscape_render_notes_rotation_and_logical_dims() {
+        let mut t = sample_trace();
+        // Landscape transposes the canvas (feed length becomes the render width)
+        // and rotates a quarter-turn clockwise onto the head.
+        t.width_dots = Some(2);
+        t.height_dots = Some(8);
+        t.rotation = Rotation::Cw90;
+        let html = render_report(&[t]);
+        assert!(html.contains("lbl-render --width-dots 2 --height-dots 8 --supersample 3"));
+        assert!(html.contains("rotated 90° clockwise"));
+    }
+
+    #[test]
+    fn auto_width_render_omits_width_flag() {
+        let mut t = sample_trace();
+        t.width_dots = None;
+        t.height_dots = Some(8);
+        let html = render_report(&[t]);
+        assert!(html.contains("lbl-render --height-dots 8 --supersample 3"));
     }
 
     #[test]

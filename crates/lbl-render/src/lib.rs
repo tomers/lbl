@@ -24,6 +24,7 @@ pub use downscale::downscale;
 pub use chromium::ChromiumBackend;
 
 use image::RgbaImage;
+use lbl_core::Rotation;
 
 /// Errors produced by the rendering stage.
 #[derive(Debug, thiserror::Error)]
@@ -45,22 +46,26 @@ pub enum RenderError {
 pub type Result<T> = std::result::Result<T, RenderError>;
 
 /// A request describing the target raster size at device resolution.
+///
+/// Each axis may be fixed (`Some`) or content-determined (`None`). Fixed-length
+/// media pins both axes; continuous media leaves the feed axis `None` so the
+/// content sizes it. At most one axis is normally `None`.
 #[derive(Debug, Clone)]
 pub struct RenderRequest {
-    /// Target width in device dots.
-    pub width_dots: u32,
+    /// Target width in device dots. `None` lets the content determine the width
+    /// (e.g. continuous media rendered in landscape).
+    pub width_dots: Option<u32>,
     /// Target height in device dots. `None` lets the content determine the
-    /// height (continuous media); the rendered height is downscaled by the same
-    /// supersample factor.
+    /// height (e.g. continuous media rendered in portrait).
     pub height_dots: Option<u32>,
     /// Supersample factor for the high-resolution first pass (clamped to >= 1).
     pub supersample: u32,
 }
 
 impl RenderRequest {
-    /// The high-resolution width used for the first pass.
-    pub fn hires_width(&self) -> u32 {
-        self.width_dots * self.supersample.max(1)
+    /// The high-resolution width used for the first pass, if fixed.
+    pub fn hires_width(&self) -> Option<u32> {
+        self.width_dots.map(|w| w * self.supersample.max(1))
     }
 
     /// The high-resolution height used for the first pass, if fixed.
@@ -79,9 +84,12 @@ pub fn render_two_pass<B: RenderBackend>(
     let factor = req.supersample.max(1);
     let hires = backend.rasterize(html, req.hires_width(), req.hires_height())?;
 
-    // Determine the exact target dimensions. For auto-height, derive the target
-    // height from the captured high-res height divided by the supersample.
-    let target_w = req.width_dots.max(1);
+    // Determine the exact target dimensions. For an auto axis, derive the
+    // target extent from the captured high-res size divided by the supersample.
+    let target_w = match req.width_dots {
+        Some(w) => w.max(1),
+        None => (hires.width() / factor).max(1),
+    };
     let target_h = match req.height_dots {
         Some(h) => h.max(1),
         None => (hires.height() / factor).max(1),
@@ -90,25 +98,43 @@ pub fn render_two_pass<B: RenderBackend>(
     Ok(downscale(&hires, target_w, target_h))
 }
 
+/// Rotate a rendered raster by the given [`Rotation`] (clockwise quarter-turns).
+///
+/// Content is laid out in the chosen reading frame first (by sizing the render
+/// request accordingly); this turns that frame onto the print head.
+pub fn apply_rotation(img: RgbaImage, rotation: Rotation) -> RgbaImage {
+    match rotation {
+        Rotation::None => img,
+        Rotation::Cw90 => image::imageops::rotate90(&img),
+        Rotation::Cw180 => image::imageops::rotate180(&img),
+        Rotation::Cw270 => image::imageops::rotate270(&img),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     struct FakeBackend;
     impl RenderBackend for FakeBackend {
-        fn rasterize(&self, _html: &str, width: u32, height: Option<u32>) -> Result<RgbaImage> {
-            Ok(RgbaImage::from_pixel(
-                width,
-                height.unwrap_or(width),
-                image::Rgba([255, 255, 255, 255]),
-            ))
+        fn rasterize(
+            &self,
+            _html: &str,
+            width: Option<u32>,
+            height: Option<u32>,
+        ) -> Result<RgbaImage> {
+            // Default an auto axis to a square so the divide-by-factor path is
+            // exercised in tests.
+            let w = width.or(height).unwrap_or(1);
+            let h = height.or(width).unwrap_or(1);
+            Ok(RgbaImage::from_pixel(w, h, image::Rgba([255, 255, 255, 255])))
         }
     }
 
     #[test]
     fn two_pass_produces_target_dims_fixed() {
         let req = RenderRequest {
-            width_dots: 200,
+            width_dots: Some(200),
             height_dots: Some(100),
             supersample: 3,
         };
@@ -119,12 +145,33 @@ mod tests {
     #[test]
     fn two_pass_auto_height_divides_by_factor() {
         let req = RenderRequest {
-            width_dots: 100,
+            width_dots: Some(100),
             height_dots: None,
             supersample: 4,
         };
         // Fake backend returns a square at hires width (400x400) -> /4 = 100.
         let img = render_two_pass(&FakeBackend, "<html></html>", &req).unwrap();
         assert_eq!(img.dimensions(), (100, 100));
+    }
+
+    #[test]
+    fn two_pass_auto_width_divides_by_factor() {
+        let req = RenderRequest {
+            width_dots: None,
+            height_dots: Some(100),
+            supersample: 4,
+        };
+        // Fake backend returns a square at hires height (400x400) -> /4 = 100.
+        let img = render_two_pass(&FakeBackend, "<html></html>", &req).unwrap();
+        assert_eq!(img.dimensions(), (100, 100));
+    }
+
+    #[test]
+    fn rotation_swaps_axes_for_quarter_turns() {
+        let img = RgbaImage::from_pixel(30, 10, image::Rgba([0, 0, 0, 255]));
+        assert_eq!(apply_rotation(img.clone(), Rotation::None).dimensions(), (30, 10));
+        assert_eq!(apply_rotation(img.clone(), Rotation::Cw90).dimensions(), (10, 30));
+        assert_eq!(apply_rotation(img.clone(), Rotation::Cw180).dimensions(), (30, 10));
+        assert_eq!(apply_rotation(img, Rotation::Cw270).dimensions(), (10, 30));
     }
 }

@@ -1,0 +1,137 @@
+//! Label orientation and quarter-turn rotation.
+//!
+//! Printers feed media in one fixed direction: the print head spans a fixed
+//! *width* (across the head) and the media advances along its *length* (the
+//! feed). Media is also marketed by those physical dimensions (e.g. `12x40`),
+//! so the head width and feed length are fixed facts about the hardware and
+//! tape — not something to swap.
+//!
+//! What *is* a choice is how label content is laid out relative to that feed:
+//!
+//! - [`Orientation::Portrait`] renders content upright in the media's natural
+//!   `width × length` frame (text runs across the head).
+//! - [`Orientation::Landscape`] renders content in the transposed
+//!   `length × width` frame and turns it a quarter onto the head, so text runs
+//!   along the (usually longer) feed direction. Stripe labels are rarely
+//!   square and people generally print along the long dimension, so landscape
+//!   is the default.
+//!
+//! Orientation, plus any extra [`Rotation`] quarter-turns, resolves to a single
+//! [`Rotation`] that the pipeline applies to the *rendered raster* after laying
+//! the content out in the chosen frame (see [`Rotation::for_print`]).
+
+use serde::{Deserialize, Serialize};
+
+/// How label content is laid out relative to the media feed direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Orientation {
+    /// Content is rendered in the media's natural `width × length` frame; text
+    /// runs across the print head.
+    Portrait,
+    /// Content is rendered in the transposed `length × width` frame and turned
+    /// a quarter onto the head; text runs along the feed direction. This is the
+    /// default because stripe labels are usually printed along their longer
+    /// dimension.
+    #[default]
+    Landscape,
+}
+
+/// A rotation in 90° steps, expressed as clockwise quarter-turns and applied to
+/// the rendered raster before it is dithered and encoded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Rotation {
+    /// No rotation.
+    #[default]
+    None,
+    /// 90° clockwise.
+    Cw90,
+    /// 180°.
+    Cw180,
+    /// 270° clockwise (i.e. 90° counter-clockwise).
+    Cw270,
+}
+
+impl Rotation {
+    /// Normalize a signed number of clockwise quarter-turns into a [`Rotation`].
+    pub fn from_quarter_turns_cw(turns: i32) -> Self {
+        match turns.rem_euclid(4) {
+            0 => Rotation::None,
+            1 => Rotation::Cw90,
+            2 => Rotation::Cw180,
+            _ => Rotation::Cw270,
+        }
+    }
+
+    /// The number of clockwise quarter-turns this rotation represents (`0..=3`).
+    pub fn quarter_turns_cw(self) -> u8 {
+        match self {
+            Rotation::None => 0,
+            Rotation::Cw90 => 1,
+            Rotation::Cw180 => 2,
+            Rotation::Cw270 => 3,
+        }
+    }
+
+    /// Whether applying this rotation swaps the width and height axes (true for
+    /// the 90°/270° quarter-turns).
+    pub fn swaps_axes(self) -> bool {
+        matches!(self, Rotation::Cw90 | Rotation::Cw270)
+    }
+
+    /// Resolve the net rotation for a print from a base [`Orientation`] plus any
+    /// additional clockwise / counter-clockwise quarter-turns the user
+    /// requested.
+    ///
+    /// Landscape contributes one clockwise quarter-turn; portrait contributes
+    /// none. `extra_cw` / `extra_ccw` then nudge the result in 90° steps, and
+    /// the total is normalized to one of the four [`Rotation`] values.
+    pub fn for_print(orientation: Orientation, extra_cw: u32, extra_ccw: u32) -> Self {
+        let base = match orientation {
+            Orientation::Portrait => 0,
+            Orientation::Landscape => 1,
+        };
+        let net = base + extra_cw as i32 - extra_ccw as i32;
+        Rotation::from_quarter_turns_cw(net)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn orientation_defaults_to_landscape() {
+        assert_eq!(Orientation::default(), Orientation::Landscape);
+    }
+
+    #[test]
+    fn portrait_is_identity_rotation() {
+        assert_eq!(Rotation::for_print(Orientation::Portrait, 0, 0), Rotation::None);
+    }
+
+    #[test]
+    fn landscape_is_a_single_clockwise_quarter_turn() {
+        assert_eq!(Rotation::for_print(Orientation::Landscape, 0, 0), Rotation::Cw90);
+    }
+
+    #[test]
+    fn extra_turns_compose_and_wrap() {
+        // Landscape (90) + one more cw = 180.
+        assert_eq!(Rotation::for_print(Orientation::Landscape, 1, 0), Rotation::Cw180);
+        // Landscape (90) - one ccw = 0.
+        assert_eq!(Rotation::for_print(Orientation::Landscape, 0, 1), Rotation::None);
+        // Portrait - one ccw wraps to 270.
+        assert_eq!(Rotation::for_print(Orientation::Portrait, 0, 1), Rotation::Cw270);
+        // Four cw turns wrap back to the base.
+        assert_eq!(Rotation::for_print(Orientation::Portrait, 4, 0), Rotation::None);
+    }
+
+    #[test]
+    fn only_quarter_turns_swap_axes() {
+        assert!(!Rotation::None.swaps_axes());
+        assert!(Rotation::Cw90.swaps_axes());
+        assert!(!Rotation::Cw180.swaps_axes());
+        assert!(Rotation::Cw270.swaps_axes());
+    }
+}

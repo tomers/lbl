@@ -30,6 +30,7 @@ default_printer = "my-dymo"     # matches a saved profile id
 supersample = 3   # high-res first pass factor (>= 1); see Rendering Quality guide
 dither = "floyd-steinberg"      # auto | floyd-steinberg | ordered | none
 use_sidecar = false
+orientation = "landscape"       # portrait | landscape (default: landscape)
 
 [catalog]
 affiliate_enabled = true
@@ -42,6 +43,13 @@ extra_paths = ["./my-catalog.toml"]
 uses a fixed factor of `2` for speed. See
 [Rendering Quality & Supersampling](./rendering-quality.md) for what the factor
 does, how it interacts with style sizing, and tuning advice.
+
+`[render] orientation` sets the default layout orientation for `lbl print`
+(override per-run with `--orientation`, and add quarter-turns with
+`--rotate-cw` / `--rotate-ccw`). It defaults to `landscape` because stripe
+labels are usually printed along their longer dimension. Orientation changes
+only how content is laid out and rotated onto the head; it never changes the
+media's physical width or feed length.
 
 ## Printer profiles
 

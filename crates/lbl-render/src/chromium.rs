@@ -93,8 +93,30 @@ impl ChromiumBackend {
     }
 }
 
+impl Drop for ChromiumBackend {
+    fn drop(&mut self) {
+        // Close the browser explicitly so chromiumoxide doesn't emit a
+        // "Browser was not closed manually" warning and leave a child process
+        // to be reaped in the background. Disjoint field borrows let us drive
+        // the async close on the owned runtime.
+        let Self { rt, browser, .. } = self;
+        rt.block_on(async {
+            let _ = browser.close().await;
+            let _ = browser.wait().await;
+        });
+    }
+}
+
 impl RenderBackend for ChromiumBackend {
-    fn rasterize(&self, html: &str, width: u32, height: Option<u32>) -> Result<RgbaImage> {
+    fn rasterize(
+        &self,
+        html: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Result<RgbaImage> {
+        // A `None` axis is content-determined: pin the other axis and let a
+        // full-page screenshot capture the laid-out extent of the free one.
+        let auto = width.is_none() || height.is_none();
         let bytes = self.rt.block_on(async {
             // Guard the whole interaction so a misbehaving page can never wedge
             // the render indefinitely.
@@ -108,9 +130,11 @@ impl RenderBackend for ChromiumBackend {
                     .map_err(|e| RenderError::Backend(e.to_string()))?;
 
                 // Pin the viewport to the requested device pixels (supersampling
-                // is already folded into `width`/`height` by the caller).
+                // is already folded into `width`/`height` by the caller). A
+                // content-determined axis gets a minimal placeholder; the
+                // full-page screenshot below captures its real extent.
                 let metrics = SetDeviceMetricsOverrideParams::builder()
-                    .width(width as i64)
+                    .width(width.unwrap_or(1).max(1) as i64)
                     .height(height.unwrap_or(1).max(1) as i64)
                     .device_scale_factor(1.0)
                     .mobile(false)
@@ -131,7 +155,7 @@ impl RenderBackend for ChromiumBackend {
                 sleep(Duration::from_millis(200)).await;
 
                 let params = ScreenshotParams::builder()
-                    .full_page(height.is_none())
+                    .full_page(auto)
                     .omit_background(false)
                     .build();
                 let bytes = page

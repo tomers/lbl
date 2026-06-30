@@ -1,5 +1,6 @@
 //! The configuration data model.
 
+use lbl_core::Orientation;
 use serde::{Deserialize, Serialize};
 
 /// The fully-merged configuration.
@@ -38,6 +39,10 @@ pub struct RenderConfig {
     pub dither: String,
     /// Prefer the Node/Playwright sidecar over the in-process Chromium driver.
     pub use_sidecar: bool,
+    /// Default label orientation (`portrait` | `landscape`). Landscape is the
+    /// default because stripe labels are usually printed along their longer
+    /// dimension.
+    pub orientation: Orientation,
 }
 
 impl Default for RenderConfig {
@@ -46,6 +51,7 @@ impl Default for RenderConfig {
             supersample: 3,
             dither: "floyd-steinberg".to_string(),
             use_sidecar: false,
+            orientation: Orientation::default(),
         }
     }
 }

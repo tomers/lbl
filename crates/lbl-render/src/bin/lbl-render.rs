@@ -23,9 +23,9 @@ struct Cli {
     /// Input HTML file. If omitted, read from stdin.
     input: Option<std::path::PathBuf>,
 
-    /// Target width in device dots.
+    /// Target width in device dots (omit for content-determined width).
     #[arg(long)]
-    width_dots: u32,
+    width_dots: Option<u32>,
 
     /// Target height in device dots (omit for content-determined height).
     #[arg(long)]
@@ -58,6 +58,10 @@ fn main() -> Result<()> {
             buf
         }
     };
+
+    if cli.width_dots.is_none() && cli.height_dots.is_none() {
+        anyhow::bail!("at least one of --width-dots / --height-dots is required");
+    }
 
     let req = RenderRequest {
         width_dots: cli.width_dots,

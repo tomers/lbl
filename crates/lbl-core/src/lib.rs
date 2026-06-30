@@ -14,6 +14,7 @@ pub mod error;
 pub mod geometry;
 pub mod job;
 pub mod media;
+pub mod orientation;
 pub mod printer;
 pub mod units;
 
@@ -22,6 +23,7 @@ pub use error::{CoreError, Result};
 pub use geometry::{Margins, Size};
 pub use job::{JobSpec, OutputMode};
 pub use media::{Adhesive, Material, Media, MediaColor, MediaLength};
+pub use orientation::{Orientation, Rotation};
 pub use printer::{
     PrinterCapabilities, PrinterId, PrinterModel, PrinterProfile, Protocol, Transport,
 };

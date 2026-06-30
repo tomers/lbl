@@ -6,11 +6,12 @@ use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
 use lbl_core::units::Dpi;
+use lbl_core::Rotation;
 use lbl_dither::{dither, Algorithm};
 use lbl_driver_api::EncodeContext;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
-use lbl_render::{render_two_pass, RenderBackend, RenderRequest};
+use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
 use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
 
@@ -142,6 +143,9 @@ pub struct PipelineOptions {
     pub copies: u32,
     /// Dithering algorithm.
     pub dither: Algorithm,
+    /// Net rotation applied to the rendered raster (resolved from the requested
+    /// orientation plus any extra quarter-turns).
+    pub rotation: Rotation,
     /// Supersample factor.
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
@@ -187,14 +191,25 @@ pub fn encode_label_traced<B: RenderBackend>(
         },
     );
 
-    let width_dots = opts.media.width_dots().0;
-    let height_dots = opts.media.length_dots().map(|d| d.0);
+    // The print head spans `head_dots` and the media advances along
+    // `feed_dots` (content-determined for continuous media). Lay content out in
+    // the chosen reading frame: a quarter-turn (landscape) transposes the
+    // render canvas so text runs along the feed, then we rotate the raster back
+    // onto the head.
+    let head_dots = opts.media.width_dots().0;
+    let feed_dots = opts.media.length_dots().map(|d| d.0);
+    let (req_width, req_height) = if opts.rotation.swaps_axes() {
+        (feed_dots, Some(head_dots))
+    } else {
+        (Some(head_dots), feed_dots)
+    };
     let req = RenderRequest {
-        width_dots,
-        height_dots,
+        width_dots: req_width,
+        height_dots: req_height,
         supersample: opts.supersample,
     };
     let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
+    let rendered = apply_rotation(rendered, opts.rotation);
 
     let dithered = dither(&rendered, opts.dither);
 
@@ -218,8 +233,9 @@ pub fn encode_label_traced<B: RenderBackend>(
         authoring_html: authoring_html.to_string(),
         transpiled_html: transpiled,
         assets_base: opts.assets_base.clone(),
-        width_dots,
-        height_dots,
+        width_dots: req_width,
+        height_dots: req_height,
+        rotation: opts.rotation,
         supersample: opts.supersample,
         rendered,
         dither: opts.dither,

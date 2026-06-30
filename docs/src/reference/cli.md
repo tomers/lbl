@@ -24,6 +24,10 @@ lbl device    Discover printers (list)
 --supersample <N>   High-res render factor before downscale (default: 3, or
                     `[render] supersample` from config). See Rendering Quality guide.
 --dither <auto|floyd-steinberg|ordered|none>
+--orientation <portrait|landscape>   Layout orientation (default: landscape, or
+                    `[render] orientation` from config)
+--rotate-cw  --rotate-ccw   Extra 90° turns, repeatable, composed on top of
+                    --orientation
 --cut  --supports-cut  --copies <N>
 --backend <chromium|sidecar>
 --network <host:port> | --usb <vid:pid> | --serial <path[:baud]> | --out-dir <DIR> | --file <FILE>
@@ -48,6 +52,15 @@ terminal-native companion to `--debug-html`: it prints each stage's artifacts
 (syntax-highlighted when stderr is a TTY) as the pipeline runs. Color for both
 follows the destination stream's TTY status and honors `NO_COLOR`.
 
+Media is fixed in the printer (the head width and feed direction don't change),
+so `--orientation` controls only how content is *laid out*: `landscape` (the
+default) lays text out along the feed — the longer dimension of typical stripe
+labels — by rendering in the transposed frame and turning the raster a quarter
+onto the head; `portrait` keeps the media's natural `width × length` frame.
+`--rotate-cw` / `--rotate-ccw` add further 90° turns on top (repeat them for
+180°/270°), so e.g. `--orientation landscape --rotate-cw` prints upside-down
+landscape.
+
 ### `lbl preview`
 
 ```text
@@ -61,7 +74,7 @@ follows the destination stream's TTY status and honors `NO_COLOR`.
 | `lbl-text` | text/CLI → authoring HTML (`--raw`, `--qr/--barcode/--image`, `--fragment`) |
 | `lbl-template` | data + template → labels (`--data`, `--each`, `--inline-resources`, `--out-dir`) |
 | `lbl-transpile-html` | `--mode print|preview`, `--assets-base`, `--index/--count` |
-| `lbl-render` | `--width-dots`, `--height-dots`, `--supersample` (default 3), `--backend`, `--out` |
+| `lbl-render` | `--width-dots`, `--height-dots` (either may be omitted for a content-determined axis), `--supersample` (default 3), `--backend`, `--out` |
 
 See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
 `--supersample` controls and how to choose a value.

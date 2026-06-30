@@ -199,9 +199,34 @@ pub struct PrintReq {
     /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
     #[serde(default)]
     media_type: Option<String>,
+    /// Layout orientation (`portrait`|`landscape`). Falls back to the
+    /// configured default (landscape) when omitted.
+    #[serde(default)]
+    orientation: Option<lbl_core::Orientation>,
+    /// Extra clockwise quarter-turns, composed on top of the orientation.
+    #[serde(default)]
+    rotate_cw: u32,
+    /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
+    #[serde(default)]
+    rotate_ccw: u32,
     /// Also build the HTML pipeline debug report.
     #[serde(default)]
     debug: bool,
+}
+
+impl PrintReq {
+    /// Resolve the net [`lbl_core::Rotation`] for this request: the explicit
+    /// orientation (or the configured default) plus any extra quarter-turns.
+    fn rotation(&self, state: &AppState) -> lbl_core::Rotation {
+        let orientation = self.orientation.unwrap_or_else(|| {
+            state
+                .loader
+                .load()
+                .map(|c| c.render.orientation)
+                .unwrap_or_default()
+        });
+        lbl_core::Rotation::for_print(orientation, self.rotate_cw, self.rotate_ccw)
+    }
 }
 
 fn default_dpi() -> f64 {
@@ -251,6 +276,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
 
     let protocol = parse_protocol(&req.protocol)?;
+    let rotation = req.rotation(&state);
     let opts = PipelineOptions {
         protocol,
         media,
@@ -259,6 +285,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         copies: req.copies,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
+        rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -337,6 +364,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
 
+    let rotation = req.rotation(&state);
     let opts = PipelineOptions {
         protocol,
         media,
@@ -345,6 +373,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         copies: req.copies,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
+        rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         style,

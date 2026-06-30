@@ -98,7 +98,7 @@ pub fn render_bitmap(
     let html = inline_assets(&transpiled);
 
     let req = RenderRequest {
-        width_dots: media.width_dots().0,
+        width_dots: Some(media.width_dots().0),
         height_dots: media.length_dots().map(|d| d.0),
         supersample,
     };
