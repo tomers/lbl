@@ -34,6 +34,18 @@ pub enum Protocol {
     Console,
 }
 
+impl Protocol {
+    /// Whether this protocol drives a physical print head with a fixed width
+    /// (so landscape content must be turned a quarter-turn onto the head).
+    ///
+    /// On-screen sinks ([`Virtual`](Protocol::Virtual) image files and the
+    /// [`Console`](Protocol::Console) preview) target a human instead, so they
+    /// show the label in its reading orientation rather than the head's.
+    pub fn targets_print_head(self) -> bool {
+        !matches!(self, Protocol::Virtual | Protocol::Console)
+    }
+}
+
 /// How the toolchain reaches a printer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
@@ -134,4 +146,25 @@ pub struct PrinterProfile {
     /// Default media SKU/key (resolved via `lbl-catalog`), if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_media: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_on_screen_sinks_lack_a_print_head() {
+        for p in [
+            Protocol::Dymo,
+            Protocol::DymoLw,
+            Protocol::EscPos,
+            Protocol::Zpl,
+            Protocol::Tspl,
+            Protocol::Niimbot,
+        ] {
+            assert!(p.targets_print_head(), "{p:?} should target a head");
+        }
+        assert!(!Protocol::Virtual.targets_print_head());
+        assert!(!Protocol::Console.targets_print_head());
+    }
 }

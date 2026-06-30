@@ -209,7 +209,16 @@ pub fn encode_label_traced<B: RenderBackend>(
         supersample: opts.supersample,
     };
     let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
-    let rendered = apply_rotation(rendered, opts.rotation);
+
+    // The quarter-turn maps the reading frame onto a physical print head. On
+    // screen sinks (image file, console preview) have no head, so they keep the
+    // reading orientation — a landscape label stays landscape in the file.
+    let applied_rotation = if opts.protocol.targets_print_head() {
+        opts.rotation
+    } else {
+        Rotation::None
+    };
+    let rendered = apply_rotation(rendered, applied_rotation);
 
     let dithered = dither(&rendered, opts.dither);
 
@@ -235,7 +244,7 @@ pub fn encode_label_traced<B: RenderBackend>(
         assets_base: opts.assets_base.clone(),
         width_dots: req_width,
         height_dots: req_height,
-        rotation: opts.rotation,
+        rotation: applied_rotation,
         supersample: opts.supersample,
         rendered,
         dither: opts.dither,
@@ -250,6 +259,75 @@ pub fn encode_label_traced<B: RenderBackend>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A backend that returns a solid raster of exactly the requested size, so
+    /// tests can exercise orientation/rotation without a browser.
+    struct SolidBackend;
+    impl RenderBackend for SolidBackend {
+        fn rasterize(
+            &self,
+            _html: &str,
+            width: Option<u32>,
+            height: Option<u32>,
+        ) -> lbl_render::Result<image::RgbaImage> {
+            let w = width.or(height).unwrap_or(1).max(1);
+            let h = height.or(width).unwrap_or(1).max(1);
+            Ok(image::RgbaImage::from_pixel(w, h, image::Rgba([0, 0, 0, 255])))
+        }
+    }
+
+    /// Landscape options for a 12×40 mm label (head 12 mm, feed 40 mm).
+    fn landscape_opts(protocol: Protocol) -> PipelineOptions {
+        PipelineOptions {
+            protocol,
+            media: Media::fixed(12.0, 40.0, Dpi(203.0)),
+            supports_cut: false,
+            cut: false,
+            copies: 1,
+            dither: Algorithm::Threshold(128),
+            rotation: Rotation::Cw90,
+            supersample: 1,
+            assets_base: AssetsBase::Cdn,
+            style: LabelStyle::default(),
+            media_type: None,
+        }
+    }
+
+    #[test]
+    fn file_output_keeps_landscape_reading_orientation() {
+        let registry = Registry::with_builtin_drivers();
+        let trace = encode_label_traced(
+            &SolidBackend,
+            &registry,
+            0,
+            "<div>x</div>",
+            &landscape_opts(Protocol::Virtual),
+        )
+        .unwrap();
+        let (w, h) = trace.rendered.dimensions();
+        // A 12×40 landscape label should render wider than tall in the file —
+        // not turned onto a (nonexistent) print head.
+        assert!(w > h, "expected landscape file, got {w}×{h}");
+        assert_eq!(trace.rotation, Rotation::None);
+    }
+
+    #[test]
+    fn hardware_output_turns_landscape_onto_the_head() {
+        let registry = Registry::with_builtin_drivers();
+        let trace = encode_label_traced(
+            &SolidBackend,
+            &registry,
+            0,
+            "<div>x</div>",
+            &landscape_opts(Protocol::Zpl),
+        )
+        .unwrap();
+        let (w, h) = trace.rendered.dimensions();
+        // A physical head is 12 mm wide, so the same label is turned to be
+        // taller than wide before encoding.
+        assert!(h > w, "expected head-oriented raster, got {w}×{h}");
+        assert_eq!(trace.rotation, Rotation::Cw90);
+    }
 
     #[test]
     fn text_source_makes_one_label() {
