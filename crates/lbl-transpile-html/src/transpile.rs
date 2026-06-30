@@ -158,6 +158,112 @@ impl ViewportPx {
     }
 }
 
+/// Calibration inset from the physical media edge, in millimetres.
+///
+/// Keeps fit/alignment inside the printable area when a printer feeds or cuts
+/// slightly off. Distinct from [`LabelStyle`] padding, which is inside
+/// `.lbl-label`. Side names follow the label reading frame (portrait: start =
+/// top, cross-start = left).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MediaInset {
+    /// Uniform inset on all sides.
+    pub all_mm: f64,
+    /// Both cross-axis sides (left + right in portrait).
+    pub horizontal_mm: Option<f64>,
+    /// Both main-axis sides (top + bottom in portrait).
+    pub vertical_mm: Option<f64>,
+    /// Main-axis start (top in portrait).
+    pub start_mm: Option<f64>,
+    /// Main-axis end (bottom in portrait).
+    pub end_mm: Option<f64>,
+    /// Cross-axis start (left in portrait).
+    pub cross_start_mm: Option<f64>,
+    /// Cross-axis end (right in portrait).
+    pub cross_end_mm: Option<f64>,
+}
+
+/// Resolved inset on each side, in millimetres.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MediaInsetSides {
+    start: f64,
+    end: f64,
+    cross_start: f64,
+    cross_end: f64,
+}
+
+impl MediaInset {
+    /// Resolve side values; more specific fields override axis/uniform defaults.
+    pub fn resolve(self) -> MediaInsetSides {
+        let base = self.all_mm.max(0.0);
+        let horizontal = self.horizontal_mm.unwrap_or(base).max(0.0);
+        let vertical = self.vertical_mm.unwrap_or(base).max(0.0);
+        MediaInsetSides {
+            start: self.start_mm.unwrap_or(vertical),
+            end: self.end_mm.unwrap_or(vertical),
+            cross_start: self.cross_start_mm.unwrap_or(horizontal),
+            cross_end: self.cross_end_mm.unwrap_or(horizontal),
+        }
+    }
+
+    /// Convert to CSS pixels for the render viewport's DPI and supersample.
+    pub fn to_px(self, dpi: f64, supersample: u32) -> MediaInsetPx {
+        let px_per_mm = dpi * supersample.max(1) as f64 / 25.4;
+        let sides = self.resolve();
+        MediaInsetPx {
+            start: sides.start * px_per_mm,
+            end: sides.end * px_per_mm,
+            cross_start: sides.cross_start * px_per_mm,
+            cross_end: sides.cross_end * px_per_mm,
+        }
+    }
+}
+
+/// Physical media inset in CSS pixels (top/right/bottom/left in portrait).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MediaInsetPx {
+    /// Main-axis start (CSS padding-top in portrait).
+    pub start: f64,
+    /// Main-axis end (CSS padding-bottom in portrait).
+    pub end: f64,
+    /// Cross-axis start (CSS padding-left in portrait).
+    pub cross_start: f64,
+    /// Cross-axis end (CSS padding-right in portrait).
+    pub cross_end: f64,
+}
+
+impl MediaInsetPx {
+    pub fn is_zero(self) -> bool {
+        self.start <= f64::EPSILON
+            && self.end <= f64::EPSILON
+            && self.cross_start <= f64::EPSILON
+            && self.cross_end <= f64::EPSILON
+    }
+
+    fn css_padding(self) -> String {
+        format!(
+            "padding:{:.2}px {:.2}px {:.2}px {:.2}px",
+            self.start, self.cross_end, self.end, self.cross_start
+        )
+    }
+}
+
+fn layout_shell_selector(mode: OutputMode) -> &'static str {
+    if mode == OutputMode::Preview {
+        ".lbl-preview"
+    } else {
+        "body"
+    }
+}
+
+/// Inset the layout shell so fit/align stay inside the calibrated printable area.
+fn media_inset_css(inset: MediaInsetPx, mode: OutputMode) -> String {
+    if inset.is_zero() {
+        return String::new();
+    }
+    let shell = layout_shell_selector(mode);
+    format!("{shell}{{{};box-sizing:border-box}}\n", inset.css_padding())
+}
+
 /// Cross-axis alignment of content within `.lbl-label` when the media viewport
 /// width is known (horizontal centering on portrait labels).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -247,27 +353,28 @@ fn label_layout_css(
     align: LabelAlign,
     valign: LabelValign,
     scale: f64,
+    inset: MediaInsetPx,
 ) -> String {
     let apply_cross = label_fit == LabelFit::Fill || viewport.is_some_and(|v| v.width.is_some());
     let apply_main = label_fit == LabelFit::Fill || viewport.is_some_and(|v| v.height.is_some());
 
-    let mut css = String::new();
+    let mut css = media_inset_css(inset, mode);
 
     if label_fit == LabelFit::Fill {
         let pct = scale.clamp(0.01, 1.0) * 100.0;
         css.push_str(&format!(
             ".lbl-label{{height:{pct:.4}%;width:{pct:.4}%;flex-shrink:0;box-sizing:border-box}}\n"
         ));
-        let container = if mode == OutputMode::Preview {
-            ".lbl-preview"
-        } else {
-            "body"
-        };
+        let container = layout_shell_selector(mode);
         css.push_str(&format!(
             "{container}{{display:flex;flex-direction:column;justify-content:{};align-items:{}}}\n",
             valign.justify_content(),
             align.align_items(),
         ));
+    } else if !inset.is_zero() {
+        // Continuous/content mode: inset the shell even without a fill box.
+        let container = layout_shell_selector(mode);
+        css.push_str(&format!("{container}{{display:flex;flex-direction:column}}\n"));
     }
 
     let mut label_rules = Vec::new();
@@ -356,6 +463,8 @@ pub struct TranspileOptions {
     pub label_valign: LabelValign,
     /// Fraction of the viewport used by the fit box in fill mode (`1.0` = 100%).
     pub label_fit_scale: f64,
+    /// Inset from the physical media edge (calibration margin).
+    pub media_inset: MediaInsetPx,
 }
 
 impl Default for TranspileOptions {
@@ -371,6 +480,7 @@ impl Default for TranspileOptions {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
         }
     }
 }
@@ -474,6 +584,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
         opts.label_align,
         opts.label_valign,
         opts.label_fit_scale,
+        opts.media_inset,
     ));
     if let Some(viewport) = &opts.viewport {
         head.push_str(&viewport.to_css(opts.mode, opts.label_fit));
@@ -598,6 +709,40 @@ mod tests {
         assert!(out.contains(".lbl-preview{height:200.00px"), "{out}");
         assert!(out.contains("min-width:100%"), "{out}");
         assert!(out.contains(".lbl-preview{width:100%;height:100%}"), "{out}");
+    }
+
+    #[test]
+    fn media_inset_resolves_specific_over_axis_defaults() {
+        let inset = MediaInset {
+            all_mm: 1.0,
+            horizontal_mm: Some(2.0),
+            vertical_mm: Some(3.0),
+            start_mm: Some(4.0),
+            cross_end_mm: Some(5.0),
+            ..Default::default()
+        };
+        let sides = inset.resolve();
+        assert_eq!(sides.start, 4.0);
+        assert_eq!(sides.end, 3.0);
+        assert_eq!(sides.cross_start, 2.0);
+        assert_eq!(sides.cross_end, 5.0);
+    }
+
+    #[test]
+    fn media_inset_css_insets_layout_shell() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            media_inset: MediaInsetPx {
+                start: 10.0,
+                end: 20.0,
+                cross_start: 30.0,
+                cross_end: 40.0,
+            },
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains("padding:10.00px 40.00px 20.00px 30.00px"), "{out}");
+        assert!(out.contains("body{display:flex"), "{out}");
     }
 
     #[test]

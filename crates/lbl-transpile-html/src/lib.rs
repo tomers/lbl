@@ -28,5 +28,5 @@ pub use assets::AssetsBase;
 pub use qr::{QrElementOverrides, QrErrorCorrection};
 pub use transpile::{
     parse_fit_scale, transpile, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    TranspileOptions, ViewportPx,
+    MediaInset, MediaInsetPx, TranspileOptions, ViewportPx,
 };

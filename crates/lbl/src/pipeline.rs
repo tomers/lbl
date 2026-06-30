@@ -15,7 +15,7 @@ use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    QrErrorCorrection, TranspileOptions, ViewportPx,
+    MediaInset, MediaInsetPx, QrErrorCorrection, TranspileOptions, ViewportPx,
 };
 
 /// A single authoring-HTML label with its batch index.
@@ -231,6 +231,8 @@ pub struct PipelineOptions {
     pub label_valign: LabelValign,
     /// Fit-box scale in fill mode (resolved from config/CLI).
     pub label_fit_scale: f64,
+    /// Inset from the physical media edge (resolved from config/CLI).
+    pub media_inset: MediaInsetPx,
 }
 
 /// Resolve a [`LabelFitSetting`] against the target media.
@@ -251,6 +253,19 @@ pub fn resolve_label_valign(s: &str) -> LabelValign {
 /// Resolve a configured fit-box scale (clamped to `(0.01, 1.0]`).
 pub fn resolve_label_fit_scale(scale: f64) -> f64 {
     scale.clamp(0.01, 1.0)
+}
+
+/// Build a [`MediaInset`] from the style configuration.
+pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
+    MediaInset {
+        all_mm: style.media_inset_mm,
+        horizontal_mm: style.media_inset_horizontal_mm,
+        vertical_mm: style.media_inset_vertical_mm,
+        start_mm: style.media_inset_start_mm,
+        end_mm: style.media_inset_end_mm,
+        cross_start_mm: style.media_inset_cross_start_mm,
+        cross_end_mm: style.media_inset_cross_end_mm,
+    }
 }
 
 /// CSS-pixel viewport matching the rasterizer's [`RenderRequest`] dimensions.
@@ -305,6 +320,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             label_align: opts.label_align,
             label_valign: opts.label_valign,
             label_fit_scale: opts.label_fit_scale,
+            media_inset: opts.media_inset,
         },
     );
 
@@ -411,6 +427,7 @@ mod tests {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
         }
     }
 

@@ -30,7 +30,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::{encode_image, MediaType};
 use lbl_render::ChromiumBackend;
 use lbl_transpile_html::LabelStyle;
-use lbl_transpile_html::{LabelAlign, LabelFit, LabelValign};
+use lbl_transpile_html::{LabelAlign, LabelFit, LabelValign, MediaInset, MediaInsetPx};
 
 /// Render resolution for the suite. Kept modest so references stay small and
 /// rendering is fast, while still leaving room for legible QR/barcodes.
@@ -341,6 +341,24 @@ fn golden_labels() {
             label_align: LabelAlign::End,
             label_valign: LabelValign::Center,
             label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_media_inset",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_fit_scale: 0.8,
+            media_inset: MediaInset {
+                all_mm: 3.0,
+                start_mm: Some(5.0),
+                cross_end_mm: Some(2.0),
+                ..Default::default()
+            }
+            .to_px(DPI, SUPERSAMPLE),
+            ..LayoutOptions::fill_defaults()
         },
     ));
 

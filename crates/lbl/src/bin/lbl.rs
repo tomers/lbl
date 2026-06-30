@@ -9,7 +9,7 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_print_transport, resolve_style, render_viewport_px, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset, resolve_print_transport, resolve_style, render_viewport_px, PipelineOptions, Source};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -19,7 +19,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign, TranspileOptions};
+use lbl_transpile_html::{parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign, MediaInsetPx, TranspileOptions};
 
 #[derive(Parser)]
 #[command(
@@ -175,6 +175,35 @@ struct StyleArgs {
     /// `style.label_fit_scale`).
     #[arg(long)]
     label_fit_scale: Option<String>,
+
+    /// Inset from the physical media edge, all sides (overrides config
+    /// `style.media_inset_mm`).
+    #[arg(long)]
+    media_inset_mm: Option<f64>,
+
+    /// Inset on both cross-axis sides (left + right in portrait).
+    #[arg(long)]
+    media_inset_horizontal_mm: Option<f64>,
+
+    /// Inset on both main-axis sides (top + bottom in portrait).
+    #[arg(long)]
+    media_inset_vertical_mm: Option<f64>,
+
+    /// Main-axis start inset (top in portrait).
+    #[arg(long)]
+    media_inset_start_mm: Option<f64>,
+
+    /// Main-axis end inset (bottom in portrait).
+    #[arg(long)]
+    media_inset_end_mm: Option<f64>,
+
+    /// Cross-axis start inset (left in portrait).
+    #[arg(long)]
+    media_inset_cross_start_mm: Option<f64>,
+
+    /// Cross-axis end inset (right in portrait).
+    #[arg(long)]
+    media_inset_cross_end_mm: Option<f64>,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -258,6 +287,27 @@ impl StyleArgs {
                 LabelValignArg::End => "end",
             }
             .into();
+        }
+        if let Some(v) = self.media_inset_mm {
+            style.media_inset_mm = v;
+        }
+        if let Some(v) = self.media_inset_horizontal_mm {
+            style.media_inset_horizontal_mm = Some(v);
+        }
+        if let Some(v) = self.media_inset_vertical_mm {
+            style.media_inset_vertical_mm = Some(v);
+        }
+        if let Some(v) = self.media_inset_start_mm {
+            style.media_inset_start_mm = Some(v);
+        }
+        if let Some(v) = self.media_inset_end_mm {
+            style.media_inset_end_mm = Some(v);
+        }
+        if let Some(v) = self.media_inset_cross_start_mm {
+            style.media_inset_cross_start_mm = Some(v);
+        }
+        if let Some(v) = self.media_inset_cross_end_mm {
+            style.media_inset_cross_end_mm = Some(v);
         }
         style
     }
@@ -575,6 +625,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
+    let media_inset = resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample);
 
     let opts = PipelineOptions {
         protocol,
@@ -592,6 +643,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         label_align,
         label_valign,
         label_fit_scale,
+        media_inset,
     };
 
     let labels = authoring_labels(read_source(&args.source)?)?;
@@ -849,6 +901,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
+    let media_inset = resolve_media_inset(&style_cfg).to_px(args.media.dpi, PREVIEW_SUPERSAMPLE);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
 
     let backend = if args.render {
@@ -872,6 +925,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 label_align,
                 label_valign,
                 label_fit_scale,
+                media_inset,
             },
         );
         let html_name = format!("preview-{:04}.html", label.index);
@@ -1089,6 +1143,7 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         label_align: LabelAlign::default(),
         label_valign: LabelValign::default(),
         label_fit_scale: 1.0,
+        media_inset: MediaInsetPx::default(),
     };
     print!("{}", transpile(&input, &opts));
     Ok(())

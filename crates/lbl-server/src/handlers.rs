@@ -9,7 +9,8 @@ use serde_json::json;
 
 use lbl::pipeline::{
     authoring_labels, encode_label, resolve_label_align, resolve_label_fit, resolve_label_fit_scale,
-    resolve_label_valign, resolve_media, resolve_style, render_viewport_px, PipelineOptions, Source,
+    resolve_label_valign, resolve_media, resolve_media_inset, resolve_style, render_viewport_px,
+    PipelineOptions, Source,
 };
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;
@@ -191,6 +192,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, PREVIEW_SUPERSAMPLE);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
     let out: Vec<_> = labels
         .into_iter()
@@ -208,6 +210,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     label_align,
                     label_valign,
                     label_fit_scale,
+                    media_inset,
                 },
             );
             json!({ "index": l.index, "html": html })
@@ -337,6 +340,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
 
     let protocol = parse_protocol(&req.protocol)?;
     let rotation = req.rotation(&state);
@@ -357,6 +361,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         label_align,
         label_valign,
         label_fit_scale,
+        media_inset,
     };
 
     let labels = authoring_labels(source).map_err(ApiError::from)?;
@@ -437,6 +442,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
 
     let rotation = req.rotation(&state);
     let opts = PipelineOptions {
@@ -456,6 +462,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         label_align,
         label_valign,
         label_fit_scale,
+        media_inset,
     };
 
     let labels = authoring_labels(source).map_err(ApiError::from)?;

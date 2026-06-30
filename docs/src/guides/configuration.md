@@ -75,12 +75,23 @@ label_align = "center"
 label_valign = "center"
 # Fit-box scale in fill mode (1.0 = full media; 0.8 or "80%" = 80% height/width)
 label_fit_scale = 1.0
+# Calibration inset from the physical sticker edge (mm); more specific fields override
+media_inset_mm = 0.0
+# media_inset_horizontal_mm = 1.0
+# media_inset_vertical_mm = 2.0
+# media_inset_start_mm = 3.0      # top in portrait (main-axis start)
+# media_inset_end_mm = 1.0        # bottom
+# media_inset_cross_start_mm = 1.5  # left
+# media_inset_cross_end_mm = 1.5    # right
 ```
 
 Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
 `--qr-dark`, `--qr-light`, `--label-fit` (`auto`, `fill`, or `content`),
 `--label-align` (`start`, `center`, or `end`), `--label-valign` (`start`,
-`center`, or `end`), and `--label-fit-scale` (`0.8`, `80%`, …).
+`center`, or `end`), `--label-fit-scale` (`0.8`, `80%`, …), and
+`--media-inset-mm` / `--media-inset-horizontal-mm` / `--media-inset-vertical-mm`
+/ `--media-inset-start-mm` / `--media-inset-end-mm` /
+`--media-inset-cross-start-mm` / `--media-inset-cross-end-mm`.
 Per-code overrides in authoring HTML:
 `<qr ec="H" margin="2">payload</qr>`.
 

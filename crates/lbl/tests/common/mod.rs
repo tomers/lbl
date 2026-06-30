@@ -34,7 +34,7 @@ use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
 use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
-use lbl_transpile_html::{transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx, TranspileOptions};
 
 /// Authoring HTML for layout/fit golden cases: short text + QR on a tall label.
 pub const LAYOUT_FIXTURE_HTML: &str = include_str!("../fixtures/layout/short_label.html");
@@ -46,6 +46,7 @@ pub struct LayoutOptions {
     pub label_align: LabelAlign,
     pub label_valign: LabelValign,
     pub label_fit_scale: f64,
+    pub media_inset: MediaInsetPx,
 }
 
 impl LayoutOptions {
@@ -56,6 +57,7 @@ impl LayoutOptions {
             label_align: LabelAlign::Center,
             label_valign: LabelValign::Center,
             label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
         }
     }
 
@@ -66,6 +68,7 @@ impl LayoutOptions {
             label_align: LabelAlign::Center,
             label_valign: LabelValign::Center,
             label_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
         }
     }
 }
@@ -159,6 +162,7 @@ pub fn render_bitmap_with_layout(
             label_align: layout.label_align,
             label_valign: layout.label_valign,
             label_fit_scale: layout.label_fit_scale,
+            media_inset: layout.media_inset,
         },
     );
     let html = inline_assets(&transpiled);

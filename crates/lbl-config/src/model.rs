@@ -98,6 +98,21 @@ pub struct StyleConfig {
     pub label_valign: String,
     /// Fit-box scale in fill mode (`1.0` = 100%; also accepts `0.8` or `80%`).
     pub label_fit_scale: f64,
+    /// Inset from the physical media edge, uniform (mm). See also the axis and
+    /// side-specific `media_inset_*` fields.
+    pub media_inset_mm: f64,
+    /// Inset on both cross-axis sides (left + right in portrait).
+    pub media_inset_horizontal_mm: Option<f64>,
+    /// Inset on both main-axis sides (top + bottom in portrait).
+    pub media_inset_vertical_mm: Option<f64>,
+    /// Main-axis start inset (top in portrait; aliases: top).
+    pub media_inset_start_mm: Option<f64>,
+    /// Main-axis end inset (bottom in portrait; aliases: bottom).
+    pub media_inset_end_mm: Option<f64>,
+    /// Cross-axis start inset (left in portrait; aliases: left).
+    pub media_inset_cross_start_mm: Option<f64>,
+    /// Cross-axis end inset (right in portrait; aliases: right).
+    pub media_inset_cross_end_mm: Option<f64>,
 }
 
 impl Default for StyleConfig {
@@ -117,6 +132,13 @@ impl Default for StyleConfig {
             label_align: "center".into(),
             label_valign: "center".into(),
             label_fit_scale: 1.0,
+            media_inset_mm: 0.0,
+            media_inset_horizontal_mm: None,
+            media_inset_vertical_mm: None,
+            media_inset_start_mm: None,
+            media_inset_end_mm: None,
+            media_inset_cross_start_mm: None,
+            media_inset_cross_end_mm: None,
         }
     }
 }
