@@ -117,6 +117,23 @@ struct StyleArgs {
     #[arg(long)]
     qr_size_mm: Option<f64>,
 
+    /// QR error-correction level: L/M/Q/H or low/medium/quartile/high
+    /// (overrides config `style.qr_error_correction`).
+    #[arg(long = "qr-ec", alias = "qr-error-correction")]
+    qr_error_correction: Option<String>,
+
+    /// QR quiet zone, in modules; 0 = none (overrides config `style.qr_margin`).
+    #[arg(long)]
+    qr_margin: Option<u32>,
+
+    /// QR dark module color, hex (overrides config `style.qr_dark`).
+    #[arg(long)]
+    qr_dark: Option<String>,
+
+    /// QR light module color, hex (overrides config `style.qr_light`).
+    #[arg(long)]
+    qr_light: Option<String>,
+
     /// Barcode bar height, in mm (overrides config `style.barcode_height_mm`).
     #[arg(long)]
     barcode_height_mm: Option<f64>,
@@ -149,6 +166,18 @@ impl StyleArgs {
         }
         if let Some(v) = self.qr_size_mm {
             style.qr_size_mm = v;
+        }
+        if let Some(v) = &self.qr_error_correction {
+            style.qr_error_correction = v.clone();
+        }
+        if let Some(v) = self.qr_margin {
+            style.qr_margin = v;
+        }
+        if let Some(v) = &self.qr_dark {
+            style.qr_dark = v.clone();
+        }
+        if let Some(v) = &self.qr_light {
+            style.qr_light = v.clone();
         }
         if let Some(v) = self.barcode_height_mm {
             style.barcode_height_mm = v;
@@ -799,6 +828,18 @@ struct TranspileArgs {
     /// QR code edge length, in pixels.
     #[arg(long)]
     qr_size_px: Option<f64>,
+    /// QR error-correction level: L/M/Q/H or low/medium/quartile/high.
+    #[arg(long = "qr-ec", alias = "qr-error-correction")]
+    qr_error_correction: Option<String>,
+    /// QR quiet zone, in modules; 0 = none.
+    #[arg(long)]
+    qr_margin: Option<u32>,
+    /// QR dark module color, hex.
+    #[arg(long)]
+    qr_dark: Option<String>,
+    /// QR light module color, hex.
+    #[arg(long)]
+    qr_light: Option<String>,
     /// Barcode bar height, in pixels.
     #[arg(long)]
     barcode_height_px: Option<f64>,
@@ -834,6 +875,19 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
     }
     if let Some(v) = args.qr_size_px {
         style.qr_size_px = v;
+    }
+    if let Some(v) = &args.qr_error_correction {
+        style.qr_error_correction =
+            lbl_transpile_html::QrErrorCorrection::parse(v).unwrap_or_default();
+    }
+    if let Some(v) = args.qr_margin {
+        style.qr_margin = v;
+    }
+    if let Some(v) = &args.qr_dark {
+        style.qr_dark = v.clone();
+    }
+    if let Some(v) = &args.qr_light {
+        style.qr_light = v.clone();
     }
     if let Some(v) = args.barcode_height_px {
         style.barcode_height_px = v;

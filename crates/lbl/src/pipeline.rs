@@ -13,7 +13,7 @@ use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
-use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelStyle, QrErrorCorrection, TranspileOptions};
 
 /// A single authoring-HTML label with its batch index.
 #[derive(Debug, Clone)]
@@ -116,7 +116,7 @@ pub fn resolve_media(
 /// pixel-based [`LabelStyle`] used by transpilation, given the render `dpi` and
 /// `supersample` factor.
 pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32) -> LabelStyle {
-    LabelStyle::from_mm(
+    let mut label = LabelStyle::from_mm(
         style.font_size_mm,
         style.qr_size_mm,
         style.barcode_height_mm,
@@ -125,7 +125,13 @@ pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32
         style.border_width_mm,
         dpi,
         supersample,
-    )
+    );
+    label.qr_error_correction =
+        QrErrorCorrection::parse(&style.qr_error_correction).unwrap_or_default();
+    label.qr_margin = style.qr_margin;
+    label.qr_dark = style.qr_dark.clone();
+    label.qr_light = style.qr_light.clone();
+    label
 }
 
 /// Options for encoding a label all the way to protocol bytes.

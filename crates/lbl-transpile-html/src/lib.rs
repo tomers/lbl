@@ -21,7 +21,9 @@
 //! ```
 
 mod assets;
+mod qr;
 mod transpile;
 
 pub use assets::AssetsBase;
+pub use qr::{QrElementOverrides, QrErrorCorrection};
 pub use transpile::{transpile, LabelStyle, TranspileOptions};

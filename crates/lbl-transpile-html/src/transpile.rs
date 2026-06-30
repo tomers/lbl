@@ -6,6 +6,7 @@ use regex::Regex;
 
 use crate::assets;
 use crate::assets::AssetsBase;
+use crate::qr::{QrElementOverrides, QrErrorCorrection};
 
 /// Visual sizing for a label, in **CSS pixels** (which map 1:1 to render
 /// device dots at the render viewport's resolution).
@@ -27,6 +28,14 @@ pub struct LabelStyle {
     pub padding_px: f64,
     /// Border drawn around the label, in pixels (0 = no border).
     pub border_width_px: f64,
+    /// QR error-correction level (redundancy).
+    pub qr_error_correction: QrErrorCorrection,
+    /// QR quiet zone, in modules (0 = none).
+    pub qr_margin: u32,
+    /// QR dark module color (hex).
+    pub qr_dark: String,
+    /// QR light module color (hex).
+    pub qr_light: String,
 }
 
 impl Default for LabelStyle {
@@ -40,6 +49,10 @@ impl Default for LabelStyle {
             barcode_module_width_px: 2.0,
             padding_px: 20.0,
             border_width_px: 0.0,
+            qr_error_correction: QrErrorCorrection::default(),
+            qr_margin: 0,
+            qr_dark: "#000000".into(),
+            qr_light: "#ffffff".into(),
         }
     }
 }
@@ -70,18 +83,32 @@ impl LabelStyle {
             barcode_module_width_px: barcode_module_width_mm * px_per_mm,
             padding_px: padding_mm * px_per_mm,
             border_width_px: border_width_mm * px_per_mm,
+            qr_error_correction: QrErrorCorrection::default(),
+            qr_margin: 0,
+            qr_dark: "#000000".into(),
+            qr_light: "#ffffff".into(),
         }
     }
 
     /// The `window.__LBL_STYLE` JSON consumed by the QR/barcode init scripts.
     fn to_js_config(&self) -> String {
-        format!(
-            "{{qr:{{width:{qr:.0}}},barcode:{{width:{bw:.2},height:{bh:.0},fontSize:{fs:.0}}}}}",
-            qr = self.qr_size_px.max(1.0),
-            bw = self.barcode_module_width_px.max(0.1),
-            bh = self.barcode_height_px.max(1.0),
-            fs = self.font_size_px.max(1.0),
-        )
+        serde_json::json!({
+            "qr": {
+                "width": self.qr_size_px.max(1.0).round() as u32,
+                "errorCorrectionLevel": self.qr_error_correction.as_str(),
+                "margin": self.qr_margin,
+                "color": {
+                    "dark": self.qr_dark,
+                    "light": self.qr_light,
+                },
+            },
+            "barcode": {
+                "width": self.barcode_module_width_px.max(0.1),
+                "height": self.barcode_height_px.max(1.0).round() as u32,
+                "fontSize": self.font_size_px.max(1.0).round() as u32,
+            },
+        })
+        .to_string()
     }
 
     /// The extra CSS that applies font, padding, border and QR sizing.
@@ -165,8 +192,23 @@ fn rewrite_qr(body: &str, features: &mut Features) -> String {
     QR_RE
         .replace_all(body, |caps: &regex::Captures| {
             features.qr = true;
+            let overrides = QrElementOverrides::from_tag_attrs(&caps[1]);
             let payload = caps[2].trim();
-            format!("<div class=\"lbl-qr\" data-qr=\"{}\"></div>", attr(payload))
+            let mut out = format!("<div class=\"lbl-qr\" data-qr=\"{}\"", attr(payload));
+            if let Some(ec) = overrides.error_correction {
+                out.push_str(&format!(" data-ec=\"{}\"", attr(ec.as_str())));
+            }
+            if let Some(m) = overrides.margin {
+                out.push_str(&format!(" data-margin=\"{m}\""));
+            }
+            if let Some(d) = overrides.dark {
+                out.push_str(&format!(" data-dark=\"{}\"", attr(&d)));
+            }
+            if let Some(l) = overrides.light {
+                out.push_str(&format!(" data-light=\"{}\"", attr(&l)));
+            }
+            out.push_str("></div>");
+            out
         })
         .into_owned()
 }
@@ -320,6 +362,7 @@ mod tests {
                 barcode_module_width_px: 4.0,
                 padding_px: 24.0,
                 border_width_px: 6.0,
+                ..Default::default()
             },
             ..Default::default()
         };
@@ -329,8 +372,17 @@ mod tests {
         assert!(out.contains("border:6.00px solid #000"), "{out}");
         assert!(out.contains(".lbl-qr{width:300.00px;height:300.00px}"), "{out}");
         assert!(out.contains("window.__LBL_STYLE="), "{out}");
-        assert!(out.contains("width:300"), "{out}"); // qr width in js
-        assert!(out.contains("height:200"), "{out}"); // barcode height in js
+        assert!(out.contains(r#""errorCorrectionLevel":"M""#), "{out}");
+        assert!(out.contains(r#""margin":0"#), "{out}");
+        assert!(out.contains(r#""width":300"#), "{out}"); // qr width in js
+        assert!(out.contains(r#""height":200"#), "{out}"); // barcode height in js
+    }
+
+    #[test]
+    fn qr_element_attrs_become_data_attributes() {
+        let out = transpile(r#"<qr ec="H" margin="2">x</qr>"#, &TranspileOptions::default());
+        assert!(out.contains(r#"data-ec="H""#), "{out}");
+        assert!(out.contains(r#"data-margin="2""#), "{out}");
     }
 
     #[test]

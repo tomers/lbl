@@ -73,6 +73,20 @@ pub const QR_INIT_JS: &str = r#"
       if(window.QRCode && QRCode.toCanvas){
         var opts={margin:0};
         if(st.width){opts.width=st.width;}
+        if(st.errorCorrectionLevel){opts.errorCorrectionLevel=st.errorCorrectionLevel;}
+        if(typeof st.margin==='number'){opts.margin=st.margin;}
+        if(st.color){opts.color=st.color;}
+        var ec=el.getAttribute('data-ec');
+        if(ec){opts.errorCorrectionLevel=ec;}
+        var margin=el.getAttribute('data-margin');
+        if(margin!==null && margin!==''){opts.margin=parseInt(margin,10);}
+        var dark=el.getAttribute('data-dark');
+        var light=el.getAttribute('data-light');
+        if(dark||light){
+          opts.color=Object.assign({},opts.color||{});
+          if(dark){opts.color.dark=dark;}
+          if(light){opts.color.light=light;}
+        }
         QRCode.toCanvas(canvas, value, opts, function(){});
       }
       el.dataset.rendered = '1';

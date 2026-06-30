@@ -57,6 +57,22 @@ struct Cli {
     #[arg(long)]
     qr_size_px: Option<f64>,
 
+    /// QR error-correction level: L/M/Q/H or low/medium/quartile/high.
+    #[arg(long = "qr-ec", alias = "qr-error-correction")]
+    qr_error_correction: Option<String>,
+
+    /// QR quiet zone, in modules; 0 = none.
+    #[arg(long)]
+    qr_margin: Option<u32>,
+
+    /// QR dark module color, hex.
+    #[arg(long)]
+    qr_dark: Option<String>,
+
+    /// QR light module color, hex.
+    #[arg(long)]
+    qr_light: Option<String>,
+
     /// Barcode bar height, in pixels.
     #[arg(long)]
     barcode_height_px: Option<f64>,
@@ -92,6 +108,19 @@ fn main() -> Result<()> {
     }
     if let Some(v) = cli.qr_size_px {
         style.qr_size_px = v;
+    }
+    if let Some(v) = &cli.qr_error_correction {
+        style.qr_error_correction =
+            lbl_transpile_html::QrErrorCorrection::parse(v).unwrap_or_default();
+    }
+    if let Some(v) = cli.qr_margin {
+        style.qr_margin = v;
+    }
+    if let Some(v) = &cli.qr_dark {
+        style.qr_dark = v.clone();
+    }
+    if let Some(v) = &cli.qr_light {
+        style.qr_light = v.clone();
     }
     if let Some(v) = cli.barcode_height_px {
         style.barcode_height_px = v;

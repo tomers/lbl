@@ -68,6 +68,15 @@ pub struct StyleConfig {
     pub font_size_mm: f64,
     /// QR code edge length, in mm.
     pub qr_size_mm: f64,
+    /// QR error-correction level: `L`, `M`, `Q`, or `H` (aliases: `low`,
+    /// `medium`, `quartile`, `high`, or `7%`/`15%`/`25%`/`30%`).
+    pub qr_error_correction: String,
+    /// QR quiet zone, in modules (0 = none).
+    pub qr_margin: u32,
+    /// QR dark module color (hex, e.g. `#000000`).
+    pub qr_dark: String,
+    /// QR light module color (hex, e.g. `#ffffff`).
+    pub qr_light: String,
     /// Barcode bar height, in mm.
     pub barcode_height_mm: f64,
     /// Barcode single-module (narrowest bar) width, in mm.
@@ -83,6 +92,10 @@ impl Default for StyleConfig {
         Self {
             font_size_mm: 2.0,
             qr_size_mm: 15.0,
+            qr_error_correction: "M".into(),
+            qr_margin: 0,
+            qr_dark: "#000000".into(),
+            qr_light: "#ffffff".into(),
             barcode_height_mm: 12.0,
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,

@@ -51,6 +51,28 @@ labels are usually printed along their longer dimension. Orientation changes
 only how content is laid out and rotated onto the head; it never changes the
 media's physical width or feed length.
 
+## Style (fonts, QR, barcodes)
+
+Physical sizes for text and codes, in millimetres:
+
+```toml
+[style]
+font_size_mm = 2.0
+qr_size_mm = 15.0
+# QR error correction (redundancy): L (~7%), M (~15%), Q (~25%), H (~30%)
+qr_error_correction = "M"
+# Quiet zone around the QR, in modules (0 = none)
+qr_margin = 0
+qr_dark = "#000000"
+qr_light = "#ffffff"
+padding_mm = 2.0
+border_width_mm = 0.0
+```
+
+Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
+`--qr-dark`, and `--qr-light`. Per-code overrides in authoring HTML:
+`<qr ec="H" margin="2">payload</qr>`.
+
 ## Printer profiles
 
 User-owned printers are persisted separately (in `printers.toml`) so a
