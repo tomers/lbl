@@ -20,6 +20,8 @@ makes sense.
 | `lbl-driver-zpl` | `crates/drivers/lbl-driver-zpl` | — | ZPL driver |
 | `lbl-driver-tspl` | `crates/drivers/lbl-driver-tspl` | — | TSPL driver |
 | `lbl-driver-niimbot` | `crates/drivers/lbl-driver-niimbot` | — | NIIMBOT packet driver (`niimbot`; D11/D110 family) |
+| `lbl-driver-file` | `crates/drivers/lbl-driver-file` | — | Virtual printer → image file (`virtual`; png/bmp/tiff/gif/pbm) |
+| `lbl-driver-console` | `crates/drivers/lbl-driver-console` | — | Console preview → terminal art (`console`) |
 | `lbl-device` | `crates/lbl-device` | `lbl-device` | USB/network discovery + transport |
 | `lbl-spool` | `crates/lbl-spool` | `lbl-spool` | Internal print spooler |
 | `lbl` | `crates/lbl` | `lbl` | Orchestrator |

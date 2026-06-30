@@ -51,7 +51,7 @@ and `preview` flows, and also exposes the individual stages as subcommands.
 | Rasterizer | `lbl-render` | HTML → raster image, two-pass (supersample then downscale) |
 | Ditherer | `lbl-dither` | Raster → 1-bit `MonoBitmap`, photo-aware |
 | Encoder | `lbl-encode` | Select a driver by protocol, encode `MonoBitmap` → protocol bytes |
-| Drivers | `drivers/lbl-driver-*` | Protocol-specific encoders (DYMO, NIIMBOT, ESC/POS, ZPL, TSPL) |
+| Drivers | `drivers/lbl-driver-*` | Protocol-specific encoders (DYMO, NIIMBOT, ESC/POS, ZPL, TSPL) plus non-hardware previews (virtual image file, console terminal art) |
 | Spooler | `lbl-spool` | Job queue, sequential dispatch, per-item cut, retry, disconnect handling |
 | Device | `lbl-device` | Discovery (USB) and transport (USB bulk / TCP / bidirectional serial) |
 | Catalog | `lbl-catalog` | Known media SKUs and printer compatibility |

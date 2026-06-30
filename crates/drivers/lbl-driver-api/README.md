@@ -24,5 +24,6 @@ impl Driver for MyDriver {
 
 Concrete drivers live alongside this crate under `crates/drivers/`:
 `lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`,
-`lbl-driver-niimbot`.
+`lbl-driver-niimbot`, and the non-hardware preview drivers `lbl-driver-file`
+(image file) and `lbl-driver-console` (terminal art).
 `lbl-encode` aggregates them and selects one by `Protocol`.
