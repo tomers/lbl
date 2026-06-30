@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use lbl_core::job::OutputMode;
-use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelStyle, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, TranspileOptions};
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Mode {
@@ -147,6 +147,10 @@ fn main() -> Result<()> {
         count: cli.count,
         style,
         label_fit: LabelFit::Content,
+        viewport: None,
+        label_align: LabelAlign::default(),
+        label_valign: LabelValign::default(),
+        label_fit_scale: 1.0,
     };
 
     let out = transpile(&input, &opts);

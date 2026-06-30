@@ -9,7 +9,7 @@ use std::io::Read;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use lbl::pipeline::{authoring_labels, resolve_label_fit, resolve_media, resolve_print_transport, resolve_style, PipelineOptions, Source};
+use lbl::pipeline::{authoring_labels, resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_print_transport, resolve_style, render_viewport_px, PipelineOptions, Source};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -19,7 +19,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelFitSetting, TranspileOptions};
+use lbl_transpile_html::{parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign, TranspileOptions};
 
 #[derive(Parser)]
 #[command(
@@ -160,6 +160,35 @@ struct StyleArgs {
     /// (overrides config `style.label_fit`).
     #[arg(long, value_enum)]
     label_fit: Option<LabelFitArg>,
+
+    /// Cross-axis alignment when the media width is known: `start`, `center`,
+    /// or `end` (overrides config `style.label_align`).
+    #[arg(long, value_enum)]
+    label_align: Option<LabelAlignArg>,
+
+    /// Main-axis alignment in fill mode: `start`, `center`, or `end` (overrides
+    /// config `style.label_valign`).
+    #[arg(long, value_enum)]
+    label_valign: Option<LabelValignArg>,
+
+    /// Fit-box scale in fill mode (`0.8`, `80%`, …; overrides config
+    /// `style.label_fit_scale`).
+    #[arg(long)]
+    label_fit_scale: Option<String>,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LabelValignArg {
+    Start,
+    Center,
+    End,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LabelAlignArg {
+    Start,
+    Center,
+    End,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -214,7 +243,31 @@ impl StyleArgs {
             }
             .into();
         }
+        if let Some(v) = self.label_align {
+            style.label_align = match v {
+                LabelAlignArg::Start => "start",
+                LabelAlignArg::Center => "center",
+                LabelAlignArg::End => "end",
+            }
+            .into();
+        }
+        if let Some(v) = self.label_valign {
+            style.label_valign = match v {
+                LabelValignArg::Start => "start",
+                LabelValignArg::Center => "center",
+                LabelValignArg::End => "end",
+            }
+            .into();
+        }
         style
+    }
+
+    fn fit_scale(&self, style: &StyleConfig) -> f64 {
+        if let Some(raw) = &self.label_fit_scale {
+            parse_fit_scale(raw).unwrap_or(style.label_fit_scale)
+        } else {
+            style.label_fit_scale
+        }
     }
 }
 
@@ -519,6 +572,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
+    let label_align = resolve_label_align(&style_cfg.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
 
     let opts = PipelineOptions {
         protocol,
@@ -533,6 +589,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
         style,
         media_type,
         label_fit,
+        label_align,
+        label_valign,
+        label_fit_scale,
     };
 
     let labels = authoring_labels(read_source(&args.source)?)?;
@@ -787,6 +846,10 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
+    let label_align = resolve_label_align(&style_cfg.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
+    let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
 
     let backend = if args.render {
         Some(ChromiumBackend::launch()?)
@@ -805,6 +868,10 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 count: Some(count),
                 style: style.clone(),
                 label_fit,
+                viewport: Some(viewport.clone()),
+                label_align,
+                label_valign,
+                label_fit_scale,
             },
         );
         let html_name = format!("preview-{:04}.html", label.index);
@@ -1018,6 +1085,10 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         count: None,
         style,
         label_fit: LabelFit::Content,
+        viewport: None,
+        label_align: LabelAlign::default(),
+        label_valign: LabelValign::default(),
+        label_fit_scale: 1.0,
     };
     print!("{}", transpile(&input, &opts));
     Ok(())

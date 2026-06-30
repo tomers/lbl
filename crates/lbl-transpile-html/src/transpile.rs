@@ -125,6 +125,165 @@ impl LabelStyle {
     }
 }
 
+/// Render viewport size in CSS pixels (matches the rasterizer's device dots
+/// times its supersample factor).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewportPx {
+    /// Viewport width, if fixed by the media.
+    pub width: Option<f64>,
+    /// Viewport height, if fixed by the media.
+    pub height: Option<f64>,
+}
+
+impl ViewportPx {
+    /// CSS that pins the document to a known media viewport so previews and
+    /// raster output show the full label width/length, not just the inked area.
+    fn to_css(&self, mode: OutputMode, label_fit: LabelFit) -> String {
+        let mut css = String::new();
+        if self.width.is_some() {
+            css.push_str("html,body{min-width:100%;width:100%}\n");
+        }
+        if label_fit == LabelFit::Fill && self.height.is_some() {
+            css.push_str("html,body{min-height:100%;height:100%}\n");
+        }
+        if mode == OutputMode::Preview {
+            if let Some(w) = self.width {
+                css.push_str(&format!(".lbl-preview{{width:{w:.2}px;box-sizing:border-box}}\n"));
+            }
+            if let Some(h) = self.height {
+                css.push_str(&format!(".lbl-preview{{height:{h:.2}px}}\n"));
+            }
+        }
+        css
+    }
+}
+
+/// Cross-axis alignment of content within `.lbl-label` when the media viewport
+/// width is known (horizontal centering on portrait labels).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LabelAlign {
+    /// Align to the start edge (left in LTR).
+    Start,
+    /// Center on the cross axis.
+    #[default]
+    Center,
+    /// Align to the end edge (right in LTR).
+    End,
+}
+
+/// Main-axis alignment within the fit box (vertical centering on portrait labels).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LabelValign {
+    Start,
+    #[default]
+    Center,
+    End,
+}
+
+macro_rules! impl_axis_align {
+    ($t:ty) => {
+        impl $t {
+            /// Parse a config / CLI value (`start`, `center`, `end`, plus `top` /
+            /// `bottom` or `left` / `right` aliases where sensible).
+            pub fn parse(s: &str) -> Option<Self> {
+                match s.trim().to_ascii_lowercase().as_str() {
+                    "start" | "left" | "top" => Some(Self::Start),
+                    "center" | "centre" | "middle" => Some(Self::Center),
+                    "end" | "right" | "bottom" => Some(Self::End),
+                    _ => None,
+                }
+            }
+
+            fn flex_keyword(self) -> &'static str {
+                match self {
+                    Self::Start => "flex-start",
+                    Self::Center => "center",
+                    Self::End => "flex-end",
+                }
+            }
+        }
+    };
+}
+
+impl_axis_align!(LabelAlign);
+impl_axis_align!(LabelValign);
+
+impl LabelAlign {
+    fn align_items(self) -> &'static str {
+        self.flex_keyword()
+    }
+}
+
+impl LabelValign {
+    fn justify_content(self) -> &'static str {
+        self.flex_keyword()
+    }
+}
+
+/// Parse a fit-scale multiplier: `0.8`, `80%`, or bare `80` (treated as a
+/// percentage). Clamped to `(0.01, 1.0]`.
+pub fn parse_fit_scale(s: &str) -> Option<f64> {
+    let s = s.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        return pct
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .map(|v| (v / 100.0).clamp(0.01, 1.0));
+    }
+    let n: f64 = s.parse().ok()?;
+    if n > 1.0 {
+        Some((n / 100.0).clamp(0.01, 1.0))
+    } else {
+        Some(n.clamp(0.01, 1.0))
+    }
+}
+
+/// Layout CSS for fit mode sizing, scaling, and axis alignment.
+fn label_layout_css(
+    label_fit: LabelFit,
+    viewport: Option<&ViewportPx>,
+    mode: OutputMode,
+    align: LabelAlign,
+    valign: LabelValign,
+    scale: f64,
+) -> String {
+    let apply_cross = label_fit == LabelFit::Fill || viewport.is_some_and(|v| v.width.is_some());
+    let apply_main = label_fit == LabelFit::Fill || viewport.is_some_and(|v| v.height.is_some());
+
+    let mut css = String::new();
+
+    if label_fit == LabelFit::Fill {
+        let pct = scale.clamp(0.01, 1.0) * 100.0;
+        css.push_str(&format!(
+            ".lbl-label{{height:{pct:.4}%;width:{pct:.4}%;flex-shrink:0;box-sizing:border-box}}\n"
+        ));
+        let container = if mode == OutputMode::Preview {
+            ".lbl-preview"
+        } else {
+            "body"
+        };
+        css.push_str(&format!(
+            "{container}{{display:flex;flex-direction:column;justify-content:{};align-items:{}}}\n",
+            valign.justify_content(),
+            align.align_items(),
+        ));
+    }
+
+    let mut label_rules = Vec::new();
+    if apply_cross {
+        label_rules.push(format!("align-items:{}", align.align_items()));
+    }
+    if apply_main {
+        label_rules.push(format!("justify-content:{}", valign.justify_content()));
+    }
+    if !label_rules.is_empty() {
+        css.push_str(&format!(".lbl-label{{{}}}\n", label_rules.join(";")));
+    }
+
+    css
+}
+
 /// How `.lbl-label` is sized within the render viewport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelFit {
@@ -188,6 +347,15 @@ pub struct TranspileOptions {
     pub style: LabelStyle,
     /// How the label root fills the render viewport.
     pub label_fit: LabelFit,
+    /// Physical media viewport, when known (preview gallery and rasterization).
+    pub viewport: Option<ViewportPx>,
+    /// Cross-axis alignment when the viewport width is known or the label fills
+    /// fixed-length media.
+    pub label_align: LabelAlign,
+    /// Main-axis alignment within the fit box (fill mode or fixed-length media).
+    pub label_valign: LabelValign,
+    /// Fraction of the viewport used by the fit box in fill mode (`1.0` = 100%).
+    pub label_fit_scale: f64,
 }
 
 impl Default for TranspileOptions {
@@ -199,6 +367,10 @@ impl Default for TranspileOptions {
             count: None,
             style: LabelStyle::default(),
             label_fit: LabelFit::Content,
+            viewport: None,
+            label_align: LabelAlign::default(),
+            label_valign: LabelValign::default(),
+            label_fit_scale: 1.0,
         }
     }
 }
@@ -291,6 +463,20 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     head.push_str(&opts.style.to_css());
     if opts.label_fit == LabelFit::Fill {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
+        if opts.mode == OutputMode::Preview {
+            head.push_str(assets::LABEL_FIT_FILL_PREVIEW_CSS);
+        }
+    }
+    head.push_str(&label_layout_css(
+        opts.label_fit,
+        opts.viewport.as_ref(),
+        opts.mode,
+        opts.label_align,
+        opts.label_valign,
+        opts.label_fit_scale,
+    ));
+    if let Some(viewport) = &opts.viewport {
+        head.push_str(&viewport.to_css(opts.mode, opts.label_fit));
     }
     if opts.mode == OutputMode::Preview {
         head.push_str(assets::PREVIEW_CSS);
@@ -397,14 +583,69 @@ mod tests {
     }
 
     #[test]
+    fn viewport_css_sizes_preview_and_stretches_document() {
+        let opts = TranspileOptions {
+            mode: OutputMode::Preview,
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(400.0),
+                height: Some(200.0),
+            }),
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains(".lbl-preview{width:400.00px"), "{out}");
+        assert!(out.contains(".lbl-preview{height:200.00px"), "{out}");
+        assert!(out.contains("min-width:100%"), "{out}");
+        assert!(out.contains(".lbl-preview{width:100%;height:100%}"), "{out}");
+    }
+
+    #[test]
+    fn fill_mode_scale_and_valign_are_configurable() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            label_fit_scale: 0.8,
+            label_valign: LabelValign::Start,
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains("height:80.0000%"), "{out}");
+        assert!(out.contains("width:80.0000%"), "{out}");
+        assert!(out.contains("body{display:flex"), "{out}");
+        assert!(out.contains("justify-content:flex-start"), "{out}");
+    }
+
+    #[test]
+    fn parse_fit_scale_accepts_fraction_and_percent() {
+        assert_eq!(parse_fit_scale("0.8"), Some(0.8));
+        assert_eq!(parse_fit_scale("80%"), Some(0.8));
+        assert_eq!(parse_fit_scale("80"), Some(0.8));
+    }
+
+    #[test]
     fn fill_mode_injects_viewport_css() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
             ..Default::default()
         };
         let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
-        assert!(out.contains("height:100%"), "{out}");
+        assert!(out.contains("height:100.0000%"), "{out}");
         assert!(out.contains("justify-content:center"), "{out}");
+        assert!(out.contains("align-items:center"), "{out}");
+    }
+
+    #[test]
+    fn label_align_start_is_configurable() {
+        let opts = TranspileOptions {
+            viewport: Some(ViewportPx {
+                width: Some(400.0),
+                height: None,
+            }),
+            label_align: LabelAlign::Start,
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains("align-items:flex-start"), "{out}");
     }
 
     #[test]
@@ -413,7 +654,8 @@ mod tests {
             "<div class=\"lbl-label\">hi</div>",
             &TranspileOptions::default(),
         );
-        assert!(!out.contains("justify-content:center"), "{out}");
+        assert!(!out.contains("html,body{height:100%"), "{out}");
+        assert!(!out.contains(".lbl-label{height:100%"), "{out}");
     }
 
     #[test]

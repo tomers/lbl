@@ -174,6 +174,29 @@ impl RenderBackend for ChromiumBackend {
             })?
         })?;
 
-        Ok(image::load_from_memory(&bytes)?.to_rgba8())
+        let mut img = image::load_from_memory(&bytes)?.to_rgba8();
+        // Full-page capture follows content bounds; expand to the pinned viewport
+        // axes so fixed-width media shows the full tape even when the ink is narrow.
+        if auto {
+            img = pad_to_min_size(
+                img,
+                width.unwrap_or(1),
+                height.unwrap_or(1),
+            );
+        }
+        Ok(img)
     }
+}
+
+/// Pad `img` to at least `min_w` x `min_h` with white, keeping existing pixels
+/// in the top-left corner.
+fn pad_to_min_size(img: RgbaImage, min_w: u32, min_h: u32) -> RgbaImage {
+    let w = img.width().max(min_w.max(1));
+    let h = img.height().max(min_h.max(1));
+    if w == img.width() && h == img.height() {
+        return img;
+    }
+    let mut out = RgbaImage::from_pixel(w, h, image::Rgba([255, 255, 255, 255]));
+    image::imageops::overlay(&mut out, &img, 0, 0);
+    out
 }

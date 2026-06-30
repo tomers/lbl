@@ -69,10 +69,18 @@ padding_mm = 2.0
 border_width_mm = 0.0
 # How the label root fills the media: auto (fill fixed-length media), fill, content
 label_fit = "auto"
+# Cross-axis alignment when the media width is known: start, center, end
+label_align = "center"
+# Main-axis alignment in fill mode: start, center, end
+label_valign = "center"
+# Fit-box scale in fill mode (1.0 = full media; 0.8 or "80%" = 80% height/width)
+label_fit_scale = 1.0
 ```
 
 Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
-`--qr-dark`, `--qr-light`, and `--label-fit` (`auto`, `fill`, or `content`).
+`--qr-dark`, `--qr-light`, `--label-fit` (`auto`, `fill`, or `content`),
+`--label-align` (`start`, `center`, or `end`), `--label-valign` (`start`,
+`center`, or `end`), and `--label-fit-scale` (`0.8`, `80%`, …).
 Per-code overrides in authoring HTML:
 `<qr ec="H" margin="2">payload</qr>`.
 

@@ -11,6 +11,7 @@ pub mod pipeline;
 pub mod terminal;
 
 pub use pipeline::{
-    authoring_labels, encode_label, encode_label_traced, resolve_label_fit, resolve_media,
-    resolve_print_transport, AuthoringLabel, PipelineOptions, Source,
+    authoring_labels, encode_label, encode_label_traced, resolve_label_align, resolve_label_fit,
+    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_print_transport,
+    render_viewport_px, AuthoringLabel, PipelineOptions, Source,
 };

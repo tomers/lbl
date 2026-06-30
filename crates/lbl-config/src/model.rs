@@ -90,6 +90,14 @@ pub struct StyleConfig {
     /// How `.lbl-label` fills the render viewport: `auto` (fill fixed-length
     /// media, shrink on continuous), `fill`, or `content`.
     pub label_fit: String,
+    /// Cross-axis alignment when the media width is known: `start`, `center`,
+    /// or `end` (`left` / `right` aliases).
+    pub label_align: String,
+    /// Main-axis alignment in fill mode: `start`, `center`, or `end` (`top` /
+    /// `bottom` aliases).
+    pub label_valign: String,
+    /// Fit-box scale in fill mode (`1.0` = 100%; also accepts `0.8` or `80%`).
+    pub label_fit_scale: f64,
 }
 
 impl Default for StyleConfig {
@@ -106,6 +114,9 @@ impl Default for StyleConfig {
             padding_mm: 2.0,
             border_width_mm: 0.0,
             label_fit: "auto".into(),
+            label_align: "center".into(),
+            label_valign: "center".into(),
+            label_fit_scale: 1.0,
         }
     }
 }

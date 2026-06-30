@@ -34,7 +34,41 @@ use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
 use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
-use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelStyle, TranspileOptions};
+use lbl_transpile_html::{transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, TranspileOptions};
+
+/// Authoring HTML for layout/fit golden cases: short text + QR on a tall label.
+pub const LAYOUT_FIXTURE_HTML: &str = include_str!("../fixtures/layout/short_label.html");
+
+/// Transpile/render options that control fit-box sizing and alignment.
+#[derive(Debug, Clone, Copy)]
+pub struct LayoutOptions {
+    pub label_fit: LabelFit,
+    pub label_align: LabelAlign,
+    pub label_valign: LabelValign,
+    pub label_fit_scale: f64,
+}
+
+impl LayoutOptions {
+    /// Defaults for fixed-length media (fill + centered + full scale).
+    pub fn fill_defaults() -> Self {
+        Self {
+            label_fit: LabelFit::Fill,
+            label_align: LabelAlign::Center,
+            label_valign: LabelValign::Center,
+            label_fit_scale: 1.0,
+        }
+    }
+
+    /// Defaults for continuous media (content width + horizontal centering).
+    pub fn continuous_defaults() -> Self {
+        Self {
+            label_fit: LabelFit::Content,
+            label_align: LabelAlign::Center,
+            label_valign: LabelValign::Center,
+            label_fit_scale: 1.0,
+        }
+    }
+}
 
 /// Vendored QR library (exposes the global `QRCode`).
 const QR_JS: &str = include_str!("../assets/qrcode.min.js");
@@ -85,6 +119,33 @@ pub fn render_bitmap(
     supersample: u32,
     algorithm: Algorithm,
 ) -> MonoBitmap {
+    let layout = if media.length_dots().is_some() {
+        LayoutOptions::fill_defaults()
+    } else {
+        LayoutOptions::continuous_defaults()
+    };
+    render_bitmap_with_layout(
+        backend,
+        authoring_html,
+        media,
+        style,
+        supersample,
+        algorithm,
+        layout,
+    )
+}
+
+/// Like [`render_bitmap`], but with explicit fit/alignment options.
+pub fn render_bitmap_with_layout(
+    backend: &ChromiumBackend,
+    authoring_html: &str,
+    media: &Media,
+    style: &LabelStyle,
+    supersample: u32,
+    algorithm: Algorithm,
+    layout: LayoutOptions,
+) -> MonoBitmap {
+    let viewport = lbl::pipeline::render_viewport_px(media, supersample, lbl_core::Rotation::None);
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -93,11 +154,11 @@ pub fn render_bitmap(
             index: None,
             count: None,
             style: style.clone(),
-            label_fit: if media.length_dots().is_some() {
-                LabelFit::Fill
-            } else {
-                LabelFit::Content
-            },
+            label_fit: layout.label_fit,
+            viewport: Some(viewport),
+            label_align: layout.label_align,
+            label_valign: layout.label_valign,
+            label_fit_scale: layout.label_fit_scale,
         },
     );
     let html = inline_assets(&transpiled);

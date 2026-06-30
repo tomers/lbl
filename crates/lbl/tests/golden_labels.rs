@@ -6,8 +6,9 @@
 //! `tests/golden/`. Together the cases cover the project's user-visible
 //! functionality: every authoring front-end, the QR/barcode/image/sizing/flex
 //! directives, configurable styling, all dithering algorithms, fixed and
-//! continuous media, catalog-resolved media, every output image format, and a
-//! batched portrait identity-card showcase on DYMO 99014 (LabelWriter 550).
+//! continuous media, catalog-resolved media, every output image format, label
+//! fit/scale/alignment, and a batched portrait identity-card showcase on DYMO
+//! 99014 (LabelWriter 550).
 //! Identity-card photos are fetched from Wikimedia Commons at test time (network
 //! required for that case).
 //!
@@ -29,6 +30,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::{encode_image, MediaType};
 use lbl_render::ChromiumBackend;
 use lbl_transpile_html::LabelStyle;
+use lbl_transpile_html::{LabelAlign, LabelFit, LabelValign};
 
 /// Render resolution for the suite. Kept modest so references stay small and
 /// rendering is fast, while still leaving room for legible QR/barcodes.
@@ -53,6 +55,9 @@ fn golden_labels() {
     let small = Media::fixed(40.0, 30.0, Dpi(DPI));
     let wide = Media::fixed(60.0, 28.0, Dpi(DPI));
     let strip = Media::continuous(50.0, Dpi(DPI));
+    // Tall fixed label so fit-box scale and axis alignment leave visible margins.
+    let layout_media = Media::fixed(40.0, 60.0, Dpi(DPI));
+    let layout_style = bordered_style(DPI, SUPERSAMPLE);
 
     let mut failures: Vec<String> = Vec::new();
 
@@ -260,6 +265,85 @@ fn golden_labels() {
         SUPERSAMPLE,
     ));
 
+    // Fit-box scale and axis alignment (`tests/fixtures/layout/short_label.html`).
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_fit_scale_80_center",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_fit_scale: 0.8,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_fit_scale_80_start",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_fit_scale: 0.8,
+            label_align: LabelAlign::Start,
+            label_valign: LabelValign::Start,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_fit_scale_80_end",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_fit_scale: 0.8,
+            label_align: LabelAlign::End,
+            label_valign: LabelValign::End,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_align_start",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_align: LabelAlign::Start,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_valign_start",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_valign: LabelValign::Start,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_align_end_valign_end",
+        &layout_media,
+        &layout_style,
+        LayoutOptions {
+            label_align: LabelAlign::End,
+            label_valign: LabelValign::End,
+            ..LayoutOptions::fill_defaults()
+        },
+    ));
+    failures.extend(run_layout_case(
+        &backend,
+        "layout_continuous_align_end",
+        &strip,
+        &layout_style,
+        LayoutOptions {
+            label_fit: LabelFit::Content,
+            label_align: LabelAlign::End,
+            label_valign: LabelValign::Center,
+            label_fit_scale: 1.0,
+        },
+    ));
+
     // --- Media ---------------------------------------------------------------
 
     // Catalog-resolved media (DYMO 11352 address label).
@@ -388,6 +472,33 @@ fn run_case(
         }
     }
     failures
+}
+
+/// Render the shared layout fixture with explicit fit/alignment and compare PNG
+/// output against `tests/golden/<name>.png`.
+fn run_layout_case(
+    backend: &ChromiumBackend,
+    name: &str,
+    media: &Media,
+    style: &LabelStyle,
+    layout: LayoutOptions,
+) -> Vec<String> {
+    let bitmap = render_bitmap_with_layout(
+        backend,
+        LAYOUT_FIXTURE_HTML,
+        media,
+        style,
+        SUPERSAMPLE,
+        Algorithm::Auto,
+        layout,
+    );
+    match encode_image(&bitmap, MediaType::Png) {
+        Ok(png) => match check_png(name, &png) {
+            Ok(()) => Vec::new(),
+            Err(err) => vec![err],
+        },
+        Err(err) => vec![format!("{name}: encode failed: {err}")],
+    }
 }
 
 /// Like [`run_case`], but authors labels from a `.lbl` single-file fixture

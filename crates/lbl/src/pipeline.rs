@@ -13,7 +13,10 @@ use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
 use lbl_template::{Engine, RenderOptions};
-use lbl_transpile_html::{transpile, AssetsBase, LabelFit, LabelFitSetting, LabelStyle, QrErrorCorrection, TranspileOptions};
+use lbl_transpile_html::{
+    transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
+    QrErrorCorrection, TranspileOptions, ViewportPx,
+};
 
 /// A single authoring-HTML label with its batch index.
 #[derive(Debug, Clone)]
@@ -222,11 +225,48 @@ pub struct PipelineOptions {
     pub media_type: Option<MediaType>,
     /// How the label root fills the render viewport (resolved from config/CLI).
     pub label_fit: LabelFit,
+    /// Cross-axis alignment when the viewport width is known (resolved from config/CLI).
+    pub label_align: LabelAlign,
+    /// Main-axis alignment in fill mode (resolved from config/CLI).
+    pub label_valign: LabelValign,
+    /// Fit-box scale in fill mode (resolved from config/CLI).
+    pub label_fit_scale: f64,
 }
 
 /// Resolve a [`LabelFitSetting`] against the target media.
 pub fn resolve_label_fit(setting: LabelFitSetting, media: &Media) -> LabelFit {
     setting.resolve(media.length_dots().is_some())
+}
+
+/// Resolve a configured cross-axis alignment string.
+pub fn resolve_label_align(s: &str) -> LabelAlign {
+    LabelAlign::parse(s).unwrap_or_default()
+}
+
+/// Resolve a configured main-axis alignment string.
+pub fn resolve_label_valign(s: &str) -> LabelValign {
+    LabelValign::parse(s).unwrap_or_default()
+}
+
+/// Resolve a configured fit-box scale (clamped to `(0.01, 1.0]`).
+pub fn resolve_label_fit_scale(scale: f64) -> f64 {
+    scale.clamp(0.01, 1.0)
+}
+
+/// CSS-pixel viewport matching the rasterizer's [`RenderRequest`] dimensions.
+pub fn render_viewport_px(media: &Media, supersample: u32, rotation: Rotation) -> ViewportPx {
+    let factor = supersample.max(1) as f64;
+    let head_dots = media.width_dots().0;
+    let feed_dots = media.length_dots().map(|d| d.0);
+    let (width_dots, height_dots) = if rotation.swaps_axes() {
+        (feed_dots, Some(head_dots))
+    } else {
+        (Some(head_dots), feed_dots)
+    };
+    ViewportPx {
+        width: width_dots.map(|w| w as f64 * factor),
+        height: height_dots.map(|h| h as f64 * factor),
+    }
 }
 
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
@@ -251,6 +291,7 @@ pub fn encode_label_traced<B: RenderBackend>(
     authoring_html: &str,
     opts: &PipelineOptions,
 ) -> Result<crate::debug::LabelTrace> {
+    let viewport = render_viewport_px(&opts.media, opts.supersample, opts.rotation);
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -260,6 +301,10 @@ pub fn encode_label_traced<B: RenderBackend>(
             count: None,
             style: opts.style.clone(),
             label_fit: opts.label_fit,
+            viewport: Some(viewport),
+            label_align: opts.label_align,
+            label_valign: opts.label_valign,
+            label_fit_scale: opts.label_fit_scale,
         },
     );
 
@@ -363,6 +408,9 @@ mod tests {
             style: LabelStyle::default(),
             media_type: None,
             label_fit: LabelFit::Fill,
+            label_align: LabelAlign::default(),
+            label_valign: LabelValign::default(),
+            label_fit_scale: 1.0,
         }
     }
 
