@@ -862,7 +862,7 @@ enum DeviceCommand {
 fn run_device(args: DeviceArgs) -> Result<()> {
     match args.command {
         DeviceCommand::List => {
-            let printers = lbl_device::discover_usb();
+            let printers = lbl_device::discover();
             println!("{}", serde_json::to_string_pretty(&printers)?);
         }
     }

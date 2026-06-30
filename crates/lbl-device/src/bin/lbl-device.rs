@@ -4,7 +4,7 @@ use std::io::Read;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use lbl_device::{discover_usb, NetworkTransport, Transport};
+use lbl_device::{discover, NetworkTransport, Transport};
 
 #[derive(Parser)]
 #[command(
@@ -18,7 +18,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// List discovered (USB) printers as JSON.
+    /// List discovered printers (USB bulk + serial ports) as JSON.
     List,
     /// Send bytes (stdin or a file) to a printer.
     Send {
@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::List => {
-            let printers = discover_usb();
+            let printers = discover();
             println!("{}", serde_json::to_string_pretty(&printers)?);
         }
         Command::Send {
