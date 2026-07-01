@@ -7,6 +7,7 @@ license.workspace      = true
 authors.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
+build                  = "build.rs"
 
 [[bin]]
 name = "lbl"
@@ -48,6 +49,9 @@ base64             = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 console            = { workspace = true }
+
+include_dir        = "0.7.4"
+ctrlc              = "3.4"
 
 [dev-dependencies]
 lbl-core           = { workspace = true }

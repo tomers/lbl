@@ -354,6 +354,8 @@ enum ProtocolArg {
     /// Console printer: render the raster to the terminal as text.
     #[value(alias = "term")]
     Console,
+    /// HTML preview: write a browser gallery of full-resolution PNGs.
+    Html,
 }
 
 impl From<ProtocolArg> for Protocol {
@@ -367,6 +369,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::Virtual => Protocol::Virtual,
             ProtocolArg::Console => Protocol::Console,
+            ProtocolArg::Html => Protocol::Html,
         }
     }
 }
@@ -525,10 +528,16 @@ struct PrintArgs {
     debug: Option<bool>,
 
     /// Before sending to a device or file, show a terminal preview of each
-    /// label and ask for confirmation. Ignored for `--protocol console`.
-    /// Overrides config `[print] confirm` / `LBL_PRINT__CONFIRM`.
+    /// label and ask for confirmation. Ignored for `--protocol console` and
+    /// `--protocol html`. Overrides config `[print] confirm` /
+    /// `LBL_PRINT__CONFIRM`.
     #[arg(long, action = clap::ArgAction::SetTrue)]
     confirm: Option<bool>,
+
+    /// Serve the HTML preview on loopback and open it in the system browser.
+    /// Requires `--protocol html`. The process stays running until Ctrl+C.
+    #[arg(long)]
+    open_browser: bool,
 
     /// Print a calibration sample pattern. Omit the value to use the resolved
     /// media width in device dots (`--media` / `--width-mm` at `--dpi`); pass a
@@ -649,6 +658,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
     let media_inset = resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample);
 
+    let preview_media = media.clone();
+
     let sample_head_dots = if args.sample_pattern.is_some() {
         Some(resolve_head_dots(args.sample_pattern.flatten(), &media).map_err(|e| anyhow!(e))?)
     } else {
@@ -674,6 +685,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
         media_inset,
     };
 
+    if args.open_browser && protocol != Protocol::Html {
+        bail!("--open-browser requires --protocol html");
+    }
+
+    if protocol == Protocol::Html && args.sample_pattern.is_some() {
+        bail!("--sample-pattern is not supported with --protocol html");
+    }
+
     if args.source.is_set() && args.sample_pattern.is_some() {
         bail!("--sample-pattern cannot be combined with label input (--text, --markdown, --html, --template)");
     }
@@ -694,7 +713,11 @@ fn run_print(args: PrintArgs) -> Result<()> {
         media_type.map(|mt| mt.extension()).unwrap_or("bin")
     };
 
-    let want_trace = args.debug_html.is_some() || debug || confirm || protocol == Protocol::Console;
+    let want_trace = args.debug_html.is_some()
+        || debug
+        || confirm
+        || protocol == Protocol::Console
+        || protocol == Protocol::Html;
 
     let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
         if let Some(head_dots) = sample_head_dots {
@@ -740,6 +763,45 @@ fn run_print(args: PrintArgs) -> Result<()> {
     // rather than to a device, and never needs confirmation.
     if protocol == Protocol::Console && args.out_dir.is_none() && args.file.is_none() {
         lbl::terminal::dump_rasters(&traces)?;
+        return Ok(());
+    }
+
+    // HTML preview: write a gallery page plus full-resolution PNGs.
+    if protocol == Protocol::Html {
+        let paths = lbl::preview::resolve_html_preview_paths(
+            args.out_dir.as_deref(),
+            args.file.as_deref(),
+        )?;
+        let source = read_source(&args.source)?;
+        let preview_input = lbl::preview::input_from_run(
+            &source,
+            lbl::preview::PreviewSourceArgs {
+                template_path: args.source.template.as_deref(),
+            },
+            &catalog,
+            printer_entry,
+            args.printer.as_deref(),
+            protocol,
+            dpi,
+            &preview_media,
+            media_sku.as_deref(),
+            &network,
+            &usb,
+            &serial,
+            &bluetooth,
+        )?;
+        let context = lbl::preview::HtmlPreviewContext::build(preview_input, &traces);
+        lbl::preview::write_html_preview(&context, &traces, &paths)?;
+        eprintln!(
+            "wrote HTML preview ({} label(s)) to {}",
+            traces.len(),
+            paths.index_html.display()
+        );
+        if args.open_browser {
+            lbl::preview::serve_and_open(&paths.bundle_dir)?;
+        } else {
+            lbl::preview::print_open_hint(&paths.bundle_dir);
+        }
         return Ok(());
     }
 

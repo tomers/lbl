@@ -8,6 +8,7 @@
 pub mod debug;
 pub mod dispatch;
 pub mod pipeline;
+pub mod preview;
 pub mod terminal;
 
 pub use pipeline::{

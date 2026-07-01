@@ -363,20 +363,29 @@ pub fn encode_label_traced<B: RenderBackend>(
 
     let dithered = dither(&rendered, opts.dither);
 
-    let mut job = JobSpec::new(opts.media.clone());
-    job.cut = opts.cut;
-    job.copies = opts.copies;
-    let caps = PrinterCapabilities {
-        dpi: opts.media.dpi,
-        max_width_mm: opts.media.width_mm,
-        supports_cut: opts.supports_cut,
-        reports_media: false,
+    let (encoded, driver_name) = if opts.protocol == Protocol::Html {
+        (Vec::new(), "html-preview".to_string())
+    } else {
+        let mut job = JobSpec::new(opts.media.clone());
+        job.cut = opts.cut;
+        job.copies = opts.copies;
+        let caps = PrinterCapabilities {
+            dpi: opts.media.dpi,
+            max_width_mm: opts.media.width_mm,
+            supports_cut: opts.supports_cut,
+            reports_media: false,
+        };
+        let driver = registry
+            .get(opts.protocol)
+            .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
+        let ctx = EncodeContext::new(&job, &caps);
+        (
+            driver
+                .encode(&dithered, &ctx)
+                .context("encoding")?,
+            driver.name().to_string(),
+        )
     };
-    let driver = registry
-        .get(opts.protocol)
-        .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
-    let ctx = EncodeContext::new(&job, &caps);
-    let encoded = driver.encode(&dithered, &ctx).context("encoding")?;
 
     Ok(crate::debug::LabelTrace {
         index,
@@ -391,7 +400,7 @@ pub fn encode_label_traced<B: RenderBackend>(
         dither: opts.dither,
         dithered,
         protocol: opts.protocol,
-        driver_name: driver.name().to_string(),
+        driver_name,
         media_type: opts.media_type,
         encoded,
     })
