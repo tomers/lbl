@@ -4,8 +4,9 @@
 //!
 //! * `--protocol console` — dump the dithered raster to stdout as text.
 //! * `--confirm` — preview each label and ask before printing to a device/file.
-//! * `--debug` — print a per-stage dump (syntax-highlighted HTML, the dithered
-//!   raster as art, an encoded-byte preview) to stderr.
+//! * `--debug` — print the effective configuration (with provenance), then a
+//!   per-stage dump (syntax-highlighted HTML, the dithered raster as art, an
+//!   encoded-byte preview) to stderr.
 //!
 //! Raster art is produced by [`lbl_driver_console::render_terminal`] so the
 //! preview matches `--protocol console` exactly. Color (ANSI) is used only when
@@ -161,6 +162,70 @@ pub fn dump_debug(traces: &[LabelTrace]) -> io::Result<()> {
         write!(err, "{}", render_label_debug(t, color))?;
     }
     err.flush()
+}
+
+/// Print the effective layered configuration (and figment provenance) to stderr.
+pub fn dump_config_report(loader: &lbl_config::Loader) -> io::Result<()> {
+    let color = stderr_color();
+    let mut err = io::stderr();
+    writeln!(err, "{}", heading("═══ Configuration ═══", color))?;
+    write!(err, "{}", render_config_report(loader, color)?)?;
+    writeln!(err)?;
+    writeln!(
+        err,
+        "{}",
+        dimmed(
+            "Per-run flags (--protocol, --padding-mm, …) override config but are not shown here.",
+            color
+        )
+    )?;
+    err.flush()
+}
+
+/// Effective configuration JSON, with optional syntax coloring.
+pub fn render_config_json(loader: &lbl_config::Loader, color: bool) -> io::Result<String> {
+    let cfg = loader
+        .load()
+        .map_err(|e| io::Error::other(e.to_string()))?;
+    let json = serde_json::to_string_pretty(&cfg).map_err(io::Error::other)?;
+    Ok(highlight_json(&json, color))
+}
+
+/// Effective configuration as text, with optional JSON and provenance coloring.
+pub fn render_config_report(loader: &lbl_config::Loader, color: bool) -> io::Result<String> {
+    let mut out = render_config_json(loader, color)?;
+    out.push_str("\n\n");
+    out.push_str(&sources_block(loader, color));
+    Ok(out)
+}
+
+fn sources_block(loader: &lbl_config::Loader, color: bool) -> String {
+    let mut out = String::new();
+    if color {
+        out.push_str(BOLD);
+    }
+    out.push_str("Sources");
+    if color {
+        out.push_str(RESET);
+    }
+    out.push('\n');
+    for (key, source) in lbl_config::describe_sources(loader.figment()) {
+        if color {
+            out.push_str(ATTR);
+            out.push_str(&key);
+            out.push_str(RESET);
+            out.push('\t');
+            out.push_str(DIM);
+            out.push_str(&source);
+            out.push_str(RESET);
+        } else {
+            out.push_str(&key);
+            out.push('\t');
+            out.push_str(&source);
+        }
+        out.push('\n');
+    }
+    out
 }
 
 /// Build the per-stage debug report for a single label.
@@ -364,6 +429,125 @@ fn highlight_tag(tag: &str) -> String {
     out
 }
 
+/// Colorize JSON for the terminal. When `color` is false the source is returned
+/// unchanged.
+pub fn highlight_json(src: &str, color: bool) -> String {
+    if !color {
+        return src.to_string();
+    }
+    let chars: Vec<char> = src.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_whitespace() {
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            let (end, is_key) = scan_json_string(&chars, i);
+            out.push_str(if is_key { TAG } else { VAL });
+            for ch in &chars[i..end] {
+                out.push(*ch);
+            }
+            out.push_str(RESET);
+            i = end;
+            continue;
+        }
+        if matches!(c, '{' | '}' | '[' | ']' | ':' | ',') {
+            out.push_str(PUNCT);
+            out.push(c);
+            out.push_str(RESET);
+            i += 1;
+            continue;
+        }
+        if c == 'n' && starts_with(&chars, i, "null") {
+            out.push_str(TAG);
+            out.push_str("null");
+            out.push_str(RESET);
+            i += 4;
+            continue;
+        }
+        if c == 't' && starts_with(&chars, i, "true") {
+            out.push_str(TAG);
+            out.push_str("true");
+            out.push_str(RESET);
+            i += 4;
+            continue;
+        }
+        if c == 'f' && starts_with(&chars, i, "false") {
+            out.push_str(TAG);
+            out.push_str("false");
+            out.push_str(RESET);
+            i += 5;
+            continue;
+        }
+        if c == '-' || c.is_ascii_digit() {
+            let end = scan_json_number(&chars, i);
+            out.push_str(ATTR);
+            for ch in &chars[i..end] {
+                out.push(*ch);
+            }
+            out.push_str(RESET);
+            i = end;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+fn starts_with(chars: &[char], i: usize, word: &str) -> bool {
+    chars[i..]
+        .iter()
+        .copied()
+        .zip(word.chars())
+        .all(|(a, b)| a == b)
+}
+
+fn scan_json_string(chars: &[char], start: usize) -> (usize, bool) {
+    let mut i = start + 1;
+    while i < chars.len() {
+        if chars[i] == '\\' {
+            i += 2;
+            continue;
+        }
+        if chars[i] == '"' {
+            let end = i + 1;
+            let mut j = end;
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
+            let is_key = j < chars.len() && chars[j] == ':';
+            return (end, is_key);
+        }
+        i += 1;
+    }
+    (chars.len(), false)
+}
+
+fn scan_json_number(chars: &[char], start: usize) -> usize {
+    let mut i = start;
+    if i < chars.len() && chars[i] == '-' {
+        i += 1;
+    }
+    while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+        i += 1;
+    }
+    if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
+        i += 1;
+        if i < chars.len() && (chars[i] == '+' || chars[i] == '-') {
+            i += 1;
+        }
+        while i < chars.len() && chars[i].is_ascii_digit() {
+            i += 1;
+        }
+    }
+    i
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,6 +589,25 @@ mod tests {
         let out = highlight_html("text <div ", true);
         assert!(out.contains("text "));
         assert!(out.contains("div"));
+    }
+
+    #[test]
+    fn highlight_json_plain_when_disabled() {
+        let src = r#"{"a": 1}"#;
+        assert_eq!(highlight_json(src, false), src);
+    }
+
+    #[test]
+    fn highlight_json_colorizes_keys_values_and_literals() {
+        let src = "{\n  \"style\": {\n    \"padding_mm\": 2.0,\n    \"label_fit\": \"auto\",\n    \"confirm\": true,\n    \"printer\": null\n  }\n}";
+        let out = highlight_json(src, true);
+        assert!(out.contains('\x1b'));
+        assert!(out.contains(TAG));
+        assert!(out.contains(VAL));
+        assert!(out.contains(ATTR));
+        assert!(out.contains(PUNCT));
+        assert!(out.contains("padding_mm"));
+        assert!(out.contains("auto"));
     }
 
     #[test]

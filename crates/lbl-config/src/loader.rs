@@ -61,6 +61,23 @@ impl Loader {
     }
 }
 
+/// Format the effective configuration for display. When `include_sources` is
+/// true, append a provenance table from figment metadata (file path, `LBL_*`
+/// env var, built-in default, etc.).
+pub fn format_effective(loader: &Loader, include_sources: bool) -> Result<String> {
+    let cfg = loader.load()?;
+    let json = serde_json::to_string_pretty(&cfg).map_err(|e| ConfigError::Load(e.to_string()))?;
+    if !include_sources {
+        return Ok(json);
+    }
+    let mut out = json;
+    out.push_str("\n\nSources\n");
+    for (key, source) in describe_sources(loader.figment()) {
+        out.push_str(&format!("{key}\t{source}\n"));
+    }
+    Ok(out)
+}
+
 impl Default for Loader {
     fn default() -> Self {
         Self::new()
@@ -165,5 +182,14 @@ mod tests {
             .load()
             .unwrap();
         assert_eq!(cfg.render.supersample, 8);
+    }
+
+    #[test]
+    fn format_effective_includes_sources() {
+        let loader = Loader::with_paths(empty_paths());
+        let out = format_effective(&loader, true).unwrap();
+        assert!(out.contains("\"supersample\": 3"));
+        assert!(out.contains("Sources\n"));
+        assert!(out.contains("render.supersample"));
     }
 }

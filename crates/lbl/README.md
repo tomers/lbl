@@ -29,6 +29,7 @@ lbl text "ship to {{qr:...}}"          # text -> authoring HTML
 lbl transpile label.html --mode preview
 lbl catalog show 11352
 lbl device list
+lbl config show
 ```
 
 Granular stages also ship as dedicated binaries: `lbl-text`, `lbl-template`,

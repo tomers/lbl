@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use lbl_config::{describe_sources, Loader};
+use lbl_config::{describe_sources, format_effective, Loader};
 
 #[derive(Parser)]
 #[command(name = "lbl-config", about = "Inspect lbl's layered configuration", color = clap::ColorChoice::Auto, styles = lbl_cli::CLAP_STYLING)]
@@ -27,8 +27,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Command::Show => {
-            let cfg = loader.load()?;
-            println!("{}", serde_json::to_string_pretty(&cfg)?);
+            println!("{}", format_effective(&loader, false)?);
         }
         Command::Sources => {
             for (key, source) in describe_sources(loader.figment()) {
@@ -36,12 +35,15 @@ fn main() -> Result<()> {
             }
         }
         Command::Paths => {
-            let p = loader.paths();
-            println!("system   {}", p.system.display());
-            println!("user     {}", p.user.display());
-            println!("project  {}", p.project.display());
-            println!("profiles {}", p.profiles.display());
-            println!("cache    {}", p.cache.display());
+            let catalog_extra = loader.load().map(|c| c.catalog.extra_paths).unwrap_or_default();
+            print!(
+                "{}",
+                lbl_config::format_paths_report(
+                    loader.paths(),
+                    &catalog_extra,
+                    lbl_config::stdout_color(),
+                )
+            );
         }
     }
     Ok(())

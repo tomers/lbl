@@ -12,9 +12,13 @@
 ## Inspect
 
 ```bash
-lbl-config show      # effective merged config (JSON)
-lbl-config sources   # which layer supplied each value
-lbl-config paths     # resolved file locations
+lbl config show      # effective merged config (JSON)
+lbl config sources   # which layer supplied each value
+lbl config paths     # resolved paths, existence, and entry counts
+
+lbl-config show      # same (standalone binary)
+lbl-config sources
+lbl-config paths
 ```
 
 The provenance view is exposed by `GET /api/config/sources` for HTTP clients.

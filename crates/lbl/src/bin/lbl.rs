@@ -56,6 +56,8 @@ enum Command {
     Transpile(TranspileArgs),
     /// Browse the media catalog.
     Catalog(CatalogArgs),
+    /// Inspect layered configuration (show|sources|paths).
+    Config(ConfigArgs),
     /// Discover connected printers.
     Device(DeviceArgs),
 }
@@ -619,7 +621,8 @@ fn config_enum<E: ValueEnum>(name: &str, value: &str) -> Result<E> {
 }
 
 fn run_print(args: PrintArgs) -> Result<()> {
-    let config = lbl_config::Loader::new()
+    let loader = lbl_config::Loader::new();
+    let config = loader
         .load()
         .unwrap_or_else(|_| lbl_config::Config::default());
     let print_cfg = &config.print;
@@ -822,6 +825,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     }
 
     if debug {
+        lbl::terminal::dump_config_report(&loader)?;
         lbl::terminal::dump_debug(&traces)?;
     }
 
@@ -1409,6 +1413,55 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
 }
 
 #[derive(Args)]
+struct ConfigArgs {
+    #[command(subcommand)]
+    command: ConfigCommand,
+}
+
+#[derive(Subcommand)]
+enum ConfigCommand {
+    /// Print the fully-merged effective configuration as JSON.
+    Show,
+    /// Print where each effective value came from (provenance).
+    Sources,
+    /// Print the resolved configuration file paths.
+    Paths,
+}
+
+fn run_config(args: ConfigArgs) -> Result<()> {
+    let loader = lbl_config::Loader::new();
+    match args.command {
+        ConfigCommand::Show => {
+            let cfg = loader.load()?;
+            let json = serde_json::to_string_pretty(&cfg)?;
+            let color = lbl::terminal::stdout_color();
+            if color {
+                print!("{}", lbl::terminal::highlight_json(&json, true));
+            } else {
+                print!("{json}");
+            }
+        }
+        ConfigCommand::Sources => {
+            for (key, source) in lbl_config::describe_sources(loader.figment()) {
+                println!("{key}\t{source}");
+            }
+        }
+        ConfigCommand::Paths => {
+            let catalog_extra = loader.load().map(|c| c.catalog.extra_paths).unwrap_or_default();
+            print!(
+                "{}",
+                lbl_config::format_paths_report(
+                    loader.paths(),
+                    &catalog_extra,
+                    lbl::terminal::stdout_color(),
+                )
+            );
+        }
+    }
+    Ok(())
+}
+
+#[derive(Args)]
 struct DeviceArgs {
     #[command(subcommand)]
     command: DeviceCommand,
@@ -1515,6 +1568,7 @@ fn main() -> Result<()> {
         Command::Markdown(a) => run_markdown(a),
         Command::Transpile(a) => run_transpile(a),
         Command::Catalog(a) => run_catalog(a),
+        Command::Config(a) => run_config(a),
         Command::Device(a) => run_device(a),
     }
 }

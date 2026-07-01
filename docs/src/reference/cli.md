@@ -10,6 +10,7 @@ lbl preview   Produce preview HTML (+ optional PNGs) for a gallery
 lbl text      Text/CLI → authoring HTML
 lbl transpile Authoring HTML → browser-ready HTML
 lbl catalog   Browse the media catalog (list|show|compatible|search)
+lbl config    Inspect layered configuration (show|sources|paths)
 lbl device    Discover printers (list)
 ```
 
@@ -44,8 +45,8 @@ lbl device    Discover printers (list)
 --network <host:port> | --usb <vid:pid> | --serial <path[:baud]> | --out-dir <DIR> | --file <FILE>
 --confirm   Preview each label as terminal art, then ask before printing
             (or `[print] confirm` / `LBL_PRINT__CONFIRM=1` in config)
---debug     Dump every pipeline stage to stderr (highlighted HTML, the dithered
-            raster as terminal art, an encoded-byte preview)
+--debug     Print effective configuration (syntax-highlighted JSON with
+            provenance when stderr is a TTY), then dump every pipeline stage
 --debug-html <FILE>   Write a standalone HTML report of every pipeline stage
 --sample-pattern [<DOTS>]   Print a calibration pattern (no label input/render/dither).
                     Omit DOTS to use the media width in device dots from
@@ -100,6 +101,16 @@ landscape.
 ```text
 (source flags as above)  --out-dir <DIR>  [--render]  [--assets-base <URL>]
 ```
+
+### `lbl config`
+
+```text
+lbl config show      Effective merged config (JSON)
+lbl config sources   Provenance: key<TAB>source (default, file path, LBL_* env, …)
+lbl config paths     Resolved paths with existence and entry counts
+```
+
+Same as the standalone `lbl-config` binary.
 
 ## Stage binaries
 
