@@ -263,6 +263,8 @@ struct UsbNodeInfo {
     mode: Option<String>,
     owner: Option<String>,
     kernel_driver: Option<String>,
+    /// Sysfs node name (e.g. `3-1.2.3`) when a printer interface has `usblp` bound.
+    usblp_interface: Option<String>,
 }
 
 #[cfg(target_os = "linux")]
@@ -497,6 +499,104 @@ fn linux_usb_device_busy_troubleshooting(vendor_id: u16, product_id: u16, style:
 }
 
 #[cfg(target_os = "linux")]
+fn push_cups_usb_auto_add_bullet(out: &mut String, style: &Style) {
+    push_bullet(
+        out,
+        style,
+        "CUPS automatically adds USB printers when they are plugged in (udev \
+         `configure-printer` / `udev-add-printer`) — if you already deleted the queue, udev \
+         may have re-added it on plug-in",
+    );
+    push_bullet(
+        out,
+        style,
+        "Exclude this printer from CUPS with a per-device USB quirk — other USB printers on \
+         the system can keep using CUPS normally",
+    );
+    push_bullet(
+        out,
+        style,
+        "Check `lpstat -v`, not only `lpstat -p` — a USB binding can appear in `-v` even when \
+         `-p` looks empty",
+    );
+}
+
+#[cfg(target_os = "linux")]
+fn push_exclude_printer_from_cups_steps(
+    out: &mut String,
+    style: &Style,
+    step: &mut usize,
+    vendor_id: u16,
+    product_id: u16,
+) {
+    let quirk_line = format!("0x{vendor_id:04x} 0x{product_id:04x} blacklist");
+    push_step(
+        out,
+        style,
+        *step,
+        "Tell CUPS not to auto-add this printer (creates a separate quirks file; does not \
+         change udev rules for other printers):",
+        "",
+        "",
+    );
+    *step += 1;
+    push_heredoc_block(
+        out,
+        style,
+        &[
+            "sudo tee /usr/share/cups/usb/lbl-exclude.usb-quirks <<'EOF'",
+            "# lbl: exclude this USB printer from CUPS auto-discovery",
+            quirk_line.as_str(),
+            "EOF",
+        ],
+    );
+}
+
+#[cfg(target_os = "linux")]
+fn push_unbind_usblp_steps(
+    out: &mut String,
+    style: &Style,
+    step: &mut usize,
+    usblp_interface: &str,
+    vendor_id: u16,
+    product_id: u16,
+) {
+    push_step(
+        out,
+        style,
+        *step,
+        "Release the printer interface from the kernel `usblp` driver (CUPS uses this driver \
+         even when no queue is listed — the CUPS USB quirk alone does not unbind it):",
+        &format!("echo -n '{usblp_interface}' | sudo tee /sys/bus/usb/drivers/usblp/unbind"),
+        "",
+    );
+    *step += 1;
+    push_step(
+        out,
+        style,
+        *step,
+        "Keep `usblp` from reclaiming this printer on plug-in (other USB printers are unaffected):",
+        "",
+        "",
+    );
+    *step += 1;
+    let rule = format!(
+        "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{vendor_id:04x}\", ATTR{{idProduct}}==\"{product_id:04x}\", ATTR{{bInterfaceClass}}==\"07\", DRIVER==\"usblp\", RUN+=\"/bin/sh -c 'echo -n %k > /sys/bus/usb/drivers/usblp/unbind'\""
+    );
+    push_heredoc_block(
+        out,
+        style,
+        &[
+            "sudo tee /etc/udev/rules.d/99-lbl-printer-usblp.rules <<'EOF'",
+            "# lbl: unbind usblp from this printer so lbl can use raw USB",
+            rule.as_str(),
+            "EOF",
+            "sudo udevadm control --reload-rules && sudo udevadm trigger",
+        ],
+    );
+}
+
+#[cfg(target_os = "linux")]
 fn linux_usb_device_busy_troubleshooting_with(
     vendor_id: u16,
     product_id: u16,
@@ -508,7 +608,11 @@ fn linux_usb_device_busy_troubleshooting_with(
     let kernel_driver = node_info
         .as_ref()
         .and_then(|info| info.kernel_driver.as_deref());
-    let cups_driver = kernel_driver.is_some_and(|driver| driver == "usblp");
+    let usblp_interface = node_info
+        .as_ref()
+        .and_then(|info| info.usblp_interface.as_deref());
+    let usblp_bound = usblp_interface.is_some()
+        || kernel_driver.is_some_and(|driver| driver == "usblp");
     let has_cups_queue = !cups_queues.is_empty();
 
     let mut out = format!(
@@ -529,27 +633,27 @@ fn linux_usb_device_busy_troubleshooting_with(
         "`lbl` needs exclusive raw USB access — it cannot share the interface with CUPS, DYMO \
          Connect, or other printer software",
     );
+    push_cups_usb_auto_add_bullet(&mut out, style);
     if has_cups_queue {
         push_bullet(
             &mut out,
             style,
-            "CUPS still has a print queue for this printer — it must be deleted \
-             (Administration → Delete Printer) before `lbl` can use the device; pausing it or \
-             changing the driver is not enough",
+            "CUPS has a print queue for this printer — delete it (Administration → Delete \
+             Printer); pausing the queue or changing the driver is not enough",
         );
         for queue in cups_queues {
             push_bullet(
                 &mut out,
                 style,
-                &format!("CUPS queue `{queue}` is bound to this printer"),
+                &format!("CUPS queue `{queue}` is bound to this printer (likely re-added by udev)"),
             );
         }
     } else if cups_running {
         push_bullet(
             &mut out,
             style,
-            "CUPS is running but `lpstat -v` shows no USB queue for this printer — other CUPS \
-             printers on the system do not block `lbl`",
+            "CUPS is running but `lpstat -v` shows no USB queue for this printer right now — \
+             other CUPS printers on the system do not block `lbl`",
         );
     }
     if cups_running {
@@ -562,31 +666,40 @@ fn linux_usb_device_busy_troubleshooting_with(
             ),
         );
     }
-    if cups_driver && !has_cups_queue {
+    if usblp_bound && !has_cups_queue {
         push_bullet(
             &mut out,
             style,
-            "The CUPS `usblp` kernel driver is still bound to this device — this often persists \
-             after deleting the queue until the printer is unplugged and replugged",
+            "The kernel `usblp` driver is bound to this printer's USB interface — this blocks \
+             raw USB access even when CUPS shows no queue; unbind `usblp` or replug after adding \
+             the udev rule below",
         );
-    } else if cups_driver && has_cups_queue {
+        if let Some(iface) = usblp_interface {
+            push_bullet(
+                &mut out,
+                style,
+                &format!("`usblp` is bound at `{iface}`"),
+            );
+        }
+    } else if usblp_bound && has_cups_queue {
         push_bullet(
             &mut out,
             style,
             "The CUPS `usblp` driver has bound this device through the queue above",
         );
-    } else if let Some(driver) = kernel_driver.filter(|&driver| driver != "usblp") {
+    } else if let Some(driver) = kernel_driver.filter(|&driver| driver != "usblp" && driver != "usb")
+    {
         push_bullet(
             &mut out,
             style,
             &format!("Kernel driver `{driver}` is bound to the device"),
         );
-    } else if !cups_running && !cups_driver {
+    } else if !cups_running && !usblp_bound {
         push_bullet(
             &mut out,
             style,
-            "CUPS does not appear to be holding this device — another program is likely \
-             responsible",
+            "CUPS and `usblp` do not appear to be holding this device right now — another \
+             program is likely responsible",
         );
     }
 
@@ -599,6 +712,15 @@ fn linux_usb_device_busy_troubleshooting_with(
         step,
         "Quit DYMO Connect and any other label or printer software",
         "",
+        "",
+    );
+    step += 1;
+    push_step(
+        &mut out,
+        style,
+        step,
+        "Check whether CUPS has a USB binding for this printer:",
+        "lpstat -v",
         "",
     );
     step += 1;
@@ -625,16 +747,10 @@ fn linux_usb_device_busy_troubleshooting_with(
             );
             step += 1;
         }
-    } else if cups_driver {
-        push_step(
-            &mut out,
-            style,
-            step,
-            "Unplug and replug the printer to release the `usblp` driver left over from CUPS",
-            "",
-            "",
-        );
-        step += 1;
+    }
+    push_exclude_printer_from_cups_steps(&mut out, style, &mut step, vendor_id, product_id);
+    if let Some(iface) = usblp_interface {
+        push_unbind_usblp_steps(&mut out, style, &mut step, iface, vendor_id, product_id);
     }
     if let Some(info) = &node_info {
         push_step(
@@ -660,7 +776,8 @@ fn linux_usb_device_busy_troubleshooting_with(
         &mut out,
         style,
         step,
-        "After closing the other program, unplug and replug the printer, then retry",
+        "After applying the steps above, retry `lbl print` (unplug and replug only if the \
+         interface is still busy)",
         "",
         "",
     );
@@ -921,11 +1038,31 @@ fn usb_device_enumerated(_vendor_id: u16, _product_id: u16) -> bool {
 }
 
 #[cfg(target_os = "linux")]
+fn find_usblp_interface(sysfs: &Path, device_name: &str) -> Option<String> {
+    let prefix = format!("{device_name}:");
+    let entries = std::fs::read_dir(sysfs).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        if read_kernel_driver_name(&entry.path()).as_deref() == Some("usblp") {
+            return Some(name);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
 fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<UsbNodeInfo> {
     let sys = Path::new("/sys/bus/usb/devices");
     let entries = std::fs::read_dir(sys).ok()?;
     for entry in entries.flatten() {
         let base = entry.path();
+        let device_name = entry.file_name().to_string_lossy().into_owned();
+        if device_name.contains(':') {
+            continue;
+        }
         let vid = read_trimmed(&base.join("idVendor"))?;
         let pid = read_trimmed(&base.join("idProduct"))?;
         if u16::from_str_radix(&vid, 16).ok()? != vendor_id {
@@ -934,16 +1071,18 @@ fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<UsbNodeInfo> 
         if u16::from_str_radix(&pid, 16).ok()? != product_id {
             continue;
         }
-        let bus = read_trimmed(&base.join("busnum"))?;
-        let dev = read_trimmed(&base.join("devnum"))?;
-        let path = PathBuf::from(format!("/dev/bus/usb/{bus}/{dev}"));
+        let bus = read_trimmed(&base.join("busnum"))?.parse::<u16>().ok()?;
+        let dev = read_trimmed(&base.join("devnum"))?.parse::<u16>().ok()?;
+        let path = PathBuf::from(format!("/dev/bus/usb/{bus:03}/{dev:03}"));
         let perms = path.to_str().and_then(node_metadata);
         let kernel_driver = read_kernel_driver_name(&base);
+        let usblp_interface = find_usblp_interface(sys, &device_name);
         return Some(UsbNodeInfo {
             path,
             mode: perms.as_ref().map(|(mode, _)| mode.clone()),
             owner: perms.as_ref().map(|(_, owner)| owner.clone()),
             kernel_driver,
+            usblp_interface,
         });
     }
     None
@@ -1078,6 +1217,11 @@ mod tests {
         assert!(msg.contains("Another program is using the USB printer"));
         assert!(msg.contains("exclusive raw USB access"));
         assert!(msg.contains("DYMO Connect"));
+        assert!(msg.contains("udev-add-printer"));
+        assert!(msg.contains("lpstat -v"));
+        assert!(msg.contains("lbl-exclude.usb-quirks"));
+        assert!(msg.contains("0x0922 0x0028 blacklist"));
+        assert!(!msg.contains("70-printers.rules"));
     }
 
     #[test]
@@ -1117,7 +1261,11 @@ mod tests {
         assert!(msg.contains("CUPS queue `LabelWriter-550`"));
         assert!(msg.contains("lpadmin -x LabelWriter-550"));
         assert!(msg.contains("Delete Printer"));
-        assert!(!msg.contains("no USB queue for this printer"));
+        assert!(msg.contains("udev-add-printer"));
+        assert!(msg.contains("lbl-exclude.usb-quirks"));
+        assert!(msg.contains("0x0922 0x0028 blacklist"));
+        assert!(!msg.contains("70-printers.rules"));
+        assert!(!msg.contains("no USB queue for this printer right now"));
     }
 
     #[cfg(target_os = "linux")]
@@ -1130,10 +1278,13 @@ mod tests {
             true,
             &[],
         );
-        assert!(msg.contains("no USB queue for this printer"));
+        assert!(msg.contains("no USB queue for this printer right now"));
         assert!(msg.contains("other CUPS printers"));
+        assert!(msg.contains("udev-add-printer"));
+        assert!(msg.contains("lbl-exclude.usb-quirks"));
+        assert!(msg.contains("0x0922 0x0028 blacklist"));
+        assert!(!msg.contains("70-printers.rules"));
         assert!(!msg.contains("lpadmin -x LabelWriter"));
-        assert!(!msg.contains("must be deleted"));
     }
 
     #[cfg(target_os = "linux")]
@@ -1146,8 +1297,49 @@ mod tests {
             false,
             &[],
         );
-        assert!(!msg.contains("no USB queue for this printer"));
+        assert!(!msg.contains("no USB queue for this printer right now"));
         assert!(!msg.contains("Administration → Delete Printer"));
+        assert!(msg.contains("udev-add-printer"));
+        assert!(msg.contains("lbl-exclude.usb-quirks"));
+        assert!(!msg.contains("70-printers.rules"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn find_usb_device_node_uses_zero_padded_dev_path() {
+        if find_usb_device_node(0x0922, 0x0028).is_some_and(|info| {
+            info.path.to_string_lossy().contains("/dev/bus/usb/")
+                && info.path.components().count() >= 5
+        }) {
+            let info = find_usb_device_node(0x0922, 0x0028).unwrap();
+            let path = info.path.to_string_lossy();
+            assert!(
+                path.starts_with("/dev/bus/usb/"),
+                "unexpected path: {path}"
+            );
+            assert!(std::path::Path::new(path.as_ref()).exists(), "path missing: {path}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn busy_troubleshooting_includes_usblp_unbind_when_bound() {
+        let Some(info) = find_usb_device_node(0x0922, 0x0028) else {
+            return;
+        };
+        let Some(iface) = info.usblp_interface else {
+            return;
+        };
+        let msg = linux_usb_device_busy_troubleshooting_with(
+            0x0922,
+            0x0028,
+            &Style { color: false },
+            true,
+            &[],
+        );
+        assert!(msg.contains("usblp"));
+        assert!(msg.contains(&format!("echo -n '{iface}'")));
+        assert!(msg.contains("99-lbl-printer-usblp.rules"));
     }
 
     #[test]
