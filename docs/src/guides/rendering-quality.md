@@ -68,9 +68,9 @@ for an example.
 
 | Context | Default | Configurable? |
 | ------- | ------- | ------------- |
-| `lbl print` | `3` | `--supersample`, `[render] supersample`, `LBL_RENDER__SUPERSAMPLE` |
-| `lbl-render` | `3` | `--supersample` |
-| HTTP `POST /api/print` | `3` | JSON `supersample` field |
+| `lbl print` | `4` | `--supersample`, `[render] supersample`, `LBL_RENDER__SUPERSAMPLE` |
+| `lbl-render` | `4` | `--supersample` |
+| HTTP `POST /api/print` | `4` | JSON `supersample` field |
 | `lbl preview --render` | `2` (fixed) | No — preview PNGs prioritize speed |
 | Web UI preview (Studio) | `2` (fixed) | No |
 
@@ -133,15 +133,35 @@ POST /api/print
 
 | Factor | Guidance |
 | ------ | -------- |
-| **Text & barcodes only** | `2` is often enough; `3` (default) is a safe general-purpose choice. |
-| **Photos or gradients** | `3`–`4` noticeably reduces stair-stepping and dither noise. |
-| **Fine detail / small type** | Try `4`; diminishing returns beyond that for typical 203–300 DPI heads. |
-| **Batch size / speed** | Each step up multiplies first-pass pixel count. Large batches on a slow machine may prefer `2`. |
+| **Text & barcodes only** | `3`–`4` (default `4`) is a safe general-purpose choice. |
+| **Photos or gradients** | `4` noticeably reduces stair-stepping and dither noise. |
+| **Fine detail / small type** | Try `4`–`6`; diminishing returns beyond that for typical 203–300 DPI heads. |
+| **Batch size / speed** | Each step up multiplies first-pass pixel count. Large batches on a slow machine may prefer `3`. |
 | **Virtual / file output** | Same rules apply — the PNG or PBM reflects the chosen factor. |
 
 There is no single “best” value: it trades **quality vs render time**. When
-debugging quality, compare outputs at `2`, `3`, and `4` with
+debugging quality, compare outputs at `3`, `4`, and `6` with
 `--protocol virtual --file out.png` before printing hardware labels.
+
+## Preprocessing warnings
+
+Before rendering, `lbl print` estimates preprocessing cost from label count,
+device dot dimensions, supersample factor, and (via `sysinfo`) this machine's
+CPU core count and installed RAM. When the adjusted weight exceeds an internal
+threshold, a yellow callout on stderr suggests mitigations — typically lowering
+`--supersample` or printing fewer labels with `--one` / `--indices`.
+
+During **batch** jobs, a similar reminder appears every **10 seconds** of
+accumulated render time so long runs are not silent. These warnings cover
+preparation only (HTML → raster → dither → encode), not time spent spooling to
+the printer.
+
+After a **hardware** print completes, `lbl print` prints a one-line summary:
+total time, preprocess vs print breakdown, feed throughput (mm/s, cm/s, or
+mm/min depending on speed), and **print efficiency** (`print time ÷ total
+time`). When efficiency falls below `[render] efficiency_warn_below` (default
+`0.55`), the same mitigation hints as the pre-flight warning are shown again.
+Set the threshold to `0` to disable.
 
 ## What supersampling does *not* change
 

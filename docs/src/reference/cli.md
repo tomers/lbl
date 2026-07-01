@@ -33,7 +33,7 @@ lbl device    Discover printers (list)
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;
                      virtual = image file; console = terminal art;
                      html = browser gallery of PNG previews)
---supersample <N>   High-res render factor before downscale (default: 3, or
+--supersample <N>   High-res render factor before downscale (default: 4, or
                     `[render] supersample` from config). See Rendering Quality guide.
 --dither <auto|floyd-steinberg|ordered|none>
 --orientation <portrait|landscape>   Layout orientation (default: landscape, or
@@ -120,7 +120,7 @@ Same as the standalone `lbl-config` binary.
 | `lbl-template` | data + template → labels (`--data`, `--each`, `--inline-resources`, `--out-dir`) |
 | `lbl-transpile-html` | `--mode print|preview`,`--assets-base`,`--index/--count` |
 | `lbl-render` | `--width-dots`, `--height-dots` (either may be omitted for a content-determined axis), |
-| | `--supersample` (default 3), `--backend`, `--out` |
+| | `--supersample` (default 4), `--backend`, `--out` |
 | `lbl-dither` | `--algorithm`, `--threshold`, `--preview-png`, `--out` |
 | `lbl-pattern` | `--height [<DOTS>]`, `--width-mm`, `--dpi`, `--out` (calibration PBM) |
 | `lbl-encode` | `--protocol`, `--sample-pattern [<DOTS>]`, `--width-mm`, `--length-mm`, |

@@ -31,7 +31,8 @@ default_printer = "my-dymo"     # matches a saved profile id
 # cache_dir = "/var/cache/lbl"
 
 [render]
-supersample = 3   # high-res first pass factor (>= 1); see Rendering Quality guide
+supersample = 4   # high-res first pass factor (>= 1); see Rendering Quality guide
+efficiency_warn_below = 0.55   # warn when print time ÷ total time falls below 55%
 dither = "floyd-steinberg"      # auto | floyd-steinberg | ordered | none
 use_sidecar = false
 orientation = "landscape"       # portrait | landscape (default: landscape)
