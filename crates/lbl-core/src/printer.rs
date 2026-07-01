@@ -32,6 +32,12 @@ pub enum Protocol {
     /// Like [`Virtual`](Protocol::Virtual) it targets a human rather than
     /// hardware; the dithered bitmap is rendered as Unicode half-block art.
     Console,
+    /// A virtual printer that writes a browser-viewable HTML gallery of the
+    /// dithered rasters (PNG images alongside an `index.html` page).
+    ///
+    /// Like [`Console`](Protocol::Console), this is for human preview rather
+    /// than hardware; it avoids downsampling large labels to terminal columns.
+    Html,
 }
 
 impl Protocol {
@@ -39,10 +45,14 @@ impl Protocol {
     /// (so landscape content must be turned a quarter-turn onto the head).
     ///
     /// On-screen sinks ([`Virtual`](Protocol::Virtual) image files and the
-    /// [`Console`](Protocol::Console) preview) target a human instead, so they
-    /// show the label in its reading orientation rather than the head's.
+    /// [`Console`](Protocol::Console) / [`Html`](Protocol::Html) previews)
+    /// target a human instead, so they show the label in its reading
+    /// orientation rather than the head's.
     pub fn targets_print_head(self) -> bool {
-        !matches!(self, Protocol::Virtual | Protocol::Console)
+        !matches!(
+            self,
+            Protocol::Virtual | Protocol::Console | Protocol::Html
+        )
     }
 
     /// Whether [`MonoBitmap::width`] runs along the feed direction.
@@ -182,5 +192,6 @@ mod tests {
         }
         assert!(!Protocol::Virtual.targets_print_head());
         assert!(!Protocol::Console.targets_print_head());
+        assert!(!Protocol::Html.targets_print_head());
     }
 }
