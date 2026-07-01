@@ -4,12 +4,14 @@
 #   just maintenance cargo-upgrade
 #   just maintenance cargo-upgrade-all
 
+import "mise.just"
+
 _:
     @just --list
 
 # Upgrade workspace Cargo.toml deps (cargo-edit) and refresh Cargo.lock.
 # Requires: cargo install cargo-edit  (or: mise install)
-cargo-upgrade:
+cargo-upgrade: _ensure-mise
     #!/usr/bin/env bash
     set -euo pipefail
     root="$(realpath "{{ source_directory() }}/..")"

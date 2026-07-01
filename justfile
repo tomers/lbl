@@ -4,6 +4,7 @@
 
 set allow-duplicate-recipes := true
 
+import "justfiles/mise.just"
 import "justfiles/rust_lint.just"
 import "justfiles/rust_cargo.just"
 
@@ -20,29 +21,29 @@ alias pca := pre-commit-all
 mod maintenance './justfiles/maintenance.just'
 
 # Run the lbl-server API on the host.
-serve *args:
+serve *args: _ensure-mise
     cargo run -p lbl-server -- --bind 127.0.0.1:8787 {{ args }}
 
 # Run the lbl CLI (e.g. `just lbl catalog show 11352`).
-lbl *args:
+lbl *args: _ensure-mise
     cargo run -q -p lbl --bin lbl -- {{ args }}
 
 # Lint the Rust workspace (rustc warnings-as-errors + clippy + rustfmt check).
-lint:
+lint: _ensure-mise
     @just rust-lint
 
 # Apply Rust autofixes (clippy --fix + rustfmt).
-lint-fix:
+lint-fix: _ensure-mise
     @just rust-lint-fix
 
-lint-fix-allow-dirty:
+lint-fix-allow-dirty: _ensure-mise
     @just clippy-fix --allow-dirty
     @just format-fix
 
 rust-lint-fix-allow-dirty: lint-fix-allow-dirty
 
 # Run the Rust workspace test suite (cargo-nextest).
-test *args:
+test *args: _ensure-mise
     @just rust-test {{ args }}
 
 # Rust workspace lint (clippy + rustc warnings-as-errors + rustfmt check).
@@ -53,7 +54,7 @@ rust-lint-fix:
     @just clippy-fix
     @just format-fix
 
-rust-pre-commit:
+rust-pre-commit: _ensure-mise
     #!/usr/bin/env bash
     set -euo pipefail
     if just rust-lint; then
@@ -64,10 +65,10 @@ rust-pre-commit:
     just format-fix
     exit 1
 
-pre-commit:
+pre-commit: _ensure-mise
     @pre-commit run
 
-pre-commit-all:
+pre-commit-all: _ensure-mise
     @pre-commit run --all-files
 
 # Lint markdown files with markdownlint.
@@ -75,10 +76,10 @@ pre-commit-all:
 # Usage:
 #   just markdownlint docs/src/guides/configuration.md
 #   just markdownlint-fix docs/src/guides/configuration.md
-markdownlint *files:
+markdownlint *files: _ensure-mise
     @pre-commit run markdownlint --hook-stage manual --files {{files}}
 
-markdownlint-fix *files:
+markdownlint-fix *files: _ensure-mise
     @pre-commit run markdownlint-fix --hook-stage manual --files {{files}} || \
       pre-commit run markdownlint --hook-stage manual --files {{files}}
 

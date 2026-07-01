@@ -43,13 +43,39 @@ text/data/HTML
 
 ## Development
 
-Tooling is managed by [mise](https://mise.jdx.dev/) and tasks are run with
-[just](https://github.com/casey/just). Install the toolchain once, then enable
-the git hooks:
+Dev tooling is managed by [mise](https://mise.jdx.dev/). It is the entrypoint for
+pinned CLIs — **`just`**, **`pre-commit`**, **`cargo-nextest`**, and the rest listed in
+[`mise.toml`](mise.toml).
+
+### Install mise
 
 ```bash
-mise install          # just, pre-commit, cargo-nextest, ...
-pre-commit install --install-hooks
+# macOS / Linux — see https://mise.jdx.dev/getting-started.html
+curl https://mise.run | sh
+
+# Homebrew (macOS / Linux)
+brew install mise
+```
+
+Activate mise in your shell (add to `~/.zshrc`, `~/.bashrc`, or equivalent):
+
+```bash
+eval "$(mise activate zsh)"   # or: bash, fish
+```
+
+### Install project tools
+
+From the repo root:
+
+```bash
+mise install                              # just, pre-commit, cargo-nextest, …
+pre-commit install --install-hooks        # git pre-commit + commit-msg hooks
+```
+
+Without shell activation you can run recipes through mise:
+
+```bash
+mise exec -- just lint
 ```
 
 Common recipes (run `just` for the full list):
