@@ -28,7 +28,7 @@ pub mod frontmatter;
 pub mod resources;
 
 pub use data::DataFormat;
-pub use engine::{Engine, RenderOptions, RenderedLabel};
+pub use engine::{resolve_batch, BatchSource, Engine, RenderOptions, RenderedLabel};
 pub use resources::{DefaultResolver, MapResolver, ResourceResolver};
 
 /// Errors produced by the templating stage.

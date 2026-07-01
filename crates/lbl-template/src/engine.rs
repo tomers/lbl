@@ -16,6 +16,49 @@ pub struct RenderedLabel {
     pub html: String,
 }
 
+/// Resolved template source, data root, and per-label records for a batch.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BatchSource {
+    /// Full template source (including frontmatter, if any).
+    pub source: String,
+    /// Template body after frontmatter is stripped.
+    pub template_body: String,
+    /// Parsed data root (external data wins over frontmatter).
+    pub data_root: Value,
+    /// One value per label in the batch.
+    pub records: Vec<Value>,
+}
+
+/// Resolve the data root and batch records without rendering.
+pub fn resolve_batch(
+    source: &str,
+    external_data: Option<Value>,
+    each: Option<&str>,
+) -> Result<BatchSource, TemplateError> {
+    let SplitSource {
+        data_text,
+        data_format,
+        template,
+    } = frontmatter::split(source);
+
+    let frontmatter_data = match data_text {
+        Some(text) => Some(match data_format {
+            Some(fmt) => data::parse(&text, fmt)?,
+            None => data::parse_auto(&text)?,
+        }),
+        None => None,
+    };
+
+    let data_root = external_data.or(frontmatter_data).unwrap_or(Value::Null);
+    let records = select_records(&data_root, each)?;
+    Ok(BatchSource {
+        source: source.to_string(),
+        template_body: template,
+        data_root,
+        records,
+    })
+}
+
 /// Options controlling a render.
 #[derive(Debug, Clone, Default)]
 pub struct RenderOptions {
@@ -44,22 +87,10 @@ impl Engine {
         external_data: Option<Value>,
         opts: &RenderOptions,
     ) -> Result<Vec<RenderedLabel>, TemplateError> {
-        let SplitSource {
-            data_text,
-            data_format,
-            template,
-        } = frontmatter::split(source);
-
-        let frontmatter_data = match data_text {
-            Some(text) => Some(match data_format {
-                Some(fmt) => data::parse(&text, fmt)?,
-                None => data::parse_auto(&text)?,
-            }),
-            None => None,
-        };
-
-        let root = external_data.or(frontmatter_data).unwrap_or(Value::Null);
-        let records = select_records(&root, opts.each.as_deref())?;
+        let batch = resolve_batch(source, external_data, opts.each.as_deref())?;
+        let template = batch.template_body;
+        let root = batch.data_root;
+        let records = batch.records;
         let total = records.len();
 
         let mut env = Environment::new();
@@ -200,5 +231,17 @@ mod tests {
             .render(src, None, &RenderOptions::default())
             .unwrap();
         assert_eq!(labels[0].html, "<div>Frodo</div>");
+    }
+
+    #[test]
+    fn resolve_batch_without_rendering() {
+        let batch = resolve_batch(
+            "---json\n[{\"name\":\"A\"},{\"name\":\"B\"}]\n---\n<div>{{ name }}</div>",
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(batch.records.len(), 2);
+        assert_eq!(batch.template_body, "<div>{{ name }}</div>");
     }
 }
