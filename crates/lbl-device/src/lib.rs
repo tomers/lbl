@@ -18,6 +18,8 @@
 //! `libdbus` on Linux).
 
 pub mod discovery;
+#[cfg(feature = "usb")]
+pub mod dymo_lw;
 pub mod media;
 pub mod transport;
 pub mod troubleshoot;
@@ -30,7 +32,7 @@ pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 
 #[cfg(feature = "usb")]
-pub use transport::UsbTransport;
+pub use transport::{DymoLwUsbTransport, UsbTransport};
 
 #[cfg(feature = "serial")]
 pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};

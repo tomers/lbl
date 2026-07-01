@@ -29,9 +29,12 @@ use crate::ble::{peripheral_label, peripheral_matches_target, NIIMBOT_CHAR};
 #[cfg(feature = "usb")]
 use nusb::descriptors::{ConfigurationDescriptor, TransferType};
 #[cfg(feature = "usb")]
-use nusb::transfer::{Bulk, Direction, Out};
+use nusb::transfer::{Bulk, Direction, In, Out};
 #[cfg(feature = "usb")]
 use nusb::{Device, MaybeFuture};
+
+#[cfg(feature = "usb")]
+use crate::dymo_lw::{send_dymo_lw_job, UsbPrinterSession};
 
 /// A transport sends a finished protocol byte stream to a printer, and — for
 /// bidirectional links — can read responses back.
@@ -236,6 +239,23 @@ fn bulk_out_endpoint(
     config: &ConfigurationDescriptor<'_>,
     interface: u8,
 ) -> Result<u8, DeviceError> {
+    bulk_endpoint(config, interface, Direction::Out)
+}
+
+#[cfg(feature = "usb")]
+fn bulk_in_endpoint(
+    config: &ConfigurationDescriptor<'_>,
+    interface: u8,
+) -> Result<u8, DeviceError> {
+    bulk_endpoint(config, interface, Direction::In)
+}
+
+#[cfg(feature = "usb")]
+fn bulk_endpoint(
+    config: &ConfigurationDescriptor<'_>,
+    interface: u8,
+    direction: Direction,
+) -> Result<u8, DeviceError> {
     let intf = config
         .interface_alt_settings()
         .find(|i| i.interface_number() == interface && i.alternate_setting() == 0)
@@ -243,11 +263,15 @@ fn bulk_out_endpoint(
             DeviceError::Transport(format!("usb interface {interface} not in configuration"))
         })?;
     intf.endpoints()
-        .find(|e| e.transfer_type() == TransferType::Bulk && e.direction() == Direction::Out)
+        .find(|e| e.transfer_type() == TransferType::Bulk && e.direction() == direction)
         .map(|e| e.address())
         .ok_or_else(|| {
             DeviceError::Transport(format!(
-                "no bulk OUT endpoint on usb interface {interface}"
+                "no bulk {} endpoint on usb interface {interface}",
+                match direction {
+                    Direction::Out => "OUT",
+                    Direction::In => "IN",
+                }
             ))
         })
 }
@@ -265,6 +289,94 @@ fn resolve_bulk_out_endpoint(
         DeviceError::Transport(format!("reading active usb configuration: {e}"))
     })?;
     bulk_out_endpoint(&config, interface)
+}
+
+#[cfg(feature = "usb")]
+fn resolve_bulk_in_endpoint(
+    device: &Device,
+    interface: u8,
+) -> Result<u8, DeviceError> {
+    let config = device.active_configuration().map_err(|e| {
+        DeviceError::Transport(format!("reading active usb configuration: {e}"))
+    })?;
+    bulk_in_endpoint(&config, interface)
+}
+
+#[cfg(feature = "usb")]
+fn open_usb_printer_session(usb: &UsbTransport) -> Result<UsbPrinterSession, DeviceError> {
+    let device_info = nusb::list_devices()
+        .wait()
+        .map_err(|e| DeviceError::Transport(format!("listing usb devices: {e}")))?
+        .find(|d| {
+            d.vendor_id() == usb.vendor_id
+                && d.product_id() == usb.product_id
+                && usb
+                    .serial
+                    .as_deref()
+                    .map(|s| d.serial_number() == Some(s))
+                    .unwrap_or(true)
+        })
+        .ok_or_else(|| {
+            DeviceError::NotFound(format!(
+                "usb {:04x}:{:04x}",
+                usb.vendor_id, usb.product_id
+            ))
+        })?;
+
+    let device = device_info
+        .open()
+        .wait()
+        .map_err(|e| DeviceError::Transport(format!("opening device: {e}")))?;
+    let ep_out_addr = resolve_bulk_out_endpoint(&device, usb.interface, usb.endpoint)?;
+    let ep_in_addr = resolve_bulk_in_endpoint(&device, usb.interface)?;
+    let interface = device
+        .claim_interface(usb.interface)
+        .wait()
+        .map_err(|e| DeviceError::Transport(format!("claiming interface: {e}")))?;
+    let ep_out = interface
+        .endpoint::<Bulk, Out>(ep_out_addr)
+        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_out_addr:#02x}: {e}")))?;
+    let ep_in = interface
+        .endpoint::<Bulk, In>(ep_in_addr)
+        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_in_addr:#02x}: {e}")))?;
+    Ok(UsbPrinterSession::new(interface, ep_out, ep_in))
+}
+
+/// USB transport for the DYMO LabelWriter 550-series (LW5) protocol.
+///
+/// Unlike [`UsbTransport`], this keeps the device open across jobs and performs
+/// the mandatory lock acquisition and 32-byte status handshakes on bulk IN.
+#[cfg(feature = "usb")]
+pub struct DymoLwUsbTransport {
+    usb: UsbTransport,
+    session: Option<UsbPrinterSession>,
+}
+
+#[cfg(feature = "usb")]
+impl DymoLwUsbTransport {
+    /// Wrap a [`UsbTransport`] configured for the target printer.
+    pub fn new(usb: UsbTransport) -> Self {
+        Self { usb, session: None }
+    }
+
+    fn ensure_session(&mut self) -> Result<&mut UsbPrinterSession, DeviceError> {
+        if self.session.is_none() {
+            self.session = Some(open_usb_printer_session(&self.usb)?);
+        }
+        Ok(self.session.as_mut().expect("session opened"))
+    }
+}
+
+#[cfg(feature = "usb")]
+impl Transport for DymoLwUsbTransport {
+    fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
+        let session = self.ensure_session()?;
+        send_dymo_lw_job(session, data)
+    }
+
+    fn is_bidirectional(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(feature = "usb")]
