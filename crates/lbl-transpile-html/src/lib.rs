@@ -22,6 +22,7 @@
 
 mod assets;
 mod qr;
+mod text_fit;
 mod transpile;
 
 pub use assets::AssetsBase;

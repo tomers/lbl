@@ -17,8 +17,9 @@ The output of `lbl-text`/`lbl-template` and the input to `lbl-transpile-html`.
   `lbl-grow`, `lbl-wrap`.
 
 On fixed-length media (`label_fit` = `fill` / `auto`), a lone
-`<div class="lbl-text">` child is auto-sized with container queries so short
-text (e.g. `User #1`) grows to use the printable area.
+`<div class="lbl-text">` child is auto-sized at transpile time to the largest
+font that fits the printable area (width, height, and line wrapping), with a
+CSS fallback when viewport geometry is not known.
 
 ## Style sizing (transpiler)
 

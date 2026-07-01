@@ -69,7 +69,7 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
   width:100%;
   text-align:center;
   line-height:1.1;
-  font-size:min(22cqw,50cqh);
+  font-size:min(calc(100cqh / 1.1),100cqw);
   white-space:pre-wrap;
   overflow:hidden;
   word-break:break-word;

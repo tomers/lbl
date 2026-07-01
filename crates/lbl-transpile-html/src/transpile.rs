@@ -578,6 +578,9 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     if opts.label_fit == LabelFit::Fill {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
+        if let Some(fit_css) = crate::text_fit::lone_text_fit_css(body, opts) {
+            head.push_str(&fit_css);
+        }
         if opts.mode == OutputMode::Preview {
             head.push_str(assets::LABEL_FIT_FILL_PREVIEW_CSS);
         }
@@ -713,7 +716,31 @@ mod tests {
             &opts,
         );
         assert!(out.contains("container-type:size"), "{out}");
-        assert!(out.contains("50cqh"), "{out}");
+        assert!(out.contains("calc(100cqh / 1.1)"), "{out}");
+    }
+
+    #[test]
+    fn fill_mode_computes_lone_text_font_from_viewport() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            "<div class=\"lbl-label\"><div class=\"lbl-text\">#1</div></div>",
+            &opts,
+        );
+        assert!(
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:129."),
+            "{out}"
+        );
     }
 
     #[test]
