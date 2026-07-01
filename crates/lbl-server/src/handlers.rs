@@ -575,12 +575,16 @@ fn dispatch(
         let (vid, pid) = target
             .split_once(':')
             .ok_or_else(|| anyhow::anyhow!("usb target must be vid:pid"))?;
-        let mut t = lbl_device::UsbTransport::new(
-            u16::from_str_radix(vid, 16)?,
-            u16::from_str_radix(pid, 16)?,
-            None,
-        );
-        dispatch_encoded(encoded, protocol, &mut t)
+        let vendor_id = u16::from_str_radix(vid, 16)?;
+        let product_id = u16::from_str_radix(pid, 16)?;
+        let usb = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+        if protocol == Protocol::DymoLw {
+            let mut t = lbl_device::DymoLwUsbTransport::new(usb);
+            dispatch_encoded(encoded, protocol, &mut t)
+        } else {
+            let mut t = usb;
+            dispatch_encoded(encoded, protocol, &mut t)
+        }
     } else if let Some(target) = serial {
         let (path, baud) = parse_serial_target(&target);
         let mut t = lbl_device::SerialTransport::new(path, baud);

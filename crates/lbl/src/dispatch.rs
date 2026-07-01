@@ -1,10 +1,9 @@
 //! Delivering encoded labels to a printer over a [`Transport`], including the
 //! per-protocol completion handshake.
 //!
-//! Write-only protocols (DYMO, ESC/POS, ZPL, TSPL) are fire-and-forget: the
-//! spooler sends the bytes and moves on. NIIMBOT is request/response, so over a
-//! bidirectional transport (a serial port) we poll the printer for status after
-//! each label and wait for it to finish before dispatching the next one.
+//! Write-only protocols (ESC/POS, ZPL, TSPL, legacy DYMO tape) are
+//! fire-and-forget: the spooler sends the bytes and moves on. DYMO LabelWriter
+//! 550 (LW5) and NIIMBOT use bidirectional handshakes over USB/serial.
 
 use std::time::{Duration, Instant};
 
