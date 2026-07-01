@@ -25,6 +25,9 @@ lbl device    Discover printers (list)
 --take <N>          Print at most N labels from the selection
 --index <N>         Print only batch index N (zero-based; repeat for several)
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
+--font-size-mm <MM>  --padding-mm <MM>  --border-mm <MM>
+                    Inner padding and border on .lbl-label (defaults from
+                    [style] padding_mm / border_width_mm, currently 2.0 / 0)
 --protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console|html>
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;
                      virtual = image file; console = terminal art;

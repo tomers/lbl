@@ -577,6 +577,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     head.push_str(&opts.style.to_css());
     if opts.label_fit == LabelFit::Fill {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
+        head.push_str(assets::LABEL_FIT_TEXT_CSS);
         if opts.mode == OutputMode::Preview {
             head.push_str(assets::LABEL_FIT_FILL_PREVIEW_CSS);
         }
@@ -695,6 +696,24 @@ mod tests {
     fn print_mode_has_no_preview_chrome() {
         let out = transpile("<div>hi</div>", &TranspileOptions::default());
         assert!(!out.contains("lbl-preview"));
+    }
+
+    #[test]
+    fn fill_mode_injects_text_fit_css() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(100.0),
+                height: Some(200.0),
+            }),
+            ..Default::default()
+        };
+        let out = transpile(
+            "<div class=\"lbl-label\"><div class=\"lbl-text\">hi</div></div>",
+            &opts,
+        );
+        assert!(out.contains("container-type:size"), "{out}");
+        assert!(out.contains("50cqh"), "{out}");
     }
 
     #[test]

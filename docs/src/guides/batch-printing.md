@@ -88,6 +88,10 @@ Templates default to **text** (`--template-format text`). Use
 `--template-format markdown` for Markdown, or `html` when the template body is
 already authoring HTML.
 
+Inner **padding** (default 2 mm) is added automatically on `.lbl-label`; on
+small tape you may want `--padding-mm 0` (or `padding_mm = 0` in config). See
+[Configuration — padding and insets](../guides/configuration.md#padding-and-insets).
+
 During development from a checkout:
 
 ```bash

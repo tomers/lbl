@@ -56,6 +56,26 @@ pub const LABEL_FIT_FILL_CSS: &str = r#"
 html,body{height:100%;width:100%;margin:0}
 "#;
 
+/// When [`LabelFit::Fill`] is active, grow a lone `.lbl-text` block to use the
+/// printable area on fixed die-cut labels.
+pub const LABEL_FIT_TEXT_CSS: &str = r#"
+.lbl-label{container-type:size}
+.lbl-label>.lbl-text:only-child{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  text-align:center;
+  line-height:1.1;
+  font-size:min(22cqw,50cqh);
+  white-space:pre-wrap;
+  overflow:hidden;
+  word-break:break-word;
+}
+"#;
+
 /// Extra fill rules for preview mode: stretch the gallery wrapper to the
 /// viewport so `.lbl-label{height:100%}` has a sized ancestor.
 pub const LABEL_FIT_FILL_PREVIEW_CSS: &str = r#"

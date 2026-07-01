@@ -85,13 +85,41 @@ media_inset_mm = 0.0
 # media_inset_cross_end_mm = 1.5    # right
 ```
 
+### Padding and insets
+
+Every label gets **inner padding** automatically: transpilation sets
+`padding` on the root `.lbl-label` from `padding_mm` (default **2.0 mm** on
+all sides). You do not add padding in the template — it is applied even for
+plain `--text` and text templates. Set `padding_mm = 0` (or pass
+`--padding-mm 0`) when you want content flush to the label edge, e.g. on small
+NIIMBOT tape.
+
+**Media inset** (`media_inset_*`) is separate: it shrinks the layout shell
+*inside the physical sticker* to compensate for printer feed/cut tolerance. It
+does not replace inner padding — both can be set together.
+
+```toml
+[style]
+padding_mm = 0          # no inner gutter (good for 12×30 mm labels)
+border_width_mm = 0.0   # optional outline around .lbl-label (0 = off)
+media_inset_mm = 0.5    # keep art off the die-cut edge
+```
+
+```bash
+# Per run
+lbl print --text "Hi" --media 12x30 --padding-mm 0 --protocol console
+
+# Project default via environment
+export LBL_STYLE__PADDING_MM=0
+```
+
 Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
-`--qr-dark`, `--qr-light`, `--label-fit` (`auto`, `fill`, or `content`),
-`--label-align` (`start`, `center`, or `end`), `--label-valign` (`start`,
-`center`, or `end`), `--label-fit-scale` (`0.8`, `80%`, …), and
-`--media-inset-mm` / `--media-inset-horizontal-mm` / `--media-inset-vertical-mm`
-/ `--media-inset-start-mm` / `--media-inset-end-mm` /
-`--media-inset-cross-start-mm` / `--media-inset-cross-end-mm`.
+`--qr-dark`, `--qr-light`, `--padding-mm`, `--border-mm`, `--label-fit`
+(`auto`, `fill`, or `content`), `--label-align` (`start`, `center`, or `end`),
+`--label-valign` (`start`, `center`, or `end`), `--label-fit-scale` (`0.8`,
+`80%`, …), and `--media-inset-mm` / `--media-inset-horizontal-mm` /
+`--media-inset-vertical-mm` / `--media-inset-start-mm` / `--media-inset-end-mm`
+/ `--media-inset-cross-start-mm` / `--media-inset-cross-end-mm`.
 Per-code overrides in authoring HTML:
 `<qr ec="H" margin="2">payload</qr>`.
 

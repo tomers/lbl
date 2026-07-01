@@ -16,6 +16,25 @@ The output of `lbl-text`/`lbl-template` and the input to `lbl-transpile-html`.
 - Flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
   `lbl-grow`, `lbl-wrap`.
 
+On fixed-length media (`label_fit` = `fill` / `auto`), a lone
+`<div class="lbl-text">` child is auto-sized with container queries so short
+text (e.g. `User #1`) grows to use the printable area.
+
+## Style sizing (transpiler)
+
+`lbl-transpile-html` injects CSS on `.lbl-label` from `[style]` / CLI flags
+(millimetres converted to pixels at the render DPI and supersample factor):
+
+| Key / flag | Default | Effect |
+| ---------- | ------- | ------ |
+| `padding_mm` / `--padding-mm` | 2.0 mm | Inner gutter between the label box and content (all sides) |
+| `border_width_mm` / `--border-mm` | 0 | Optional border drawn around `.lbl-label` |
+| `font_size_mm` / `--font-size-mm` | 2.0 mm | Base text size (before auto-fit on lone text blocks) |
+| `media_inset_*` / `--media-inset-*` | 0 | Shrink the layout shell inside the physical media edge |
+
+Padding is always applied by the pipeline — it is not part of authoring HTML.
+See [Configuration](../guides/configuration.md#padding-and-insets).
+
 ## Browser-ready HTML
 
 The output of `lbl-transpile-html`. Custom elements are rewritten to placeholder
