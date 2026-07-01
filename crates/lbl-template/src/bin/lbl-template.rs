@@ -62,6 +62,7 @@ fn main() -> Result<()> {
 
     let opts = RenderOptions {
         each: cli.each.clone(),
+        ..RenderOptions::default()
     };
     let engine = Engine::new();
 

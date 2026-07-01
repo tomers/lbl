@@ -20,7 +20,7 @@ type PrintTransportTargets = (
     Option<String>,
     Option<String>,
 );
-use lbl_template::{Engine, RenderOptions};
+use lbl_template::{BatchSelection, Engine, RenderOptions, select_batch_indices};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
     MediaInset, MediaInsetPx, QrErrorCorrection, TranspileOptions, ViewportPx,
@@ -61,9 +61,11 @@ pub enum Source {
 }
 
 /// Turn a [`Source`] into one or more authoring-HTML labels.
-pub fn authoring_labels(source: Source) -> Result<Vec<AuthoringLabel>> {
+pub fn authoring_labels(source: Source, selection: &BatchSelection) -> Result<Vec<AuthoringLabel>> {
     match source {
         Source::Text { text, raw } => {
+            let record = serde_json::json!({ "text": text, "raw": raw });
+            select_batch_indices(std::slice::from_ref(&record), selection)?;
             let doc = lbl_text::Document::parse(&text, raw);
             Ok(vec![AuthoringLabel {
                 index: 0,
@@ -71,20 +73,33 @@ pub fn authoring_labels(source: Source) -> Result<Vec<AuthoringLabel>> {
             }])
         }
         Source::Markdown(markdown) => {
+            let record = serde_json::json!({ "markdown": markdown });
+            select_batch_indices(std::slice::from_ref(&record), selection)?;
             let doc = lbl_markdown::MarkdownDocument::parse(&markdown);
             Ok(vec![AuthoringLabel {
                 index: 0,
                 html: doc.to_authoring_document(),
             }])
         }
-        Source::Html(html) => Ok(vec![AuthoringLabel { index: 0, html }]),
+        Source::Html(html) => {
+            let record = serde_json::json!({ "html": html });
+            select_batch_indices(std::slice::from_ref(&record), selection)?;
+            Ok(vec![AuthoringLabel { index: 0, html }])
+        }
         Source::Template {
             template,
             data,
             each,
         } => {
             let labels = Engine::new()
-                .render(&template, data, &RenderOptions { each })
+                .render(
+                    &template,
+                    data,
+                    &RenderOptions {
+                        each,
+                        selection: selection.clone(),
+                    },
+                )
                 .context("rendering template")?;
             Ok(labels
                 .into_iter()
@@ -564,7 +579,7 @@ mod tests {
         let labels = authoring_labels(Source::Text {
             text: "hi {{qr:x}}".into(),
             raw: false,
-        })
+        }, &BatchSelection::default())
         .unwrap();
         assert_eq!(labels.len(), 1);
         assert!(labels[0].html.contains("<qr>x</qr>"));
@@ -576,7 +591,7 @@ mod tests {
             template: "<div>{{ name }}</div>".into(),
             data: Some(serde_json::json!([{"name":"A"},{"name":"B"}])),
             each: None,
-        })
+        }, &BatchSelection::default())
         .unwrap();
         assert_eq!(labels.len(), 2);
     }

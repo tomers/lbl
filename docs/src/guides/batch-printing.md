@@ -42,6 +42,28 @@ If your data wraps the records, point at them with `--each`:
 lbl print --template card.html --data payload.json --each /people ...
 ```
 
+## Selecting which labels to print
+
+After the batch is resolved, narrow it with the same substring filter as the
+HTML preview UI (`--filter`), or with iterator-style flags:
+
+```bash
+# Only Carmela (case-insensitive match on any data field)
+lbl print --template card.html --data people.json --filter car ...
+
+# First label only
+lbl print --template card.html --data people.json --one ...
+
+# Skip the first two, then print up to three
+lbl print --template card.html --data people.json --skip 2 --take 3 ...
+
+# Explicit zero-based batch index (repeat for several)
+lbl print --template card.html --data people.json --index 0 --index 2 ...
+```
+
+Selection order: `--index` (if any) → `--filter` → `--skip` → `--take` /
+`--one`.
+
 ## Single-file (frontmatter)
 
 Data and template can live together:

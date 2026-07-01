@@ -5,7 +5,8 @@ use serde_json::{Map, Value};
 
 use crate::frontmatter::{self, SplitSource};
 use crate::resources::{inline_images, ResourceResolver};
-use crate::{data, TemplateError};
+use crate::selection::select_batch_indices;
+use crate::{data, selection::BatchSelection, TemplateError};
 
 /// A single rendered label.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +67,8 @@ pub struct RenderOptions {
     /// rendering (e.g. `/items`). If unset, a top-level array is used as the
     /// batch, otherwise a single label is produced.
     pub each: Option<String>,
+    /// Which batch records to render.
+    pub selection: BatchSelection,
 }
 
 /// The templating engine.
@@ -91,7 +94,7 @@ impl Engine {
         let template = batch.template_body;
         let root = batch.data_root;
         let records = batch.records;
-        let total = records.len();
+        let selected = select_batch_indices(&records, &opts.selection)?;
 
         let mut env = Environment::new();
         env.add_template("label", &template)
@@ -100,8 +103,10 @@ impl Engine {
             .get_template("label")
             .map_err(|e| TemplateError::Render(e.to_string()))?;
 
-        let mut out = Vec::with_capacity(total);
-        for (index, record) in records.into_iter().enumerate() {
+        let total = records.len();
+        let mut out = Vec::with_capacity(selected.len());
+        for index in selected {
+            let record = records[index].clone();
             let ctx = build_context(record, index, total, &root);
             let html = tmpl
                 .render(minijinja::Value::from_serialize(&ctx))
@@ -217,6 +222,7 @@ mod tests {
                 Some(json!({"items":[{"name":"X"},{"name":"Y"}]})),
                 &RenderOptions {
                     each: Some("/items".into()),
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -231,6 +237,29 @@ mod tests {
             .render(src, None, &RenderOptions::default())
             .unwrap();
         assert_eq!(labels[0].html, "<div>Frodo</div>");
+    }
+
+    #[test]
+    fn render_respects_batch_selection() {
+        let labels = Engine::new()
+            .render(
+                "<div>{{ name }}</div>",
+                Some(json!([
+                    {"name": "Tony Soprano"},
+                    {"name": "Carmela Soprano"}
+                ])),
+                &RenderOptions {
+                    each: None,
+                    selection: crate::selection::BatchSelection {
+                        filter: Some("car".into()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        assert_eq!(labels.len(), 1);
+        assert_eq!(labels[0].index, 1);
+        assert_eq!(labels[0].html, "<div>Carmela Soprano</div>");
     }
 
     #[test]

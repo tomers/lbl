@@ -95,6 +95,48 @@ struct SourceArgs {
     each: Option<String>,
 }
 
+#[derive(Args, Clone, Default)]
+struct BatchSelectArgs {
+    /// Only include labels whose data fields contain this substring
+    /// (case-insensitive). Matches the HTML preview filter.
+    #[arg(long)]
+    filter: Option<String>,
+
+    /// Print only one label from the current selection (same as `--take 1`).
+    #[arg(long, conflicts_with = "take")]
+    one: bool,
+
+    /// Skip the first N labels in the current selection.
+    #[arg(long, default_value_t = 0)]
+    skip: usize,
+
+    /// Print at most N labels from the current selection.
+    #[arg(long, conflicts_with = "one")]
+    take: Option<usize>,
+
+    /// Print only the label at this zero-based batch index. Repeat for multiple
+    /// indices (applied before `--filter`, `--skip`, and `--take`).
+    #[arg(long = "index")]
+    indices: Vec<usize>,
+}
+
+impl BatchSelectArgs {
+    fn to_selection(&self) -> lbl_template::BatchSelection {
+        lbl_template::BatchSelection {
+            filter: self.filter.clone(),
+            skip: self.skip,
+            take: self
+                .take
+                .or(if self.one { Some(1) } else { None }),
+            indices: if self.indices.is_empty() {
+                None
+            } else {
+                Some(self.indices.clone())
+            },
+        }
+    }
+}
+
 impl SourceArgs {
     fn is_set(&self) -> bool {
         self.text.is_some()
@@ -414,6 +456,8 @@ struct PrintArgs {
     #[command(flatten)]
     source: SourceArgs,
     #[command(flatten)]
+    batch: BatchSelectArgs,
+    #[command(flatten)]
     media: MediaArgs,
     #[command(flatten)]
     style: StyleArgs,
@@ -730,7 +774,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
             let traces = if want_trace { vec![trace] } else { vec![] };
             (encoded, traces)
         } else {
-            let labels = authoring_labels(read_source(&args.source)?)?;
+            let labels = authoring_labels(read_source(&args.source)?, &args.batch.to_selection())?;
             match backend {
                 BackendArg::Chromium => {
                     let backend = ChromiumBackend::launch()?;
@@ -942,6 +986,8 @@ struct PreviewArgs {
     #[command(flatten)]
     source: SourceArgs,
     #[command(flatten)]
+    batch: BatchSelectArgs,
+    #[command(flatten)]
     style: StyleArgs,
 
     /// Output directory for preview HTML (and PNGs with --render).
@@ -964,7 +1010,7 @@ struct PreviewArgs {
 const PREVIEW_SUPERSAMPLE: u32 = 2;
 
 fn run_preview(args: PreviewArgs) -> Result<()> {
-    let labels = authoring_labels(read_source(&args.source)?)?;
+    let labels = authoring_labels(read_source(&args.source)?, &args.batch.to_selection())?;
     let count = labels.len();
     std::fs::create_dir_all(&args.out_dir)?;
 

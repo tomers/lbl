@@ -17,6 +17,11 @@ lbl device    Discover printers (list)
 
 ```text
 --text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
+--filter <TEXT>     Keep labels whose data fields contain TEXT (case-insensitive)
+--one               Print one label from the selection (same as --take 1)
+--skip <N>          Skip the first N labels in the selection (default: 0)
+--take <N>          Print at most N labels from the selection
+--index <N>         Print only batch index N (zero-based; repeat for several)
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
 --protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console|html>
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;

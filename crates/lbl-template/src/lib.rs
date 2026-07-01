@@ -26,10 +26,14 @@ pub mod data;
 pub mod engine;
 pub mod frontmatter;
 pub mod resources;
+pub mod selection;
 
 pub use data::DataFormat;
 pub use engine::{resolve_batch, BatchSource, Engine, RenderOptions, RenderedLabel};
 pub use resources::{DefaultResolver, MapResolver, ResourceResolver};
+pub use selection::{
+    flatten_values, record_matches_query, select_batch_indices, BatchSelection,
+};
 
 /// Errors produced by the templating stage.
 #[derive(Debug, thiserror::Error)]

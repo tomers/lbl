@@ -170,7 +170,7 @@ impl SourceReq {
 }
 
 pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
-    let labels = authoring_labels(req.source.into_source()?).map_err(ApiError::from)?;
+    let labels = authoring_labels(req.source.into_source()?, &lbl_template::BatchSelection::default()).map_err(ApiError::from)?;
     let count = labels.len();
     const PREVIEW_SUPERSAMPLE: u32 = 2;
     // Resolve the configured physical sizes against the standard preview DPI and
@@ -365,7 +365,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         media_inset,
     };
 
-    let labels = authoring_labels(source).map_err(ApiError::from)?;
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default()).map_err(ApiError::from)?;
     let use_sidecar = req.use_sidecar;
     let network = req.network.clone();
     let usb = req.usb.clone();
@@ -466,7 +466,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         media_inset,
     };
 
-    let labels = authoring_labels(source).map_err(ApiError::from)?;
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default()).map_err(ApiError::from)?;
     let use_sidecar = req.use_sidecar;
     let want_debug = req.debug;
     let (extension, mime) = match media_type {

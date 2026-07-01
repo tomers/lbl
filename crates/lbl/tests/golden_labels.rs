@@ -464,7 +464,7 @@ fn run_case(
     algorithm: Algorithm,
     supersample: u32,
 ) -> Vec<String> {
-    let labels = match authoring_labels(source) {
+    let labels = match authoring_labels(source, &lbl_template::BatchSelection::default()) {
         Ok(labels) => labels,
         Err(err) => return vec![format!("{name}: authoring failed: {err}")],
     };
