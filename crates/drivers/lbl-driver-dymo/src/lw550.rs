@@ -10,7 +10,9 @@
 //!
 //! ```text
 //! ESC s <job-id:u32>      start of print job
-//! ESC i                   select graphics output mode (best for dithered raster)
+//! ESC i                   select graphics output mode (300×600 dpi feed; use only
+//!                         when the raster was rendered for that mode)
+//! ESC h                   select text output mode (300×300 dpi; default for lbl)
 //! [ESC L <lines:u32>]     set length to continuous stock (continuous media only)
 //! per label:
 //!   ESC n <index:u16>     set label index
@@ -33,7 +35,8 @@ use crate::ESC;
 // Command bytes.
 const START_JOB: u8 = b's';
 const SET_MAX_LENGTH: u8 = b'L';
-const GRAPHICS_MODE: u8 = b'i';
+const SET_DENSITY: u8 = b'C';
+const TEXT_MODE: u8 = b'h';
 const SET_LABEL_INDEX: u8 = b'n';
 const LABEL_DATA: u8 = b'D';
 const SHORT_FORM_FEED: u8 = b'G'; // feed next label into print position
@@ -43,6 +46,9 @@ const END_JOB: u8 = b'Q';
 // `ESC D` fixed parameters.
 const BITS_PER_PIXEL: u8 = 0x01;
 const ALIGN_BOTTOM: u8 = 0x02;
+
+/// Default print density (100 %) for `ESC C`.
+const DEFAULT_DENSITY: u8 = 100;
 
 /// Driver for the DYMO LabelWriter 550 series (550 / 550 Turbo / 5XL).
 #[derive(Debug, Clone, Copy)]
@@ -92,7 +98,8 @@ impl Driver for LabelWriter550Driver {
         // --- Print job header ---
         out.extend_from_slice(&[ESC, START_JOB]);
         out.extend_from_slice(&self.job_id.to_le_bytes());
-        out.extend_from_slice(&[ESC, GRAPHICS_MODE]);
+        out.extend_from_slice(&[ESC, SET_DENSITY, DEFAULT_DENSITY]);
+        out.extend_from_slice(&[ESC, TEXT_MODE]);
         if continuous {
             // Set length to continuous stock; pass the line count as the length.
             out.extend_from_slice(&[ESC, SET_MAX_LENGTH]);
@@ -153,19 +160,20 @@ mod tests {
         // ESC s <jobid=1 le>
         assert_eq!(&bytes[0..2], &[ESC, b's']);
         assert_eq!(&bytes[2..6], &[1, 0, 0, 0]);
-        // ESC i (graphics)
-        assert_eq!(&bytes[6..8], &[ESC, b'i']);
+        // ESC C 100 (density) + ESC h (300×300 text mode)
+        assert_eq!(&bytes[6..10], &[ESC, b'C', 100, ESC]);
+        assert_eq!(&bytes[10..11], &[b'h']);
         // ESC n <index=0 le16>
-        assert_eq!(&bytes[8..10], &[ESC, b'n']);
-        assert_eq!(&bytes[10..12], &[0, 0]);
+        assert_eq!(&bytes[11..13], &[ESC, b'n']);
+        assert_eq!(&bytes[13..15], &[0, 0]);
         // ESC D BPP Align Width(=2 lines) Height(=8 dots)
-        assert_eq!(&bytes[12..16], &[ESC, b'D', 0x01, 0x02]);
-        assert_eq!(&bytes[16..20], &[2, 0, 0, 0]); // width = lines
-        assert_eq!(&bytes[20..24], &[8, 0, 0, 0]); // height = dots
-                                                   // data: 2 bytes (first line 0x80, second 0x00)
-        assert_eq!(&bytes[24..26], &[0x80, 0x00]);
+        assert_eq!(&bytes[15..19], &[ESC, b'D', 0x01, 0x02]);
+        assert_eq!(&bytes[19..23], &[2, 0, 0, 0]); // width = lines
+        assert_eq!(&bytes[23..27], &[8, 0, 0, 0]); // height = dots
+        // data: 2 bytes (first line 0x80, second 0x00)
+        assert_eq!(&bytes[27..29], &[0x80, 0x00]);
         // trailer: ESC E (feed to tear, last label) then ESC Q
-        assert_eq!(&bytes[26..30], &[ESC, b'E', ESC, b'Q']);
+        assert_eq!(&bytes[29..33], &[ESC, b'E', ESC, b'Q']);
     }
 
     #[test]
