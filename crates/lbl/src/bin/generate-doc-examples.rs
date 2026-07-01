@@ -7,6 +7,7 @@
 //!   cargo run -q -p lbl --bin generate-doc-examples
 //!   cargo run -q -p lbl --bin generate-doc-examples -- --check
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -47,6 +48,13 @@ struct Defaults {
 #[derive(Debug, Deserialize)]
 struct Example {
     id: String,
+    title: String,
+    description: String,
+    doc: String,
+    #[serde(default)]
+    doc_title: Option<String>,
+    #[serde(default)]
+    doc_section: Option<String>,
     caption: String,
     media: String,
     #[serde(default)]
@@ -125,8 +133,16 @@ fn run() -> Result<()> {
             }
         }
         rows.push(ExampleRow {
+            title: example.title.clone(),
+            description: example.description.clone(),
             caption: example.caption.clone(),
             command: format_display_command(&example.args),
+            readme_doc: format_readme_doc_link(example),
+            book_doc: format_book_doc_link(example),
+            doc_title: example
+                .doc_title
+                .clone()
+                .unwrap_or_else(|| default_doc_title(&example.doc)),
             readme_image: format!("docs/src/generated/images/{}.png", example.id),
             book_image: format!("images/{}.png", example.id),
         });
@@ -154,6 +170,7 @@ fn run() -> Result<()> {
         fs::create_dir_all(book_path.parent().unwrap())?;
         fs::write(&book_path, &book_page)
             .with_context(|| format!("write {}", book_path.display()))?;
+        prune_orphan_images(&images_dir, &manifest.example)?;
         eprintln!(
             "wrote {} preview(s), README section, and {}",
             manifest.example.len(),
@@ -165,8 +182,13 @@ fn run() -> Result<()> {
 }
 
 struct ExampleRow {
+    title: String,
+    description: String,
     caption: String,
     command: String,
+    readme_doc: String,
+    book_doc: String,
+    doc_title: String,
     readme_image: String,
     book_image: String,
 }
@@ -288,27 +310,86 @@ fn shell_join(args: &[String]) -> String {
         .join(" ")
 }
 
+fn default_doc_title(doc: &str) -> String {
+    let stem = doc
+        .rsplit('/')
+        .next()
+        .unwrap_or(doc)
+        .trim_end_matches(".md");
+    stem.split('-')
+        .map(|w| {
+            let mut chars = w.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn format_readme_doc_link(example: &Example) -> String {
+    format_doc_href(&format!("docs/src/{}", example.doc), example)
+}
+
+fn format_book_doc_link(example: &Example) -> String {
+    format_doc_href(&format!("../{}", example.doc), example)
+}
+
+fn format_doc_href(base: &str, example: &Example) -> String {
+    match &example.doc_section {
+        Some(section) => format!("{base}#{section}"),
+        None => base.to_string(),
+    }
+}
+
+fn render_example_header(row: &ExampleRow, doc_href: &str) -> String {
+    let mut out = String::new();
+    out.push_str("### ");
+    out.push_str(&row.title);
+    out.push_str("\n\n");
+    out.push_str(&row.description);
+    out.push('\n');
+    out.push_str("\n*");
+    out.push_str(&row.caption);
+    out.push_str("* · [");
+    out.push_str(&row.doc_title);
+    out.push_str(" →](");
+    out.push_str(doc_href);
+    out.push_str(")\n\n");
+    out
+}
+
+fn append_examples_intro(out: &mut String, regenerate_line: &str) {
+    out.push_str(
+        "Each preview highlights a different capability on **fixed-length** media. Commands show\n",
+    );
+    out.push_str(
+        "content and layout flags only — media size, DPI, protocol, and output path come from\n",
+    );
+    out.push_str("project config (`lbl.toml`) or environment.\n\n");
+    out.push_str(regenerate_line);
+    out.push_str("\n\n");
+}
+
 fn render_readme_section(rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(README_START);
     out.push('\n');
     out.push_str("\n## Fixed-size label examples\n\n");
-    out.push_str(
-        "Commands show content and layout flags only. Media size, DPI, protocol, \
-         and output path are supplied by project config (`lbl.toml`) or environment — \
-         see [Configuration](docs/src/guides/configuration.md). Preview images are \
-         generated from the manifest in [`docs/examples/manifest.toml`](docs/examples/manifest.toml) \
-         via `just doc-examples`.\n\n",
+    append_examples_intro(
+        &mut out,
+        "Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.",
     );
     for row in rows {
         out.push_str("<table>\n<tr>\n<td valign=\"top\">\n\n");
-        out.push_str(&row.caption);
-        out.push_str("\n\n```bash\n");
+        out.push_str(&render_example_header(row, &row.readme_doc));
+        out.push_str("```bash\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n</td>\n<td>\n\n");
         out.push_str(&format!(
             "<img src=\"{}\" alt=\"{}\" width=\"240\"/>\n\n",
-            row.readme_image, row.caption
+            row.readme_image, row.title
         ));
         out.push_str("</td>\n</tr>\n</table>\n\n");
     }
@@ -319,25 +400,36 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
 
 fn render_book_page(rows: &[ExampleRow]) -> String {
     let mut out = String::new();
-    out.push_str("# Fixed-size label examples\n\n");
     out.push_str(
-        "Commands show content and layout flags only. Media size, DPI, protocol, \
-         and output path come from project config (`lbl.toml`) or environment.\n\n",
+        "# Fixed-size label examples
+
+",
     );
-    out.push_str(
-        "The cases below mirror the guides: getting started, printing text, batch \
-         printing, configuration, rendering quality, and printers & media. Regenerate \
-         previews with `just doc-examples`.\n\n",
-    );
+    append_examples_intro(&mut out, "Regenerate with `just doc-examples`.");
     for row in rows {
-        out.push_str(&format!("## {}\n\n", row.caption));
+        out.push_str("## ");
+        out.push_str(&row.title);
+        out.push('\n');
+        out.push('\n');
+        out.push_str(&row.description);
+        out.push('\n');
+        out.push_str("\n*");
+        out.push_str(&row.caption);
+        out.push_str("* · [");
+        out.push_str(&row.doc_title);
+        out.push_str(" →](");
+        out.push_str(&row.book_doc);
+        out.push_str(")\n\n");
         out.push_str("```bash\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n");
         out.push_str(&format!(
-            "<img src=\"{}\" alt=\"{}\" width=\"320\"/>\n\n",
-            row.book_image, row.caption
+            "<img src=\"{}\" alt=\"{}\" width=\"320\"/>\n",
+            row.book_image, row.title
         ));
+    }
+    if !out.ends_with('\n') {
+        out.push('\n');
     }
     out
 }
@@ -357,8 +449,14 @@ fn patch_readme(readme_path: &Path, section: &str) -> Result<()> {
         + README_END.len();
     let mut patched = String::new();
     patched.push_str(&readme[..start]);
-    patched.push_str(section);
-    patched.push_str(&readme[end..]);
+    patched.push_str(section.trim_end_matches('\n'));
+    let suffix = readme[end..].trim_start_matches('\n');
+    if !suffix.is_empty() {
+        patched.push_str("\n\n");
+        patched.push_str(suffix);
+    } else {
+        patched.push('\n');
+    }
     fs::write(readme_path, patched).with_context(|| format!("write {}", readme_path.display()))?;
     Ok(())
 }
@@ -376,6 +474,21 @@ fn check_readme_section(readme_path: &Path, expected: &str) -> Result<()> {
     let actual = &readme[start..end];
     if actual != expected.trim_end() {
         bail!("README.md doc-examples section is stale; run `just doc-examples` and commit");
+    }
+    Ok(())
+}
+
+fn prune_orphan_images(images_dir: &Path, examples: &[Example]) -> Result<()> {
+    let keep: HashSet<String> = examples.iter().map(|e| format!("{}.png", e.id)).collect();
+    if !images_dir.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(images_dir)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.ends_with(".png") && !keep.contains(&name) {
+            fs::remove_file(entry.path())?;
+        }
     }
     Ok(())
 }

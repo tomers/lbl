@@ -103,22 +103,30 @@ cargo test            # run the test suite
 
 ## Fixed-size label examples
 
-Commands show content and layout flags only. Media size, DPI, protocol, and output path are supplied by project config (`lbl.toml`) or environment — see [Configuration](docs/src/guides/configuration.md). Preview images are generated from the manifest in [`docs/examples/manifest.toml`](docs/examples/manifest.toml) via `just doc-examples`.
+Each preview highlights a different capability on **fixed-length** media. Commands show
+content and layout flags only — media size, DPI, protocol, and output path come from
+project config (`lbl.toml`) or environment.
+
+Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.
 
 <table>
 <tr>
 <td valign="top">
 
-DYMO 11352 · 25×54 mm
+### Inline QR, barcode, and sizing
+
+Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain string — no HTML required.
+
+*DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
 ```bash
-lbl print --text 'Hello {{qr:https://example.com}}'
+lbl print --text 'Ship {{size:1.5:Alice}} {{barcode:LBL-42}} {{qr:https://track/42}}'
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/hello-qr.png" alt="DYMO 11352 · 25×54 mm" width="240"/>
+<img src="docs/src/generated/images/inline-syntax.png" alt="Inline QR, barcode, and sizing" width="240"/>
 
 </td>
 </tr>
@@ -128,16 +136,24 @@ lbl print --text 'Hello {{qr:https://example.com}}'
 <tr>
 <td valign="top">
 
-DYMO 11352 · 25×54 mm
+### Markdown input
+
+Headings, emphasis, and inline directives compose on fixed-length media via `--markdown`.
+
+*DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md)
 
 ```bash
-lbl print --text Hello
+lbl print --markdown '# Order 44
+
+Ship **fast** to dock 4
+
+{{qr:https://track/42}}'
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/hello.png" alt="DYMO 11352 · 25×54 mm" width="240"/>
+<img src="docs/src/generated/images/markdown-label.png" alt="Markdown input" width="240"/>
 
 </td>
 </tr>
@@ -147,7 +163,11 @@ lbl print --text Hello
 <tr>
 <td valign="top">
 
-DYMO 99014 · 54×101 mm
+### Batch HTML template
+
+One HTML layout rendered against a JSON array — here, a name badge with QR on portrait die-cut stock.
+
+*DYMO 99014 · 54×101 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
 
 ```bash
 lbl print --template card.html --template-format html --data people.json --one
@@ -156,7 +176,7 @@ lbl print --template card.html --template-format html --data people.json --one
 </td>
 <td>
 
-<img src="docs/src/generated/images/batch-card.png" alt="DYMO 99014 · 54×101 mm" width="240"/>
+<img src="docs/src/generated/images/batch-card.png" alt="Batch HTML template" width="240"/>
 
 </td>
 </tr>
@@ -166,16 +186,20 @@ lbl print --template card.html --template-format html --data people.json --one
 <tr>
 <td valign="top">
 
-NIIMBOT 12×30 mm @ 203 dpi
+### Template from shell input
+
+Run `lbl print` once per value: `xargs` appends each line as `--data`, and `{{ it }}` is the scalar.
+
+*NIIMBOT 12×30 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
 
 ```bash
-lbl print --template 'User #{{ it }}' --data 1 --padding-mm 0
+lbl print --template 'Hello user #{{ it }}, my friend' --data 1 --padding-mm 0
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/user-number.png" alt="NIIMBOT 12×30 mm @ 203 dpi" width="240"/>
+<img src="docs/src/generated/images/shell-template.png" alt="Template from shell input" width="240"/>
 
 </td>
 </tr>
@@ -185,16 +209,22 @@ lbl print --template 'User #{{ it }}' --data 1 --padding-mm 0
 <tr>
 <td valign="top">
 
-NIIMBOT 12×30 mm @ 203 dpi
+### Zero padding on small tape
+
+Default inner padding is 2 mm; set `--padding-mm 0` (or `padding_mm` in config) so content uses the full printable area.
+
+*NIIMBOT 12×30 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 
 ```bash
-lbl print --text Hi --padding-mm 0
+lbl print --text 'Aisle 4
+Bin 12
+Qty 60' --padding-mm 0
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/hi-no-padding.png" alt="NIIMBOT 12×30 mm @ 203 dpi" width="240"/>
+<img src="docs/src/generated/images/zero-padding.png" alt="Zero padding on small tape" width="240"/>
 
 </td>
 </tr>
@@ -204,16 +234,20 @@ lbl print --text Hi --padding-mm 0
 <tr>
 <td valign="top">
 
-NIIMBOT 12×22 mm @ 203 dpi
+### Config-driven print defaults
+
+With `[print] protocol`, `bluetooth`, and media set in `lbl.toml`, the command only needs the label content.
+
+*NIIMBOT 12×22 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
 
 ```bash
-lbl print --text Hello
+lbl print --text 'Scan to pair {{qr:https://lbl.example/pair}}'
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/hello-niimbot.png" alt="NIIMBOT 12×22 mm @ 203 dpi" width="240"/>
+<img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" width="240"/>
 
 </td>
 </tr>
@@ -223,16 +257,20 @@ lbl print --text Hello
 <tr>
 <td valign="top">
 
-DYMO 11352 · 25×54 mm · supersample 4
+### Supersampling for print quality
+
+Higher `--supersample` renders at more dots before downscaling — sharper barcodes and small type on 1-bit heads.
+
+*DYMO 11352 · 25×54 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
 
 ```bash
-lbl print --text Hello --supersample 4
+lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 4
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/hello-supersample.png" alt="DYMO 11352 · 25×54 mm · supersample 4" width="240"/>
+<img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" width="240"/>
 
 </td>
 </tr>
@@ -242,16 +280,20 @@ lbl print --text Hello --supersample 4
 <tr>
 <td valign="top">
 
-NIIMBOT 12×40 mm @ 203 dpi
+### NIIMBOT catalog media
+
+Die-cut tape sizes (`12x40`, `12x30`, …) resolve from the bundled catalog by SKU instead of raw millimetres.
+
+*NIIMBOT 12×40 mm @ 203 dpi* · [Printers & media →](docs/src/guides/printers-media.md#niimbot)
 
 ```bash
-lbl print --text Ship --padding-mm 0
+lbl print --text 'Ship to {{size:1.2:Dock 4}} {{qr:https://track/42}}' --padding-mm 0
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/niimbot-tape.png" alt="NIIMBOT 12×40 mm @ 203 dpi" width="240"/>
+<img src="docs/src/generated/images/niimbot-catalog.png" alt="NIIMBOT catalog media" width="240"/>
 
 </td>
 </tr>
@@ -261,26 +303,28 @@ lbl print --text Ship --padding-mm 0
 <tr>
 <td valign="top">
 
-56×89 mm @ 300 dpi
+### Explicit media dimensions
+
+When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly for fixed-size stock.
+
+*56×89 mm @ 300 dpi* · [Printers & media →](docs/src/guides/printers-media.md#media)
 
 ```bash
-lbl print --text 'Receipt line'
+lbl print --text 'Receipt
+Item ×2  $18.00
+Total      $36.00'
 ```
 
 </td>
 <td>
 
-<img src="docs/src/generated/images/fixed-dimensions.png" alt="56×89 mm @ 300 dpi" width="240"/>
+<img src="docs/src/generated/images/fixed-dimensions.png" alt="Explicit media dimensions" width="240"/>
 
 </td>
 </tr>
 </table>
 
 <!-- doc-examples:end -->
-
-
-
-
 
 ## Documentation
 
