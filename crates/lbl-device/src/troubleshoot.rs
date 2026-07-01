@@ -260,10 +260,12 @@ fn linux_permission_troubleshooting(target: &TransportTarget, style: &Style) -> 
 #[cfg(target_os = "linux")]
 struct UsbNodeInfo {
     path: PathBuf,
+    /// Sysfs device node name (e.g. `3-1.2.3`), used for `usblp` unbind paths.
+    sysfs_name: String,
     mode: Option<String>,
     owner: Option<String>,
     kernel_driver: Option<String>,
-    /// Sysfs node name (e.g. `3-1.2.3`) when a printer interface has `usblp` bound.
+    /// Interface node (e.g. `3-1.2.3:1.0`) when the kernel `usblp` driver is bound.
     usblp_interface: Option<String>,
 }
 
@@ -608,11 +610,23 @@ fn linux_usb_device_busy_troubleshooting_with(
     let kernel_driver = node_info
         .as_ref()
         .and_then(|info| info.kernel_driver.as_deref());
+    let usblp_bound = node_info
+        .as_ref()
+        .and_then(|info| info.usblp_interface.as_deref())
+        .is_some()
+        || kernel_driver.is_some_and(|driver| driver == "usblp");
     let usblp_interface = node_info
         .as_ref()
-        .and_then(|info| info.usblp_interface.as_deref());
-    let usblp_bound = usblp_interface.is_some()
-        || kernel_driver.is_some_and(|driver| driver == "usblp");
+        .and_then(|info| info.usblp_interface.as_deref())
+        .map(str::to_string)
+        .or_else(|| {
+            usblp_bound.then(|| {
+                node_info
+                    .as_ref()
+                    .map(|info| format!("{}:1.0", info.sysfs_name))
+                    .unwrap_or_else(|| format!("{vendor_id:04x}:{product_id:04x}:1.0"))
+            })
+        });
     let has_cups_queue = !cups_queues.is_empty();
 
     let mut out = format!(
@@ -674,7 +688,7 @@ fn linux_usb_device_busy_troubleshooting_with(
              raw USB access even when CUPS shows no queue; unbind `usblp` or replug after adding \
              the udev rule below",
         );
-        if let Some(iface) = usblp_interface {
+        if let Some(ref iface) = usblp_interface {
             push_bullet(
                 &mut out,
                 style,
@@ -724,6 +738,11 @@ fn linux_usb_device_busy_troubleshooting_with(
         "",
     );
     step += 1;
+    if usblp_bound {
+        if let Some(ref iface) = usblp_interface {
+            push_unbind_usblp_steps(&mut out, style, &mut step, iface, vendor_id, product_id);
+        }
+    }
     if has_cups_queue {
         if cups_running {
             push_step(
@@ -749,9 +768,6 @@ fn linux_usb_device_busy_troubleshooting_with(
         }
     }
     push_exclude_printer_from_cups_steps(&mut out, style, &mut step, vendor_id, product_id);
-    if let Some(iface) = usblp_interface {
-        push_unbind_usblp_steps(&mut out, style, &mut step, iface, vendor_id, product_id);
-    }
     if let Some(info) = &node_info {
         push_step(
             &mut out,
@@ -1079,6 +1095,7 @@ fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<UsbNodeInfo> 
         let usblp_interface = find_usblp_interface(sys, &device_name);
         return Some(UsbNodeInfo {
             path,
+            sysfs_name: device_name,
             mode: perms.as_ref().map(|(mode, _)| mode.clone()),
             owner: perms.as_ref().map(|(_, owner)| owner.clone()),
             kernel_driver,
