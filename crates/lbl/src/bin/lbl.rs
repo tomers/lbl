@@ -885,17 +885,21 @@ fn run_print(args: PrintArgs) -> Result<()> {
             lbl::preview::PreviewSourceArgs {
                 template_path: args.source.template.as_deref(),
             },
-            &catalog,
-            printer_entry,
-            args.printer.as_deref(),
-            protocol,
-            dpi,
-            &preview_media,
-            media_sku.as_deref(),
-            &network,
-            &usb,
-            &serial,
-            &bluetooth,
+            lbl::preview::PreviewRunContext {
+                catalog: &catalog,
+                printer_entry,
+                printer_key: args.printer.as_deref(),
+                protocol,
+                dpi,
+                media: &preview_media,
+                media_sku: media_sku.as_deref(),
+                transport: lbl::preview::PreviewTransport {
+                    network: &network,
+                    usb: &usb,
+                    serial: &serial,
+                    bluetooth: &bluetooth,
+                },
+            },
         )?;
         let context = lbl::preview::HtmlPreviewContext::build(preview_input, &traces);
         lbl::preview::write_html_preview(&context, &traces, &paths)?;

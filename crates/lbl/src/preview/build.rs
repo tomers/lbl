@@ -15,37 +15,47 @@ pub struct PreviewSourceArgs<'a> {
     pub template_path: Option<&'a str>,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Transport targets selected for the print run.
+pub struct PreviewTransport<'a> {
+    pub network: &'a Option<String>,
+    pub usb: &'a Option<String>,
+    pub serial: &'a Option<String>,
+    pub bluetooth: &'a Option<String>,
+}
+
+/// Resolved printer and media context for a preview run.
+pub struct PreviewRunContext<'a> {
+    pub catalog: &'a Catalog,
+    pub printer_entry: Option<&'a PrinterEntry>,
+    pub printer_key: Option<&'a str>,
+    pub protocol: Protocol,
+    pub dpi: f64,
+    pub media: &'a Media,
+    pub media_sku: Option<&'a str>,
+    pub transport: PreviewTransport<'a>,
+}
+
 pub fn input_from_run(
     source: &Source,
     source_args: PreviewSourceArgs<'_>,
-    catalog: &Catalog,
-    printer_entry: Option<&PrinterEntry>,
-    printer_key: Option<&str>,
-    protocol: Protocol,
-    dpi: f64,
-    media: &Media,
-    media_sku: Option<&str>,
-    network: &Option<String>,
-    usb: &Option<String>,
-    serial: &Option<String>,
-    bluetooth: &Option<String>,
+    ctx: PreviewRunContext<'_>,
 ) -> Result<HtmlPreviewInput> {
-    let catalog_media = media_sku.and_then(|sku| catalog.lookup(sku));
+    let catalog_media = ctx.media_sku.and_then(|sku| ctx.catalog.lookup(sku));
     let preview_media = HtmlPreviewMedia::from_resolved(
-        media,
-        media_sku,
+        ctx.media,
+        ctx.media_sku,
         catalog_media.map(|entry| entry.name.as_str()),
     );
 
     let preview_printer = HtmlPreviewPrinter::from_run(
-        printer_key.or_else(|| printer_entry.map(|p| p.canonical_key())),
-        printer_entry.map(|p| p.name.as_str()),
-        printer_entry.map(|p| p.brand.as_str()),
-        protocol,
-        dpi,
-        printer_entry.map(|p| p.max_width_mm),
-        transport_summary(network, usb, serial, bluetooth),
+        ctx.printer_key
+            .or_else(|| ctx.printer_entry.map(|p| p.canonical_key())),
+        ctx.printer_entry.map(|p| p.name.as_str()),
+        ctx.printer_entry.map(|p| p.brand.as_str()),
+        ctx.protocol,
+        ctx.dpi,
+        ctx.printer_entry.map(|p| p.max_width_mm),
+        transport_summary(&ctx.transport),
     );
 
     let (template, data, records) = preview_template_and_data(source, source_args)?;
@@ -131,20 +141,18 @@ fn preview_template_and_data(
     })
 }
 
-fn transport_summary(
-    network: &Option<String>,
-    usb: &Option<String>,
-    serial: &Option<String>,
-    bluetooth: &Option<String>,
-) -> Option<String> {
-    if let Some(host) = network {
+fn transport_summary(transport: &PreviewTransport<'_>) -> Option<String> {
+    if let Some(host) = transport.network {
         return Some(format!("network {host}"));
     }
-    if let Some(vidpid) = usb {
+    if let Some(vidpid) = transport.usb {
         return Some(format!("usb {vidpid}"));
     }
-    if let Some(path) = serial {
+    if let Some(path) = transport.serial {
         return Some(format!("serial {path}"));
     }
-    bluetooth.as_ref().map(|name| format!("bluetooth {name}"))
+    transport
+        .bluetooth
+        .as_ref()
+        .map(|name| format!("bluetooth {name}"))
 }
