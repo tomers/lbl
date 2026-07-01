@@ -82,17 +82,40 @@ struct SourceArgs {
     #[arg(long, group = "src")]
     html: Option<String>,
 
-    /// Template file (rendered with --data).
+    /// Template file, inline source, or `-` for stdin (rendered with --data).
     #[arg(long, group = "src")]
     template: Option<String>,
 
-    /// Data file/URL for --template.
+    /// Data file or inline JSON/TOML/YAML for --template.
     #[arg(long)]
     data: Option<String>,
 
     /// JSON-pointer to a batch array within the data.
     #[arg(long)]
     each: Option<String>,
+
+    /// How to interpret the rendered --template body: `text` (default),
+    /// `markdown`, or `html`.
+    #[arg(long, value_enum, default_value_t = TemplateFormatArg::Text)]
+    template_format: TemplateFormatArg,
+}
+
+#[derive(Clone, Copy, ValueEnum, Default)]
+enum TemplateFormatArg {
+    #[default]
+    Text,
+    Markdown,
+    Html,
+}
+
+impl From<TemplateFormatArg> for lbl::pipeline::TemplateFormat {
+    fn from(v: TemplateFormatArg) -> Self {
+        match v {
+            TemplateFormatArg::Text => Self::Text,
+            TemplateFormatArg::Markdown => Self::Markdown,
+            TemplateFormatArg::Html => Self::Html,
+        }
+    }
 }
 
 #[derive(Args, Clone, Default)]
@@ -1436,7 +1459,13 @@ fn read_source(args: &SourceArgs) -> Result<Source> {
         return Ok(Source::Html(content));
     }
     if let Some(template) = &args.template {
-        let template_src = std::fs::read_to_string(template)?;
+        let template_src = if template == "-" {
+            read_stdin_string()?
+        } else if std::path::Path::new(template).is_file() {
+            std::fs::read_to_string(template)?
+        } else {
+            template.clone()
+        };
         let data = match &args.data {
             Some(src) => Some(load_data(src)?),
             None => None,
@@ -1445,16 +1474,20 @@ fn read_source(args: &SourceArgs) -> Result<Source> {
             template: template_src,
             data,
             each: args.each.clone(),
+            format: args.template_format.into(),
         });
     }
     bail!("no input; pass --text, --markdown, --html, or --template")
 }
 
 fn load_data(src: &str) -> Result<serde_json::Value> {
-    let text = if src.starts_with("http://") || src.starts_with("https://") {
+    if src.starts_with("http://") || src.starts_with("https://") {
         bail!("URL data sources are supported via the lbl-template binary");
-    } else {
+    }
+    let text = if std::path::Path::new(src).is_file() {
         std::fs::read_to_string(src)?
+    } else {
+        src.to_string()
     };
     lbl_template::data::parse_auto(&text).map_err(|e| anyhow!("{e}"))
 }

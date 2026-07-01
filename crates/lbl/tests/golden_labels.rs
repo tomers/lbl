@@ -144,6 +144,7 @@ fn golden_labels() {
                 {"name": "Beta", "id": 2}
             ])),
             each: None,
+            format: lbl::pipeline::TemplateFormat::Html,
         },
         &small,
         &style,

@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use super::context::{
     HtmlPreviewInput, HtmlPreviewMedia, HtmlPreviewPrinter, HtmlPreviewTemplate,
 };
-use crate::pipeline::Source;
+use crate::pipeline::{Source, TemplateFormat};
 
 /// Source flags needed to recover template paths for the preview UI.
 pub struct PreviewSourceArgs<'a> {
@@ -69,11 +69,17 @@ fn preview_template_and_data(
             template,
             data,
             each,
+            format,
         } => {
             let batch = resolve_batch(template, data.clone(), each.as_deref())?;
+            let kind = match format {
+                TemplateFormat::Text => "template (text)",
+                TemplateFormat::Markdown => "template (markdown)",
+                TemplateFormat::Html => "template",
+            };
             (
                 HtmlPreviewTemplate {
-                    kind: "template".into(),
+                    kind: kind.into(),
                     path: source_args.template_path.map(str::to_string),
                     each: each.clone(),
                     body: batch.template_body,

@@ -10,7 +10,7 @@ use serde_json::json;
 use lbl::pipeline::{
     authoring_labels, encode_label, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_style, PipelineOptions, Source,
+    resolve_style, PipelineOptions, Source, TemplateFormat,
 };
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;
@@ -142,6 +142,8 @@ pub struct SourceReq {
     data: Option<serde_json::Value>,
     #[serde(default)]
     each: Option<String>,
+    #[serde(default)]
+    template_format: TemplateFormat,
 }
 
 impl SourceReq {
@@ -160,6 +162,7 @@ impl SourceReq {
                 template,
                 data: self.data,
                 each: self.each,
+                format: self.template_format,
             });
         }
         Err(ApiError(

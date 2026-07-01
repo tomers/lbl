@@ -35,6 +35,19 @@ pub struct AuthoringLabel {
     pub html: String,
 }
 
+/// How a rendered [`Source::Template`] body is turned into authoring HTML.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TemplateFormat {
+    /// Plain text: run through `lbl-text` after rendering (default).
+    #[default]
+    Text,
+    /// Markdown: run through `lbl-markdown` after rendering.
+    Markdown,
+    /// The template body is already authoring HTML.
+    Html,
+}
+
 /// The input to a flow.
 #[derive(Debug, Clone)]
 pub enum Source {
@@ -57,6 +70,8 @@ pub enum Source {
         data: Option<serde_json::Value>,
         /// JSON-pointer to a batch array, if any.
         each: Option<String>,
+        /// How to interpret each rendered label body.
+        format: TemplateFormat,
     },
 }
 
@@ -90,6 +105,7 @@ pub fn authoring_labels(source: Source, selection: &BatchSelection) -> Result<Ve
             template,
             data,
             each,
+            format,
         } => {
             let labels = Engine::new()
                 .render(
@@ -105,10 +121,20 @@ pub fn authoring_labels(source: Source, selection: &BatchSelection) -> Result<Ve
                 .into_iter()
                 .map(|l| AuthoringLabel {
                     index: l.index,
-                    html: l.html,
+                    html: template_render_to_authoring(&l.html, format),
                 })
                 .collect())
         }
+    }
+}
+
+fn template_render_to_authoring(rendered: &str, format: TemplateFormat) -> String {
+    match format {
+        TemplateFormat::Text => lbl_text::Document::parse(rendered, false).to_authoring_document(),
+        TemplateFormat::Markdown => {
+            lbl_markdown::MarkdownDocument::parse(rendered).to_authoring_document()
+        }
+        TemplateFormat::Html => rendered.to_string(),
     }
 }
 
@@ -591,9 +617,25 @@ mod tests {
             template: "<div>{{ name }}</div>".into(),
             data: Some(serde_json::json!([{"name":"A"},{"name":"B"}])),
             each: None,
+            format: TemplateFormat::Html,
         }, &BatchSelection::default())
         .unwrap();
         assert_eq!(labels.len(), 2);
+    }
+
+    #[test]
+    fn text_template_format_batches_through_lbl_text() {
+        let labels = authoring_labels(Source::Template {
+            template: "User #{{ index + 1 }}".into(),
+            data: Some(serde_json::json!([{}, {}])),
+            each: None,
+            format: TemplateFormat::Text,
+        }, &BatchSelection::default())
+        .unwrap();
+        assert_eq!(labels.len(), 2);
+        assert!(labels[0].html.contains("User #1"));
+        assert!(labels[1].html.contains("User #2"));
+        assert!(labels[0].html.contains("lbl-label"));
     }
 
     #[test]

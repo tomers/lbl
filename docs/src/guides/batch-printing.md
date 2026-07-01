@@ -29,8 +29,11 @@ Batch printing renders one template against many records.
 A top-level array produces one label per element. Within the template you have
 the record's fields, plus `index`, `count`, `it`, and `data`.
 
+Templates default to plain **text**; HTML layouts like this one need
+`--template-format html`:
+
 ```bash
-lbl print --template card.html --data people.json \
+lbl print --template card.html --template-format html --data people.json \
   --media 99014 --protocol zpl --network 192.168.1.50:9100 --cut --supports-cut
 ```
 
@@ -63,6 +66,52 @@ lbl print --template card.html --data people.json --index 0 --index 2 ...
 
 Selection order: `--index` (if any) → `--filter` → `--skip` → `--take` /
 `--one`.
+
+## Shell iteration (`seq` and `xargs`)
+
+When values come from the shell instead of a JSON file, run `lbl print` once per
+value:
+
+```bash
+seq 1 3 | xargs -n1 lbl print \
+  --template 'User #{{ it }}' \
+  --media 12x30 --dpi 203 --protocol console \
+  --data
+```
+
+Put `--data` **last**. `xargs -n1` appends each line from `seq` as the value of
+`--data`, so the three runs are effectively `--data 1`, `--data 2`, and
+`--data 3`. Inline JSON scalars are supported; in the template `{{ it }}` is
+that number (`index` is always `0` and `count` is `1` on each run).
+
+Templates default to **text** (`--template-format text`). Use
+`--template-format markdown` for Markdown, or `html` when the template body is
+already authoring HTML.
+
+During development from a checkout:
+
+```bash
+seq 1 3 | xargs -n1 cargo run -q -p lbl --bin lbl -- print \
+  --template 'User #{{ it }}' \
+  --media 12x30 --dpi 203 --protocol console \
+  --data
+```
+
+For a named field, substitute into a small JSON object with `xargs -I`:
+
+```bash
+seq 1 3 | xargs -I%n lbl print \
+  --template 'User #{{ n }}' \
+  --media 12x30 --dpi 203 --protocol console \
+  --data '{"n":%n}'
+```
+
+(`-I` runs one command per input line, like `-n1`, but replaces `%n` in the
+command string.)
+
+Compare with a **single** invocation that batches every record in one JSON array
+(see above): one render/spool pass, shared transport, and one confirmation
+prompt when `--confirm` is set.
 
 ## Single-file (frontmatter)
 

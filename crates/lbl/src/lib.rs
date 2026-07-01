@@ -15,5 +15,5 @@ pub use pipeline::{
     authoring_labels, encode_label, encode_label_traced, encode_sample_pattern,
     encode_sample_pattern_traced, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, AuthoringLabel, PipelineOptions, Source,
+    resolve_print_transport, AuthoringLabel, PipelineOptions, Source, TemplateFormat,
 };

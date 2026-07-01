@@ -16,7 +16,9 @@ lbl device    Discover printers (list)
 ### `lbl print`
 
 ```text
---text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
+--text <T> | --markdown <T|FILE|-> | --html <FILE|-> |
+  --template <INLINE|FILE|-> [--data <INLINE|FILE|>] [--each <PTR>]
+  [--template-format text|markdown|html]
 --filter <TEXT>     Keep labels whose data fields contain TEXT (case-insensitive)
 --one               Print one label from the selection (same as --take 1)
 --skip <N>          Skip the first N labels in the selection (default: 0)
