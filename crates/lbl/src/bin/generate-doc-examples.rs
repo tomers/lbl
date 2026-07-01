@@ -52,6 +52,13 @@ struct ExampleFile {
 }
 
 #[derive(Debug, Deserialize)]
+struct CompareVariant {
+    #[serde(default)]
+    label: Option<String>,
+    args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct Example {
     id: String,
     title: String,
@@ -73,6 +80,16 @@ struct Example {
     dir: Option<String>,
     #[serde(default)]
     files: Vec<ExampleFile>,
+    #[serde(default)]
+    composite: Option<String>,
+    #[serde(default)]
+    xargs: Option<String>,
+    #[serde(default)]
+    show_media: bool,
+    #[serde(default)]
+    render_args: Vec<String>,
+    #[serde(default)]
+    compare: Vec<CompareVariant>,
     args: Vec<String>,
 }
 
@@ -144,7 +161,7 @@ fn run() -> Result<()> {
             title: example.title.clone(),
             description: example.description.clone(),
             caption: example.caption.clone(),
-            command: format_display_command(&example.args),
+            command: format_display_command(example),
             readme_doc: format_readme_doc_link(example),
             book_doc: format_book_doc_link(example),
             doc_title: example
@@ -251,9 +268,107 @@ fn render_example(
 ) -> Result<Vec<u8>> {
     let work_dir = example_work_dir(examples_root, example);
 
+    if !example.compare.is_empty() {
+        for (i, variant) in example.compare.iter().enumerate() {
+            let target = numbered_output_path(png_path, i);
+            let args = resolve_print_args(example, Some(&variant.args));
+            run_lbl_print(lbl_bin, &work_dir, defaults, example, &target, &args, None)?;
+        }
+    } else if let Some(xargs) = &example.xargs {
+        let values = xargs_values(xargs)?;
+        for (i, value) in values.iter().enumerate() {
+            let target = numbered_output_path(png_path, i);
+            let args = resolve_print_args(example, None);
+            run_lbl_print(
+                lbl_bin,
+                &work_dir,
+                defaults,
+                example,
+                &target,
+                &args,
+                Some(value),
+            )?;
+        }
+    } else {
+        let args = resolve_print_args(example, None);
+        run_lbl_print(lbl_bin, &work_dir, defaults, example, png_path, &args, None)?;
+    }
+
+    if example.composite.as_deref() == Some("side_by_side") {
+        composite_side_by_side(png_path)?;
+    }
+    fs::read(png_path).with_context(|| format!("read generated {}", png_path.display()))
+}
+
+fn resolve_print_args(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
+    let mut args = example.args.clone();
+    args.extend(example.render_args.clone());
+    if let Some(extra) = compare_extra {
+        args = merge_flag_args(args, extra);
+    }
+    args
+}
+
+fn merge_flag_args(base: Vec<String>, overlay: &[String]) -> Vec<String> {
+    let mut pairs: Vec<(String, Option<String>)> = Vec::new();
+    let mut i = 0;
+    while i < base.len() {
+        let flag = base[i].clone();
+        if flag.starts_with("--") {
+            if let Some(value) = base.get(i + 1).filter(|v| !v.starts_with("--")) {
+                i += 2;
+                pairs.push((flag, Some(value.clone())));
+            } else {
+                i += 1;
+                pairs.push((flag, None));
+            }
+        } else {
+            i += 1;
+            pairs.push((flag, None));
+        }
+    }
+    i = 0;
+    while i < overlay.len() {
+        let flag = overlay[i].clone();
+        if flag.starts_with("--") {
+            let value = overlay.get(i + 1).filter(|v| !v.starts_with("--")).cloned();
+            let step = if value.is_some() { 2 } else { 1 };
+            if let Some(pos) = pairs.iter().position(|(f, _)| f == &flag) {
+                pairs[pos] = (flag, value);
+            } else {
+                pairs.push((flag, value));
+            }
+            i += step;
+        } else {
+            pairs.push((flag, None));
+            i += 1;
+        }
+    }
+    let mut out = Vec::new();
+    for (flag, value) in pairs {
+        out.push(flag);
+        if let Some(value) = value {
+            out.push(value);
+        }
+    }
+    out
+}
+
+fn run_lbl_print(
+    lbl_bin: &Path,
+    work_dir: &Path,
+    defaults: &Defaults,
+    example: &Example,
+    png_path: &Path,
+    print_args: &[String],
+    data: Option<&str>,
+) -> Result<()> {
     let mut cmd = Command::new(lbl_bin);
     cmd.arg("print");
-    cmd.args(&example.args);
+    cmd.args(print_args);
+    if let Some(value) = data {
+        cmd.args(["--data", value]);
+    }
     if !example.media.is_empty() {
         cmd.args(["--media", &example.media]);
     } else {
@@ -268,7 +383,7 @@ fn render_example(
     if let Some(dpi) = example.dpi {
         cmd.args(["--dpi", &format_num(dpi)]);
     }
-    if !example.args.iter().any(|a| a == "--supersample") {
+    if !print_args.iter().any(|a| a == "--supersample") {
         cmd.args(["--supersample", &defaults.supersample.to_string()]);
     }
     cmd.args([
@@ -277,7 +392,7 @@ fn render_example(
         "--file",
         &png_path.display().to_string(),
     ]);
-    cmd.current_dir(&work_dir);
+    cmd.current_dir(work_dir);
     cmd.stdout(Stdio::null());
 
     let output = cmd
@@ -291,7 +406,37 @@ fn render_example(
             work_dir.display()
         );
     }
-    fs::read(png_path).with_context(|| format!("read generated {}", png_path.display()))
+    Ok(())
+}
+
+fn xargs_values(spec: &str) -> Result<Vec<String>> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(spec)
+        .output()
+        .with_context(|| format!("run xargs producer `{spec}`"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("xargs producer `{spec}` failed:\n{stderr}");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+fn numbered_output_path(base: &Path, index: usize) -> PathBuf {
+    if index == 0 {
+        return base.to_path_buf();
+    }
+    let parent = base.parent().unwrap_or_else(|| Path::new("."));
+    let stem = base.file_stem().and_then(|s| s.to_str()).unwrap_or("label");
+    let name = match base.extension().and_then(|e| e.to_str()) {
+        Some(ext) => format!("{stem}-{index:02}.{ext}"),
+        None => format!("{stem}-{index:02}"),
+    };
+    parent.join(name)
 }
 
 fn format_num(n: f64) -> String {
@@ -302,26 +447,228 @@ fn format_num(n: f64) -> String {
     }
 }
 
-fn format_display_command(args: &[String]) -> String {
-    format!("lbl print {}", shell_join(args))
+const COMPOSITE_GAP_PX: u32 = 12;
+
+/// Collect the base PNG and numbered batch siblings (`out.png`, `out-01.png`, …).
+fn collect_label_pngs(base: &Path) -> Result<Vec<PathBuf>> {
+    if !base.is_file() {
+        bail!("missing batch label output {}", base.display());
+    }
+    let mut paths = vec![base.to_path_buf()];
+    let parent = base.parent().context("batch label path has no parent")?;
+    let stem = base
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .context("batch label path has no stem")?;
+    let ext = base
+        .extension()
+        .and_then(|e| e.to_str())
+        .context("batch label path has no extension")?;
+    let mut n = 1usize;
+    loop {
+        let sibling = parent.join(format!("{stem}-{n:02}.{ext}"));
+        if sibling.is_file() {
+            paths.push(sibling);
+            n += 1;
+        } else {
+            break;
+        }
+    }
+    Ok(paths)
 }
 
-fn shell_join(args: &[String]) -> String {
-    args.iter()
-        .map(|arg| {
-            if arg.is_empty() {
-                "''".to_string()
-            } else if arg
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
-            {
-                arg.clone()
-            } else {
-                format!("'{}'", arg.replace('\'', "'\\''"))
-            }
+/// Stitch a multi-label batch into one preview image.
+fn composite_side_by_side(base: &Path) -> Result<()> {
+    let paths = collect_label_pngs(base)?;
+    if paths.len() <= 1 {
+        return Ok(());
+    }
+
+    let images: Vec<_> = paths
+        .iter()
+        .map(|path| {
+            image::open(path)
+                .with_context(|| format!("open {}", path.display()))
+                .map(|img| img.to_rgba8())
         })
-        .collect::<Vec<_>>()
-        .join(" ")
+        .collect::<Result<_>>()?;
+
+    let gap = COMPOSITE_GAP_PX;
+    let total_w: u32 =
+        images.iter().map(image::RgbaImage::width).sum::<u32>() + gap * (images.len() as u32 - 1);
+    let max_h = images
+        .iter()
+        .map(image::RgbaImage::height)
+        .max()
+        .unwrap_or(0);
+
+    let mut canvas =
+        image::RgbaImage::from_pixel(total_w, max_h, image::Rgba([255, 255, 255, 255]));
+    let mut x = 0u32;
+    for img in &images {
+        let y = (max_h.saturating_sub(img.height())) / 2;
+        image::imageops::overlay(&mut canvas, img, i64::from(x), i64::from(y));
+        x += img.width() + gap;
+    }
+
+    canvas
+        .save(base)
+        .with_context(|| format!("write composite {}", base.display()))?;
+    for path in paths.iter().skip(1) {
+        fs::remove_file(path).with_context(|| format!("remove {}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn format_display_command(example: &Example) -> String {
+    let mut out = String::new();
+    if let Some(dir) = &example.dir {
+        out.push_str("$ cd docs/examples/");
+        out.push_str(dir);
+        out.push('\n');
+    }
+
+    if let Some(xargs) = &example.xargs {
+        out.push_str("$ ");
+        out.push_str(xargs);
+        out.push_str(" | xargs -n1 lbl print \\\n");
+        let arg_lines = format_print_arg_lines(&display_args_for(example, None));
+        for line in &arg_lines {
+            out.push_str("  ");
+            out.push_str(line);
+            out.push_str(" \\");
+            out.push('\n');
+        }
+        out.push_str("  --data");
+        return out.trim_end().to_string();
+    }
+
+    if !example.compare.is_empty() {
+        let mut blocks = Vec::new();
+        for variant in &example.compare {
+            let label = variant
+                .label
+                .clone()
+                .unwrap_or_else(|| "variant".to_string());
+            blocks.push(format!(
+                "# {}\n{}",
+                label,
+                format_lbl_print_block(&display_args_for(example, Some(&variant.args)))
+            ));
+        }
+        out.push_str(&blocks.join("\n\n"));
+        return out.trim_end().to_string();
+    }
+
+    out.push_str(&format_lbl_print_block(&display_args_for(example, None)));
+    out.trim_end().to_string()
+}
+
+fn display_args_for(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
+    let mut args = example.args.clone();
+    if let Some(extra) = compare_extra {
+        args = merge_flag_args(args, extra);
+    }
+    let media = display_media_args(example);
+    if example.show_media {
+        let mut out = media;
+        out.extend(args);
+        out
+    } else {
+        args.extend(media);
+        args
+    }
+}
+
+fn display_media_args(example: &Example) -> Vec<String> {
+    if example.media.is_empty() {
+        let mut out = Vec::new();
+        if let Some(width) = example.width_mm {
+            out.push("--width-mm".to_string());
+            out.push(format_num(width));
+        }
+        if let Some(length) = example.length_mm {
+            out.push("--length-mm".to_string());
+            out.push(format_num(length));
+        }
+        if let Some(dpi) = example.dpi {
+            out.push("--dpi".to_string());
+            out.push(format_num(dpi));
+        }
+        out
+    } else if example.show_media {
+        let mut out = vec!["--media".to_string(), example.media.clone()];
+        if let Some(dpi) = example.dpi {
+            out.push("--dpi".to_string());
+            out.push(format_num(dpi));
+        }
+        out
+    } else {
+        Vec::new()
+    }
+}
+
+fn format_lbl_print_block(args: &[String]) -> String {
+    let arg_lines = format_print_arg_lines(args);
+    if arg_lines.is_empty() {
+        return "$ lbl print".to_string();
+    }
+    let mut out = String::from("$ lbl print \\\n");
+    for (idx, line) in arg_lines.iter().enumerate() {
+        out.push_str("  ");
+        out.push_str(line);
+        if idx < arg_lines.len() - 1 {
+            out.push_str(" \\");
+        }
+        out.push('\n');
+    }
+    out.trim_end().to_string()
+}
+
+fn format_print_arg_lines(args: &[String]) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let flag = &args[i];
+        if let Some(value) = args.get(i + 1).filter(|_| flag.starts_with("--")) {
+            i += 2;
+            lines.push(format!("{flag} {}", format_shell_value(value)));
+        } else {
+            i += 1;
+            lines.push(flag.clone());
+        }
+    }
+    lines
+}
+
+fn format_shell_value(s: &str) -> String {
+    if s.contains('\n') {
+        let mut out = String::from("$'");
+        for ch in s.chars() {
+            match ch {
+                '\n' => out.push_str("\\n"),
+                '\t' => out.push_str("\\t"),
+                '\\' => out.push_str("\\\\"),
+                '\'' => out.push_str("\\'"),
+                _ => out.push(ch),
+            }
+        }
+        out.push('\'');
+        return out;
+    }
+    shell_quote(s)
+}
+
+fn shell_quote(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    if s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+    {
+        return s.to_string();
+    }
+    format!("'{}'", s.replace('\'', "'\\''"))
 }
 
 fn default_doc_title(doc: &str) -> String {
@@ -443,9 +790,9 @@ fn append_examples_intro(out: &mut String, regenerate_line: &str) {
         "Each preview highlights a different capability on **fixed-length** media. Commands show\n",
     );
     out.push_str(
-        "content and layout flags only — media size, DPI, protocol, and output path come from\n",
+        "the flags that matter for each example; protocol and output path come from project\n",
     );
-    out.push_str("project config (`lbl.toml`) or environment.\n\n");
+    out.push_str("config (`lbl.toml`) or the doc generator defaults.\n\n");
     out.push_str(regenerate_line);
     out.push_str("\n\n");
 }
@@ -469,7 +816,7 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
         if !row.files.is_empty() {
             out.push_str(&render_embedded_files(&row.files, false));
         }
-        out.push_str("```bash\n");
+        out.push_str("```console\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n");
     }
@@ -503,7 +850,7 @@ fn render_book_page(rows: &[ExampleRow]) -> String {
         if !row.files.is_empty() {
             out.push_str(&render_embedded_files(&row.files, true));
         }
-        out.push_str("```bash\n");
+        out.push_str("```console\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n");
         out.push_str(&format!(
@@ -631,11 +978,120 @@ fn compare_png_bytes(expected: &[u8], actual: &[u8]) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    fn example_with(args: Vec<&str>) -> Example {
+        Example {
+            id: "test".into(),
+            title: String::new(),
+            description: String::new(),
+            doc: String::new(),
+            doc_title: None,
+            doc_section: None,
+            caption: String::new(),
+            media: String::new(),
+            dpi: None,
+            width_mm: None,
+            length_mm: None,
+            dir: None,
+            files: Vec::new(),
+            composite: None,
+            xargs: None,
+            show_media: false,
+            render_args: Vec::new(),
+            compare: Vec::new(),
+            args: args.into_iter().map(str::to_string).collect(),
+        }
+    }
+
     #[test]
-    fn shell_join_quotes_spaces() {
+    fn shell_quote_spaces() {
+        assert_eq!(shell_quote("User #{{ it }}"), "'User #{{ it }}'");
+    }
+
+    #[test]
+    fn format_shell_value_uses_ansi_c_for_newlines() {
+        assert_eq!(format_shell_value("Aisle 4\nBin 12"), "$'Aisle 4\\nBin 12'");
+    }
+
+    #[test]
+    fn format_display_command_uses_continuations() {
+        let cmd =
+            format_display_command(&example_with(vec!["--text", "hello", "--padding-mm", "0"]));
+        assert_eq!(cmd, "$ lbl print \\\n  --text hello \\\n  --padding-mm 0");
+    }
+
+    #[test]
+    fn format_display_command_includes_cd_for_example_dir() {
+        let mut ex = example_with(vec!["--template", "card.html"]);
+        ex.dir = Some("batch-card".into());
         assert_eq!(
-            shell_join(&["--template".into(), "User #{{ it }}".into()]),
-            "--template 'User #{{ it }}'"
+            format_display_command(&ex),
+            "$ cd docs/examples/batch-card\n$ lbl print \\\n  --template card.html"
+        );
+    }
+
+    #[test]
+    fn format_display_command_formats_xargs_pipeline() {
+        let mut ex = example_with(vec![
+            "--template",
+            "Hello user #{{ it }}, my friend",
+            "--padding-mm",
+            "0",
+        ]);
+        ex.xargs = Some("seq 1 3".into());
+        assert_eq!(
+            format_display_command(&ex),
+            "$ seq 1 3 | xargs -n1 lbl print \\\n  \
+             --template 'Hello user #{{ it }}, my friend' \\\n  \
+             --padding-mm 0 \\\n  \
+             --data"
+        );
+    }
+
+    #[test]
+    fn numbered_output_path_inserts_suffix() {
+        let base = PathBuf::from("/tmp/shell-template.png");
+        assert_eq!(
+            numbered_output_path(&base, 1),
+            PathBuf::from("/tmp/shell-template-01.png")
+        );
+    }
+
+    #[test]
+    fn display_media_args_shows_explicit_dimensions() {
+        let mut ex = example_with(vec!["--text", "Hi"]);
+        ex.width_mm = Some(56.0);
+        ex.length_mm = Some(89.0);
+        ex.dpi = Some(300.0);
+        assert_eq!(
+            display_media_args(&ex),
+            vec!["--width-mm", "56", "--length-mm", "89", "--dpi", "300"]
+        );
+    }
+
+    #[test]
+    fn display_media_args_shows_catalog_media_when_requested() {
+        let mut ex = example_with(vec!["--text", "Hi"]);
+        ex.media = "12x40".into();
+        ex.dpi = Some(203.0);
+        ex.show_media = true;
+        assert_eq!(
+            display_media_args(&ex),
+            vec!["--media", "12x40", "--dpi", "203"]
+        );
+    }
+
+    #[test]
+    fn merge_flag_args_overrides_existing_flags() {
+        let base = vec![
+            "--text".into(),
+            "hello".into(),
+            "--supersample".into(),
+            "4".into(),
+        ];
+        let overlay = vec!["--supersample".into(), "8".into()];
+        assert_eq!(
+            merge_flag_args(base, &overlay),
+            vec!["--text", "hello", "--supersample", "8"]
         );
     }
 }

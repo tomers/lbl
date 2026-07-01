@@ -104,8 +104,8 @@ cargo test            # run the test suite
 ## Fixed-size label examples
 
 Each preview highlights a different capability on **fixed-length** media. Commands show
-content and layout flags only — media size, DPI, protocol, and output path come from
-project config (`lbl.toml`) or environment.
+the flags that matter for each example; protocol and output path come from project
+config (`lbl.toml`) or the doc generator defaults.
 
 Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.
 
@@ -117,8 +117,12 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain
 
 *DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
-```bash
-lbl print --text 'Ship {{size:1.5:Alice}} {{barcode:LBL-42}} {{qr:https://track/42}}'
+```console
+$ lbl print \
+  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
+  --qr-size-mm 9 \
+  --barcode-height-mm 7 \
+  --padding-mm 1
 ```
 
 ### Markdown input
@@ -129,21 +133,19 @@ Headings, emphasis, and inline directives compose on fixed-length media via `--m
 
 *DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md)
 
-```bash
-lbl print --markdown '# Order 44
-
-Ship **fast** to dock 4
-
-{{qr:https://track/42}}'
+```console
+$ lbl print \
+  --markdown $'# Order 44\n\nShip **fast** to dock 4\n\n{{qr:https://track/42}}' \
+  --orientation portrait
 ```
 
 ### Batch HTML template
 
-One HTML layout rendered against a JSON array — here, a name badge with QR on portrait die-cut stock.
+One HTML layout rendered against a JSON array — here, name badges with QR for two people.
 
 <img src="docs/src/generated/images/batch-card.png" alt="Batch HTML template" />
 
-*DYMO 99014 · 54×101 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
+*DYMO 11352 · 25×54 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
 
 [card.html](docs/examples/batch-card/card.html)
 
@@ -174,20 +176,31 @@ One HTML layout rendered against a JSON array — here, a name badge with QR on 
 ]
 ```
 
-```bash
-lbl print --template card.html --template-format html --data people.json --one
+```console
+$ cd docs/examples/batch-card
+$ lbl print \
+  --template card.html \
+  --template-format html \
+  --data people.json \
+  --orientation portrait \
+  --qr-size-mm 9 \
+  --padding-mm 1
 ```
 
-### Template from shell input
+### Shell iteration with seq | xargs
 
-Run `lbl print` once per value: `xargs` appends each line as `--data`, and `{{ it }}` is the scalar.
+`seq | xargs -n1 lbl print` runs once per value — each line becomes `--data`.
+`{{ it }}` is the scalar in the template.
 
-<img src="docs/src/generated/images/shell-template.png" alt="Template from shell input" />
+<img src="docs/src/generated/images/shell-template.png" alt="Shell iteration with seq | xargs" />
 
-*NIIMBOT 12×30 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
+*NIIMBOT 12×22 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
 
-```bash
-lbl print --template 'Hello user #{{ it }}, my friend' --data 1 --padding-mm 0
+```console
+$ seq 1 3 | xargs -n1 lbl print \
+  --template 'Hello user #{{ it }}, my friend' \
+  --padding-mm 0 \
+  --data
 ```
 
 ### Zero padding on small tape
@@ -198,10 +211,10 @@ Default inner padding is 2 mm; set `--padding-mm 0` (or `padding_mm` in config) 
 
 *NIIMBOT 12×30 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 
-```bash
-lbl print --text 'Aisle 4
-Bin 12
-Qty 60' --padding-mm 0
+```console
+$ lbl print \
+  --text $'Aisle 4\nBin 12\nQty 60' \
+  --padding-mm 0
 ```
 
 ### Config-driven print defaults
@@ -212,32 +225,48 @@ With `[print] protocol`, `bluetooth`, and media set in `lbl.toml`, the command o
 
 *NIIMBOT 12×22 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
 
-```bash
-lbl print --text 'Scan to pair {{qr:https://lbl.example/pair}}'
+```console
+$ lbl print \
+  --text 'Scan {{qr:https://x/p}}'
 ```
 
 ### Supersampling for print quality
 
-Higher `--supersample` renders at more dots before downscaling — sharper barcodes and small type on 1-bit heads.
+Side by side: `--supersample 2` (left) vs `--supersample 8` (right).
+More render dots before downscaling yield sharper barcodes and small type.
 
 <img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" />
 
 *DYMO 11352 · 25×54 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
 
-```bash
-lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 4
+```console
+# supersample 2 (left)
+$ lbl print \
+  --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' \
+  --supersample 2
+
+# supersample 8 (right)
+$ lbl print \
+  --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' \
+  --supersample 8
 ```
 
 ### NIIMBOT catalog media
 
-Die-cut tape sizes (`12x40`, `12x30`, …) resolve from the bundled catalog by SKU instead of raw millimetres.
+Use `--media 12x40` to pick a die-cut size from the bundled catalog instead of passing raw `--width-mm` / `--length-mm`.
 
 <img src="docs/src/generated/images/niimbot-catalog.png" alt="NIIMBOT catalog media" />
 
 *NIIMBOT 12×40 mm @ 203 dpi* · [Printers & media →](docs/src/guides/printers-media.md#niimbot)
 
-```bash
-lbl print --text 'Ship to {{size:1.2:Dock 4}} {{qr:https://track/42}}' --padding-mm 0
+```console
+$ lbl print \
+  --media 12x40 \
+  --dpi 203 \
+  --text 'Ship to {{size:1.2:Dock 4}}{{qr:https://t/42}}' \
+  --orientation portrait \
+  --padding-mm 0 \
+  --qr-size-mm 9
 ```
 
 ### Explicit media dimensions
@@ -248,10 +277,12 @@ When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly
 
 *56×89 mm @ 300 dpi* · [Printers & media →](docs/src/guides/printers-media.md#media)
 
-```bash
-lbl print --text 'Receipt
-Item ×2  $18.00
-Total      $36.00'
+```console
+$ lbl print \
+  --text $'Receipt\nItem ×2  $18.00\nTotal      $36.00' \
+  --width-mm 56 \
+  --length-mm 89 \
+  --dpi 300
 ```
 
 <!-- doc-examples:end -->

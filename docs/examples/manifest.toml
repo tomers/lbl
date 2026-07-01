@@ -13,21 +13,35 @@
 #   - dir: optional subdirectory under docs/examples/ to run from
 #   - files: optional [{ path, lang }] source files to embed before the command
 #   - args: lbl print flags shown in the abbreviated command (content/layout only)
+#   - render_args: extra lbl print flags used for rendering only (omitted from docs)
+#   - show_media: when true, include --media (and --dpi when set) in the documented command
+#   - compare: render each entry side by side (e.g. supersample 2 vs 8); args merge over `args`
+#   - composite: optional "side_by_side" to stitch multi-label batch output into one PNG
+#   - xargs: optional shell producer (e.g. "seq 1 2") — runs lbl print once per line via xargs
 
 [defaults]
 protocol    = "virtual"
 supersample = 2
 
 [[example]]
-id          = "inline-syntax"
-title       = "Inline QR, barcode, and sizing"
+id = "inline-syntax"
+title = "Inline QR, barcode, and sizing"
 description = "Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain string — no HTML required."
-doc         = "guides/printing-text.md"
-doc_title   = "Printing text"
+doc = "guides/printing-text.md"
+doc_title = "Printing text"
 doc_section = "inline-mini-syntax-default"
-caption     = "DYMO 11352 · 25×54 mm"
-media       = "11352"
-args        = ["--text", "Ship {{size:1.5:Alice}} {{barcode:LBL-42}} {{qr:https://track/42}}"]
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+args = [
+  "--text",
+  "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}",
+  "--qr-size-mm",
+  "9",
+  "--barcode-height-mm",
+  "7",
+  "--padding-mm",
+  "1",
+]
 
 [[example]]
 id = "markdown-label"
@@ -41,32 +55,49 @@ args = ["--markdown", """# Order 44
 
 Ship **fast** to dock 4
 
-{{qr:https://track/42}}"""]
+{{qr:https://track/42}}""", "--orientation", "portrait"]
 
 [[example]]
-id          = "batch-card"
-title       = "Batch HTML template"
-description = "One HTML layout rendered against a JSON array — here, a name badge with QR on portrait die-cut stock."
-doc         = "guides/batch-printing.md"
-doc_title   = "Batch printing"
+id = "batch-card"
+title = "Batch HTML template"
+description = "One HTML layout rendered against a JSON array — here, name badges with QR for two people."
+doc = "guides/batch-printing.md"
+doc_title = "Batch printing"
 doc_section = "template--data"
-caption     = "DYMO 99014 · 54×101 mm"
-media       = "99014"
-dir         = "batch-card"
-files       = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json", "--one"]
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+dir = "batch-card"
+composite = "side_by_side"
+files = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
+args = [
+  "--template",
+  "card.html",
+  "--template-format",
+  "html",
+  "--data",
+  "people.json",
+  "--orientation",
+  "portrait",
+  "--qr-size-mm",
+  "9",
+  "--padding-mm",
+  "1",
+]
 
 [[example]]
-id          = "shell-template"
-title       = "Template from shell input"
-description = "Run `lbl print` once per value: `xargs` appends each line as `--data`, and `{{ it }}` is the scalar."
-doc         = "guides/batch-printing.md"
-doc_title   = "Batch printing"
+id = "shell-template"
+title = "Shell iteration with seq | xargs"
+description = """`seq | xargs -n1 lbl print` runs once per value — each line becomes `--data`.
+`{{ it }}` is the scalar in the template."""
+doc = "guides/batch-printing.md"
+doc_title = "Batch printing"
 doc_section = "shell-iteration-seq-and-xargs"
-caption     = "NIIMBOT 12×30 mm @ 203 dpi"
-media       = "12x30"
-dpi         = 203
-args        = ["--template", "Hello user #{{ it }}, my friend", "--data", "1", "--padding-mm", "0"]
+caption = "NIIMBOT 12×22 mm @ 203 dpi"
+media = "niimbot-12x22"
+dpi = 203
+xargs = "seq 1 3"
+composite = "side_by_side"
+args = ["--template", "Hello user #{{ it }}, my friend", "--padding-mm", "0"]
 
 [[example]]
 id          = "zero-padding"
@@ -90,30 +121,53 @@ doc_section = "print-defaults-lbl-print"
 caption     = "NIIMBOT 12×22 mm @ 203 dpi"
 media       = "niimbot-12x22"
 dpi         = 203
-args        = ["--text", "Scan to pair {{qr:https://lbl.example/pair}}"]
+args        = ["--text", "Scan {{qr:https://x/p}}"]
+render_args = ["--qr-size-mm", "7", "--padding-mm", "0"]
 
 [[example]]
-id          = "supersample"
-title       = "Supersampling for print quality"
-description = "Higher `--supersample` renders at more dots before downscaling — sharper barcodes and small type on 1-bit heads."
-doc         = "guides/rendering-quality.md"
-doc_title   = "Rendering quality"
+id = "supersample"
+title = "Supersampling for print quality"
+description = """Side by side: `--supersample 2` (left) vs `--supersample 8` (right).
+More render dots before downscaling yield sharper barcodes and small type."""
+doc = "guides/rendering-quality.md"
+doc_title = "Rendering quality"
 doc_section = "how-to-set-it"
-caption     = "DYMO 11352 · 25×54 mm"
-media       = "11352"
-args        = ["--text", "{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}", "--supersample", "4"]
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+composite = "side_by_side"
+args = ["--text", "{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}"]
+compare = [
+  { label = "supersample 2 (left)", args = [
+    "--supersample",
+    "2",
+  ] },
+  { label = "supersample 8 (right)", args = [
+    "--supersample",
+    "8",
+  ] },
+]
 
 [[example]]
-id          = "niimbot-catalog"
-title       = "NIIMBOT catalog media"
-description = "Die-cut tape sizes (`12x40`, `12x30`, …) resolve from the bundled catalog by SKU instead of raw millimetres."
-doc         = "guides/printers-media.md"
-doc_title   = "Printers & media"
+id = "niimbot-catalog"
+title = "NIIMBOT catalog media"
+description = "Use `--media 12x40` to pick a die-cut size from the bundled catalog instead of passing raw `--width-mm` / `--length-mm`."
+doc = "guides/printers-media.md"
+doc_title = "Printers & media"
 doc_section = "niimbot"
-caption     = "NIIMBOT 12×40 mm @ 203 dpi"
-media       = "12x40"
-dpi         = 203
-args        = ["--text", "Ship to {{size:1.2:Dock 4}} {{qr:https://track/42}}", "--padding-mm", "0"]
+caption = "NIIMBOT 12×40 mm @ 203 dpi"
+media = "12x40"
+dpi = 203
+show_media = true
+args = [
+  "--text",
+  "Ship to {{size:1.2:Dock 4}}{{qr:https://t/42}}",
+  "--orientation",
+  "portrait",
+  "--padding-mm",
+  "0",
+  "--qr-size-mm",
+  "9",
+]
 
 [[example]]
 id          = "fixed-dimensions"
