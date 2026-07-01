@@ -1,0 +1,36 @@
+---json
+[
+  {
+    "name": "Tony Soprano",
+    "role": "Boss",
+    "department": "DiMeo Crime Family",
+    "employee_id": "NJ-BOSS-001",
+    "event": "The Sopranos",
+    "access": "CAPO DI TUTTI CAPI",
+    "badge_number": "001",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Tony_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  },
+  {
+    "name": "Carmela Soprano",
+    "role": "First Lady",
+    "department": "Soprano Household",
+    "employee_id": "NJ-CARM-002",
+    "event": "The Sopranos",
+    "access": "NORTH CALDWELL",
+    "badge_number": "002",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Carmela_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  }
+]
+---
+<div class="lbl-label lbl-col lbl-center">
+  <div class="lbl-text" style="font-size:0.62em">{{ event }}</div>
+  <img src="{{ photo }}" alt="" style="width:12em;height:14em;object-fit:cover" />
+  <span class="lbl-text" style="font-size:1.2em;font-weight:bold">{{ name }}</span>
+  <span class="lbl-text" style="font-size:0.85em">{{ role }} · {{ department }}</span>
+  <qr>https://id.lbl.example/{{ employee_id }}</qr>
+  <barcode type="CODE128">{{ employee_id }}</barcode>
+  <div class="lbl-row lbl-between" style="width:100%">
+    <span class="lbl-text" style="font-size:0.55em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.55em">#{{ badge_number }}</span>
+  </div>
+</div>

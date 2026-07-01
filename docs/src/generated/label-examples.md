@@ -14,24 +14,23 @@ On wide media the elements flow in a row; spacing comes from `element_gap_mm` in
 *DYMO 11352 · 25×54 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
-# default element gap (left)
+# default element gap
 $ lbl print \
   --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
-  --orientation landscape \
   --qr-size-mm 9 \
   --barcode-height-mm 7 \
   --padding-mm 1
 
-# element gap 8 mm (right)
+# element gap 8 mm
 LBL_STYLE__ELEMENT_GAP_MM=8 $ lbl print \
   --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
-  --orientation landscape \
   --qr-size-mm 9 \
   --barcode-height-mm 7 \
   --padding-mm 1
 ```
 
 <img src="images/inline-syntax.png" alt="Inline mini-syntax" width="320"/>
+<img src="images/inline-syntax-01.png" alt="Inline mini-syntax" width="320"/>
 ---
 
 ## Markdown input
@@ -53,17 +52,15 @@ $ lbl print \
 
 One HTML layout rendered against a JSON array — here, name badges with QR for two people.
 
-*DYMO 11352 · 25×54 mm* · [Batch printing →](../guides/batch-printing.md#template--data)
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](../guides/batch-printing.md#template--data)
 
 [card.html](../../examples/batch-card/card.html)
 
 ```html
-<div class="lbl-label lbl-row lbl-center">
-  <div class="lbl-col">
-    <strong>{{ name }}</strong>
-    <span>{{ title }}</span>
-    <qr>{{ url }}</qr>
-  </div>
+<div class="lbl-label lbl-col lbl-center">
+  <strong>{{ name }}</strong>
+  <span>{{ title }}</span>
+  <qr>{{ url }}</qr>
 </div>
 ```
 
@@ -90,53 +87,41 @@ $ lbl print \
   --template card.html \
   --template-format html \
   --data people.json \
-  --orientation portrait \
-  --qr-size-mm 9 \
+  --qr-size-mm 7 \
   --padding-mm 1
 ```
 
 <img src="images/batch-card.png" alt="Batch HTML template" width="320"/>
-<img src="images/batch-card-01.png" alt="Batch HTML template" width="320"/>
 ---
 
 ## Single-file template and data
 
-Data and template can live in one file — frontmatter holds the records, the body is the layout.
+Data and template can live in one file — a JSON frontmatter array batches without `--each`.
 
-*DYMO 11352 · 25×54 mm* · [Batch printing →](../guides/batch-printing.md#single-file-frontmatter)
+*NIIMBOT 12×22 mm @ 203 dpi* · [Batch printing →](../guides/batch-printing.md#single-file-frontmatter)
 
 [combined.html](../../examples/batch-combined/combined.html)
 
 ```html
----toml
-[[items]]
-name = "Alice"
-title = "Engineer"
-
-[[items]]
-name = "Bob"
-title = "Designer"
+---json
+[
+  { "name": "Alice", "title": "Engineer" },
+  { "name": "Bob", "title": "Designer" }
+]
 ---
-<div class="lbl-label lbl-row lbl-center">
-  <div class="lbl-col">
-    <strong>{{ name }}</strong>
-    <span>{{ title }}</span>
-  </div>
+<div class="lbl-label lbl-col lbl-center">
+  <strong>{{ name }}</strong>
+  <span>{{ title }}</span>
 </div>
 ```
 
 ```console
-$ cd docs/examples/batch-combined
 $ lbl print \
   --template combined.html \
-  --template-format html \
-  --each /items \
-  --orientation portrait \
-  --padding-mm 1
+  --template-format html
 ```
 
 <img src="images/batch-combined.png" alt="Single-file template and data" width="320"/>
-<img src="images/batch-combined-01.png" alt="Single-file template and data" width="320"/>
 ---
 
 ## Linux pipeline batching
@@ -147,10 +132,8 @@ Pipe shell output into `lbl print` — `seq | xargs -n1 lbl print … --data` ru
 *NIIMBOT 12×22 mm @ 203 dpi* · [Batch printing →](../guides/batch-printing.md#shell-iteration-seq-and-xargs)
 
 ```console
-$ seq 1 3 | xargs -n1 lbl print \
-  --template 'User #{{ it }}' \
-  --padding-mm 0 \
-  --data
+# example
+$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data
 ```
 
 <img src="images/shell-template.png" alt="Linux pipeline batching" width="320"/>
@@ -165,44 +148,38 @@ Position content across the label width with `--label-align` (`start`, `center`,
 *DYMO 11352 · 25×54 mm* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
-# start (left)
-$ lbl print \
-  --text Align \
-  --orientation landscape \
-  --label-align start
+# align left
+# example
+$ lbl print --label-align start --text 'align left'
 
-# center (middle)
-$ lbl print \
-  --text Align \
-  --orientation landscape \
-  --label-align center
+# align center
+# example
+$ lbl print --label-align center --text 'align center'
 
-# end (right)
-$ lbl print \
-  --text Align \
-  --orientation landscape \
-  --label-align end
+# align right
+# example
+$ lbl print --label-align end --text 'align right'
 ```
 
 <img src="images/label-align.png" alt="Cross-axis alignment" width="320"/>
+<img src="images/label-align-01.png" alt="Cross-axis alignment" width="320"/>
+<img src="images/label-align-02.png" alt="Cross-axis alignment" width="320"/>
 ---
 
 ## Inner padding
 
-Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge. Compare none vs generous padding.
+Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge.
 
 *NIIMBOT 12×30 mm @ 203 dpi* · [Configuration →](../guides/configuration.md#padding-and-insets)
 
 ```console
 # padding 0 (left)
-$ lbl print \
-  --text 'ABC 123' \
-  --padding-mm 0
+# example
+$ lbl print --text Hi --padding-mm 0
 
 # padding 8 mm (right)
-$ lbl print \
-  --text 'ABC 123' \
-  --padding-mm 8
+# example
+$ lbl print --text Hi --padding-mm 8
 ```
 
 <img src="images/zero-padding.png" alt="Inner padding" width="320"/>
@@ -226,10 +203,8 @@ orientation = "landscape"
 ```
 
 ```console
-$ cd docs/examples/config-defaults
-# lbl.toml in this directory applies
-$ lbl print \
-  --text 'Hello {{qr:https://x/p}}'
+# example
+$ lbl print --text 'Hello {{qr:https://x/p}}'
 ```
 
 <img src="images/config-defaults.png" alt="Config-driven print defaults" width="320"/>
@@ -242,32 +217,14 @@ More render dots before downscaling yield sharper barcodes and small type.
 
 *DYMO 11352 · 25×54 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
 
-[pattern.html](../../examples/supersample/pattern.html)
-
-```html
-<div class="lbl-label lbl-col">
-  <div class="lbl-text" style="font-size:0.55em">SMALL AaBbCc 0123456789</div>
-  <div class="lbl-row lbl-center">
-    <barcode type="EAN13">4006381333931</barcode>
-    <div class="lbl-text" style="font-size:0.65em">SKU 7788</div>
-  </div>
-  <div class="lbl-text" style="font-size:0.45em">Thin strokes · fine detail · edge aliasing</div>
-</div>
-```
-
 ```console
-$ cd docs/examples/supersample
 # supersample 1 (left)
-$ lbl print \
-  --html pattern.html \
-  --orientation landscape \
-  --supersample 1
+# example
+$ lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 1
 
 # supersample 8 (right)
-$ lbl print \
-  --html pattern.html \
-  --orientation landscape \
-  --supersample 8
+# example
+$ lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 8
 ```
 
 <img src="images/supersample.png" alt="Supersampling for print quality" width="320"/>
@@ -275,32 +232,99 @@ $ lbl print \
 
 ## Catalog media SKU
 
-Pick a die-cut size from the bundled catalog with `--media` instead of passing raw `--width-mm` / `--length-mm`.
+Pick a die-cut size from the bundled catalog with `--media` instead of raw `--width-mm` / `--length-mm`.
 
 *NIIMBOT 12×40 mm @ 203 dpi* · [Printers & media →](../guides/printers-media.md#niimbot)
 
 ```console
-$ lbl print \
-  --media 12x40 \
-  --dpi 203 \
-  --text 'Dock 4'
+# example
+$ lbl print --media 12x40 --text 12x40
 ```
 
 <img src="images/niimbot-catalog.png" alt="Catalog media SKU" width="320"/>
+---
+
+## Another catalog SKU
+
+Another die-cut size from the same catalog — only `--media` and content change.
+
+*NIIMBOT 12×22 mm @ 203 dpi* · [Printers & media →](../guides/printers-media.md#niimbot)
+
+```console
+# example
+$ lbl print --media 12x22 --text 12x22
+```
+
+<img src="images/niimbot-catalog-2.png" alt="Another catalog SKU" width="320"/>
 ---
 
 ## Explicit media dimensions
 
 When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly.
 
-*56×89 mm @ 300 dpi* · [Printers & media →](../guides/printers-media.md#media)
+*48×76 mm @ 300 dpi* · [Printers & media →](../guides/printers-media.md#media)
 
 ```console
 $ lbl print \
   --text $'Receipt\nItem ×2  $18.00\nTotal      $36.00' \
-  --width-mm 56 \
-  --length-mm 89 \
+  --width-mm 48 \
+  --length-mm 76 \
   --dpi 300
 ```
 
 <img src="images/fixed-dimensions.png" alt="Explicit media dimensions" width="320"/>
+---
+
+## Complex HTML batch
+
+Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from the test suite.
+
+*DYMO 99014 · 54×101 mm* · [Batch printing →](../guides/batch-printing.md#template--data)
+
+[sopranos.lbl](../../examples/sopranos/sopranos.lbl)
+
+```text
+---json
+[
+  {
+    "name": "Tony Soprano",
+    "role": "Boss",
+    "department": "DiMeo Crime Family",
+    "employee_id": "NJ-BOSS-001",
+    "event": "The Sopranos",
+    "access": "CAPO DI TUTTI CAPI",
+    "badge_number": "001",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Tony_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  },
+  {
+    "name": "Carmela Soprano",
+    "role": "First Lady",
+    "department": "Soprano Household",
+    "employee_id": "NJ-CARM-002",
+    "event": "The Sopranos",
+    "access": "NORTH CALDWELL",
+    "badge_number": "002",
+    "photo": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Carmela_Soprano_%28The_Sopranos_Family_Tree%29.jpg"
+  }
+]
+---
+<div class="lbl-label lbl-col lbl-center">
+  <div class="lbl-text" style="font-size:0.62em">{{ event }}</div>
+  <img src="{{ photo }}" alt="" style="width:12em;height:14em;object-fit:cover" />
+  <span class="lbl-text" style="font-size:1.2em;font-weight:bold">{{ name }}</span>
+  <span class="lbl-text" style="font-size:0.85em">{{ role }} · {{ department }}</span>
+  <qr>https://id.lbl.example/{{ employee_id }}</qr>
+  <barcode type="CODE128">{{ employee_id }}</barcode>
+  <div class="lbl-row lbl-between" style="width:100%">
+    <span class="lbl-text" style="font-size:0.55em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.55em">#{{ badge_number }}</span>
+  </div>
+</div>
+```
+
+```console
+# example
+$ lbl print --template sopranos.lbl --template-format html
+```
+
+<img src="images/sopranos-cards.png" alt="Complex HTML batch" width="320"/>

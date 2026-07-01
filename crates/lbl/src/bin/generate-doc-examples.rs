@@ -93,11 +93,21 @@ struct Example {
     xargs: Option<String>,
     #[serde(default)]
     show_media: bool,
+    #[serde(default = "default_true")]
+    show_dpi: bool,
+    #[serde(default)]
+    hide_cd: bool,
+    #[serde(default)]
+    single_line: bool,
     #[serde(default)]
     render_args: Vec<String>,
     #[serde(default)]
     compare: Vec<CompareVariant>,
     args: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn main() -> ExitCode {
@@ -517,7 +527,9 @@ fn format_num(n: f64) -> String {
     }
 }
 
-const COMPOSITE_GAP_PX: u32 = 12;
+const COMPOSITE_GAP_PX: u32 = 24;
+const COMPOSITE_BG: [u8; 4] = [176, 176, 176, 255];
+const COMPOSITE_DIVIDER: [u8; 4] = [64, 64, 64, 255];
 
 /// Collect the base PNG and numbered batch siblings (`out.png`, `out-01.png`, …).
 fn collect_label_pngs(base: &Path) -> Result<Vec<PathBuf>> {
@@ -564,21 +576,30 @@ fn composite_side_by_side(base: &Path) -> Result<()> {
         .collect::<Result<_>>()?;
 
     let gap = COMPOSITE_GAP_PX;
-    let total_w: u32 =
-        images.iter().map(image::RgbaImage::width).sum::<u32>() + gap * (images.len() as u32 - 1);
+    let divider = gap / 3;
+    let total_w: u32 = images.iter().map(image::RgbaImage::width).sum::<u32>()
+        + divider * (images.len().saturating_sub(1) as u32)
+        + gap * (images.len().saturating_sub(1) as u32);
     let max_h = images
         .iter()
         .map(image::RgbaImage::height)
         .max()
         .unwrap_or(0);
 
-    let mut canvas =
-        image::RgbaImage::from_pixel(total_w, max_h, image::Rgba([255, 255, 255, 255]));
+    let mut canvas = image::RgbaImage::from_pixel(total_w, max_h, image::Rgba(COMPOSITE_BG));
     let mut x = 0u32;
-    for img in &images {
+    for (i, img) in images.iter().enumerate() {
         let y = (max_h.saturating_sub(img.height())) / 2;
         image::imageops::overlay(&mut canvas, img, i64::from(x), i64::from(y));
-        x += img.width() + gap;
+        x += img.width();
+        if i + 1 < images.len() {
+            for dx in 0..divider {
+                for dy in 0..max_h {
+                    canvas.put_pixel(x + dx, dy, image::Rgba(COMPOSITE_DIVIDER));
+                }
+            }
+            x += divider + gap;
+        }
     }
 
     canvas
@@ -592,7 +613,7 @@ fn composite_side_by_side(base: &Path) -> Result<()> {
 
 fn format_display_command(example: &Example) -> String {
     let mut out = String::new();
-    if let Some(dir) = &example.dir {
+    if let Some(dir) = example.dir.as_ref().filter(|_| !example.hide_cd) {
         out.push_str("$ cd docs/examples/");
         out.push_str(dir);
         out.push('\n');
@@ -604,6 +625,15 @@ fn format_display_command(example: &Example) -> String {
     }
 
     if let Some(xargs) = &example.xargs {
+        if example.single_line {
+            let args = format_print_arg_lines(&display_args_for(example, None)).join(" ");
+            out.push_str("# example\n$ ");
+            out.push_str(xargs);
+            out.push_str(" | xargs -n1 lbl print ");
+            out.push_str(&args);
+            out.push_str(" --data");
+            return out;
+        }
         out.push_str("$ ");
         out.push_str(xargs);
         out.push_str(" | xargs -n1 lbl print \\\n");
@@ -626,19 +656,21 @@ fn format_display_command(example: &Example) -> String {
                 .clone()
                 .unwrap_or_else(|| "variant".to_string());
             let prefix = format_compare_env_prefix(&variant.env);
-            blocks.push(format!(
-                "# {}\n{}{}",
-                label,
-                prefix,
-                format_lbl_print_block(&display_args_for(example, Some(&variant.args)))
-            ));
+            let block = format_lbl_print_block(
+                &display_args_for(example, Some(&variant.args)),
+                example.single_line,
+            );
+            blocks.push(format!("# {}\n{}{}", label, prefix, block));
         }
         out.push_str(&blocks.join("\n\n"));
         return out.trim_end().to_string();
     }
 
-    out.push_str(&format_lbl_print_block(&display_args_for(example, None)));
-    ensure_command_block_has_context(&mut out);
+    let mut block = format_lbl_print_block(&display_args_for(example, None), example.single_line);
+    if !example.single_line {
+        ensure_command_block_has_context(&mut block);
+    }
+    out.push_str(&block);
     out.trim_end().to_string()
 }
 
@@ -686,9 +718,11 @@ fn display_media_args(example: &Example) -> Vec<String> {
         out
     } else if example.show_media {
         let mut out = vec!["--media".to_string(), example.media.clone()];
-        if let Some(dpi) = example.dpi {
-            out.push("--dpi".to_string());
-            out.push(format_num(dpi));
+        if example.show_dpi {
+            if let Some(dpi) = example.dpi {
+                out.push("--dpi".to_string());
+                out.push(format_num(dpi));
+            }
         }
         out
     } else {
@@ -708,10 +742,13 @@ fn format_compare_env_prefix(env: &HashMap<String, String>) -> String {
     format!("{} ", parts.join(" "))
 }
 
-fn format_lbl_print_block(args: &[String]) -> String {
+fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
     let arg_lines = format_print_arg_lines(args);
     if arg_lines.is_empty() {
         return "$ lbl print".to_string();
+    }
+    if single_line {
+        return format!("# example\n$ lbl print {}", arg_lines.join(" "));
     }
     let mut out = String::from("$ lbl print \\\n");
     for (idx, line) in arg_lines.iter().enumerate() {
@@ -1097,6 +1134,9 @@ mod tests {
             separate_images: false,
             xargs: None,
             show_media: false,
+            show_dpi: true,
+            hide_cd: false,
+            single_line: false,
             render_args: Vec::new(),
             compare: Vec::new(),
             args: args.into_iter().map(str::to_string).collect(),
@@ -1121,6 +1161,27 @@ mod tests {
     }
 
     #[test]
+    fn format_display_command_single_line() {
+        let mut ex = example_with(vec!["--text", "hello"]);
+        ex.single_line = true;
+        assert_eq!(
+            format_display_command(&ex),
+            "# example\n$ lbl print --text hello"
+        );
+    }
+
+    #[test]
+    fn format_display_command_hides_cd_when_requested() {
+        let mut ex = example_with(vec!["--template", "card.html"]);
+        ex.dir = Some("batch-card".into());
+        ex.hide_cd = true;
+        assert_eq!(
+            format_display_command(&ex),
+            "$ lbl print \\\n  --template card.html"
+        );
+    }
+
+    #[test]
     fn format_display_command_includes_cd_for_example_dir() {
         let mut ex = example_with(vec!["--template", "card.html"]);
         ex.dir = Some("batch-card".into());
@@ -1132,14 +1193,12 @@ mod tests {
 
     #[test]
     fn format_display_command_formats_xargs_pipeline() {
-        let mut ex = example_with(vec!["--template", "User #{{ it }}", "--padding-mm", "0"]);
+        let mut ex = example_with(vec!["--template", "User #{{ it }}"]);
         ex.xargs = Some("seq 1 3".into());
+        ex.single_line = true;
         assert_eq!(
             format_display_command(&ex),
-            "$ seq 1 3 | xargs -n1 lbl print \\\n  \
-             --template 'User #{{ it }}' \\\n  \
-             --padding-mm 0 \\\n  \
-             --data"
+            "# example\n$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data"
         );
     }
 
@@ -1174,6 +1233,16 @@ mod tests {
             display_media_args(&ex),
             vec!["--media", "12x40", "--dpi", "203"]
         );
+    }
+
+    #[test]
+    fn display_media_args_omits_dpi_when_disabled() {
+        let mut ex = example_with(vec!["--text", "Hi"]);
+        ex.media = "12x40".into();
+        ex.dpi = Some(203.0);
+        ex.show_media = true;
+        ex.show_dpi = false;
+        assert_eq!(display_media_args(&ex), vec!["--media", "12x40"]);
     }
 
     #[test]
