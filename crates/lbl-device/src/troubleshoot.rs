@@ -182,12 +182,21 @@ fn linux_permission_troubleshooting(target: &TransportTarget, style: &Style) -> 
 }
 
 #[cfg(target_os = "linux")]
+struct UsbNodeInfo {
+    path: PathBuf,
+    mode: Option<String>,
+    owner: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
 fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: &Style) -> String {
     let group = "plugdev";
     let groups = current_group_names();
     let in_group = groups.iter().any(|g| g == group);
-    let device = find_usb_device_node(vendor_id, product_id);
-    let udev_rule = udev_rule_for_vendor(vendor_id);
+    let enumerated = usb_device_enumerated(vendor_id, product_id);
+    let node_info = find_usb_device_node(vendor_id, product_id);
+    let connected = enumerated || node_info.is_some();
+    let udev_access_rule = udev_access_rule_for_vendor(vendor_id);
 
     let mut out = format!(
         "{}\n",
@@ -198,22 +207,36 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
         style,
         &format!(
             "Target device {vendor_id:04x}:{product_id:04x} {}",
-            if device.is_some() {
-                "is connected"
+            if enumerated {
+                "is connected (visible to USB enumeration)"
+            } else if node_info.is_some() {
+                "is connected (visible in sysfs)"
             } else {
                 "was not found — check that it is plugged in"
             }
         ),
     );
 
-    if let Some((node, mode, owner)) = device {
+    if let Some(info) = node_info {
         push_bullet(
             &mut out,
             style,
-            &format!(
-                "Device node {} is {mode} owned by {owner}",
-                node.display()
-            ),
+            &match (&info.mode, &info.owner) {
+                (Some(mode), Some(owner)) => format!(
+                    "Device node {} is {mode} owned by {owner}",
+                    info.path.display()
+                ),
+                _ => format!(
+                    "Device node {} exists but its permissions could not be read",
+                    info.path.display()
+                ),
+            },
+        );
+    } else if connected {
+        push_bullet(
+            &mut out,
+            style,
+            "Could not resolve the /dev/bus/usb device node (permissions may still be wrong)",
         );
     }
 
@@ -231,11 +254,20 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
         );
     }
 
-    if let Some(path) = &udev_rule {
+    if let Some(path) = &udev_access_rule {
         push_bullet(
             &mut out,
             style,
-            &format!("Found a udev rule that may apply: {}", path.display()),
+            &format!(
+                "Found a udev rule that grants device access: {}",
+                path.display()
+            ),
+        );
+    } else {
+        push_bullet(
+            &mut out,
+            style,
+            &format!("No udev rule grants `{group}` access to vendor {vendor_id:04x}"),
         );
     }
 
@@ -264,48 +296,33 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
             );
             step += 1;
         }
-    } else {
-        push_step(
-            &mut out,
-            style,
-            step,
-            &format!(
-                "If `{group}` was added recently, log out and back in so the new membership \
-                 takes effect"
-            ),
-            "",
-            "",
-        );
-        step += 1;
     }
 
-    if udev_rule.is_none() {
+    if udev_access_rule.is_none() {
         push_step(
             &mut out,
             style,
             step,
-            "Install a udev rule (then reload udev and replug the printer):",
+            &format!(
+                "Install a udev rule granting `{group}` access (then reload udev and replug \
+                 the printer):"
+            ),
             "",
             "",
         );
         step += 1;
-        push_indented_command(
-            &mut out,
-            style,
-            "sudo tee /etc/udev/rules.d/99-lbl-printer.rules <<'EOF'",
+        let udev_rule_line = format!(
+            "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{vendor_id:04x}\", GROUP=\"{group}\", MODE=\"0660\""
         );
-        push_indented_command(
+        push_shell_block(
             &mut out,
             style,
-            &format!(
-                "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{vendor_id:04x}\", GROUP=\"{group}\", MODE=\"0660\""
-            ),
-        );
-        push_indented_command(&mut out, style, "EOF");
-        push_indented_command(
-            &mut out,
-            style,
-            "sudo udevadm control --reload-rules && sudo udevadm trigger",
+            &[
+                "sudo tee /etc/udev/rules.d/99-lbl-printer.rules <<'EOF'",
+                &udev_rule_line,
+                "EOF",
+                "sudo udevadm control --reload-rules && sudo udevadm trigger",
+            ],
         );
     } else {
         push_step(
@@ -317,6 +334,20 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
             "so udev permissions apply)",
         );
         step += 1;
+        if in_group {
+            push_step(
+                &mut out,
+                style,
+                step,
+                &format!(
+                    "If `{group}` membership or the udev rule changed recently, log out and \
+                     back in"
+                ),
+                "",
+                "",
+            );
+            step += 1;
+        }
     }
 
     push_step(
@@ -470,8 +501,11 @@ fn push_step(out: &mut String, style: &Style, step: usize, before: &str, command
     }
 }
 
-fn push_indented_command(out: &mut String, style: &Style, command: &str) {
-    let _ = write!(out, "\n     {}", style.command(command));
+fn push_shell_block(out: &mut String, style: &Style, lines: &[&str]) {
+    for line in lines {
+        out.push('\n');
+        out.push_str(&style.command(line));
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -516,8 +550,25 @@ fn group_names_by_gid() -> std::collections::HashMap<String, String> {
     map
 }
 
+#[cfg(all(target_os = "linux", feature = "usb"))]
+fn usb_device_enumerated(vendor_id: u16, product_id: u16) -> bool {
+    use nusb::MaybeFuture;
+
+    nusb::list_devices()
+        .wait()
+        .ok()
+        .is_some_and(|mut devices| {
+            devices.any(|d| d.vendor_id() == vendor_id && d.product_id() == product_id)
+        })
+}
+
+#[cfg(all(target_os = "linux", not(feature = "usb")))]
+fn usb_device_enumerated(_vendor_id: u16, _product_id: u16) -> bool {
+    false
+}
+
 #[cfg(target_os = "linux")]
-fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<(PathBuf, String, String)> {
+fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<UsbNodeInfo> {
     let sys = Path::new("/sys/bus/usb/devices");
     let entries = std::fs::read_dir(sys).ok()?;
     for entry in entries.flatten() {
@@ -532,9 +583,13 @@ fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<(PathBuf, Str
         }
         let bus = read_trimmed(&base.join("busnum"))?;
         let dev = read_trimmed(&base.join("devnum"))?;
-        let node = PathBuf::from(format!("/dev/bus/usb/{bus}/{dev}"));
-        let (mode, owner) = node_metadata(node.to_str()?)?;
-        return Some((node, mode, owner));
+        let path = PathBuf::from(format!("/dev/bus/usb/{bus}/{dev}"));
+        let perms = path.to_str().and_then(node_metadata);
+        return Some(UsbNodeInfo {
+            path,
+            mode: perms.as_ref().map(|(mode, _)| mode.clone()),
+            owner: perms.as_ref().map(|(_, owner)| owner.clone()),
+        });
     }
     None
 }
@@ -581,8 +636,20 @@ fn user_name(uid: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn udev_rule_for_vendor(vendor_id: u16) -> Option<PathBuf> {
+fn udev_line_grants_access(line: &str, vendor_id: u16) -> bool {
+    if line.trim_start().starts_with('#') {
+        return false;
+    }
+    let lower = line.to_lowercase();
     let needle = format!("{vendor_id:04x}");
+    if !lower.contains("idvendor") || !lower.contains(&needle) {
+        return false;
+    }
+    lower.contains("group=") || lower.contains("mode=") || lower.contains("uaccess")
+}
+
+#[cfg(target_os = "linux")]
+fn udev_access_rule_for_vendor(vendor_id: u16) -> Option<PathBuf> {
     for dir in ["/etc/udev/rules.d", "/usr/lib/udev/rules.d", "/lib/udev/rules.d"] {
         let Ok(entries) = std::fs::read_dir(dir) else {
             continue;
@@ -595,7 +662,10 @@ fn udev_rule_for_vendor(vendor_id: u16) -> Option<PathBuf> {
             let Ok(content) = std::fs::read_to_string(&path) else {
                 continue;
             };
-            if content.contains("idVendor") && content.to_lowercase().contains(&needle) {
+            if content
+                .lines()
+                .any(|line| udev_line_grants_access(line, vendor_id))
+            {
                 return Some(path);
             }
         }
@@ -640,11 +710,44 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn udev_line_grants_access_requires_group_or_mode() {
+        assert!(udev_line_grants_access(
+            r#"SUBSYSTEM=="usb", ATTR{idVendor}=="0922", GROUP="plugdev", MODE="0660""#,
+            0x0922
+        ));
+        assert!(!udev_line_grants_access(
+            r#"ATTR{idVendor}=="0922", ATTR{idProduct}=="1001", RUN+="usb_modeswitch '/%k'""#,
+            0x0922
+        ));
+        assert!(!udev_line_grants_access(
+            r#"# ATTR{idVendor}=="0922", GROUP="plugdev""#,
+            0x0922
+        ));
+    }
+
+    #[test]
+    fn shell_block_starts_at_column_zero() {
+        let mut out = String::new();
+        push_shell_block(
+            &mut out,
+            &Style { color: false },
+            &["sudo tee file <<'EOF'", "rule", "EOF"],
+        );
+        assert!(out.contains("\nsudo tee file <<'EOF'\nrule\nEOF"));
+        assert!(!out.contains("\n     EOF"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn usb_troubleshooting_skips_group_step_when_already_member() {
         let msg = linux_usb_permission_troubleshooting(0x0922, 0x0028, &Style { color: false });
         if current_group_names().iter().any(|g| g == "plugdev") {
             assert!(msg.contains("already in the `plugdev` group"));
             assert!(!msg.contains("sudo usermod -aG plugdev"));
+            assert!(
+                msg.contains("Install a udev rule granting `plugdev` access")
+                    || msg.contains("Unplug and replug the printer")
+            );
         } else {
             assert!(msg.contains("not in the `plugdev` group"));
             assert!(msg.contains("sudo usermod -aG plugdev"));
