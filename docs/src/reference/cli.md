@@ -18,9 +18,10 @@ lbl device    Discover printers (list)
 ```text
 --text <T> | --html <FILE|-> | --template <FILE> [--data <FILE>] [--each <PTR>]
 --media <SKU> | --width-mm <MM> [--length-mm <MM>]   --dpi <DPI>
---protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console>
+--protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console|html>
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;
-                     virtual = image file; console = terminal art)
+                     virtual = image file; console = terminal art;
+                     html = browser gallery of PNG previews)
 --supersample <N>   High-res render factor before downscale (default: 3, or
                     `[render] supersample` from config). See Rendering Quality guide.
 --dither <auto|floyd-steinberg|ordered|none>
@@ -56,6 +57,17 @@ wait for the printer's status to confirm completion between labels.
 half-block art (black ink on white media when stdout is a TTY) instead of
 sending it to a device — handy for a quick look without hardware or an image
 viewer. With `--file`/`--out-dir` it writes the plain (uncolored) art to a file.
+
+`--protocol html` writes a browser gallery backed by a Nuxt UI app: `index.html`
+plus an `images/` subdirectory of full-resolution PNGs (one per label). Tabs cover
+**Labels** (filterable cards with optional per-label data), **Printer**, **Media**,
+**Template**, and **Data**. By default the bundle lands in a temp directory; pass
+`--out-dir` or `--file path/to/index.html` to choose the location.
+`--open-browser` serves the bundle on `http://127.0.0.1:<port>/` and opens it
+(browsers block ES modules on `file://`, so double-clicking `index.html` will
+not work). Without `--open-browser`, serve the directory yourself, e.g.
+`python3 -m http.server 8080 --bind 127.0.0.1`. Rebuild the embedded UI with
+`just preview-ui-build` after editing `crates/lbl/preview-ui/`.
 
 `--confirm` shows that same preview for each label and waits for a single
 `y` keypress (`n` or `q` cancels) before printing to any non-console output.
