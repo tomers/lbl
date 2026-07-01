@@ -37,7 +37,7 @@ struct Cli {
     /// is rasterized at this multiple of the target device dots, then
     /// downscaled before dithering. Also scales mm→px style conversion during
     /// transpilation.
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 4)]
     supersample: u32,
 
     /// Rendering backend.

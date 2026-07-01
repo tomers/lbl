@@ -45,15 +45,19 @@ pub struct RenderConfig {
     /// default because stripe labels are usually printed along their longer
     /// dimension.
     pub orientation: Orientation,
+    /// Warn after a hardware print when print efficiency (`print time ÷ total
+    /// time`) falls below this fraction (0.0–1.0). Set to `0` to disable.
+    pub efficiency_warn_below: f64,
 }
 
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {
-            supersample: 3,
+            supersample: 4,
             dither: "floyd-steinberg".to_string(),
             use_sidecar: false,
             orientation: Orientation::default(),
+            efficiency_warn_below: 0.55,
         }
     }
 }

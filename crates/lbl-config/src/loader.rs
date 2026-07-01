@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn defaults_load_when_no_files_present() {
         let cfg = Loader::with_paths(empty_paths()).load().unwrap();
-        assert_eq!(cfg.render.supersample, 3);
+        assert_eq!(cfg.render.supersample, 4);
         assert_eq!(cfg.render.dither, "floyd-steinberg");
         assert!(cfg.catalog.affiliate_enabled);
     }
@@ -188,7 +188,7 @@ mod tests {
     fn format_effective_includes_sources() {
         let loader = Loader::with_paths(empty_paths());
         let out = format_effective(&loader, true).unwrap();
-        assert!(out.contains("\"supersample\": 3"));
+        assert!(out.contains("\"supersample\": 4"));
         assert!(out.contains("Sources\n"));
         assert!(out.contains("render.supersample"));
     }
