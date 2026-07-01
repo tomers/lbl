@@ -2,9 +2,9 @@
 
 use std::io::Read;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use lbl_device::{discover, NetworkTransport, Transport};
+use lbl_device::{discover, format_send_failure, NetworkTransport, Transport, TransportTarget};
 
 #[derive(Parser)]
 #[command(
@@ -88,7 +88,7 @@ fn send(
             .rsplit_once(':')
             .ok_or_else(|| anyhow::anyhow!("network target must be host:port"))?;
         let mut t = NetworkTransport::new(host, port.parse()?);
-        t.send(data)?;
+        t.send(data).context("send failed")?;
         return Ok(());
     }
 
@@ -97,10 +97,16 @@ fn send(
         let (vid, pid) = target
             .split_once(':')
             .ok_or_else(|| anyhow::anyhow!("usb target must be vid:pid (hex)"))?;
-        let vid = u16::from_str_radix(vid, 16)?;
-        let pid = u16::from_str_radix(pid, 16)?;
-        let mut t = lbl_device::UsbTransport::new(vid, pid, None);
-        t.send(data)?;
+        let vendor_id = u16::from_str_radix(vid, 16)?;
+        let product_id = u16::from_str_radix(pid, 16)?;
+        let mut t = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+        let transport_target = TransportTarget::Usb {
+            vendor_id,
+            product_id,
+        };
+        if let Err(err) = t.send(data) {
+            bail!(format_send_failure(&err, Some(&transport_target)));
+        }
         return Ok(());
     }
     #[cfg(not(feature = "usb"))]
@@ -109,8 +115,13 @@ fn send(
     #[cfg(feature = "serial")]
     if let Some(target) = serial {
         let (path, baud) = parse_serial(&target);
+        let transport_target = TransportTarget::Serial {
+            path: path.clone(),
+        };
         let mut t = lbl_device::SerialTransport::new(path, baud);
-        t.send(data)?;
+        if let Err(err) = t.send(data) {
+            bail!(format_send_failure(&err, Some(&transport_target)));
+        }
         return Ok(());
     }
     #[cfg(not(feature = "serial"))]

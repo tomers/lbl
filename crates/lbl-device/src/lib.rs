@@ -20,6 +20,7 @@
 pub mod discovery;
 pub mod media;
 pub mod transport;
+pub mod troubleshoot;
 
 #[cfg(feature = "ble")]
 pub mod ble;
@@ -37,8 +38,10 @@ pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};
 #[cfg(feature = "ble")]
 pub use transport::{BleTransport, BLE_DEFAULT_CHUNK, BLE_DEFAULT_SCAN_SECS};
 
+pub use troubleshoot::{format_dispatch_failure, format_send_failure, TransportTarget};
+
 /// Errors produced by the device layer.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DeviceError {
     /// The requested device could not be found.
     #[error("device not found: {0}")]

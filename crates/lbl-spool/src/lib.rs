@@ -87,6 +87,8 @@ pub struct SpoolReport {
     pub remaining: usize,
     /// Set when the run aborted because the device became unreachable.
     pub disconnected: bool,
+    /// The last transport error when [`disconnected`](Self::disconnected) is set.
+    pub last_error: Option<DeviceError>,
 }
 
 /// The print spooler.
@@ -209,7 +211,8 @@ impl Spooler {
                 self.queue.push_front(job);
                 report.disconnected = true;
                 report.remaining = self.queue.len();
-                if let Some(e) = last_err {
+                report.last_error = last_err;
+                if let Some(e) = &report.last_error {
                     tracing::warn!("last error: {e}");
                 }
                 return report;
@@ -308,6 +311,10 @@ mod tests {
         assert!(report.disconnected);
         assert_eq!(report.completed, 0);
         assert_eq!(report.remaining, 2);
+        assert!(matches!(
+            report.last_error,
+            Some(DeviceError::NotFound(_))
+        ));
         // The failed job remains queued (not lost) for a later retry.
         assert_eq!(spool.state(a), Some(JobState::Queued));
         assert_eq!(spool.pending(), 2);

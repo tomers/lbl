@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use lbl_device::NetworkTransport;
+use lbl_device::{format_dispatch_failure, NetworkTransport, TransportTarget};
 use lbl_spool::Spooler;
 
 #[derive(Parser)]
@@ -41,12 +41,12 @@ fn main() -> Result<()> {
         spool.enqueue(name, bytes, None);
     }
 
-    let report = if let Some(target) = cli.network {
+    let (report, target) = if let Some(target) = cli.network {
         let (host, port) = target
             .rsplit_once(':')
             .ok_or_else(|| anyhow::anyhow!("network target must be host:port"))?;
         let mut t = NetworkTransport::new(host, port.parse()?);
-        spool.run(&mut t)
+        (spool.run(&mut t), None)
     } else if let Some(target) = cli.usb {
         run_usb(&mut spool, &target)?
     } else if let Some(target) = cli.serial {
@@ -55,39 +55,60 @@ fn main() -> Result<()> {
         bail!("no target; use --network host:port, --usb vid:pid, or --serial path[:baud]")
     };
 
-    println!(
-        "completed={} failed={} remaining={} disconnected={}",
-        report.completed, report.failed, report.remaining, report.disconnected
-    );
     if report.disconnected {
+        eprintln!(
+            "completed={} failed={} remaining={} disconnected={}",
+            report.completed, report.failed, report.remaining, report.disconnected
+        );
+        if let Some(err) = report.last_error.as_ref() {
+            bail!(format_dispatch_failure(err, target.as_ref(), report.remaining));
+        }
         bail!(
             "device disconnected; {} job(s) retained in queue",
             report.remaining
         );
     }
+
+    println!(
+        "completed={} failed={} remaining={} disconnected={}",
+        report.completed, report.failed, report.remaining, report.disconnected
+    );
     Ok(())
 }
 
 #[cfg(feature = "usb")]
-fn run_usb(spool: &mut Spooler, target: &str) -> Result<lbl_spool::SpoolReport> {
+fn run_usb(
+    spool: &mut Spooler,
+    target: &str,
+) -> Result<(lbl_spool::SpoolReport, Option<TransportTarget>)> {
     let (vid, pid) = target
         .split_once(':')
         .ok_or_else(|| anyhow::anyhow!("usb target must be vid:pid (hex)"))?;
-    let mut t = lbl_device::UsbTransport::new(
-        u16::from_str_radix(vid, 16)?,
-        u16::from_str_radix(pid, 16)?,
-        None,
-    );
-    Ok(spool.run(&mut t))
+    let vendor_id = u16::from_str_radix(vid, 16)?;
+    let product_id = u16::from_str_radix(pid, 16)?;
+    let mut t = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+    Ok((
+        spool.run(&mut t),
+        Some(TransportTarget::Usb {
+            vendor_id,
+            product_id,
+        }),
+    ))
 }
 
 #[cfg(not(feature = "usb"))]
-fn run_usb(_spool: &mut Spooler, _target: &str) -> Result<lbl_spool::SpoolReport> {
+fn run_usb(
+    _spool: &mut Spooler,
+    _target: &str,
+) -> Result<(lbl_spool::SpoolReport, Option<TransportTarget>)> {
     bail!("USB support not compiled in")
 }
 
 #[cfg(feature = "serial")]
-fn run_serial(spool: &mut Spooler, target: &str) -> Result<lbl_spool::SpoolReport> {
+fn run_serial(
+    spool: &mut Spooler,
+    target: &str,
+) -> Result<(lbl_spool::SpoolReport, Option<TransportTarget>)> {
     let (path, baud) = match target.rsplit_once(':') {
         Some((p, b)) if !b.is_empty() && b.chars().all(|c| c.is_ascii_digit()) => (
             p.to_string(),
@@ -95,11 +116,17 @@ fn run_serial(spool: &mut Spooler, target: &str) -> Result<lbl_spool::SpoolRepor
         ),
         _ => (target.to_string(), lbl_device::DEFAULT_SERIAL_BAUD),
     };
-    let mut t = lbl_device::SerialTransport::new(path, baud);
-    Ok(spool.run(&mut t))
+    let mut t = lbl_device::SerialTransport::new(path.clone(), baud);
+    Ok((
+        spool.run(&mut t),
+        Some(TransportTarget::Serial { path }),
+    ))
 }
 
 #[cfg(not(feature = "serial"))]
-fn run_serial(_spool: &mut Spooler, _target: &str) -> Result<lbl_spool::SpoolReport> {
+fn run_serial(
+    _spool: &mut Spooler,
+    _target: &str,
+) -> Result<(lbl_spool::SpoolReport, Option<TransportTarget>)> {
     bail!("serial support not compiled in")
 }

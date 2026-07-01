@@ -9,7 +9,7 @@
 use std::time::{Duration, Instant};
 
 use lbl_core::printer::Protocol;
-use lbl_device::{DeviceError, Transport};
+use lbl_device::{format_dispatch_failure, DeviceError, Transport, TransportTarget};
 use lbl_spool::{SpoolReport, Spooler};
 
 /// Enqueue every `(name, bytes)` label and dispatch it over `transport`,
@@ -24,6 +24,24 @@ pub fn dispatch_encoded<T: Transport>(
         spool.enqueue(name, bytes, None);
     }
     spool.run_with(transport, |t| finalize_job(protocol, t))
+}
+
+/// Turn a spool [`SpoolReport`] into `Ok(())` or a user-facing error.
+pub fn finish_dispatch(report: SpoolReport, target: Option<TransportTarget>) -> Result<(), String> {
+    if report.disconnected {
+        if let Some(err) = report.last_error.as_ref() {
+            return Err(format_dispatch_failure(
+                err,
+                target.as_ref(),
+                report.remaining,
+            ));
+        }
+        return Err(format!(
+            "device disconnected; {} job(s) not sent",
+            report.remaining
+        ));
+    }
+    Ok(())
 }
 
 /// After a job's bytes are delivered, perform any protocol-specific completion

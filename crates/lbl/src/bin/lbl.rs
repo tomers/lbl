@@ -870,7 +870,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     if let Some(file) = &args.file {
         let mut t = lbl_device::FileTransport::new(file.clone());
-        return dispatch_with(encoded, protocol, &mut t);
+        return dispatch_with(encoded, protocol, &mut t, None);
     }
 
     if protocol == Protocol::Virtual {
@@ -918,21 +918,32 @@ fn dispatch(
             .rsplit_once(':')
             .ok_or_else(|| anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
-        dispatch_with(encoded, protocol, &mut t)
+        dispatch_with(encoded, protocol, &mut t, None)
     } else if let Some(target) = usb {
         let (vid, pid) = target
             .split_once(':')
             .ok_or_else(|| anyhow!("usb target must be vid:pid"))?;
-        let mut t = lbl_device::UsbTransport::new(
-            u16::from_str_radix(vid, 16)?,
-            u16::from_str_radix(pid, 16)?,
-            None,
-        );
-        dispatch_with(encoded, protocol, &mut t)
+        let vendor_id = u16::from_str_radix(vid, 16)?;
+        let product_id = u16::from_str_radix(pid, 16)?;
+        let mut t = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+        dispatch_with(
+            encoded,
+            protocol,
+            &mut t,
+            Some(lbl_device::TransportTarget::Usb {
+                vendor_id,
+                product_id,
+            }),
+        )
     } else if let Some(target) = serial {
         let (path, baud) = lbl::dispatch::parse_serial_target(&target);
-        let mut t = lbl_device::SerialTransport::new(path, baud);
-        dispatch_with(encoded, protocol, &mut t)
+        let mut t = lbl_device::SerialTransport::new(path.clone(), baud);
+        dispatch_with(
+            encoded,
+            protocol,
+            &mut t,
+            Some(lbl_device::TransportTarget::Serial { path }),
+        )
     } else if let Some(target) = bluetooth {
         dispatch_bluetooth(encoded, protocol, target)
     } else {
@@ -949,7 +960,7 @@ fn dispatch_bluetooth(
     target: String,
 ) -> Result<()> {
     let mut t = lbl_device::BleTransport::new(target);
-    dispatch_with(encoded, protocol, &mut t)
+    dispatch_with(encoded, protocol, &mut t, None)
 }
 
 #[cfg(not(feature = "ble"))]
@@ -968,12 +979,21 @@ fn dispatch_with<T: lbl_device::Transport>(
     encoded: Vec<(String, Vec<u8>)>,
     protocol: Protocol,
     transport: &mut T,
+    target: Option<lbl_device::TransportTarget>,
 ) -> Result<()> {
     let report = lbl::dispatch::dispatch_encoded(encoded, protocol, transport);
-    println!(
-        "completed={} remaining={} disconnected={}",
-        report.completed, report.remaining, report.disconnected
-    );
+    if report.disconnected {
+        eprintln!(
+            "completed={} remaining={} disconnected={}",
+            report.completed, report.remaining, report.disconnected
+        );
+        lbl::dispatch::finish_dispatch(report, target).map_err(anyhow::Error::msg)?;
+    } else {
+        println!(
+            "completed={} remaining={} disconnected={}",
+            report.completed, report.remaining, report.disconnected
+        );
+    }
     Ok(())
 }
 
