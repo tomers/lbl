@@ -17,6 +17,7 @@
 - [Rendering Quality & Supersampling](./guides/rendering-quality.md)
 - [Configuration](./guides/configuration.md)
 - [Managing Printers & Media](./guides/printers-media.md)
+- [Fixed-size Label Examples](./generated/label-examples.md)
 
 # Reference
 

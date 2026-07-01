@@ -64,6 +64,15 @@ repos:
 
   - repo: local
     hooks:
+      - id: doc-examples
+        name: doc examples (generated)
+        entry: just doc-examples-check
+        language: system
+        files: ^(docs/examples/|docs/src/generated/|crates/lbl/src/bin/generate-doc-examples\.rs|README\.md)$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
       - id: rust
         name: rust (clippy + rustfmt, warnings as errors; autofixes on failure)
         entry: just rust-pre-commit

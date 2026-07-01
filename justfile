@@ -56,6 +56,14 @@ rust-lint-fix-allow-dirty: lint-fix-allow-dirty
 test *args: _ensure-mise
     @just rust-test {{ args }}
 
+# Regenerate fixed-size label examples (README + mdBook previews).
+doc-examples: _ensure-mise
+    cargo run -q -p lbl --bin generate-doc-examples
+
+# Fail when committed doc examples differ from the manifest output.
+doc-examples-check: _ensure-mise
+    cargo run -q -p lbl --bin generate-doc-examples -- --check
+
 # Rust workspace lint (clippy + rustc warnings-as-errors + rustfmt check).
 rust-lint: rustc-lint clippy format
 

@@ -86,6 +86,8 @@ just lint                           # lint the Rust workspace (rustc + clippy + 
 just lint-fix                       # apply autofixes (clippy --fix + rustfmt)
 just lint-fix-allow-dirty           # same, but allow a dirty working tree
 just test                           # run the Rust test suite (cargo-nextest)
+just doc-examples                   # regenerate fixed-size label README/doc previews
+just doc-examples-check             # fail if generated doc examples are stale
 just maintenance cargo-upgrade      # bump Cargo.toml deps + refresh Cargo.lock
 just pre-commit-all                 # run the full pre-commit suite on all files
 ```
@@ -96,6 +98,189 @@ just pre-commit-all                 # run the full pre-commit suite on all files
 cargo build           # build the whole workspace
 cargo test            # run the test suite
 ```
+
+<!-- doc-examples:start -->
+
+## Fixed-size label examples
+
+Commands show content and layout flags only. Media size, DPI, protocol, and output path are supplied by project config (`lbl.toml`) or environment — see [Configuration](docs/src/guides/configuration.md). Preview images are generated from the manifest in [`docs/examples/manifest.toml`](docs/examples/manifest.toml) via `just doc-examples`.
+
+<table>
+<tr>
+<td valign="top">
+
+DYMO 11352 · 25×54 mm
+
+```bash
+lbl print --text 'Hello {{qr:https://example.com}}'
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/hello-qr.png" alt="DYMO 11352 · 25×54 mm" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+DYMO 11352 · 25×54 mm
+
+```bash
+lbl print --text Hello
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/hello.png" alt="DYMO 11352 · 25×54 mm" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+DYMO 99014 · 54×101 mm
+
+```bash
+lbl print --template card.html --template-format html --data people.json --one
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/batch-card.png" alt="DYMO 99014 · 54×101 mm" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+NIIMBOT 12×30 mm @ 203 dpi
+
+```bash
+lbl print --template 'User #{{ it }}' --data 1 --padding-mm 0
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/user-number.png" alt="NIIMBOT 12×30 mm @ 203 dpi" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+NIIMBOT 12×30 mm @ 203 dpi
+
+```bash
+lbl print --text Hi --padding-mm 0
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/hi-no-padding.png" alt="NIIMBOT 12×30 mm @ 203 dpi" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+NIIMBOT 12×22 mm @ 203 dpi
+
+```bash
+lbl print --text Hello
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/hello-niimbot.png" alt="NIIMBOT 12×22 mm @ 203 dpi" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+DYMO 11352 · 25×54 mm · supersample 4
+
+```bash
+lbl print --text Hello --supersample 4
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/hello-supersample.png" alt="DYMO 11352 · 25×54 mm · supersample 4" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+NIIMBOT 12×40 mm @ 203 dpi
+
+```bash
+lbl print --text Ship --padding-mm 0
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/niimbot-tape.png" alt="NIIMBOT 12×40 mm @ 203 dpi" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td valign="top">
+
+56×89 mm @ 300 dpi
+
+```bash
+lbl print --text 'Receipt line'
+```
+
+</td>
+<td>
+
+<img src="docs/src/generated/images/fixed-dimensions.png" alt="56×89 mm @ 300 dpi" width="240"/>
+
+</td>
+</tr>
+</table>
+
+<!-- doc-examples:end -->
+
+
+
+
 
 ## Documentation
 

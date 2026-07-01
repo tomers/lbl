@@ -1,0 +1,93 @@
+# Source of truth for fixed-size label examples shown in the README and docs.
+# Regenerate with: just doc-examples
+#
+# Each [[example]] defines:
+#   - id: output image basename under docs/src/generated/images/
+#   - caption: media size line shown beside the command
+#   - media: catalog SKU or size key passed to lbl print (not shown in docs)
+#   - dpi: optional DPI override (NIIMBOT tape)
+#   - dir: optional subdirectory under docs/examples/ to run from
+#   - args: lbl print flags shown in the abbreviated command (content/layout only)
+
+[defaults]
+protocol = "virtual"
+supersample = 2
+
+# introduction.md, guides/printing-text.md, guides/rendering-quality.md
+[[example]]
+id = "hello-qr"
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+args = ["--text", "Hello {{qr:https://example.com}}"]
+
+# guides/getting-started.md
+[[example]]
+id = "hello"
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+args = ["--text", "Hello"]
+
+# guides/batch-printing.md
+[[example]]
+id = "batch-card"
+caption = "DYMO 99014 · 54×101 mm"
+media = "99014"
+dir = "batch-card"
+args = [
+  "--template",
+  "card.html",
+  "--template-format",
+  "html",
+  "--data",
+  "people.json",
+  "--one",
+]
+
+# guides/batch-printing.md (shell iteration, single value)
+[[example]]
+id = "user-number"
+caption = "NIIMBOT 12×30 mm @ 203 dpi"
+media = "12x30"
+dpi = 203
+args = ["--template", "User #{{ it }}", "--data", "1", "--padding-mm", "0"]
+
+# guides/configuration.md
+[[example]]
+id = "hi-no-padding"
+caption = "NIIMBOT 12×30 mm @ 203 dpi"
+media = "12x30"
+dpi = 203
+args = ["--text", "Hi", "--padding-mm", "0"]
+
+# guides/configuration.md (media + protocol from config)
+[[example]]
+id = "hello-niimbot"
+caption = "NIIMBOT 12×22 mm @ 203 dpi"
+media = "niimbot-12x22"
+dpi = 203
+args = ["--text", "Hello"]
+
+# guides/rendering-quality.md
+[[example]]
+id = "hello-supersample"
+caption = "DYMO 11352 · 25×54 mm · supersample 4"
+media = "11352"
+args = ["--text", "Hello", "--supersample", "4"]
+
+# guides/printers-media.md
+[[example]]
+id = "niimbot-tape"
+caption = "NIIMBOT 12×40 mm @ 203 dpi"
+media = "12x40"
+dpi = 203
+args = ["--text", "Ship", "--padding-mm", "0"]
+
+# guides/printers-media.md (dimensions instead of SKU)
+[[example]]
+id = "fixed-dimensions"
+caption = "56×89 mm @ 300 dpi"
+media = ""
+width_mm = 56
+length_mm = 89
+dpi = 300
+args = ["--text", "Receipt line"]
