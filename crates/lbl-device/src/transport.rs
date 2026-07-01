@@ -28,6 +28,8 @@ use crate::ble::{peripheral_label, peripheral_matches_target, NIIMBOT_CHAR};
 
 #[cfg(feature = "usb")]
 use nusb::transfer::{Bulk, Out};
+#[cfg(feature = "usb")]
+use nusb::MaybeFuture;
 
 /// A transport sends a finished protocol byte stream to a printer, and — for
 /// bidirectional links — can read responses back.
@@ -212,46 +214,43 @@ impl UsbTransport {
 #[cfg(feature = "usb")]
 impl Transport for UsbTransport {
     fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
-        pollster::block_on(async {
-            let device_info = nusb::list_devices()
-                .await
-                .map_err(|e| DeviceError::Transport(format!("listing usb devices: {e}")))?
-                .find(|d| {
-                    d.vendor_id() == self.vendor_id
-                        && d.product_id() == self.product_id
-                        && self
-                            .serial
-                            .as_deref()
-                            .map(|s| d.serial_number() == Some(s))
-                            .unwrap_or(true)
-                })
-                .ok_or_else(|| {
-                    DeviceError::NotFound(format!(
-                        "usb {:04x}:{:04x}",
-                        self.vendor_id, self.product_id
-                    ))
-                })?;
+        let device_info = nusb::list_devices()
+            .wait()
+            .map_err(|e| DeviceError::Transport(format!("listing usb devices: {e}")))?
+            .find(|d| {
+                d.vendor_id() == self.vendor_id
+                    && d.product_id() == self.product_id
+                    && self
+                        .serial
+                        .as_deref()
+                        .map(|s| d.serial_number() == Some(s))
+                        .unwrap_or(true)
+            })
+            .ok_or_else(|| {
+                DeviceError::NotFound(format!(
+                    "usb {:04x}:{:04x}",
+                    self.vendor_id, self.product_id
+                ))
+            })?;
 
-            let device = device_info
-                .open()
-                .await
-                .map_err(|e| DeviceError::Transport(format!("opening device: {e}")))?;
-            let interface = device
-                .claim_interface(self.interface)
-                .await
-                .map_err(|e| DeviceError::Transport(format!("claiming interface: {e}")))?;
+        let device = device_info
+            .open()
+            .wait()
+            .map_err(|e| DeviceError::Transport(format!("opening device: {e}")))?;
+        let interface = device
+            .claim_interface(self.interface)
+            .wait()
+            .map_err(|e| DeviceError::Transport(format!("claiming interface: {e}")))?;
 
-            let mut ep_out = interface
-                .endpoint::<Bulk, Out>(self.endpoint)
-                .map_err(|e| {
-                    DeviceError::Transport(format!("bulk endpoint {:#02x}: {e}", self.endpoint))
-                })?;
-            let completion =
-                ep_out.transfer_blocking(data.to_vec().into(), Duration::from_secs(30));
-            completion
-                .status
-                .map_err(|e| DeviceError::Transport(format!("bulk out: {e}")))
-        })
+        let mut ep_out = interface
+            .endpoint::<Bulk, Out>(self.endpoint)
+            .map_err(|e| {
+                DeviceError::Transport(format!("bulk endpoint {:#02x}: {e}", self.endpoint))
+            })?;
+        let completion = ep_out.transfer_blocking(data.to_vec().into(), Duration::from_secs(30));
+        completion
+            .status
+            .map_err(|e| DeviceError::Transport(format!("bulk out: {e}")))
     }
 }
 

@@ -14,7 +14,7 @@ path = "src/bin/lbl-device.rs"
 
 [features]
 default = ["usb", "serial"]
-usb     = ["dep:nusb", "dep:pollster"]
+usb     = ["dep:nusb"]
 serial  = ["dep:serialport"]
 # Bluetooth Low Energy transport (NIIMBOT D-series and other BLE printers).
 # Opt-in because, unlike the other transports, it pulls in `btleplug` and — on
@@ -35,7 +35,6 @@ anyhow      = { workspace = true }
 tracing     = { workspace = true }
 
 nusb       = { version = "0.2", optional = true }
-pollster   = { version = "0.4", optional = true }
 serialport = { workspace = true, optional = true }
 
 # BLE transport (behind the `ble` feature).

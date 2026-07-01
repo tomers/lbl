@@ -4,6 +4,9 @@ use lbl_catalog::Catalog;
 use lbl_core::printer::Protocol;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "usb")]
+use nusb::MaybeFuture;
+
 /// A printer discovered on the system.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiscoveredPrinter {
@@ -43,7 +46,7 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
         }
     };
 
-    let devices = match pollster::block_on(nusb::list_devices()) {
+    let devices = match nusb::list_devices().wait() {
         Ok(d) => d,
         Err(e) => {
             tracing::warn!("usb enumeration failed: {e}");
