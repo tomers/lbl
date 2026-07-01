@@ -109,13 +109,11 @@ project config (`lbl.toml`) or environment.
 
 Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.
 
-<table>
-<tr>
-<td valign="top">
-
 ### Inline QR, barcode, and sizing
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain string — no HTML required.
+
+<img src="docs/src/generated/images/inline-syntax.png" alt="Inline QR, barcode, and sizing" />
 
 *DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
@@ -123,22 +121,11 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain
 lbl print --text 'Ship {{size:1.5:Alice}} {{barcode:LBL-42}} {{qr:https://track/42}}'
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/inline-syntax.png" alt="Inline QR, barcode, and sizing" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Markdown input
 
 Headings, emphasis, and inline directives compose on fixed-length media via `--markdown`.
+
+<img src="docs/src/generated/images/markdown-label.png" alt="Markdown input" />
 
 *DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md)
 
@@ -150,22 +137,11 @@ Ship **fast** to dock 4
 {{qr:https://track/42}}'
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/markdown-label.png" alt="Markdown input" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Batch HTML template
 
 One HTML layout rendered against a JSON array — here, a name badge with QR on portrait die-cut stock.
+
+<img src="docs/src/generated/images/batch-card.png" alt="Batch HTML template" />
 
 *DYMO 99014 · 54×101 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
 
@@ -202,22 +178,11 @@ One HTML layout rendered against a JSON array — here, a name badge with QR on 
 lbl print --template card.html --template-format html --data people.json --one
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/batch-card.png" alt="Batch HTML template" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Template from shell input
 
 Run `lbl print` once per value: `xargs` appends each line as `--data`, and `{{ it }}` is the scalar.
+
+<img src="docs/src/generated/images/shell-template.png" alt="Template from shell input" />
 
 *NIIMBOT 12×30 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
 
@@ -225,22 +190,11 @@ Run `lbl print` once per value: `xargs` appends each line as `--data`, and `{{ i
 lbl print --template 'Hello user #{{ it }}, my friend' --data 1 --padding-mm 0
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/shell-template.png" alt="Template from shell input" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Zero padding on small tape
 
 Default inner padding is 2 mm; set `--padding-mm 0` (or `padding_mm` in config) so content uses the full printable area.
+
+<img src="docs/src/generated/images/zero-padding.png" alt="Zero padding on small tape" />
 
 *NIIMBOT 12×30 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 
@@ -250,22 +204,11 @@ Bin 12
 Qty 60' --padding-mm 0
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/zero-padding.png" alt="Zero padding on small tape" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Config-driven print defaults
 
 With `[print] protocol`, `bluetooth`, and media set in `lbl.toml`, the command only needs the label content.
+
+<img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" />
 
 *NIIMBOT 12×22 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
 
@@ -273,22 +216,11 @@ With `[print] protocol`, `bluetooth`, and media set in `lbl.toml`, the command o
 lbl print --text 'Scan to pair {{qr:https://lbl.example/pair}}'
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Supersampling for print quality
 
 Higher `--supersample` renders at more dots before downscaling — sharper barcodes and small type on 1-bit heads.
+
+<img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" />
 
 *DYMO 11352 · 25×54 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
 
@@ -296,22 +228,11 @@ Higher `--supersample` renders at more dots before downscaling — sharper barco
 lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 4
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### NIIMBOT catalog media
 
 Die-cut tape sizes (`12x40`, `12x30`, …) resolve from the bundled catalog by SKU instead of raw millimetres.
+
+<img src="docs/src/generated/images/niimbot-catalog.png" alt="NIIMBOT catalog media" />
 
 *NIIMBOT 12×40 mm @ 203 dpi* · [Printers & media →](docs/src/guides/printers-media.md#niimbot)
 
@@ -319,22 +240,11 @@ Die-cut tape sizes (`12x40`, `12x30`, …) resolve from the bundled catalog by S
 lbl print --text 'Ship to {{size:1.2:Dock 4}} {{qr:https://track/42}}' --padding-mm 0
 ```
 
-</td>
-<td>
-
-<img src="docs/src/generated/images/niimbot-catalog.png" alt="NIIMBOT catalog media" width="240"/>
-
-</td>
-</tr>
-</table>
-
-<table>
-<tr>
-<td valign="top">
-
 ### Explicit media dimensions
 
 When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly for fixed-size stock.
+
+<img src="docs/src/generated/images/fixed-dimensions.png" alt="Explicit media dimensions" />
 
 *56×89 mm @ 300 dpi* · [Printers & media →](docs/src/guides/printers-media.md#media)
 
@@ -343,15 +253,6 @@ lbl print --text 'Receipt
 Item ×2  $18.00
 Total      $36.00'
 ```
-
-</td>
-<td>
-
-<img src="docs/src/generated/images/fixed-dimensions.png" alt="Explicit media dimensions" width="240"/>
-
-</td>
-</tr>
-</table>
 
 <!-- doc-examples:end -->
 

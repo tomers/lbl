@@ -416,14 +416,19 @@ fn render_embedded_files(files: &[EmbeddedFile], book: bool) -> String {
     out
 }
 
-fn render_example_header(row: &ExampleRow, doc_href: &str) -> String {
+fn render_example_title(row: &ExampleRow) -> String {
     let mut out = String::new();
     out.push_str("### ");
     out.push_str(&row.title);
     out.push_str("\n\n");
     out.push_str(&row.description);
-    out.push('\n');
-    out.push_str("\n*");
+    out.push_str("\n\n");
+    out
+}
+
+fn render_example_meta(row: &ExampleRow, doc_href: &str) -> String {
+    let mut out = String::new();
+    out.push('*');
     out.push_str(&row.caption);
     out.push_str("* · [");
     out.push_str(&row.doc_title);
@@ -455,19 +460,18 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
         "Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.",
     );
     for row in rows {
-        out.push_str("<table>\n<tr>\n<td valign=\"top\">\n\n");
-        out.push_str(&render_example_header(row, &row.readme_doc));
+        out.push_str(&render_example_title(row));
+        out.push_str(&format!(
+            "<img src=\"{}\" alt=\"{}\" />\n\n",
+            row.readme_image, row.title
+        ));
+        out.push_str(&render_example_meta(row, &row.readme_doc));
         if !row.files.is_empty() {
             out.push_str(&render_embedded_files(&row.files, false));
         }
         out.push_str("```bash\n");
         out.push_str(&row.command);
-        out.push_str("\n```\n\n</td>\n<td>\n\n");
-        out.push_str(&format!(
-            "<img src=\"{}\" alt=\"{}\" width=\"240\"/>\n\n",
-            row.readme_image, row.title
-        ));
-        out.push_str("</td>\n</tr>\n</table>\n\n");
+        out.push_str("\n```\n\n");
     }
     out.push_str(README_END);
     out.push('\n');
