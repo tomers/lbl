@@ -13,6 +13,9 @@ const HEADING: &str = "\x1b[1;33m";
 const DIM: &str = "\x1b[2m";
 const CMD: &str = "\x1b[36m";
 const BULLET: &str = "\x1b[38;5;245m";
+const LINK: &str = "\x1b[36m";
+#[cfg(target_os = "linux")]
+const CUPS_ADMIN_URL: &str = "http://localhost:631/";
 
 struct Style {
     color: bool,
@@ -60,6 +63,15 @@ impl Style {
             "  • ".into()
         }
     }
+
+    /// OSC-8 hyperlink when color is enabled; plain `label (url)` otherwise.
+    fn link(&self, url: &str, label: &str) -> String {
+        if self.color {
+            format!("\x1b]8;;{url}\x1b\\{LINK}{label}{RESET}\x1b]8;;\x1b\\")
+        } else {
+            format!("{label} ({url})")
+        }
+    }
 }
 
 /// The transport target that failed, used to tailor troubleshooting hints.
@@ -80,17 +92,35 @@ impl DeviceError {
     /// Whether the error looks like an OS permission denial.
     pub fn is_permission_denied(&self) -> bool {
         match self {
-            DeviceError::Transport(msg) => {
-                let lower = msg.to_lowercase();
-                lower.contains("permission denied")
-                    || lower.contains("access denied")
-                    || lower.contains("errno 13")
-                    || lower.contains("operation not permitted")
-                    || lower.contains("eacces")
-            }
+            DeviceError::Transport(msg) => transport_message_matches(msg, &[
+                "permission denied",
+                "access denied",
+                "errno 13",
+                "operation not permitted",
+                "eacces",
+            ]),
             DeviceError::NotFound(_) => false,
         }
     }
+
+    /// Whether another process or driver already holds the device/interface.
+    pub fn is_device_busy(&self) -> bool {
+        match self {
+            DeviceError::Transport(msg) => transport_message_matches(msg, &[
+                "interface is busy",
+                "device busy",
+                "resource busy",
+                "errno 16",
+                "ebusy",
+            ]),
+            DeviceError::NotFound(_) => false,
+        }
+    }
+}
+
+fn transport_message_matches(msg: &str, needles: &[&str]) -> bool {
+    let lower = msg.to_lowercase();
+    needles.iter().any(|needle| lower.contains(needle))
 }
 
 /// Build a user-facing failure message for a spool/dispatch run that aborted.
@@ -124,6 +154,13 @@ pub fn format_dispatch_failure(
                 out.push_str(&section);
             }
         }
+    } else if error.is_device_busy() {
+        if let Some(target) = target {
+            if let Some(section) = device_busy_troubleshooting(target, &style) {
+                out.push_str("\n\n");
+                out.push_str(&section);
+            }
+        }
     }
 
     out
@@ -144,8 +181,47 @@ pub fn format_send_failure(error: &DeviceError, target: Option<&TransportTarget>
                 out.push_str(&section);
             }
         }
+    } else if error.is_device_busy() {
+        if let Some(target) = target {
+            if let Some(section) = device_busy_troubleshooting(target, &style) {
+                out.push_str("\n\n");
+                out.push_str(&section);
+            }
+        }
     }
     out
+}
+
+fn device_busy_troubleshooting(target: &TransportTarget, style: &Style) -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        Some(linux_device_busy_troubleshooting(target, style))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = style;
+        Some(match target {
+            TransportTarget::Usb { .. } => {
+                "Another program is using the USB printer. Quit DYMO Connect or other label \
+                 software, remove the printer from macOS Printers & Scanners if it is set up \
+                 there, then unplug and replug the device."
+                    .into()
+            }
+            TransportTarget::Serial { path } => format!(
+                "Serial port {path} is in use. Close other apps that may have it open, then \
+                 retry."
+            ),
+        })
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        let _ = (target, style);
+        Some(
+            "The device is in use by another program. Close other software that may be \
+             connected to the printer, then retry."
+                .into(),
+        )
+    }
 }
 
 fn permission_troubleshooting(target: &TransportTarget, style: &Style) -> Option<String> {
@@ -186,6 +262,7 @@ struct UsbNodeInfo {
     path: PathBuf,
     mode: Option<String>,
     owner: Option<String>,
+    kernel_driver: Option<String>,
 }
 
 #[cfg(target_os = "linux")]
@@ -314,7 +391,7 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
         let udev_rule_line = format!(
             "SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"{vendor_id:04x}\", GROUP=\"{group}\", MODE=\"0660\""
         );
-        push_shell_block(
+        push_heredoc_block(
             &mut out,
             style,
             &[
@@ -360,6 +437,282 @@ fn linux_usb_permission_troubleshooting(vendor_id: u16, product_id: u16, style: 
     );
 
     out
+}
+
+#[cfg(target_os = "linux")]
+fn linux_device_busy_troubleshooting(target: &TransportTarget, style: &Style) -> String {
+    match target {
+        TransportTarget::Usb {
+            vendor_id,
+            product_id,
+        } => linux_usb_device_busy_troubleshooting(*vendor_id, *product_id, style),
+        TransportTarget::Serial { path } => {
+            let mut out = format!(
+                "{}\n",
+                style.heading("Serial port is already in use.")
+            );
+            push_bullet(
+                &mut out,
+                style,
+                &format!("Target port {path} could not be opened exclusively"),
+            );
+            out.push('\n');
+            out.push_str(&style.heading("Try:"));
+            push_step(
+                &mut out,
+                style,
+                1,
+                "Close other programs that may be using",
+                path,
+                "",
+            );
+            push_step(
+                &mut out,
+                style,
+                2,
+                "Check which process holds the port:",
+                &format!("fuser -v {path}"),
+                "",
+            );
+            out
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_usb_device_busy_troubleshooting(vendor_id: u16, product_id: u16, style: &Style) -> String {
+    let cups_running = cups_is_running();
+    let cups_queues = if cups_running {
+        cups_usb_queues(vendor_id, product_id)
+    } else {
+        Vec::new()
+    };
+    linux_usb_device_busy_troubleshooting_with(
+        vendor_id,
+        product_id,
+        style,
+        cups_running,
+        &cups_queues,
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn linux_usb_device_busy_troubleshooting_with(
+    vendor_id: u16,
+    product_id: u16,
+    style: &Style,
+    cups_running: bool,
+    cups_queues: &[String],
+) -> String {
+    let node_info = find_usb_device_node(vendor_id, product_id);
+    let kernel_driver = node_info
+        .as_ref()
+        .and_then(|info| info.kernel_driver.as_deref());
+    let cups_driver = kernel_driver.is_some_and(|driver| driver == "usblp");
+    let has_cups_queue = !cups_queues.is_empty();
+
+    let mut out = format!(
+        "{}\n",
+        style.heading("Another program is using the USB printer.")
+    );
+    push_bullet(
+        &mut out,
+        style,
+        &format!(
+            "Target device {vendor_id:04x}:{product_id:04x} is connected, but its USB interface \
+             is already claimed"
+        ),
+    );
+    push_bullet(
+        &mut out,
+        style,
+        "`lbl` needs exclusive raw USB access — it cannot share the interface with CUPS, DYMO \
+         Connect, or other printer software",
+    );
+    if has_cups_queue {
+        push_bullet(
+            &mut out,
+            style,
+            "CUPS still has a print queue for this printer — it must be deleted \
+             (Administration → Delete Printer) before `lbl` can use the device; pausing it or \
+             changing the driver is not enough",
+        );
+        for queue in cups_queues {
+            push_bullet(
+                &mut out,
+                style,
+                &format!("CUPS queue `{queue}` is bound to this printer"),
+            );
+        }
+    } else if cups_running {
+        push_bullet(
+            &mut out,
+            style,
+            "CUPS is running but `lpstat -v` shows no USB queue for this printer — other CUPS \
+             printers on the system do not block `lbl`",
+        );
+    }
+    if cups_running {
+        push_bullet(
+            &mut out,
+            style,
+            &format!(
+                "CUPS web admin: {}",
+                style.link(CUPS_ADMIN_URL, CUPS_ADMIN_URL)
+            ),
+        );
+    }
+    if cups_driver && !has_cups_queue {
+        push_bullet(
+            &mut out,
+            style,
+            "The CUPS `usblp` kernel driver is still bound to this device — this often persists \
+             after deleting the queue until the printer is unplugged and replugged",
+        );
+    } else if cups_driver && has_cups_queue {
+        push_bullet(
+            &mut out,
+            style,
+            "The CUPS `usblp` driver has bound this device through the queue above",
+        );
+    } else if let Some(driver) = kernel_driver.filter(|&driver| driver != "usblp") {
+        push_bullet(
+            &mut out,
+            style,
+            &format!("Kernel driver `{driver}` is bound to the device"),
+        );
+    } else if !cups_running && !cups_driver {
+        push_bullet(
+            &mut out,
+            style,
+            "CUPS does not appear to be holding this device — another program is likely \
+             responsible",
+        );
+    }
+
+    out.push('\n');
+    out.push_str(&style.heading("Try:"));
+    let mut step = 1;
+    push_step(
+        &mut out,
+        style,
+        step,
+        "Quit DYMO Connect and any other label or printer software",
+        "",
+        "",
+    );
+    step += 1;
+    if has_cups_queue {
+        if cups_running {
+            push_step(
+                &mut out,
+                style,
+                step,
+                "Open the CUPS web admin and delete this printer (Administration → Delete Printer):",
+                CUPS_ADMIN_URL,
+                "",
+            );
+            step += 1;
+        }
+        for queue in cups_queues {
+            push_step(
+                &mut out,
+                style,
+                step,
+                "Delete the CUPS queue:",
+                &format!("lpadmin -x {queue}"),
+                "",
+            );
+            step += 1;
+        }
+    } else if cups_driver {
+        push_step(
+            &mut out,
+            style,
+            step,
+            "Unplug and replug the printer to release the `usblp` driver left over from CUPS",
+            "",
+            "",
+        );
+        step += 1;
+    }
+    if let Some(info) = &node_info {
+        push_step(
+            &mut out,
+            style,
+            step,
+            "See which process is using the device node:",
+            &format!("fuser -v {}", info.path.display()),
+            "",
+        );
+    } else {
+        push_step(
+            &mut out,
+            style,
+            step,
+            "Find the device node with",
+            "lsusb",
+            "and `ls -l /dev/bus/usb/*/*`, then run `fuser -v` on that path",
+        );
+    }
+    step += 1;
+    push_step(
+        &mut out,
+        style,
+        step,
+        "After closing the other program, unplug and replug the printer, then retry",
+        "",
+        "",
+    );
+    out
+}
+
+#[cfg(target_os = "linux")]
+fn cups_usb_queues(vendor_id: u16, product_id: u16) -> Vec<String> {
+    let Ok(output) = std::process::Command::new("lpstat").arg("-v").output() else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("device for ")?;
+            let (queue, uri) = rest.split_once(": ")?;
+            if !uri.starts_with("usb://") {
+                return None;
+            }
+            usb_uri_matches_printer(uri, vendor_id, product_id).then_some(queue.to_string())
+        })
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+fn usb_uri_matches_printer(uri: &str, vendor_id: u16, product_id: u16) -> bool {
+    let lower = uri.to_lowercase();
+    let vid = format!("{vendor_id:04x}");
+    let pid = format!("{product_id:04x}");
+    if lower.contains(&vid) || lower.contains(&pid) {
+        return true;
+    }
+    match vendor_id {
+        0x0922 => lower.contains("dymo") || lower.contains("labelwriter"),
+        _ => false,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn cups_is_running() -> bool {
+    if Path::new("/run/cups/cups.sock").exists() {
+        return true;
+    }
+    std::process::Command::new("systemctl")
+        .args(["is-active", "--quiet", "cups"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "linux")]
@@ -501,7 +854,7 @@ fn push_step(out: &mut String, style: &Style, step: usize, before: &str, command
     }
 }
 
-fn push_shell_block(out: &mut String, style: &Style, lines: &[&str]) {
+fn push_heredoc_block(out: &mut String, style: &Style, lines: &[&str]) {
     for line in lines {
         out.push('\n');
         out.push_str(&style.command(line));
@@ -585,13 +938,29 @@ fn find_usb_device_node(vendor_id: u16, product_id: u16) -> Option<UsbNodeInfo> 
         let dev = read_trimmed(&base.join("devnum"))?;
         let path = PathBuf::from(format!("/dev/bus/usb/{bus}/{dev}"));
         let perms = path.to_str().and_then(node_metadata);
+        let kernel_driver = read_kernel_driver_name(&base);
         return Some(UsbNodeInfo {
             path,
             mode: perms.as_ref().map(|(mode, _)| mode.clone()),
             owner: perms.as_ref().map(|(_, owner)| owner.clone()),
+            kernel_driver,
         });
     }
     None
+}
+
+#[cfg(target_os = "linux")]
+fn read_kernel_driver_name(sysfs_device: &Path) -> Option<String> {
+    let driver = sysfs_device.join("driver");
+    if !driver.exists() {
+        return None;
+    }
+    std::fs::read_link(&driver).ok().and_then(|target| {
+        target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+    })
 }
 
 #[cfg(target_os = "linux")]
@@ -687,6 +1056,101 @@ mod tests {
     }
 
     #[test]
+    fn detects_device_busy_errors() {
+        assert!(DeviceError::Transport("claiming interface: interface is busy (errno 16)".into())
+            .is_device_busy());
+        assert!(!DeviceError::Transport("permission denied (errno 13)".into()).is_device_busy());
+    }
+
+    #[test]
+    fn dispatch_failure_includes_busy_troubleshooting() {
+        let err = DeviceError::Transport("claiming interface: interface is busy (errno 16)".into());
+        let msg = format_dispatch_failure(
+            &err,
+            Some(&TransportTarget::Usb {
+                vendor_id: 0x0922,
+                product_id: 0x0028,
+            }),
+            1,
+        );
+        assert!(msg.contains("print failed:"));
+        assert!(msg.contains("interface is busy"));
+        assert!(msg.contains("Another program is using the USB printer"));
+        assert!(msg.contains("exclusive raw USB access"));
+        assert!(msg.contains("DYMO Connect"));
+    }
+
+    #[test]
+    fn link_renders_plain_url_without_color() {
+        let style = Style { color: false };
+        assert_eq!(
+            style.link("http://localhost:631/", "CUPS admin"),
+            "CUPS admin (http://localhost:631/)"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn usb_uri_matches_dymo_printer() {
+        assert!(usb_uri_matches_printer(
+            "usb://DYMO/LabelWriter%20550?serial=04121002436300",
+            0x0922,
+            0x0028
+        ));
+        assert!(!usb_uri_matches_printer(
+            "implicitclass://EPSON_L6190_Series/",
+            0x0922,
+            0x0028
+        ));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn busy_troubleshooting_lists_cups_queue_to_delete() {
+        let msg = linux_usb_device_busy_troubleshooting_with(
+            0x0922,
+            0x0028,
+            &Style { color: false },
+            true,
+            &["LabelWriter-550".to_string()],
+        );
+        assert!(msg.contains("CUPS queue `LabelWriter-550`"));
+        assert!(msg.contains("lpadmin -x LabelWriter-550"));
+        assert!(msg.contains("Delete Printer"));
+        assert!(!msg.contains("no USB queue for this printer"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn busy_troubleshooting_skips_cups_delete_when_no_queue() {
+        let msg = linux_usb_device_busy_troubleshooting_with(
+            0x0922,
+            0x0028,
+            &Style { color: false },
+            true,
+            &[],
+        );
+        assert!(msg.contains("no USB queue for this printer"));
+        assert!(msg.contains("other CUPS printers"));
+        assert!(!msg.contains("lpadmin -x LabelWriter"));
+        assert!(!msg.contains("must be deleted"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn busy_troubleshooting_omits_cups_when_not_running() {
+        let msg = linux_usb_device_busy_troubleshooting_with(
+            0x0922,
+            0x0028,
+            &Style { color: false },
+            false,
+            &[],
+        );
+        assert!(!msg.contains("no USB queue for this printer"));
+        assert!(!msg.contains("Administration → Delete Printer"));
+    }
+
+    #[test]
     fn dispatch_failure_includes_error_without_debug() {
         let err = DeviceError::Transport("opening device: permission denied (errno 13)".into());
         let msg = format_dispatch_failure(&err, None, 4);
@@ -726,9 +1190,9 @@ mod tests {
     }
 
     #[test]
-    fn shell_block_starts_at_column_zero() {
+    fn heredoc_block_starts_at_column_zero() {
         let mut out = String::new();
-        push_shell_block(
+        push_heredoc_block(
             &mut out,
             &Style { color: false },
             &["sudo tee file <<'EOF'", "rule", "EOF"],
