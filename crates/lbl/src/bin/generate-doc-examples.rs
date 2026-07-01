@@ -71,6 +71,8 @@ struct Example {
     doc_title: Option<String>,
     #[serde(default)]
     doc_section: Option<String>,
+    #[serde(default)]
+    section: Option<String>,
     caption: String,
     media: String,
     #[serde(default)]
@@ -103,6 +105,8 @@ struct Example {
     render_args: Vec<String>,
     #[serde(default)]
     compare: Vec<CompareVariant>,
+    #[serde(default)]
+    batch_args: Vec<String>,
     args: Vec<String>,
 }
 
@@ -203,6 +207,7 @@ fn run() -> Result<()> {
             .map(|path| path.replacen("docs/src/generated/", "", 1))
             .collect();
         rows.push(ExampleRow {
+            section: example.section.clone(),
             title: example.title.clone(),
             description: example.description.clone(),
             caption: example.caption.clone(),
@@ -253,6 +258,7 @@ fn run() -> Result<()> {
 }
 
 struct ExampleRow {
+    section: Option<String>,
     title: String,
     description: String,
     caption: String,
@@ -331,7 +337,7 @@ fn render_example(
             )?;
         }
     } else if let Some(xargs) = &example.xargs {
-        let values = xargs_values(xargs)?;
+        let values = xargs_values(xargs, &work_dir)?;
         for (i, value) in values.iter().enumerate() {
             let target = numbered_output_path(png_path, i);
             let args = resolve_print_args(example, None);
@@ -374,6 +380,7 @@ fn render_example(
 
 fn resolve_print_args(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
     let mut args = example.args.clone();
+    args.extend(example.batch_args.clone());
     args.extend(example.render_args.clone());
     if let Some(extra) = compare_extra {
         args = merge_flag_args(args, extra);
@@ -489,10 +496,11 @@ fn run_lbl_print(
     Ok(())
 }
 
-fn xargs_values(spec: &str) -> Result<Vec<String>> {
+fn xargs_values(spec: &str, work_dir: &Path) -> Result<Vec<String>> {
     let output = Command::new("sh")
         .arg("-c")
         .arg(spec)
+        .current_dir(work_dir)
         .output()
         .with_context(|| format!("run xargs producer `{spec}`"))?;
     if !output.status.success() {
@@ -686,6 +694,7 @@ fn ensure_command_block_has_context(block: &mut String) {
 
 fn display_args_for(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
     let mut args = example.args.clone();
+    args.extend(example.batch_args.clone());
     if let Some(extra) = compare_extra {
         args = merge_flag_args(args, extra);
     }
@@ -941,9 +950,19 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
         &mut out,
         "Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.",
     );
+    let mut prev_section: Option<&str> = None;
     for (idx, row) in rows.iter().enumerate() {
+        let section_key = row.section.as_deref();
         if idx > 0 {
             out.push_str("---\n\n");
+        }
+        if section_key != prev_section {
+            if let Some(section) = section_key {
+                out.push_str("## ");
+                out.push_str(section);
+                out.push_str("\n\n");
+            }
+            prev_section = section_key;
         }
         out.push_str(&render_example_title(row));
         for image in &row.readme_images {
@@ -973,11 +992,25 @@ fn render_book_page(rows: &[ExampleRow]) -> String {
 ",
     );
     append_examples_intro(&mut out, "Regenerate with `just doc-examples`.");
+    let mut prev_section: Option<&str> = None;
     for (idx, row) in rows.iter().enumerate() {
         if idx > 0 {
             out.push_str("---\n\n");
         }
-        out.push_str("## ");
+        let section_key = row.section.as_deref();
+        if section_key != prev_section {
+            if let Some(section) = section_key {
+                out.push_str("## ");
+                out.push_str(section);
+                out.push_str("\n\n");
+            }
+            prev_section = section_key;
+        }
+        if row.section.is_some() {
+            out.push_str("### ");
+        } else {
+            out.push_str("## ");
+        }
         out.push_str(&row.title);
         out.push('\n');
         out.push('\n');
@@ -1122,6 +1155,7 @@ mod tests {
             doc: String::new(),
             doc_title: None,
             doc_section: None,
+            section: None,
             caption: String::new(),
             media: String::new(),
             dpi: None,
@@ -1139,6 +1173,7 @@ mod tests {
             single_line: false,
             render_args: Vec::new(),
             compare: Vec::new(),
+            batch_args: Vec::new(),
             args: args.into_iter().map(str::to_string).collect(),
         }
     }

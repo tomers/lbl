@@ -45,7 +45,11 @@ impl Block {
     pub fn to_authoring_html(&self) -> String {
         match self {
             Block::Text(t) => {
-                format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
+                if t.contains('\n') {
+                    format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
+                } else {
+                    format!("<span class=\"lbl-text\">{}</span>", text_to_html(t))
+                }
             }
             Block::Sized { scale, text } => format!(
                 "<span class=\"lbl-text\" style=\"font-size:{}em\">{}</span>",

@@ -112,7 +112,7 @@ Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) wit
 ### Inline mini-syntax
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-On wide media the elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`).
+Elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`).
 
 <img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" />
 
@@ -123,17 +123,11 @@ On wide media the elements flow in a row; spacing comes from `element_gap_mm` in
 ```console
 # default element gap
 $ lbl print \
-  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
-  --qr-size-mm 9 \
-  --barcode-height-mm 7 \
-  --padding-mm 1
+  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
 
 # element gap 8 mm
 LBL_STYLE__ELEMENT_GAP_MM=8 $ lbl print \
-  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
-  --qr-size-mm 9 \
-  --barcode-height-mm 7 \
-  --padding-mm 1
+  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
 ```
 
 ---
@@ -144,110 +138,11 @@ Headings, emphasis, and inline directives compose via `--markdown`.
 
 <img src="docs/src/generated/images/markdown-label.png" alt="Markdown input" />
 
-*DYMO 11352 · 25×54 mm* · [Printing text →](docs/src/guides/printing-text.md)
+*NIIMBOT 12×22 mm @ 203 dpi* · [Printing text →](docs/src/guides/printing-text.md)
 
 ```console
 $ lbl print \
-  --markdown $'# Order 44\n\nShip **fast** to dock 4\n\n{{qr:https://track/42}}' \
-  --orientation portrait
-```
-
----
-
-### Batch HTML template
-
-One HTML layout rendered against a JSON array — here, name badges with QR for two people.
-
-<img src="docs/src/generated/images/batch-card.png" alt="Batch HTML template" />
-
-*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
-
-[card.html](docs/examples/batch-card/card.html)
-
-```html
-<div class="lbl-label lbl-col lbl-center">
-  <strong>{{ name }}</strong>
-  <span>{{ title }}</span>
-  <qr>{{ url }}</qr>
-</div>
-```
-
-[people.json](docs/examples/batch-card/people.json)
-
-```json
-[
-  {
-    "name": "Alice",
-    "title": "Engineer",
-    "url": "https://example.com/alice"
-  },
-  {
-    "name": "Bob",
-    "title": "Designer",
-    "url": "https://example.com/bob"
-  }
-]
-```
-
-```console
-$ cd docs/examples/batch-card
-$ lbl print \
-  --template card.html \
-  --template-format html \
-  --data people.json \
-  --qr-size-mm 7 \
-  --padding-mm 1
-```
-
----
-
-### Single-file template and data
-
-Data and template can live in one file — a JSON frontmatter array batches without `--each`.
-
-<img src="docs/src/generated/images/batch-combined.png" alt="Single-file template and data" />
-
-*NIIMBOT 12×22 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
-
-[combined.html](docs/examples/batch-combined/combined.html)
-
-```html
----json
-[
-  { "name": "Alice", "title": "Engineer" },
-  { "name": "Bob", "title": "Designer" }
-]
----
-<div class="lbl-label lbl-col lbl-center">
-  <strong>{{ name }}</strong>
-  <span>{{ title }}</span>
-</div>
-```
-
-```console
-$ lbl print \
-  --template combined.html \
-  --template-format html
-```
-
----
-
-### Linux pipeline batching
-
-Pipe shell output into `lbl print` — `seq | xargs -n1 lbl print … --data` runs once per value.
-`{{ it }}` is the scalar passed on each invocation.
-
-<img src="docs/src/generated/images/shell-template.png" alt="Linux pipeline batching" />
-
-<img src="docs/src/generated/images/shell-template-01.png" alt="Linux pipeline batching" />
-
-<img src="docs/src/generated/images/shell-template-02.png" alt="Linux pipeline batching" />
-
-*NIIMBOT 12×22 mm @ 203 dpi* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
-
-```console
-# example
-$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data
+  --markdown $'# Order 44\n\nShip **fast** to dock 4\n\n{{qr:https://track/42}}'
 ```
 
 ---
@@ -262,20 +157,20 @@ Position content across the label width with `--label-align` (`start`, `center`,
 
 <img src="docs/src/generated/images/label-align-02.png" alt="Cross-axis alignment" />
 
-*DYMO 11352 · 25×54 mm* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
+*54×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # align left
 # example
-$ lbl print --label-align start --text 'align left'
+$ lbl print --label-align start --text 'align left' --width-mm 54 --length-mm 15 --dpi 300
 
 # align center
 # example
-$ lbl print --label-align center --text 'align center'
+$ lbl print --label-align center --text 'align center' --width-mm 54 --length-mm 15 --dpi 300
 
 # align right
 # example
-$ lbl print --label-align end --text 'align right'
+$ lbl print --label-align end --text 'align right' --width-mm 54 --length-mm 15 --dpi 300
 ```
 
 ---
@@ -286,16 +181,16 @@ Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge
 
 <img src="docs/src/generated/images/zero-padding.png" alt="Inner padding" />
 
-*NIIMBOT 12×30 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
+*54×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 
 ```console
 # padding 0 (left)
 # example
-$ lbl print --text Hi --padding-mm 0
+$ lbl print --text Hi --padding-mm 0 --width-mm 54 --length-mm 15 --dpi 300
 
-# padding 8 mm (right)
+# padding 4 mm (right)
 # example
-$ lbl print --text Hi --padding-mm 8
+$ lbl print --text Hi --padding-mm 4 --width-mm 54 --length-mm 15 --dpi 300
 ```
 
 ---
@@ -306,7 +201,7 @@ When transport and protocol live in `lbl.toml`, the run command only needs label
 
 <img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" />
 
-*NIIMBOT 12×22 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
+*NIIMBOT 12×40 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
 
 [lbl.toml](docs/examples/config-defaults/lbl.toml)
 
@@ -447,6 +342,201 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 ```console
 # example
 $ lbl print --template sopranos.lbl --template-format html
+```
+
+---
+
+## Templating
+
+### HTML template
+
+One HTML layout rendered against a JSON array — name badges with QR for Alice and Bob.
+
+<img src="docs/src/generated/images/batch-card.png" alt="HTML template" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#template--data)
+
+[card.html](docs/examples/batch-card/card.html)
+
+```html
+<div class="lbl-label lbl-row lbl-center">
+  <div class="lbl-col">
+    <strong>{{ name }}</strong>
+    <span>{{ title }}</span>
+  </div>
+  <qr>{{ url }}</qr>
+</div>
+```
+
+[people.json](docs/examples/batch-card/people.json)
+
+```json
+[
+  {
+    "name": "Alice",
+    "title": "Engineer",
+    "url": "https://example.com/alice"
+  },
+  {
+    "name": "Bob",
+    "title": "Designer",
+    "url": "https://example.com/bob"
+  }
+]
+```
+
+```console
+$ cd docs/examples/batch-card
+$ lbl print \
+  --template card.html \
+  --template-format html \
+  --data people.json
+```
+
+---
+
+### Single-file template and data (HTML)
+
+Data and template in one file — a JSON frontmatter array batches without `--each`.
+
+<img src="docs/src/generated/images/batch-combined.png" alt="Single-file template and data (HTML)" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
+
+[combined.html](docs/examples/batch-combined/combined.html)
+
+```html
+---json
+[
+  { "name": "Alice", "title": "Engineer", "url": "https://example.com/alice" },
+  { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
+]
+---
+<div class="lbl-label lbl-row lbl-center">
+  <div class="lbl-col">
+    <strong>{{ name }}</strong>
+    <span>{{ title }}</span>
+  </div>
+  <qr>{{ url }}</qr>
+</div>
+```
+
+```console
+$ lbl print \
+  --template combined.html \
+  --template-format html
+```
+
+---
+
+### Single-file template and data (LBL)
+
+The same frontmatter batch works in a `.lbl` file — HTML template syntax inside.
+
+<img src="docs/src/generated/images/batch-combined-lbl.png" alt="Single-file template and data (LBL)" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
+
+[combined.lbl](docs/examples/batch-combined/combined.lbl)
+
+```text
+---json
+[
+  { "name": "Alice", "title": "Engineer", "url": "https://example.com/alice" },
+  { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
+]
+---
+<div class="lbl-label lbl-row lbl-center">
+  <div class="lbl-col">
+    <strong>{{ name }}</strong>
+    <span>{{ title }}</span>
+  </div>
+  <qr>{{ url }}</qr>
+</div>
+```
+
+```console
+$ lbl print \
+  --template combined.lbl \
+  --template-format html
+```
+
+---
+
+### Command pipelining
+
+Pipe one JSON object per line into `lbl print` — each line becomes `--data` for one badge.
+
+<img src="docs/src/generated/images/shell-template.png" alt="Command pipelining" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#shell-iteration-seq-and-xargs)
+
+```console
+$ cd docs/examples/batch-card
+# example
+$ cat people.ndjson | xargs -n1 lbl print --template card.html --template-format html --data
+```
+
+---
+
+## Iterators
+
+### `--one`
+
+Print only the first label from a batch selection.
+
+<img src="docs/src/generated/images/iter-one.png" alt="`--one`" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
+
+```console
+# example
+$ lbl print --template card.html --template-format html --data people.json --one
+```
+
+---
+
+### `--index`
+
+Select a label by zero-based index — here, Bob at index 1.
+
+<img src="docs/src/generated/images/iter-index.png" alt="`--index`" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
+
+```console
+# example
+$ lbl print --template card.html --template-format html --data people.json --index 1
+```
+
+---
+
+### `--filter`
+
+Keep only labels whose data fields contain a substring (case-insensitive).
+
+<img src="docs/src/generated/images/iter-filter.png" alt="`--filter`" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
+
+```console
+# example
+$ lbl print --template card.html --template-format html --data people.json --filter Bob
+```
+
+---
+
+### `--skip` and `--take`
+
+Skip the first N labels, then print at most M from the remainder.
+
+<img src="docs/src/generated/images/iter-skip-take.png" alt="`--skip` and `--take`" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
+
+```console
+# example
+$ lbl print --template card.html --template-format html --data people.json --skip 1 --take 1
 ```
 
 <!-- doc-examples:end -->

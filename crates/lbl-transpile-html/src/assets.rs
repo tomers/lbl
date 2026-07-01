@@ -39,7 +39,7 @@ pub const BASE_CSS: &str = r#"
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0}
 .lbl-label{display:flex;flex-direction:column}
-.lbl-row{display:flex;flex-direction:row}
+.lbl-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center}
 .lbl-col{display:flex;flex-direction:column}
 .lbl-center{align-items:center;justify-content:center}
 .lbl-between{justify-content:space-between}

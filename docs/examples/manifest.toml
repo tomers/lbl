@@ -9,7 +9,7 @@ supersample = 2
 id = "inline-syntax"
 title = "Inline mini-syntax"
 description = """Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-On wide media the elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`)."""
+Elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`)."""
 doc = "guides/printing-text.md"
 doc_title = "Printing text"
 doc_section = "inline-mini-syntax-default"
@@ -17,16 +17,7 @@ caption = "DYMO 11352 · 25×54 mm"
 media = "11352"
 separate_images = true
 render_args = ["--orientation", "landscape"]
-args = [
-  "--text",
-  "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}",
-  "--qr-size-mm",
-  "9",
-  "--barcode-height-mm",
-  "7",
-  "--padding-mm",
-  "1",
-]
+args = ["--text", "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}"]
 compare = [{ label = "default element gap" }, { label = "element gap 8 mm", env = { LBL_STYLE__ELEMENT_GAP_MM = "8" } }]
 
 [[example]]
@@ -35,71 +26,14 @@ title = "Markdown input"
 description = "Headings, emphasis, and inline directives compose via `--markdown`."
 doc = "guides/printing-text.md"
 doc_title = "Printing text"
-caption = "DYMO 11352 · 25×54 mm"
-media = "11352"
+caption = "NIIMBOT 12×22 mm @ 203 dpi"
+media = "niimbot-12x22"
+dpi = 203
 args = ["--markdown", """# Order 44
 
 Ship **fast** to dock 4
 
-{{qr:https://track/42}}""", "--orientation", "portrait"]
-
-[[example]]
-id = "batch-card"
-title = "Batch HTML template"
-description = "One HTML layout rendered against a JSON array — here, name badges with QR for two people."
-doc = "guides/batch-printing.md"
-doc_title = "Batch printing"
-doc_section = "template--data"
-caption = "DYMO 2112286 · 25×25 mm"
-media = "2112286"
-dir = "batch-card"
-composite = "side_by_side"
-files = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
-args = [
-  "--template",
-  "card.html",
-  "--template-format",
-  "html",
-  "--data",
-  "people.json",
-  "--qr-size-mm",
-  "7",
-  "--padding-mm",
-  "1",
-]
-
-[[example]]
-id          = "batch-combined"
-title       = "Single-file template and data"
-description = "Data and template can live in one file — a JSON frontmatter array batches without `--each`."
-doc         = "guides/batch-printing.md"
-doc_title   = "Batch printing"
-doc_section = "single-file-frontmatter"
-caption     = "NIIMBOT 12×22 mm @ 203 dpi"
-media       = "niimbot-12x22"
-dpi         = 203
-dir         = "batch-combined"
-hide_cd     = true
-composite   = "side_by_side"
-files       = [{ path = "combined.html", lang = "html" }]
-args        = ["--template", "combined.html", "--template-format", "html"]
-
-[[example]]
-id = "shell-template"
-title = "Linux pipeline batching"
-description = """Pipe shell output into `lbl print` — `seq | xargs -n1 lbl print … --data` runs once per value.
-`{{ it }}` is the scalar passed on each invocation."""
-doc = "guides/batch-printing.md"
-doc_title = "Batch printing"
-doc_section = "shell-iteration-seq-and-xargs"
-caption = "NIIMBOT 12×22 mm @ 203 dpi"
-media = "niimbot-12x22"
-dpi = 203
-xargs = "seq 1 3"
-separate_images = true
-single_line = true
-render_args = ["--padding-mm", "0"]
-args = ["--template", "User #{{ it }}"]
+{{qr:https://track/42}}"""]
 
 [[example]]
 id = "label-align"
@@ -108,8 +42,11 @@ description = "Position content across the label width with `--label-align` (`st
 doc = "guides/configuration.md"
 doc_title = "Configuration"
 doc_section = "style-fonts-qr-barcodes"
-caption = "DYMO 11352 · 25×54 mm"
-media = "11352"
+caption = "54×15 mm @ 300 dpi"
+media = ""
+width_mm = 54
+length_mm = 15
+dpi = 300
 separate_images = true
 single_line = true
 render_args = ["--orientation", "landscape"]
@@ -142,20 +79,23 @@ description = "Inner padding (`--padding-mm`, default 2 mm) gutters content from
 doc = "guides/configuration.md"
 doc_title = "Configuration"
 doc_section = "padding-and-insets"
-caption = "NIIMBOT 12×30 mm @ 203 dpi"
-media = "12x30"
-dpi = 203
+caption = "54×15 mm @ 300 dpi"
+media = ""
+width_mm = 54
+length_mm = 15
+dpi = 300
 composite = "side_by_side"
 single_line = true
+render_args = ["--orientation", "landscape"]
 args = ["--text", "Hi"]
 compare = [
   { label = "padding 0 (left)", args = [
     "--padding-mm",
     "0",
   ] },
-  { label = "padding 8 mm (right)", args = [
+  { label = "padding 4 mm (right)", args = [
     "--padding-mm",
-    "8",
+    "4",
   ] },
 ]
 
@@ -166,8 +106,8 @@ description = "When transport and protocol live in `lbl.toml`, the run command o
 doc         = "guides/configuration.md"
 doc_title   = "Configuration"
 doc_section = "print-defaults-lbl-print"
-caption     = "NIIMBOT 12×22 mm @ 203 dpi"
-media       = "niimbot-12x22"
+caption     = "NIIMBOT 12×40 mm @ 203 dpi"
+media       = "12x40"
 dpi         = 203
 dir         = "config-defaults"
 hide_cd     = true
@@ -259,3 +199,138 @@ composite   = "side_by_side"
 files       = [{ path = "sopranos.lbl", lang = "text" }]
 args        = ["--template", "sopranos.lbl", "--template-format", "html"]
 render_args = ["--qr-size-mm", "12", "--padding-mm", "1"]
+
+[[example]]
+id          = "batch-card"
+section     = "Templating"
+title       = "HTML template"
+description = "One HTML layout rendered against a JSON array — name badges with QR for Alice and Bob."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "template--data"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+composite   = "side_by_side"
+files       = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+
+[[example]]
+id          = "batch-combined"
+section     = "Templating"
+title       = "Single-file template and data (HTML)"
+description = "Data and template in one file — a JSON frontmatter array batches without `--each`."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "single-file-frontmatter"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-combined"
+hide_cd     = true
+composite   = "side_by_side"
+files       = [{ path = "combined.html", lang = "html" }]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "combined.html", "--template-format", "html"]
+
+[[example]]
+id          = "batch-combined-lbl"
+section     = "Templating"
+title       = "Single-file template and data (LBL)"
+description = "The same frontmatter batch works in a `.lbl` file — HTML template syntax inside."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "single-file-frontmatter"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-combined"
+hide_cd     = true
+composite   = "side_by_side"
+files       = [{ path = "combined.lbl", lang = "text" }]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "combined.lbl", "--template-format", "html"]
+
+[[example]]
+id          = "shell-template"
+section     = "Templating"
+title       = "Command pipelining"
+description = """Pipe one JSON object per line into `lbl print` — each line becomes `--data` for one badge."""
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "shell-iteration-seq-and-xargs"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+xargs       = "cat people.ndjson"
+composite   = "side_by_side"
+single_line = true
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html"]
+
+[[example]]
+id          = "iter-one"
+section     = "Iterators"
+title       = "`--one`"
+description = "Print only the first label from a batch selection."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "batch-selection"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+hide_cd     = true
+single_line = true
+batch_args  = ["--one"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+
+[[example]]
+id          = "iter-index"
+section     = "Iterators"
+title       = "`--index`"
+description = "Select a label by zero-based index — here, Bob at index 1."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "batch-selection"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+hide_cd     = true
+single_line = true
+batch_args  = ["--index", "1"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+
+[[example]]
+id          = "iter-filter"
+section     = "Iterators"
+title       = "`--filter`"
+description = "Keep only labels whose data fields contain a substring (case-insensitive)."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "batch-selection"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+hide_cd     = true
+single_line = true
+batch_args  = ["--filter", "Bob"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+
+[[example]]
+id          = "iter-skip-take"
+section     = "Iterators"
+title       = "`--skip` and `--take`"
+description = "Skip the first N labels, then print at most M from the remainder."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "batch-selection"
+caption     = "DYMO 2112286 · 25×25 mm"
+media       = "2112286"
+dir         = "batch-card"
+hide_cd     = true
+single_line = true
+batch_args  = ["--skip", "1", "--take", "1"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
