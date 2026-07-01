@@ -46,6 +46,12 @@ struct Defaults {
 }
 
 #[derive(Debug, Deserialize)]
+struct ExampleFile {
+    path: String,
+    lang: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct Example {
     id: String,
     title: String,
@@ -65,6 +71,8 @@ struct Example {
     length_mm: Option<f64>,
     #[serde(default)]
     dir: Option<String>,
+    #[serde(default)]
+    files: Vec<ExampleFile>,
     args: Vec<String>,
 }
 
@@ -143,6 +151,7 @@ fn run() -> Result<()> {
                 .doc_title
                 .clone()
                 .unwrap_or_else(|| default_doc_title(&example.doc)),
+            files: load_example_files(&examples_root, example)?,
             readme_image: format!("docs/src/generated/images/{}.png", example.id),
             book_image: format!("images/{}.png", example.id),
         });
@@ -189,8 +198,17 @@ struct ExampleRow {
     readme_doc: String,
     book_doc: String,
     doc_title: String,
+    files: Vec<EmbeddedFile>,
     readme_image: String,
     book_image: String,
+}
+
+struct EmbeddedFile {
+    path: String,
+    lang: String,
+    contents: String,
+    readme_href: String,
+    book_href: String,
 }
 
 fn workspace_root() -> Result<PathBuf> {
@@ -231,11 +249,7 @@ fn render_example(
     example: &Example,
     png_path: &Path,
 ) -> Result<Vec<u8>> {
-    let work_dir = example
-        .dir
-        .as_ref()
-        .map(|d| examples_root.join(d))
-        .unwrap_or_else(|| examples_root.to_path_buf());
+    let work_dir = example_work_dir(examples_root, example);
 
     let mut cmd = Command::new(lbl_bin);
     cmd.arg("print");
@@ -343,6 +357,65 @@ fn format_doc_href(base: &str, example: &Example) -> String {
     }
 }
 
+fn example_work_dir(examples_root: &Path, example: &Example) -> PathBuf {
+    example
+        .dir
+        .as_ref()
+        .map(|d| examples_root.join(d))
+        .unwrap_or_else(|| examples_root.to_path_buf())
+}
+
+fn load_example_files(examples_root: &Path, example: &Example) -> Result<Vec<EmbeddedFile>> {
+    let work_dir = example_work_dir(examples_root, example);
+    let repo_root = examples_root
+        .parent()
+        .and_then(|p| p.parent())
+        .context("resolve repo root from docs/examples")?;
+    example
+        .files
+        .iter()
+        .map(|file| {
+            let path = work_dir.join(&file.path);
+            let contents = fs::read_to_string(&path)
+                .with_context(|| format!("read example file {}", path.display()))?;
+            let readme_href = path
+                .strip_prefix(repo_root)
+                .with_context(|| format!("{} outside repo root", path.display()))?
+                .display()
+                .to_string();
+            let book_href = readme_href.replacen("docs/", "../../", 1);
+            Ok(EmbeddedFile {
+                path: file.path.clone(),
+                lang: file.lang.clone(),
+                contents,
+                readme_href,
+                book_href,
+            })
+        })
+        .collect()
+}
+
+fn render_embedded_files(files: &[EmbeddedFile], book: bool) -> String {
+    let mut out = String::new();
+    for file in files {
+        let href = if book {
+            &file.book_href
+        } else {
+            &file.readme_href
+        };
+        out.push('[');
+        out.push_str(&file.path);
+        out.push_str("](");
+        out.push_str(href);
+        out.push_str(")\n\n```");
+        out.push_str(&file.lang);
+        out.push('\n');
+        out.push_str(file.contents.trim_end());
+        out.push_str("\n```\n\n");
+    }
+    out
+}
+
 fn render_example_header(row: &ExampleRow, doc_href: &str) -> String {
     let mut out = String::new();
     out.push_str("### ");
@@ -384,6 +457,9 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
     for row in rows {
         out.push_str("<table>\n<tr>\n<td valign=\"top\">\n\n");
         out.push_str(&render_example_header(row, &row.readme_doc));
+        if !row.files.is_empty() {
+            out.push_str(&render_embedded_files(&row.files, false));
+        }
         out.push_str("```bash\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n</td>\n<td>\n\n");
@@ -420,6 +496,9 @@ fn render_book_page(rows: &[ExampleRow]) -> String {
         out.push_str(" →](");
         out.push_str(&row.book_doc);
         out.push_str(")\n\n");
+        if !row.files.is_empty() {
+            out.push_str(&render_embedded_files(&row.files, true));
+        }
         out.push_str("```bash\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n");

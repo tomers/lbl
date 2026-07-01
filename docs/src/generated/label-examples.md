@@ -38,6 +38,35 @@ One HTML layout rendered against a JSON array — here, a name badge with QR on 
 
 *DYMO 99014 · 54×101 mm* · [Batch printing →](../guides/batch-printing.md#template--data)
 
+[card.html](../../examples/batch-card/card.html)
+
+```html
+<div class="lbl-label lbl-row lbl-center">
+  <div class="lbl-col">
+    <strong>{{ name }}</strong>
+    <span>{{ title }}</span>
+    <qr>{{ url }}</qr>
+  </div>
+</div>
+```
+
+[people.json](../../examples/batch-card/people.json)
+
+```json
+[
+  {
+    "name": "Alice",
+    "title": "Engineer",
+    "url": "https://example.com/alice"
+  },
+  {
+    "name": "Bob",
+    "title": "Designer",
+    "url": "https://example.com/bob"
+  }
+]
+```
+
 ```bash
 lbl print --template card.html --template-format html --data people.json --one
 ```
