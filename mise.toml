@@ -1,10 +1,12 @@
 [tools]
-just = "latest"
-pre-commit = "latest"
-"cargo:cargo-edit" = "latest"
-jq = "latest"
-ripgrep = "latest"
-shellcheck = "latest"
+just                  = "latest"
+pre-commit            = "latest"
+"cargo:cargo-edit"    = "latest"
+jq                    = "latest"
+ripgrep               = "latest"
+shellcheck            = "latest"
+gitleaks              = "latest"
+taplo                 = "latest"
 "cargo:cargo-nextest" = "latest"
 
 [tasks]

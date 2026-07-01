@@ -6,8 +6,9 @@ Cargo.lock.orig
 .DS_Store
 *.swp
 
-# Sidecar
+# Sidecar / JS tooling caches
 sidecar/node_modules
+node_modules/
 
 # Local caches / work dirs
 .lbl-cache/
