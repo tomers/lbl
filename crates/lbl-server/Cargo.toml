@@ -17,6 +17,7 @@ lbl-core           = { workspace = true }
 lbl-config         = { workspace = true }
 lbl-catalog        = { workspace = true }
 lbl                = { path = "../lbl" }
+lbl-template       = { workspace = true }
 lbl-transpile-html = { workspace = true }
 lbl-device         = { workspace = true }
 lbl-encode         = { workspace = true }

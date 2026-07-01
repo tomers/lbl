@@ -115,9 +115,7 @@ fn send(
     #[cfg(feature = "serial")]
     if let Some(target) = serial {
         let (path, baud) = parse_serial(&target);
-        let transport_target = TransportTarget::Serial {
-            path: path.clone(),
-        };
+        let transport_target = TransportTarget::Serial { path: path.clone() };
         let mut t = lbl_device::SerialTransport::new(path, baud);
         if let Err(err) = t.send(data) {
             bail!(format_send_failure(&err, Some(&transport_target)));

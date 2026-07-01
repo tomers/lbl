@@ -15,8 +15,7 @@ static LONE_TEXT_RE: Lazy<Regex> = Lazy::new(|| {
 
 static ANY_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<[^>]+>").expect("any tag regex"));
 
-static BR_TAG_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?is)<br\s*/?>").expect("br tag regex"));
+static BR_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<br\s*/?>").expect("br tag regex"));
 
 /// Line height for lone-text auto-fit (must match [`crate::assets::LABEL_FIT_TEXT_CSS`]).
 pub const LINE_HEIGHT: f64 = 1.1;
@@ -91,7 +90,11 @@ fn wrapped_line_count(line: &str, font_px: f64, max_width_px: f64) -> usize {
 
     for word in line.split_whitespace() {
         let word_em = line_em_width(word);
-        let space_em = if current_em > 0.0 { char_width_em(' ') } else { 0.0 };
+        let space_em = if current_em > 0.0 {
+            char_width_em(' ')
+        } else {
+            0.0
+        };
         if (current_em + space_em + word_em) * font_px <= max_width_px {
             current_em += space_em + word_em;
             continue;
@@ -165,7 +168,12 @@ mod tests {
         let font_short = max_fit_font_px(354.0, 142.0, "#1");
         let font_long = max_fit_font_px(354.0, 142.0, "User number forty-two please");
         assert!(font_long < font_short, "{font_long} vs {font_short}");
-        assert!(text_fits(font_long, 354.0, 142.0, "User number forty-two please"));
+        assert!(text_fits(
+            font_long,
+            354.0,
+            142.0,
+            "User number forty-two please"
+        ));
     }
 
     #[test]

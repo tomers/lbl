@@ -191,8 +191,14 @@ fn describe_catalog_file(path: &Path) -> String {
 }
 
 fn count_catalog_sections(map: &serde_json::Map<String, serde_json::Value>) -> String {
-    let entries = map.get("entries").and_then(|v| v.as_array()).map(|a| a.len());
-    let printers = map.get("printers").and_then(|v| v.as_array()).map(|a| a.len());
+    let entries = map
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len());
+    let printers = map
+        .get("printers")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len());
     match (entries, printers) {
         (Some(e), Some(p)) if e > 0 || p > 0 => format!("{e} entries, {p} printers"),
         (Some(e), _) if e > 0 => format!("{e} entries"),
@@ -331,8 +337,10 @@ mod tests {
 
         let paths = empty_paths(dir.path());
         let lines = describe_paths(&paths, &[]);
-        let by_label: std::collections::HashMap<_, _> =
-            lines.iter().map(|l| (l.label.as_str(), l.status.as_str())).collect();
+        let by_label: std::collections::HashMap<_, _> = lines
+            .iter()
+            .map(|l| (l.label.as_str(), l.status.as_str()))
+            .collect();
 
         assert_eq!(by_label["system"], "missing");
         assert_eq!(by_label["user"], "2 sections");

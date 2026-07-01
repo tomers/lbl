@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::DeviceError;
 
 #[cfg(feature = "usb")]
-use nusb::transfer::{Bulk, Buffer, In, Out};
+use nusb::transfer::{Buffer, Bulk, In, Out};
 #[cfg(feature = "usb")]
 use nusb::Interface;
 
@@ -106,7 +106,10 @@ impl UsbPrinterSession {
 }
 
 #[cfg(feature = "usb")]
-pub(crate) fn send_dymo_lw_job(session: &mut UsbPrinterSession, payload: &[u8]) -> Result<(), DeviceError> {
+pub(crate) fn send_dymo_lw_job(
+    session: &mut UsbPrinterSession,
+    payload: &[u8],
+) -> Result<(), DeviceError> {
     acquire_lock(session)?;
     dispatch_job_segments(session, payload)?;
     Ok(())
@@ -124,7 +127,10 @@ fn handshake(session: &mut UsbPrinterSession, lock: u8) -> Result<(), DeviceErro
     interpret_status(&status, "label handshake")
 }
 
-fn dispatch_job_segments(session: &mut UsbPrinterSession, payload: &[u8]) -> Result<(), DeviceError> {
+fn dispatch_job_segments(
+    session: &mut UsbPrinterSession,
+    payload: &[u8],
+) -> Result<(), DeviceError> {
     let mut pos = 0usize;
     require_esc_cmd(payload, &mut pos, b's')?;
     pos += 4; // job id
@@ -195,7 +201,7 @@ fn skip_label_data(payload: &[u8], pos: &mut usize) -> Result<usize, DeviceError
     let height = read_u32_le(payload, *pos)?;
     *pos += 4;
     let data_len = width
-        .checked_mul((height + 7) / 8)
+        .checked_mul(height.div_ceil(8))
         .ok_or_else(|| DeviceError::Transport("dymo-lw label data length overflow".into()))?
         as usize;
     let end = pos
@@ -283,7 +289,7 @@ fn interpret_status(status: &[u8], phase: &str) -> Result<(), DeviceError> {
                     "{phase}: no media loaded in the printer"
                 )));
             }
-            5 | 6 | 7 => {
+            5..=7 => {
                 return Err(DeviceError::Transport(format!(
                     "{phase}: media roll is empty or nearly empty (bay status {})",
                     status[10]

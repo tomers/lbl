@@ -61,7 +61,11 @@ fn main() -> Result<()> {
             report.completed, report.failed, report.remaining, report.disconnected
         );
         if let Some(err) = report.last_error.as_ref() {
-            bail!(format_dispatch_failure(err, target.as_ref(), report.remaining));
+            bail!(format_dispatch_failure(
+                err,
+                target.as_ref(),
+                report.remaining
+            ));
         }
         bail!(
             "device disconnected; {} job(s) retained in queue",
@@ -117,10 +121,7 @@ fn run_serial(
         _ => (target.to_string(), lbl_device::DEFAULT_SERIAL_BAUD),
     };
     let mut t = lbl_device::SerialTransport::new(path.clone(), baud);
-    Ok((
-        spool.run(&mut t),
-        Some(TransportTarget::Serial { path }),
-    ))
+    Ok((spool.run(&mut t), Some(TransportTarget::Serial { path })))
 }
 
 #[cfg(not(feature = "serial"))]

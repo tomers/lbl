@@ -49,10 +49,7 @@ impl Protocol {
     /// target a human instead, so they show the label in its reading
     /// orientation rather than the head's.
     pub fn targets_print_head(self) -> bool {
-        !matches!(
-            self,
-            Protocol::Virtual | Protocol::Console | Protocol::Html
-        )
+        !matches!(self, Protocol::Virtual | Protocol::Console | Protocol::Html)
     }
 
     /// Whether [`MonoBitmap::width`] runs along the feed direction.

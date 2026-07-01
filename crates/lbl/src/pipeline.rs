@@ -20,7 +20,7 @@ type PrintTransportTargets = (
     Option<String>,
     Option<String>,
 );
-use lbl_template::{BatchSelection, Engine, RenderOptions, select_batch_indices};
+use lbl_template::{select_batch_indices, BatchSelection, Engine, RenderOptions};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
     MediaInset, MediaInsetPx, QrErrorCorrection, TranspileOptions, ViewportPx,
@@ -421,9 +421,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
         let ctx = EncodeContext::new(&job, &caps);
         (
-            driver
-                .encode(&dithered, &ctx)
-                .context("encoding")?,
+            driver.encode(&dithered, &ctx).context("encoding")?,
             driver.name().to_string(),
         )
     };
@@ -602,10 +600,13 @@ mod tests {
 
     #[test]
     fn text_source_makes_one_label() {
-        let labels = authoring_labels(Source::Text {
-            text: "hi {{qr:x}}".into(),
-            raw: false,
-        }, &BatchSelection::default())
+        let labels = authoring_labels(
+            Source::Text {
+                text: "hi {{qr:x}}".into(),
+                raw: false,
+            },
+            &BatchSelection::default(),
+        )
         .unwrap();
         assert_eq!(labels.len(), 1);
         assert!(labels[0].html.contains("<qr>x</qr>"));
@@ -613,24 +614,30 @@ mod tests {
 
     #[test]
     fn template_source_batches() {
-        let labels = authoring_labels(Source::Template {
-            template: "<div>{{ name }}</div>".into(),
-            data: Some(serde_json::json!([{"name":"A"},{"name":"B"}])),
-            each: None,
-            format: TemplateFormat::Html,
-        }, &BatchSelection::default())
+        let labels = authoring_labels(
+            Source::Template {
+                template: "<div>{{ name }}</div>".into(),
+                data: Some(serde_json::json!([{"name":"A"},{"name":"B"}])),
+                each: None,
+                format: TemplateFormat::Html,
+            },
+            &BatchSelection::default(),
+        )
         .unwrap();
         assert_eq!(labels.len(), 2);
     }
 
     #[test]
     fn text_template_format_batches_through_lbl_text() {
-        let labels = authoring_labels(Source::Template {
-            template: "User #{{ index + 1 }}".into(),
-            data: Some(serde_json::json!([{}, {}])),
-            each: None,
-            format: TemplateFormat::Text,
-        }, &BatchSelection::default())
+        let labels = authoring_labels(
+            Source::Template {
+                template: "User #{{ index + 1 }}".into(),
+                data: Some(serde_json::json!([{}, {}])),
+                each: None,
+                format: TemplateFormat::Text,
+            },
+            &BatchSelection::default(),
+        )
         .unwrap();
         assert_eq!(labels.len(), 2);
         assert!(labels[0].html.contains("User #1"));

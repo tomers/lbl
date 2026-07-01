@@ -184,9 +184,7 @@ pub fn dump_config_report(loader: &lbl_config::Loader) -> io::Result<()> {
 
 /// Effective configuration JSON, with optional syntax coloring.
 pub fn render_config_json(loader: &lbl_config::Loader, color: bool) -> io::Result<String> {
-    let cfg = loader
-        .load()
-        .map_err(|e| io::Error::other(e.to_string()))?;
+    let cfg = loader.load().map_err(|e| io::Error::other(e.to_string()))?;
     let json = serde_json::to_string_pretty(&cfg).map_err(io::Error::other)?;
     Ok(highlight_json(&json, color))
 }

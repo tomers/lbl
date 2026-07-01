@@ -78,27 +78,25 @@ impl Style {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransportTarget {
     /// USB bulk device identified by vendor and product id.
-    Usb {
-        vendor_id: u16,
-        product_id: u16,
-    },
+    Usb { vendor_id: u16, product_id: u16 },
     /// USB CDC-ACM or other serial port.
-    Serial {
-        path: String,
-    },
+    Serial { path: String },
 }
 
 impl DeviceError {
     /// Whether the error looks like an OS permission denial.
     pub fn is_permission_denied(&self) -> bool {
         match self {
-            DeviceError::Transport(msg) => transport_message_matches(msg, &[
-                "permission denied",
-                "access denied",
-                "errno 13",
-                "operation not permitted",
-                "eacces",
-            ]),
+            DeviceError::Transport(msg) => transport_message_matches(
+                msg,
+                &[
+                    "permission denied",
+                    "access denied",
+                    "errno 13",
+                    "operation not permitted",
+                    "eacces",
+                ],
+            ),
             DeviceError::NotFound(_) => false,
         }
     }
@@ -106,13 +104,16 @@ impl DeviceError {
     /// Whether another process or driver already holds the device/interface.
     pub fn is_device_busy(&self) -> bool {
         match self {
-            DeviceError::Transport(msg) => transport_message_matches(msg, &[
-                "interface is busy",
-                "device busy",
-                "resource busy",
-                "errno 16",
-                "ebusy",
-            ]),
+            DeviceError::Transport(msg) => transport_message_matches(
+                msg,
+                &[
+                    "interface is busy",
+                    "device busy",
+                    "resource busy",
+                    "errno 16",
+                    "ebusy",
+                ],
+            ),
             DeviceError::NotFound(_) => false,
         }
     }
@@ -251,9 +252,7 @@ fn linux_permission_troubleshooting(target: &TransportTarget, style: &Style) -> 
             vendor_id,
             product_id,
         } => linux_usb_permission_troubleshooting(*vendor_id, *product_id, style),
-        TransportTarget::Serial { path } => {
-            linux_serial_permission_troubleshooting(path, style)
-        }
+        TransportTarget::Serial { path } => linux_serial_permission_troubleshooting(path, style),
     }
 }
 
@@ -451,10 +450,7 @@ fn linux_device_busy_troubleshooting(target: &TransportTarget, style: &Style) ->
             product_id,
         } => linux_usb_device_busy_troubleshooting(*vendor_id, *product_id, style),
         TransportTarget::Serial { path } => {
-            let mut out = format!(
-                "{}\n",
-                style.heading("Serial port is already in use.")
-            );
+            let mut out = format!("{}\n", style.heading("Serial port is already in use."));
             push_bullet(
                 &mut out,
                 style,
@@ -689,11 +685,7 @@ fn linux_usb_device_busy_troubleshooting_with(
              the udev rule below",
         );
         if let Some(ref iface) = usblp_interface {
-            push_bullet(
-                &mut out,
-                style,
-                &format!("`usblp` is bound at `{iface}`"),
-            );
+            push_bullet(&mut out, style, &format!("`usblp` is bound at `{iface}`"));
         }
     } else if usblp_bound && has_cups_queue {
         push_bullet(
@@ -701,7 +693,8 @@ fn linux_usb_device_busy_troubleshooting_with(
             style,
             "The CUPS `usblp` driver has bound this device through the queue above",
         );
-    } else if let Some(driver) = kernel_driver.filter(|&driver| driver != "usblp" && driver != "usb")
+    } else if let Some(driver) =
+        kernel_driver.filter(|&driver| driver != "usblp" && driver != "usb")
     {
         push_bullet(
             &mut out,
@@ -974,7 +967,14 @@ fn push_bullet(out: &mut String, style: &Style, line: &str) {
     out.push_str(line);
 }
 
-fn push_step(out: &mut String, style: &Style, step: usize, before: &str, command: &str, after: &str) {
+fn push_step(
+    out: &mut String,
+    style: &Style,
+    step: usize,
+    before: &str,
+    command: &str,
+    after: &str,
+) {
     let _ = write!(out, "\n  {}. ", style.heading(&step.to_string()));
     out.push_str(before);
     if !command.is_empty() {
@@ -1040,12 +1040,9 @@ fn group_names_by_gid() -> std::collections::HashMap<String, String> {
 fn usb_device_enumerated(vendor_id: u16, product_id: u16) -> bool {
     use nusb::MaybeFuture;
 
-    nusb::list_devices()
-        .wait()
-        .ok()
-        .is_some_and(|mut devices| {
-            devices.any(|d| d.vendor_id() == vendor_id && d.product_id() == product_id)
-        })
+    nusb::list_devices().wait().ok().is_some_and(|mut devices| {
+        devices.any(|d| d.vendor_id() == vendor_id && d.product_id() == product_id)
+    })
 }
 
 #[cfg(all(target_os = "linux", not(feature = "usb")))]
@@ -1175,7 +1172,11 @@ fn udev_line_grants_access(line: &str, vendor_id: u16) -> bool {
 
 #[cfg(target_os = "linux")]
 fn udev_access_rule_for_vendor(vendor_id: u16) -> Option<PathBuf> {
-    for dir in ["/etc/udev/rules.d", "/usr/lib/udev/rules.d", "/lib/udev/rules.d"] {
+    for dir in [
+        "/etc/udev/rules.d",
+        "/usr/lib/udev/rules.d",
+        "/lib/udev/rules.d",
+    ] {
         let Ok(entries) = std::fs::read_dir(dir) else {
             continue;
         };
@@ -1204,8 +1205,10 @@ mod tests {
 
     #[test]
     fn detects_permission_denied_errors() {
-        assert!(DeviceError::Transport("opening device: permission denied (errno 13)".into())
-            .is_permission_denied());
+        assert!(
+            DeviceError::Transport("opening device: permission denied (errno 13)".into())
+                .is_permission_denied()
+        );
         assert!(DeviceError::Transport("access denied".into()).is_permission_denied());
         assert!(!DeviceError::NotFound("gone".into()).is_permission_denied());
         assert!(!DeviceError::Transport("device busy".into()).is_permission_denied());
@@ -1213,8 +1216,10 @@ mod tests {
 
     #[test]
     fn detects_device_busy_errors() {
-        assert!(DeviceError::Transport("claiming interface: interface is busy (errno 16)".into())
-            .is_device_busy());
+        assert!(
+            DeviceError::Transport("claiming interface: interface is busy (errno 16)".into())
+                .is_device_busy()
+        );
         assert!(!DeviceError::Transport("permission denied (errno 13)".into()).is_device_busy());
     }
 
@@ -1330,11 +1335,11 @@ mod tests {
         }) {
             let info = find_usb_device_node(0x0922, 0x0028).unwrap();
             let path = info.path.to_string_lossy();
+            assert!(path.starts_with("/dev/bus/usb/"), "unexpected path: {path}");
             assert!(
-                path.starts_with("/dev/bus/usb/"),
-                "unexpected path: {path}"
+                std::path::Path::new(path.as_ref()).exists(),
+                "path missing: {path}"
             );
-            assert!(std::path::Path::new(path.as_ref()).exists(), "path missing: {path}");
         }
     }
 

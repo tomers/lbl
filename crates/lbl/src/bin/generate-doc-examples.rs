@@ -233,10 +233,7 @@ fn render_example(
         cmd.args(["--dpi", &format_num(dpi)]);
     }
     if !example.args.iter().any(|a| a == "--supersample") {
-        cmd.args([
-            "--supersample",
-            &defaults.supersample.to_string(),
-        ]);
+        cmd.args(["--supersample", &defaults.supersample.to_string()]);
     }
     cmd.args([
         "--protocol",
@@ -349,9 +346,7 @@ fn patch_readme(readme_path: &Path, section: &str) -> Result<()> {
     let readme = fs::read_to_string(readme_path)
         .with_context(|| format!("read {}", readme_path.display()))?;
     if !readme.contains(README_START) || !readme.contains(README_END) {
-        bail!(
-            "README.md is missing {README_START} / {README_END} markers; add them first"
-        );
+        bail!("README.md is missing {README_START} / {README_END} markers; add them first");
     }
     let start = readme
         .find(README_START)
@@ -364,8 +359,7 @@ fn patch_readme(readme_path: &Path, section: &str) -> Result<()> {
     patched.push_str(&readme[..start]);
     patched.push_str(section);
     patched.push_str(&readme[end..]);
-    fs::write(readme_path, patched)
-        .with_context(|| format!("write {}", readme_path.display()))?;
+    fs::write(readme_path, patched).with_context(|| format!("write {}", readme_path.display()))?;
     Ok(())
 }
 
@@ -381,16 +375,13 @@ fn check_readme_section(readme_path: &Path, expected: &str) -> Result<()> {
         + README_END.len();
     let actual = &readme[start..end];
     if actual != expected.trim_end() {
-        bail!(
-            "README.md doc-examples section is stale; run `just doc-examples` and commit"
-        );
+        bail!("README.md doc-examples section is stale; run `just doc-examples` and commit");
     }
     Ok(())
 }
 
 fn check_file_contents(path: &Path, expected: &str) -> Result<()> {
-    let existing = fs::read_to_string(path)
-        .with_context(|| format!("read {}", path.display()))?;
+    let existing = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     if existing != expected {
         bail!(
             "{} is stale; run `just doc-examples` and commit",

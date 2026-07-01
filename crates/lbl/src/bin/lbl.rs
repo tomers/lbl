@@ -150,9 +150,7 @@ impl BatchSelectArgs {
         lbl_template::BatchSelection {
             filter: self.filter.clone(),
             skip: self.skip,
-            take: self
-                .take
-                .or(if self.one { Some(1) } else { None }),
+            take: self.take.or(if self.one { Some(1) } else { None }),
             indices: if self.indices.is_empty() {
                 None
             } else {
@@ -1447,7 +1445,10 @@ fn run_config(args: ConfigArgs) -> Result<()> {
             }
         }
         ConfigCommand::Paths => {
-            let catalog_extra = loader.load().map(|c| c.catalog.extra_paths).unwrap_or_default();
+            let catalog_extra = loader
+                .load()
+                .map(|c| c.catalog.extra_paths)
+                .unwrap_or_default();
             print!(
                 "{}",
                 lbl_config::format_paths_report(

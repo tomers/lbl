@@ -7,9 +7,7 @@ use lbl_core::printer::Protocol;
 use lbl_template::resolve_batch;
 use serde_json::{json, Value};
 
-use super::context::{
-    HtmlPreviewInput, HtmlPreviewMedia, HtmlPreviewPrinter, HtmlPreviewTemplate,
-};
+use super::context::{HtmlPreviewInput, HtmlPreviewMedia, HtmlPreviewPrinter, HtmlPreviewTemplate};
 use crate::pipeline::{Source, TemplateFormat};
 
 /// Source flags needed to recover template paths for the preview UI.
@@ -17,6 +15,7 @@ pub struct PreviewSourceArgs<'a> {
     pub template_path: Option<&'a str>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn input_from_run(
     source: &Source,
     source_args: PreviewSourceArgs<'_>,
@@ -96,7 +95,11 @@ fn preview_template_and_data(
             };
             (
                 HtmlPreviewTemplate {
-                    kind: if *raw { "text (raw)".into() } else { "text".into() },
+                    kind: if *raw {
+                        "text (raw)".into()
+                    } else {
+                        "text".into()
+                    },
                     path: None,
                     each: None,
                     body,
@@ -143,7 +146,5 @@ fn transport_summary(
     if let Some(path) = serial {
         return Some(format!("serial {path}"));
     }
-    bluetooth
-        .as_ref()
-        .map(|name| format!("bluetooth {name}"))
+    bluetooth.as_ref().map(|name| format!("bluetooth {name}"))
 }

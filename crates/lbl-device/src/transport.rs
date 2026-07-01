@@ -285,20 +285,17 @@ fn resolve_bulk_out_endpoint(
     if let Some(ep) = endpoint {
         return Ok(ep);
     }
-    let config = device.active_configuration().map_err(|e| {
-        DeviceError::Transport(format!("reading active usb configuration: {e}"))
-    })?;
+    let config = device
+        .active_configuration()
+        .map_err(|e| DeviceError::Transport(format!("reading active usb configuration: {e}")))?;
     bulk_out_endpoint(&config, interface)
 }
 
 #[cfg(feature = "usb")]
-fn resolve_bulk_in_endpoint(
-    device: &Device,
-    interface: u8,
-) -> Result<u8, DeviceError> {
-    let config = device.active_configuration().map_err(|e| {
-        DeviceError::Transport(format!("reading active usb configuration: {e}"))
-    })?;
+fn resolve_bulk_in_endpoint(device: &Device, interface: u8) -> Result<u8, DeviceError> {
+    let config = device
+        .active_configuration()
+        .map_err(|e| DeviceError::Transport(format!("reading active usb configuration: {e}")))?;
     bulk_in_endpoint(&config, interface)
 }
 
@@ -317,10 +314,7 @@ fn open_usb_printer_session(usb: &UsbTransport) -> Result<UsbPrinterSession, Dev
                     .unwrap_or(true)
         })
         .ok_or_else(|| {
-            DeviceError::NotFound(format!(
-                "usb {:04x}:{:04x}",
-                usb.vendor_id, usb.product_id
-            ))
+            DeviceError::NotFound(format!("usb {:04x}:{:04x}", usb.vendor_id, usb.product_id))
         })?;
 
     let device = device_info
@@ -405,8 +399,7 @@ impl Transport for UsbTransport {
             .open()
             .wait()
             .map_err(|e| DeviceError::Transport(format!("opening device: {e}")))?;
-        let endpoint =
-            resolve_bulk_out_endpoint(&device, self.interface, self.endpoint)?;
+        let endpoint = resolve_bulk_out_endpoint(&device, self.interface, self.endpoint)?;
         let interface = device
             .claim_interface(self.interface)
             .wait()
@@ -414,9 +407,7 @@ impl Transport for UsbTransport {
 
         let mut ep_out = interface
             .endpoint::<Bulk, Out>(endpoint)
-            .map_err(|e| {
-                DeviceError::Transport(format!("bulk endpoint {endpoint:#02x}: {e}"))
-            })?;
+            .map_err(|e| DeviceError::Transport(format!("bulk endpoint {endpoint:#02x}: {e}")))?;
         let completion = ep_out.transfer_blocking(data.to_vec().into(), Duration::from_secs(30));
         completion
             .status

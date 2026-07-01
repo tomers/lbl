@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(&bytes[2..6], &[1, 0, 0, 0]);
         // ESC C 100 (density) + ESC h (300×300 text mode)
         assert_eq!(&bytes[6..10], &[ESC, b'C', 100, ESC]);
-        assert_eq!(&bytes[10..11], &[b'h']);
+        assert_eq!(&bytes[10..11], b"h");
         // ESC n <index=0 le16>
         assert_eq!(&bytes[11..13], &[ESC, b'n']);
         assert_eq!(&bytes[13..15], &[0, 0]);
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(&bytes[15..19], &[ESC, b'D', 0x01, 0x02]);
         assert_eq!(&bytes[19..23], &[2, 0, 0, 0]); // width = lines
         assert_eq!(&bytes[23..27], &[8, 0, 0, 0]); // height = dots
-        // data: 2 bytes (first line 0x80, second 0x00)
+                                                   // data: 2 bytes (first line 0x80, second 0x00)
         assert_eq!(&bytes[27..29], &[0x80, 0x00]);
         // trailer: ESC E (feed to tear, last label) then ESC Q
         assert_eq!(&bytes[29..33], &[ESC, b'E', ESC, b'Q']);

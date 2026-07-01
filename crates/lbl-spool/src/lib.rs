@@ -311,10 +311,7 @@ mod tests {
         assert!(report.disconnected);
         assert_eq!(report.completed, 0);
         assert_eq!(report.remaining, 2);
-        assert!(matches!(
-            report.last_error,
-            Some(DeviceError::NotFound(_))
-        ));
+        assert!(matches!(report.last_error, Some(DeviceError::NotFound(_))));
         // The failed job remains queued (not lost) for a later retry.
         assert_eq!(spool.state(a), Some(JobState::Queued));
         assert_eq!(spool.pending(), 2);

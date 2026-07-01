@@ -55,10 +55,8 @@ pub fn resolve_html_preview_paths(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let bundle_dir = std::env::temp_dir().join(format!(
-        "lbl-preview-{}-{stamp}",
-        std::process::id()
-    ));
+    let bundle_dir =
+        std::env::temp_dir().join(format!("lbl-preview-{}-{stamp}", std::process::id()));
     Ok(HtmlPreviewPaths {
         index_html: bundle_dir.join("index.html"),
         bundle_dir,
@@ -72,30 +70,23 @@ pub fn write_html_preview(
     traces: &[LabelTrace],
     paths: &HtmlPreviewPaths,
 ) -> Result<()> {
-    std::fs::create_dir_all(&paths.bundle_dir).with_context(|| {
-        format!(
-            "create preview directory {}",
-            paths.bundle_dir.display()
-        )
-    })?;
+    std::fs::create_dir_all(&paths.bundle_dir)
+        .with_context(|| format!("create preview directory {}", paths.bundle_dir.display()))?;
 
     extract_preview_assets(&paths.bundle_dir)?;
 
     let images_dir = paths.bundle_dir.join("images");
-    std::fs::create_dir_all(&images_dir).with_context(|| {
-        format!("create preview images directory {}", images_dir.display())
-    })?;
+    std::fs::create_dir_all(&images_dir)
+        .with_context(|| format!("create preview images directory {}", images_dir.display()))?;
 
     for trace in traces {
         let name = format!("label-{:04}.png", trace.index);
         let png = png_bytes_from_mono(&trace.dithered)?;
-        std::fs::write(images_dir.join(&name), &png).with_context(|| {
-            format!("write preview image {name}")
-        })?;
+        std::fs::write(images_dir.join(&name), &png)
+            .with_context(|| format!("write preview image {name}"))?;
     }
 
-    let payload =
-        serde_json::to_string(context).context("serialize html preview payload")?;
+    let payload = serde_json::to_string(context).context("serialize html preview payload")?;
     let html = inject_preview_payload(&normalize_static_paths(&index_shell()?), &payload)?;
 
     if let Some(parent) = paths.index_html.parent() {
@@ -103,37 +94,24 @@ pub fn write_html_preview(
             std::fs::create_dir_all(parent)?;
         }
     }
-    std::fs::write(&paths.index_html, html).with_context(|| {
-        format!("write preview page {}", paths.index_html.display())
-    })?;
+    std::fs::write(&paths.index_html, html)
+        .with_context(|| format!("write preview page {}", paths.index_html.display()))?;
     Ok(())
 }
 
 fn inject_preview_payload(shell: &str, payload_json: &str) -> Result<String> {
     const MARKER: &str = "<!--LBL_PREVIEW_PAYLOAD-->";
     if shell.contains(MARKER) {
-        let script = format!(
-            "<script>window.__LBL_PREVIEW__={payload_json};</script>\n{MARKER}"
-        );
+        let script = format!("<script>window.__LBL_PREVIEW__={payload_json};</script>\n{MARKER}");
         return Ok(shell.replace(MARKER, &script));
     }
 
     let script = format!("<script>window.__LBL_PREVIEW__={payload_json};</script>");
     if let Some(pos) = shell.find("<script") {
-        return Ok(format!(
-            "{}\n{}\n{}",
-            &shell[..pos],
-            script,
-            &shell[pos..]
-        ));
+        return Ok(format!("{}\n{}\n{}", &shell[..pos], script, &shell[pos..]));
     }
     if let Some(pos) = shell.find("</body>") {
-        return Ok(format!(
-            "{}\n{}\n{}",
-            &shell[..pos],
-            script,
-            &shell[pos..]
-        ));
+        return Ok(format!("{}\n{}\n{}", &shell[..pos], script, &shell[pos..]));
     }
     Ok(format!("{shell}\n{script}\n"))
 }
@@ -162,8 +140,8 @@ mod tests {
     };
     use image::Rgba;
     use image::RgbaImage;
-    use lbl_core::Rotation;
     use lbl_core::printer::Protocol;
+    use lbl_core::Rotation;
     use lbl_dither::Algorithm;
     use lbl_transpile_html::AssetsBase;
 
@@ -222,10 +200,7 @@ mod tests {
 
     #[test]
     fn writes_index_payload_and_images() {
-        let dir = std::env::temp_dir().join(format!(
-            "lbl-preview-test-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("lbl-preview-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let paths = HtmlPreviewPaths {
             bundle_dir: dir.clone(),
@@ -251,7 +226,8 @@ mod tests {
 
     #[test]
     fn normalize_static_paths_rewrites_nuxt_config() {
-        let html = r#"<link href="/_nuxt/x.css"><script>baseURL:"/",buildAssetsDir:"/_nuxt/"</script>"#;
+        let html =
+            r#"<link href="/_nuxt/x.css"><script>baseURL:"/",buildAssetsDir:"/_nuxt/"</script>"#;
         let out = super::normalize_static_paths(html);
         assert!(out.contains("./_nuxt/x.css"));
         assert!(out.contains("baseURL:\"./\""));

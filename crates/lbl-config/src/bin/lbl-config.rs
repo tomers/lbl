@@ -35,7 +35,10 @@ fn main() -> Result<()> {
             }
         }
         Command::Paths => {
-            let catalog_extra = loader.load().map(|c| c.catalog.extra_paths).unwrap_or_default();
+            let catalog_extra = loader
+                .load()
+                .map(|c| c.catalog.extra_paths)
+                .unwrap_or_default();
             print!(
                 "{}",
                 lbl_config::format_paths_report(

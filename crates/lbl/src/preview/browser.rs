@@ -26,9 +26,7 @@ pub fn serve_and_open(root: &Path) -> Result<()> {
 
 /// Hint printed when the bundle is written without `--open-browser`.
 pub fn print_open_hint(bundle_dir: &Path) {
-    eprintln!(
-        "Open the preview over HTTP (browsers block ES modules on file://), e.g.:"
-    );
+    eprintln!("Open the preview over HTTP (browsers block ES modules on file://), e.g.:");
     eprintln!(
         "  cd {} && python3 -m http.server 8080 --bind 127.0.0.1",
         bundle_dir.display()
@@ -48,7 +46,10 @@ impl PreviewServer {
             .canonicalize()
             .with_context(|| format!("resolve preview directory {}", root.display()))?;
         let listener = TcpListener::bind("127.0.0.1:0").context("bind preview server")?;
-        let port = listener.local_addr().context("preview server address")?.port();
+        let port = listener
+            .local_addr()
+            .context("preview server address")?
+            .port();
         let url = format!("http://127.0.0.1:{port}/");
         let (stop_tx, stop_rx) = mpsc::channel();
 
@@ -125,8 +126,8 @@ fn handle_connection(mut stream: TcpStream, root: &Path) -> Result<()> {
         }
     };
 
-    let body = std::fs::read(&file_path)
-        .with_context(|| format!("read {}", file_path.display()))?;
+    let body =
+        std::fs::read(&file_path).with_context(|| format!("read {}", file_path.display()))?;
     let mime = mime_for_path(&file_path);
     write_response(&mut stream, 200, mime, &body)
 }
@@ -189,7 +190,9 @@ fn write_response(
          \r\n",
         body.len()
     );
-    stream.write_all(header.as_bytes()).context("write headers")?;
+    stream
+        .write_all(header.as_bytes())
+        .context("write headers")?;
     stream.write_all(body).context("write body")?;
     Ok(())
 }
@@ -281,10 +284,17 @@ mod tests {
         use std::net::TcpStream;
         let url = url.strip_prefix("http://").unwrap();
         let (host_port, path) = url.split_once('/').unwrap_or((url, ""));
-        let path = if path.is_empty() { "/" } else { &format!("/{path}") };
+        let path = if path.is_empty() {
+            "/"
+        } else {
+            &format!("/{path}")
+        };
         let mut stream = TcpStream::connect(host_port).unwrap();
         stream
-            .write_all(format!("GET {path} HTTP/1.1\r\nHost: {host_port}\r\nConnection: close\r\n\r\n").as_bytes())
+            .write_all(
+                format!("GET {path} HTTP/1.1\r\nHost: {host_port}\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
             .unwrap();
         let mut buf = String::new();
         stream.read_to_string(&mut buf).unwrap();
