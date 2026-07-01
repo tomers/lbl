@@ -46,3 +46,15 @@ Overlays:
 ```bash
 lbl-catalog --catalog my-extra.toml list
 ```
+
+## Debug
+
+Set `RUST_LOG=info` to enable diagnostic log output on stderr:
+
+```bash
+RUST_LOG=info lbl-catalog list
+RUST_LOG=debug lbl-catalog --catalog my-extra.toml show 11352
+```
+
+Use `RUST_LOG=lbl_catalog=info` to limit output to this crate; raise to `debug`
+or `trace` for more detail.
