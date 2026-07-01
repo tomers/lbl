@@ -1,11 +1,11 @@
 [package]
-name = "lbl-config"
-description = "Layered configuration for the lbl toolchain (defaults < system < user < project < env < CLI)."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-config"
+description            = "Layered configuration for the lbl toolchain (defaults < system < user < project < env < CLI)."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -13,16 +13,16 @@ name = "lbl-config"
 path = "src/bin/lbl-config.rs"
 
 [dependencies]
-lbl-core = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-figment = { workspace = true }
-toml = { workspace = true }
-thiserror = { workspace = true }
+lbl-core    = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+figment     = { workspace = true }
+toml        = { workspace = true }
+thiserror   = { workspace = true }
 directories = { workspace = true }
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
+clap        = { workspace = true }
+lbl-cli     = { workspace = true }
+anyhow      = { workspace = true }
 
 [dev-dependencies]
 figment = { version = "0.10", features = ["test"] }

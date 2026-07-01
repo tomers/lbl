@@ -53,5 +53,5 @@ Delivered verbatim by `lbl-device`/`lbl-spool`.
 
 - `lbl-template --out-dir` writes `label-NNNN.html` + `manifest.json`.
 - `lbl preview --out-dir` writes `preview-NNNN.html` (+ `.png` with `--render`)
-  + `gallery.json` (`{count, labels:[{index, html[, png]}]}`).
+  and `gallery.json` (`{count, labels:[{index, html[, png]}]}`).
 - Multi-label stdout uses NDJSON (`{"index":N,"html":"…"}` per line).

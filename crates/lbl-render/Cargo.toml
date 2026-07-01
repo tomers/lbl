@@ -1,11 +1,11 @@
 [package]
-name = "lbl-render"
-description = "Render HTML to a raster image fit to printer media, two-pass (high-res then downscale) for photo quality."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-render"
+description            = "Render HTML to a raster image fit to printer media, two-pass (high-res then downscale) for photo quality."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -19,17 +19,17 @@ default = ["chromium"]
 chromium = ["dep:chromiumoxide", "dep:futures", "dep:urlencoding", "dep:tempfile"]
 
 [dependencies]
-lbl-core = { workspace = true }
-serde = { workspace = true }
+lbl-core  = { workspace = true }
+serde     = { workspace = true }
 thiserror = { workspace = true }
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true }
-image = { workspace = true }
-tracing = { workspace = true }
+clap      = { workspace = true }
+lbl-cli   = { workspace = true }
+anyhow    = { workspace = true }
+tokio     = { workspace = true }
+image     = { workspace = true }
+tracing   = { workspace = true }
 
 chromiumoxide = { version = "0.9", optional = true }
-futures = { version = "0.3", optional = true }
-urlencoding = { version = "2", optional = true }
-tempfile = { workspace = true, optional = true }
+futures       = { version = "0.3", optional = true }
+urlencoding   = { version = "2", optional = true }
+tempfile      = { workspace = true, optional = true }

@@ -1,11 +1,11 @@
 [package]
-name = "lbl-dither"
-description = "Convert raster images to a printer's bit depth with photo-aware dithering."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-dither"
+description            = "Convert raster images to a printer's bit depth with photo-aware dithering."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -13,9 +13,9 @@ name = "lbl-dither"
 path = "src/bin/lbl-dither.rs"
 
 [dependencies]
-lbl-core = { workspace = true }
+lbl-core  = { workspace = true }
 thiserror = { workspace = true }
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
-image = { workspace = true }
+clap      = { workspace = true }
+lbl-cli   = { workspace = true }
+anyhow    = { workspace = true }
+image     = { workspace = true }

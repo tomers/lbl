@@ -85,16 +85,18 @@ landscape.
 | ------ | ------- |
 | `lbl-text` | text/CLI → authoring HTML (`--raw`, `--qr/--barcode/--image`, `--fragment`) |
 | `lbl-template` | data + template → labels (`--data`, `--each`, `--inline-resources`, `--out-dir`) |
-| `lbl-transpile-html` | `--mode print|preview`, `--assets-base`, `--index/--count` |
-| `lbl-render` | `--width-dots`, `--height-dots` (either may be omitted for a content-determined axis), `--supersample` (default 3), `--backend`, `--out` |
-
-See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
-`--supersample` controls and how to choose a value.
+| `lbl-transpile-html` | `--mode print|preview`,`--assets-base`,`--index/--count` |
+| `lbl-render` | `--width-dots`, `--height-dots` (either may be omitted for a content-determined axis), |
+| | `--supersample` (default 3), `--backend`, `--out` |
 | `lbl-dither` | `--algorithm`, `--threshold`, `--preview-png`, `--out` |
 | `lbl-pattern` | `--height [<DOTS>]`, `--width-mm`, `--dpi`, `--out` (calibration PBM) |
-| `lbl-encode` | `--protocol`, `--sample-pattern [<DOTS>]`, `--width-mm`, `--length-mm`, `--dpi`, `--cut`, `--supports-cut` |
+| `lbl-encode` | `--protocol`, `--sample-pattern [<DOTS>]`, `--width-mm`, `--length-mm`, |
+| | `--dpi`, `--cut`, `--supports-cut` |
 | `lbl-device` | `list`; `send --network host:port | --usb vid:pid | --serial path[:baud]` |
 | `lbl-spool` | `--network|--usb|--serial` plus encoded files to queue |
 | `lbl-config` | `show`, `sources`, `paths` |
 | `lbl-catalog` | `list`, `show <key>`, `compatible --printer <m>`, `search <q>` |
 | `lbl-server` | `--bind <addr>` (HTTP API) |
+
+See [Rendering Quality & Supersampling](../guides/rendering-quality.md) for what
+`--supersample` controls and how to choose a value.

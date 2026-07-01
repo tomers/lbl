@@ -1,14 +1,14 @@
 [package]
-name = "lbl-driver-file"
-description = "Virtual printer driver for lbl: renders labels to image files (PNG, BMP, ...)."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-driver-file"
+description            = "Virtual printer driver for lbl: renders labels to image files (PNG, BMP, ...)."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-lbl-core = { workspace = true }
+lbl-core       = { workspace = true }
 lbl-driver-api = { workspace = true }
-image = { workspace = true }
+image          = { workspace = true }

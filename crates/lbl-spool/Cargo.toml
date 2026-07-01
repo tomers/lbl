@@ -1,11 +1,11 @@
 [package]
-name = "lbl-spool"
-description = "Internal print spooler for lbl: job queue, sequential dispatch, per-item cut control, retry, and disconnect handling."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-spool"
+description            = "Internal print spooler for lbl: job queue, sequential dispatch, per-item cut control, retry, and disconnect handling."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -14,16 +14,16 @@ path = "src/bin/lbl-spool.rs"
 
 [features]
 default = ["usb", "serial"]
-usb = ["lbl-device/usb"]
-serial = ["lbl-device/serial"]
+usb     = ["lbl-device/usb"]
+serial  = ["lbl-device/serial"]
 
 [dependencies]
-lbl-core = { workspace = true }
+lbl-core   = { workspace = true }
 lbl-device = { path = "../lbl-device", default-features = false }
-serde = { workspace = true }
+serde      = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
+thiserror  = { workspace = true }
+clap       = { workspace = true }
+lbl-cli    = { workspace = true }
+anyhow     = { workspace = true }
+tracing    = { workspace = true }

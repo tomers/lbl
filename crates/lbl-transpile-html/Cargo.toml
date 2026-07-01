@@ -1,11 +1,11 @@
 [package]
-name = "lbl-transpile-html"
-description = "Transpile authoring HTML (custom <qr>/<barcode> elements, flex utilities) into browser-ready HTML for print or preview."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-transpile-html"
+description            = "Transpile authoring HTML (custom <qr>/<barcode> elements, flex utilities) into browser-ready HTML for print or preview."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -13,12 +13,12 @@ name = "lbl-transpile-html"
 path = "src/bin/lbl-transpile-html.rs"
 
 [dependencies]
-lbl-core = { workspace = true }
-serde = { workspace = true }
+lbl-core   = { workspace = true }
+serde      = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
-regex = "1"
-once_cell = "1"
+thiserror  = { workspace = true }
+clap       = { workspace = true }
+lbl-cli    = { workspace = true }
+anyhow     = { workspace = true }
+regex      = "1"
+once_cell  = "1"

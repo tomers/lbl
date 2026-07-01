@@ -1,84 +1,84 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/lbl-core",
-    "crates/lbl-cli",
-    "crates/lbl-config",
-    "crates/lbl-catalog",
-    "crates/lbl-text",
-    "crates/lbl-markdown",
-    "crates/lbl-template",
-    "crates/lbl-transpile-html",
-    "crates/lbl-render",
-    "crates/lbl-dither",
-    "crates/lbl-pattern",
-    "crates/lbl-encode",
-    "crates/lbl-device",
-    "crates/lbl-spool",
-    "crates/lbl",
-    "crates/lbl-server",
-    "crates/drivers/lbl-driver-api",
-    "crates/drivers/lbl-driver-dymo",
-    "crates/drivers/lbl-driver-escpos",
-    "crates/drivers/lbl-driver-zpl",
-    "crates/drivers/lbl-driver-tspl",
-    "crates/drivers/lbl-driver-niimbot",
-    "crates/drivers/lbl-driver-file",
-    "crates/drivers/lbl-driver-console",
+  "crates/lbl-core",
+  "crates/lbl-cli",
+  "crates/lbl-config",
+  "crates/lbl-catalog",
+  "crates/lbl-text",
+  "crates/lbl-markdown",
+  "crates/lbl-template",
+  "crates/lbl-transpile-html",
+  "crates/lbl-render",
+  "crates/lbl-dither",
+  "crates/lbl-pattern",
+  "crates/lbl-encode",
+  "crates/lbl-device",
+  "crates/lbl-spool",
+  "crates/lbl",
+  "crates/lbl-server",
+  "crates/drivers/lbl-driver-api",
+  "crates/drivers/lbl-driver-dymo",
+  "crates/drivers/lbl-driver-escpos",
+  "crates/drivers/lbl-driver-zpl",
+  "crates/drivers/lbl-driver-tspl",
+  "crates/drivers/lbl-driver-niimbot",
+  "crates/drivers/lbl-driver-file",
+  "crates/drivers/lbl-driver-console",
 ]
 
 [workspace.package]
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-authors = ["lbl contributors"]
-repository = "https://github.com/labelle-org/lbl"
+version      = "0.1.0"
+edition      = "2021"
+license      = "Apache-2.0"
+authors      = ["lbl contributors"]
+repository   = "https://github.com/labelle-org/lbl"
 rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crates
-lbl-core = { path = "crates/lbl-core" }
-lbl-cli = { path = "crates/lbl-cli" }
-lbl-config = { path = "crates/lbl-config" }
-lbl-catalog = { path = "crates/lbl-catalog" }
-lbl-text = { path = "crates/lbl-text" }
-lbl-markdown = { path = "crates/lbl-markdown" }
-lbl-template = { path = "crates/lbl-template" }
+lbl-core           = { path = "crates/lbl-core" }
+lbl-cli            = { path = "crates/lbl-cli" }
+lbl-config         = { path = "crates/lbl-config" }
+lbl-catalog        = { path = "crates/lbl-catalog" }
+lbl-text           = { path = "crates/lbl-text" }
+lbl-markdown       = { path = "crates/lbl-markdown" }
+lbl-template       = { path = "crates/lbl-template" }
 lbl-transpile-html = { path = "crates/lbl-transpile-html" }
-lbl-render = { path = "crates/lbl-render" }
-lbl-dither = { path = "crates/lbl-dither" }
-lbl-pattern = { path = "crates/lbl-pattern" }
-lbl-driver-api = { path = "crates/drivers/lbl-driver-api" }
-lbl-driver-dymo = { path = "crates/drivers/lbl-driver-dymo" }
-lbl-driver-escpos = { path = "crates/drivers/lbl-driver-escpos" }
-lbl-driver-zpl = { path = "crates/drivers/lbl-driver-zpl" }
-lbl-driver-tspl = { path = "crates/drivers/lbl-driver-tspl" }
+lbl-render         = { path = "crates/lbl-render" }
+lbl-dither         = { path = "crates/lbl-dither" }
+lbl-pattern        = { path = "crates/lbl-pattern" }
+lbl-driver-api     = { path = "crates/drivers/lbl-driver-api" }
+lbl-driver-dymo    = { path = "crates/drivers/lbl-driver-dymo" }
+lbl-driver-escpos  = { path = "crates/drivers/lbl-driver-escpos" }
+lbl-driver-zpl     = { path = "crates/drivers/lbl-driver-zpl" }
+lbl-driver-tspl    = { path = "crates/drivers/lbl-driver-tspl" }
 lbl-driver-niimbot = { path = "crates/drivers/lbl-driver-niimbot" }
-lbl-driver-file = { path = "crates/drivers/lbl-driver-file" }
+lbl-driver-file    = { path = "crates/drivers/lbl-driver-file" }
 lbl-driver-console = { path = "crates/drivers/lbl-driver-console" }
-lbl-encode = { path = "crates/lbl-encode" }
-lbl-device = { path = "crates/lbl-device" }
-lbl-spool = { path = "crates/lbl-spool" }
+lbl-encode         = { path = "crates/lbl-encode" }
+lbl-device         = { path = "crates/lbl-device" }
+lbl-spool          = { path = "crates/lbl-spool" }
 
 # Shared third-party dependencies
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "1.1"
-serde_yaml = "0.9"
-thiserror = "2"
-anyhow = "1"
-clap = { version = "4", features = ["derive", "env", "color"] }
-clap-cargo = { version = "0.18", default-features = false, features = ["clap"] }
-tracing = "0.1"
+serde              = { version = "1", features = ["derive"] }
+serde_json         = "1"
+toml               = "1.1"
+serde_yaml         = "0.9"
+thiserror          = "2"
+anyhow             = "1"
+clap               = { version = "4", features = ["derive", "env", "color"] }
+clap-cargo         = { version = "0.18", default-features = false, features = ["clap"] }
+tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tokio = { version = "1", features = ["full"] }
-figment = { version = "0.10", features = ["toml", "env"] }
-image = "0.25"
-base64 = "0.22"
-directories = "6"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
-tempfile = "3"
-console = "0.16"
+tokio              = { version = "1", features = ["full"] }
+figment            = { version = "0.10", features = ["toml", "env"] }
+image              = "0.25"
+base64             = "0.22"
+directories        = "6"
+reqwest            = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
+tempfile           = "3"
+console            = "0.16"
 # Serial (USB CDC-ACM) transport. `libudev` (default) is only needed for port
 # enumeration; we open ports by path, so it is disabled to avoid a system dep.
 serialport = { version = "4", default-features = false }

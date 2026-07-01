@@ -1,11 +1,11 @@
 [package]
-name = "lbl-pattern"
-description = "Generate calibration test patterns as 1-bit bitmaps (no dithering or rescaling)."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+name                   = "lbl-pattern"
+description            = "Generate calibration test patterns as 1-bit bitmaps (no dithering or rescaling)."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
@@ -14,10 +14,10 @@ path = "src/bin/lbl-pattern.rs"
 
 [dependencies]
 lbl-core = { workspace = true }
-fontdue = "0.9"
-clap = { workspace = true }
-lbl-cli = { workspace = true }
-anyhow = { workspace = true }
+fontdue  = "0.9"
+clap     = { workspace = true }
+lbl-cli  = { workspace = true }
+anyhow   = { workspace = true }
 
 [dev-dependencies]
 image = { workspace = true }
