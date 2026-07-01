@@ -27,9 +27,11 @@ use uuid::Uuid;
 use crate::ble::{peripheral_label, peripheral_matches_target, NIIMBOT_CHAR};
 
 #[cfg(feature = "usb")]
-use nusb::transfer::{Bulk, Out};
+use nusb::descriptors::{ConfigurationDescriptor, TransferType};
 #[cfg(feature = "usb")]
-use nusb::MaybeFuture;
+use nusb::transfer::{Bulk, Direction, Out};
+#[cfg(feature = "usb")]
+use nusb::{Device, MaybeFuture};
 
 /// A transport sends a finished protocol byte stream to a printer, and — for
 /// bidirectional links — can read responses back.
@@ -143,6 +145,22 @@ mod tests {
         assert_eq!(std::fs::read(dir.join("label-01.png")).unwrap(), b"second");
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    #[cfg(feature = "usb")]
+    #[test]
+    fn bulk_out_endpoint_from_labelwriter_550_descriptor() {
+        use nusb::descriptors::ConfigurationDescriptor;
+
+        // DYMO LabelWriter 550 (0922:0028): printer class interface 0, bulk OUT 0x02.
+        let config = ConfigurationDescriptor::new(&[
+            0x09, 0x02, 0x20, 0x00, 0x01, 0x01, 0x00, 0xc0, 0x04, //
+            0x09, 0x04, 0x00, 0x00, 0x02, 0x07, 0x01, 0x02, 0x00, //
+            0x07, 0x05, 0x82, 0x02, 0x40, 0x00, 0x00, //
+            0x07, 0x05, 0x02, 0x02, 0x40, 0x00, 0x00, //
+        ])
+        .unwrap();
+        assert_eq!(bulk_out_endpoint(&config, 0).unwrap(), 0x02);
+    }
 }
 
 /// A network (raw TCP, e.g. port 9100) transport.
@@ -192,23 +210,61 @@ pub struct UsbTransport {
     pub serial: Option<String>,
     /// Interface number to claim.
     pub interface: u8,
-    /// Bulk OUT endpoint address.
-    pub endpoint: u8,
+    /// Bulk OUT endpoint address. When `None`, the first bulk OUT endpoint on
+    /// the interface is chosen from the device descriptor (e.g. DYMO
+    /// LabelWriter 550 uses `0x02`, not `0x01`).
+    pub endpoint: Option<u8>,
 }
 
 #[cfg(feature = "usb")]
 impl UsbTransport {
-    /// Create a USB transport. Defaults to interface 0 and endpoint 0x01 if not
-    /// overridden afterward.
+    /// Create a USB transport. Defaults to interface 0 and auto-detects the bulk
+    /// OUT endpoint from the device descriptor.
     pub fn new(vendor_id: u16, product_id: u16, serial: Option<String>) -> Self {
         Self {
             vendor_id,
             product_id,
             serial,
             interface: 0,
-            endpoint: 0x01,
+            endpoint: None,
         }
     }
+}
+
+#[cfg(feature = "usb")]
+fn bulk_out_endpoint(
+    config: &ConfigurationDescriptor<'_>,
+    interface: u8,
+) -> Result<u8, DeviceError> {
+    let intf = config
+        .interface_alt_settings()
+        .find(|i| i.interface_number() == interface && i.alternate_setting() == 0)
+        .ok_or_else(|| {
+            DeviceError::Transport(format!("usb interface {interface} not in configuration"))
+        })?;
+    intf.endpoints()
+        .find(|e| e.transfer_type() == TransferType::Bulk && e.direction() == Direction::Out)
+        .map(|e| e.address())
+        .ok_or_else(|| {
+            DeviceError::Transport(format!(
+                "no bulk OUT endpoint on usb interface {interface}"
+            ))
+        })
+}
+
+#[cfg(feature = "usb")]
+fn resolve_bulk_out_endpoint(
+    device: &Device,
+    interface: u8,
+    endpoint: Option<u8>,
+) -> Result<u8, DeviceError> {
+    if let Some(ep) = endpoint {
+        return Ok(ep);
+    }
+    let config = device.active_configuration().map_err(|e| {
+        DeviceError::Transport(format!("reading active usb configuration: {e}"))
+    })?;
+    bulk_out_endpoint(&config, interface)
 }
 
 #[cfg(feature = "usb")]
@@ -237,15 +293,17 @@ impl Transport for UsbTransport {
             .open()
             .wait()
             .map_err(|e| DeviceError::Transport(format!("opening device: {e}")))?;
+        let endpoint =
+            resolve_bulk_out_endpoint(&device, self.interface, self.endpoint)?;
         let interface = device
             .claim_interface(self.interface)
             .wait()
             .map_err(|e| DeviceError::Transport(format!("claiming interface: {e}")))?;
 
         let mut ep_out = interface
-            .endpoint::<Bulk, Out>(self.endpoint)
+            .endpoint::<Bulk, Out>(endpoint)
             .map_err(|e| {
-                DeviceError::Transport(format!("bulk endpoint {:#02x}: {e}", self.endpoint))
+                DeviceError::Transport(format!("bulk endpoint {endpoint:#02x}: {e}"))
             })?;
         let completion = ep_out.transfer_blocking(data.to_vec().into(), Duration::from_secs(30));
         completion
