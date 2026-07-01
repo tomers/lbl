@@ -10,6 +10,14 @@ Cargo.lock.orig
 sidecar/node_modules
 node_modules/
 
+# Nuxt preview UI build output (embedded by `include_dir!` at compile time).
+crates/lbl/assets/preview/*
+!crates/lbl/assets/preview/.gitkeep
+crates/lbl/preview-ui/.nuxt/
+crates/lbl/preview-ui/.output/
+crates/lbl/preview-ui/dist/
+crates/lbl/preview-ui/node_modules/
+
 # Local caches / work dirs
 .lbl-cache/
 .lint-cache/

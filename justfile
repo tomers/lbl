@@ -28,6 +28,16 @@ serve *args: _ensure-mise
 lbl *args: _ensure-mise
     cargo run -q -p lbl --bin lbl -- {{ args }}
 
+# Build the Nuxt UI bundle embedded by `lbl print --protocol html`.
+# Also runs automatically from `crates/lbl/build.rs` when `assets/preview/_nuxt`
+# is missing (e.g. fresh clone).
+preview-ui-build: _ensure-mise
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd crates/lbl/preview-ui
+    npm install
+    npm run build
+
 # Lint the Rust workspace (rustc warnings-as-errors + clippy + rustfmt check).
 lint: _ensure-mise
     @just rust-lint
