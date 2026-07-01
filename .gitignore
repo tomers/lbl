@@ -26,3 +26,4 @@ crates/lbl/preview-ui/node_modules/
 # Dev tooling
 runtime/
 .mise.local.toml
+.pre-commit-home/
