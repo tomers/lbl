@@ -89,6 +89,8 @@ pub struct SpoolReport {
     pub disconnected: bool,
     /// The last transport error when [`disconnected`](Self::disconnected) is set.
     pub last_error: Option<DeviceError>,
+    /// Wall time spent dispatching jobs (send + protocol handshakes).
+    pub duration: Duration,
 }
 
 /// The print spooler.
@@ -178,6 +180,7 @@ impl Spooler {
         T: Transport,
         F: FnMut(&mut T) -> Result<(), DeviceError>,
     {
+        let run_started = std::time::Instant::now();
         let mut report = SpoolReport::default();
 
         while let Some(job) = self.queue.pop_front() {
@@ -215,11 +218,13 @@ impl Spooler {
                 if let Some(e) = &report.last_error {
                     tracing::warn!("last error: {e}");
                 }
+                report.duration = run_started.elapsed();
                 return report;
             }
         }
 
         report.remaining = self.queue.len();
+        report.duration = run_started.elapsed();
         report
     }
 

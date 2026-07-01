@@ -6,14 +6,18 @@
 //! binaries.
 
 use std::io::Read;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use lbl::job_input;
 use lbl::pipeline::{
-    authoring_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
+    authoring_labels, encode_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_style, PipelineOptions, Source,
+    resolve_print_transport, resolve_style, EncodeLabelsOptions, EncodeLabelsResult,
+    PipelineOptions, Source,
 };
+use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::Catalog;
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
@@ -23,11 +27,19 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::MediaType;
 use lbl_encode::Registry;
 use lbl_pattern::resolve_head_dots;
-use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
+use lbl_render::{ChromiumBackend, SidecarBackend};
 use lbl_transpile_html::{
     parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign,
     MediaInsetPx, TranspileOptions,
 };
+
+type EncodedPrintBatch = (
+    Vec<(String, Vec<u8>)>,
+    Vec<lbl::debug::LabelTrace>,
+    Vec<LabelFeedDots>,
+    Duration,
+    usize,
+);
 
 #[derive(Parser)]
 #[command(
@@ -734,6 +746,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
         None
     };
 
+    let efficiency_warn_below = render_cfg.efficiency_warn_below;
+
     let opts = PipelineOptions {
         protocol,
         media,
@@ -787,29 +801,53 @@ fn run_print(args: PrintArgs) -> Result<()> {
         || protocol == Protocol::Console
         || protocol == Protocol::Html;
 
-    let (encoded, traces): (Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>) =
+    let (encoded, traces, feed_dots, preprocess_duration, label_count): EncodedPrintBatch =
         if let Some(head_dots) = sample_head_dots {
+            let started = Instant::now();
             let trace = lbl::encode_sample_pattern_traced(&registry, 0, head_dots, &opts)
                 .context("encoding sample pattern")?;
+            let preprocess_duration = started.elapsed();
+            let feed_dots = vec![LabelFeedDots(feed_dots_for_trace(&trace, protocol))];
             let encoded = vec![(
                 format!("sample-pattern-{head_dots:04}.{extension}"),
                 trace.encoded.clone(),
             )];
             let traces = if want_trace { vec![trace] } else { vec![] };
-            (encoded, traces)
+            (encoded, traces, feed_dots, preprocess_duration, 1)
         } else {
             let labels = authoring_labels(read_source(&args.source)?, &args.batch.to_selection())?;
-            match backend {
+            let label_count = labels.len();
+            let encode_opts = EncodeLabelsOptions {
+                extension,
+                want_trace,
+                warn_preprocess: true,
+                sidecar_backend: matches!(backend, BackendArg::Sidecar),
+            };
+            let EncodeLabelsResult {
+                encoded,
+                traces,
+                feed_dots,
+                preprocess_duration,
+            } = match &backend {
                 BackendArg::Chromium => {
                     let backend = ChromiumBackend::launch()?;
-                    encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+                    encode_labels(&backend, &registry, &labels, &opts, encode_opts)?
                 }
                 BackendArg::Sidecar => {
                     let backend = SidecarBackend::node_default();
-                    encode_all(&backend, &registry, &labels, &opts, extension, want_trace)?
+                    encode_labels(&backend, &registry, &labels, &opts, encode_opts)?
                 }
-            }
+            };
+            (encoded, traces, feed_dots, preprocess_duration, label_count)
         };
+
+    let preprocess_input = job_input(
+        label_count,
+        &opts.media,
+        opts.rotation,
+        opts.supersample,
+        matches!(backend, BackendArg::Sidecar),
+    );
 
     if let Some(path) = &args.debug_html {
         let html = lbl::debug::render_report(&traces);
@@ -895,39 +933,36 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     if let Some(file) = &args.file {
         let mut t = lbl_device::FileTransport::new(file.clone());
-        return dispatch_with(encoded, protocol, &mut t, None);
+        return dispatch_with(encoded, protocol, &mut t, None, None);
     }
 
     if protocol == Protocol::Virtual {
         bail!("virtual printer needs an output target; pass --file or --out-dir");
     }
 
-    dispatch(encoded, protocol, network, usb, serial, bluetooth)
-}
-
-#[allow(clippy::type_complexity)]
-fn encode_all<B: RenderBackend>(
-    backend: &B,
-    registry: &Registry,
-    labels: &[lbl::pipeline::AuthoringLabel],
-    opts: &PipelineOptions,
-    extension: &str,
-    want_trace: bool,
-) -> Result<(Vec<(String, Vec<u8>)>, Vec<lbl::debug::LabelTrace>)> {
-    let mut out = Vec::new();
-    let mut traces = Vec::new();
-    for label in labels {
-        let trace = lbl::encode_label_traced(backend, registry, label.index, &label.html, opts)
-            .with_context(|| format!("encoding label {}", label.index))?;
-        out.push((
-            format!("label-{:04}.{extension}", label.index),
-            trace.encoded.clone(),
-        ));
-        if want_trace {
-            traces.push(trace);
-        }
-    }
-    Ok((out, traces))
+    let summary = PrintSummaryInput {
+        timings: PrintRunTimings {
+            preprocess: preprocess_duration,
+            print: Duration::ZERO,
+        },
+        label_count,
+        copies,
+        feed_dots: &feed_dots,
+        media: &opts.media,
+        rotation: opts.rotation,
+        protocol,
+        preprocess: &preprocess_input,
+        efficiency_warn_below,
+    };
+    dispatch(
+        encoded,
+        protocol,
+        network,
+        usb,
+        serial,
+        bluetooth,
+        Some(summary),
+    )
 }
 
 fn dispatch(
@@ -937,13 +972,14 @@ fn dispatch(
     usb: Option<String>,
     serial: Option<String>,
     bluetooth: Option<String>,
+    summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
     if let Some(target) = network {
         let (host, port) = target
             .rsplit_once(':')
             .ok_or_else(|| anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
-        dispatch_with(encoded, protocol, &mut t, None)
+        dispatch_with(encoded, protocol, &mut t, None, summary)
     } else if let Some(target) = usb {
         let (vid, pid) = target
             .split_once(':')
@@ -957,10 +993,10 @@ fn dispatch(
         let usb = lbl_device::UsbTransport::new(vendor_id, product_id, None);
         if protocol == Protocol::DymoLw {
             let mut t = lbl_device::DymoLwUsbTransport::new(usb);
-            dispatch_with(encoded, protocol, &mut t, target_info)
+            dispatch_with(encoded, protocol, &mut t, target_info, summary)
         } else {
             let mut t = usb;
-            dispatch_with(encoded, protocol, &mut t, target_info)
+            dispatch_with(encoded, protocol, &mut t, target_info, summary)
         }
     } else if let Some(target) = serial {
         let (path, baud) = lbl::dispatch::parse_serial_target(&target);
@@ -970,9 +1006,10 @@ fn dispatch(
             protocol,
             &mut t,
             Some(lbl_device::TransportTarget::Serial { path }),
+            summary,
         )
     } else if let Some(target) = bluetooth {
-        dispatch_bluetooth(encoded, protocol, target)
+        dispatch_bluetooth(encoded, protocol, target, summary)
     } else {
         bail!("no target; pass --network, --usb, --serial, --bluetooth, --file, or --out-dir");
     }
@@ -985,9 +1022,10 @@ fn dispatch_bluetooth(
     encoded: Vec<(String, Vec<u8>)>,
     protocol: Protocol,
     target: String,
+    summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
     let mut t = lbl_device::BleTransport::new(target);
-    dispatch_with(encoded, protocol, &mut t, None)
+    dispatch_with(encoded, protocol, &mut t, None, summary)
 }
 
 #[cfg(not(feature = "ble"))]
@@ -995,6 +1033,7 @@ fn dispatch_bluetooth(
     _encoded: Vec<(String, Vec<u8>)>,
     _protocol: Protocol,
     _target: String,
+    _summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
     bail!(
         "Bluetooth LE support is not compiled in; rebuild with `--features ble` \
@@ -1007,19 +1046,28 @@ fn dispatch_with<T: lbl_device::Transport>(
     protocol: Protocol,
     transport: &mut T,
     target: Option<lbl_device::TransportTarget>,
+    mut summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
     let report = lbl::dispatch::dispatch_encoded(encoded, protocol, transport);
+    let print_duration = report.duration;
     if report.disconnected {
         eprintln!(
             "completed={} remaining={} disconnected={}",
             report.completed, report.remaining, report.disconnected
         );
         lbl::dispatch::finish_dispatch(report, target).map_err(anyhow::Error::msg)?;
-    } else {
+    } else if summary.is_none() {
         println!(
             "completed={} remaining={} disconnected={}",
             report.completed, report.remaining, report.disconnected
         );
+    }
+    if let Some(mut input) = summary.take() {
+        input.timings = PrintRunTimings {
+            preprocess: input.timings.preprocess,
+            print: print_duration,
+        };
+        lbl::terminal::print_run_summary(&input)?;
     }
     Ok(())
 }

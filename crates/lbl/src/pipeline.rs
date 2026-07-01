@@ -1,5 +1,7 @@
 //! Pipeline chaining used by the orchestrator's high-level flows.
 
+use std::time::{Duration, Instant};
+
 use anyhow::{anyhow, bail, Context, Result};
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::job::{JobSpec, OutputMode};
@@ -20,7 +22,8 @@ type PrintTransportTargets = (
     Option<String>,
     Option<String>,
 );
-use lbl_template::{select_batch_indices, BatchSelection, Engine, RenderOptions};
+pub use lbl_template::BatchSelection;
+use lbl_template::{select_batch_indices, Engine, RenderOptions};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
     MediaInset, MediaInsetPx, QrErrorCorrection, TranspileOptions, ViewportPx,
@@ -282,6 +285,104 @@ pub struct PipelineOptions {
     pub label_fit_scale: f64,
     /// Inset from the physical media edge (resolved from config/CLI).
     pub media_inset: MediaInsetPx,
+}
+
+/// Options for [`encode_labels`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EncodeLabelsOptions {
+    /// File extension for encoded output names (e.g. `png`, `bin`).
+    pub extension: &'static str,
+    /// Keep per-stage traces for debug / confirm / preview flows.
+    pub want_trace: bool,
+    /// Emit preprocessing warnings to stderr when a job is heavy.
+    pub warn_preprocess: bool,
+    /// Sidecar backend is in use (slower than in-process Chromium).
+    pub sidecar_backend: bool,
+}
+
+/// Result of [`encode_labels`].
+pub struct EncodeLabelsResult {
+    pub encoded: Vec<(String, Vec<u8>)>,
+    pub traces: Vec<crate::debug::LabelTrace>,
+    /// Feed extent per label (for throughput stats even when traces are omitted).
+    pub feed_dots: Vec<crate::print_stats::LabelFeedDots>,
+    pub preprocess_duration: Duration,
+}
+
+/// Encode every label in `labels`, optionally warning when preprocessing is
+/// expected to be slow.
+pub fn encode_labels<B: RenderBackend>(
+    backend: &B,
+    registry: &Registry,
+    labels: &[AuthoringLabel],
+    opts: &PipelineOptions,
+    encode_opts: EncodeLabelsOptions,
+) -> Result<EncodeLabelsResult> {
+    use crate::preprocess::{estimate_job, job_input, BATCH_WARN_INTERVAL};
+    use crate::print_stats::{feed_dots_for_trace, LabelFeedDots};
+    use std::time::Duration;
+
+    let mut encoded = Vec::new();
+    let mut traces = Vec::new();
+    let mut feed_dots = Vec::new();
+    if labels.is_empty() {
+        return Ok(EncodeLabelsResult {
+            encoded,
+            traces,
+            feed_dots,
+            preprocess_duration: Duration::ZERO,
+        });
+    }
+
+    let preprocess_input = job_input(
+        labels.len(),
+        &opts.media,
+        opts.rotation,
+        opts.supersample,
+        encode_opts.sidecar_backend,
+    );
+    let preprocess_estimate = estimate_job(&preprocess_input);
+
+    if encode_opts.warn_preprocess && preprocess_estimate.exceeds_threshold {
+        crate::terminal::warn_preprocess_before(&preprocess_input, &preprocess_estimate)?;
+    }
+
+    let batch = labels.len() > 1;
+    let mut preprocess_elapsed = Duration::ZERO;
+    let mut next_batch_warn = BATCH_WARN_INTERVAL;
+
+    for label in labels {
+        let started = Instant::now();
+        let trace = encode_label_traced(backend, registry, label.index, &label.html, opts)
+            .with_context(|| format!("encoding label {}", label.index))?;
+        preprocess_elapsed += started.elapsed();
+
+        if encode_opts.warn_preprocess && batch && preprocess_elapsed >= next_batch_warn {
+            crate::terminal::warn_preprocess_batch_progress(
+                preprocess_elapsed,
+                encoded.len() + 1,
+                labels.len(),
+                &preprocess_input,
+                &preprocess_estimate,
+            )?;
+            next_batch_warn += BATCH_WARN_INTERVAL;
+        }
+
+        feed_dots.push(LabelFeedDots(feed_dots_for_trace(&trace, opts.protocol)));
+        encoded.push((
+            format!("label-{:04}.{}", label.index, encode_opts.extension),
+            trace.encoded.clone(),
+        ));
+        if encode_opts.want_trace {
+            traces.push(trace);
+        }
+    }
+    Ok(EncodeLabelsResult {
+        encoded,
+        traces,
+        feed_dots,
+        preprocess_duration: preprocess_elapsed,
+    })
 }
 
 /// Resolve a [`LabelFitSetting`] against the target media.

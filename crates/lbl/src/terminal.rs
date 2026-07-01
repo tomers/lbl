@@ -17,12 +17,17 @@ use std::io::{self, IsTerminal, Write};
 use console::{Key, Term};
 use lbl_driver_console::{render_terminal, TerminalOptions};
 
+use std::time::Duration;
+
 use crate::debug::{protocol_cli_name, LabelTrace};
+use crate::preprocess::{JobPreprocessInput, PreprocessEstimate};
+use crate::print_stats::PrintSummaryInput;
 
 // ANSI styling. Kept local and minimal so the crate stays dependency-light.
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
 const DIM: &str = "\x1b[2m";
+const WARN: &str = "\x1b[38;5;220m"; // yellow
 const HEADER: &str = "\x1b[1;38;5;75m"; // bold blue
 const TAG: &str = "\x1b[38;5;75m"; // blue
 const ATTR: &str = "\x1b[38;5;180m"; // tan
@@ -43,6 +48,177 @@ pub fn stdout_color() -> bool {
 /// Whether stderr should be colorized.
 pub fn stderr_color() -> bool {
     color_for(io::stderr().is_terminal())
+}
+
+/// Warn before a heavy preprocessing job starts (render + dither + encode).
+pub fn warn_preprocess_before(
+    input: &JobPreprocessInput,
+    estimate: &PreprocessEstimate,
+) -> io::Result<()> {
+    let color = stderr_color();
+    let (w, r, d) = if color {
+        (WARN, RESET, DIM)
+    } else {
+        ("", "", "")
+    };
+    let mut err = io::stderr();
+    let ss = input.supersample.max(1);
+    let hires_w = input.width_dots.saturating_mul(ss);
+    let hires_h = input.height_dots.saturating_mul(ss);
+    let eta = format_seconds(estimate.estimated_seconds);
+    let w_dots = input.width_dots;
+    let h_dots = input.height_dots;
+
+    writeln!(
+        err,
+        "\n{w}⚠ {BOLD}Heavy label preprocessing expected{RESET}{r} (~{eta} for {} label(s))",
+        input.label_count
+    )?;
+    writeln!(
+        err,
+        "{d}  {w_dots}×{h_dots} device dots · supersample {ss} · high-res pass {hires_w}×{hires_h} px per label{r}"
+    )?;
+    write_preprocess_mitigations(&mut err, input, color)?;
+    writeln!(err)?;
+    err.flush()
+}
+
+/// Periodic batch guidance while preprocessing is still running.
+pub fn warn_preprocess_batch_progress(
+    elapsed: Duration,
+    completed: usize,
+    total: usize,
+    input: &JobPreprocessInput,
+    estimate: &PreprocessEstimate,
+) -> io::Result<()> {
+    let color = stderr_color();
+    let (w, r, d) = if color {
+        (WARN, RESET, DIM)
+    } else {
+        ("", "", "")
+    };
+    let mut err = io::stderr();
+    writeln!(
+        err,
+        "\n{w}⚠ {BOLD}Preprocessing still running{RESET}{r} — {completed}/{total} labels · {:.0}s elapsed · ~{} remaining",
+        elapsed.as_secs_f64(),
+        format_seconds(estimate.estimated_seconds * (1.0 - completed as f64 / total as f64))
+    )?;
+    write_preprocess_mitigations(&mut err, input, color)?;
+    writeln!(err, "{d}  (Cancel with Ctrl+C; labels already prepared are not sent until spooling completes.){r}")?;
+    writeln!(err)?;
+    err.flush()
+}
+
+fn write_preprocess_mitigations(
+    err: &mut impl Write,
+    input: &JobPreprocessInput,
+    color: bool,
+) -> io::Result<()> {
+    let (d, r, v) = if color {
+        (DIM, RESET, VAL)
+    } else {
+        ("", "", "")
+    };
+    writeln!(err, "{d}  Mitigations:{r}")?;
+    if let Some(suggested) = crate::preprocess::suggest_supersample(input.supersample) {
+        writeln!(
+            err,
+            "{d}    • lower supersample: {v}--supersample {suggested}{r}  (now {})",
+            input.supersample
+        )?;
+        writeln!(
+            err,
+            "{d}      or set {v}[render] supersample = {suggested}{r} in lbl.toml"
+        )?;
+    }
+    if input.label_count > 1 {
+        writeln!(
+            err,
+            "{d}    • print fewer labels: {v}--one <index>{r}  or  {v}--indices 0,1,…{r}"
+        )?;
+    }
+    Ok(())
+}
+
+/// Summary after a successful hardware print.
+pub fn print_run_summary(input: &PrintSummaryInput<'_>) -> io::Result<()> {
+    use crate::print_stats::{
+        format_duration, format_efficiency, format_throughput, total_feed_mm,
+    };
+
+    let color = stderr_color();
+    let (h, r, d, v) = if color {
+        (HEADER, RESET, DIM, VAL)
+    } else {
+        ("", "", "", "")
+    };
+    let mut err = io::stderr();
+
+    let timings = input.timings;
+    let total = timings.total();
+    let efficiency = timings.efficiency();
+    let feed_mm = total_feed_mm(
+        input.feed_dots,
+        input.label_count,
+        input.media,
+        input.rotation,
+        input.copies,
+        input.media.dpi.0,
+    );
+    let throughput = format_throughput(feed_mm, timings.print);
+
+    let labels = input.label_count;
+    let copies = input.copies.max(1);
+    let label_word = if labels == 1 { "label" } else { "labels" };
+    let copy_note = if copies > 1 {
+        format!(" × {copies} copies")
+    } else {
+        String::new()
+    };
+
+    writeln!(
+        err,
+        "\n{h}Print complete{r} — {labels} {label_word}{copy_note} · {feed_mm:.1} mm feed"
+    )?;
+    writeln!(
+        err,
+        "{d}  total {v}{}{r}  ·  preprocess {v}{}{r}  ·  printing {v}{}{r}  ·  {v}{throughput}{r}  ·  efficiency {v}{}{r}",
+        format_duration(total),
+        format_duration(timings.preprocess),
+        format_duration(timings.print),
+        format_efficiency(efficiency),
+    )?;
+
+    if input.efficiency_warn_below > 0.0 && efficiency < input.efficiency_warn_below {
+        let (w, _) = if color { (WARN, RESET) } else { ("", "") };
+        writeln!(
+            err,
+            "\n{w}⚠ Preprocessing took most of the run (efficiency {} < {:.0}% threshold).{r}",
+            format_efficiency(efficiency),
+            input.efficiency_warn_below * 100.0
+        )?;
+        write_preprocess_mitigations(&mut err, input.preprocess, color)?;
+    }
+
+    writeln!(err)?;
+    err.flush()
+}
+
+fn format_seconds(secs: f64) -> String {
+    if secs < 1.0 {
+        "under 1s".to_string()
+    } else if secs < 60.0 {
+        format!("{:.0}s", secs.round())
+    } else {
+        let mins = (secs / 60.0).floor() as u32;
+        let rem = secs - f64::from(mins * 60);
+        if rem < 1.0 {
+            format!("{mins}m")
+        } else {
+            format!("{mins}m {:.0}s", rem.round())
+        }
+    }
 }
 
 /// Best-effort terminal width in columns (from `$COLUMNS`), clamped to a sane

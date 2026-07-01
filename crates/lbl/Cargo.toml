@@ -53,10 +53,11 @@ base64             = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 console            = { workspace = true }
+sysinfo            = "0.33"
 
-include_dir        = "0.7.4"
-ctrlc              = "3.4"
-toml               = { workspace = true }
+include_dir = "0.7.4"
+ctrlc       = "3.4"
+toml        = { workspace = true }
 
 [dev-dependencies]
 lbl-core           = { workspace = true }
