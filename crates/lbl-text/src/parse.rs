@@ -111,8 +111,27 @@ impl Document {
     /// and its children) consumed by `lbl-transpile-html`.
     pub fn to_authoring_html(&self) -> String {
         let mut out = String::from("<div class=\"lbl-label\">");
-        for block in &self.blocks {
-            out.push_str(&block.to_authoring_html());
+        let mut i = 0;
+        while i < self.blocks.len() {
+            if is_inline_flow_block(&self.blocks[i]) {
+                let start = i;
+                while i < self.blocks.len() && is_inline_flow_block(&self.blocks[i]) {
+                    i += 1;
+                }
+                let group = &self.blocks[start..i];
+                if group.len() == 1 {
+                    out.push_str(&group[0].to_authoring_html());
+                } else {
+                    out.push_str("<div class=\"lbl-row lbl-center\">");
+                    for block in group {
+                        out.push_str(&block.to_authoring_html());
+                    }
+                    out.push_str("</div>");
+                }
+            } else {
+                out.push_str(&self.blocks[i].to_authoring_html());
+                i += 1;
+            }
         }
         out.push_str("</div>");
         out
@@ -228,6 +247,13 @@ fn flush_text(buf: &mut String, blocks: &mut Vec<Block>) {
         blocks.push(Block::Text(trimmed.to_string()));
     }
     buf.clear();
+}
+
+fn is_inline_flow_block(block: &Block) -> bool {
+    match block {
+        Block::Text(t) => !t.contains('\n'),
+        Block::Sized { .. } | Block::Qr { .. } | Block::Barcode { .. } | Block::Image(_) => true,
+    }
 }
 
 /// Parse the inside of an inline `{{...}}` directive (e.g. `qr:https://x.y`,
@@ -468,6 +494,24 @@ mod tests {
                 "inner: {inner}"
             );
         }
+    }
+
+    #[test]
+    fn inline_directives_flow_in_a_row() {
+        let doc = Document::parse(
+            "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}",
+            false,
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains("lbl-row"), "{html}");
+        assert!(html.contains("<qr>https://track/42</qr>"), "{html}");
+    }
+
+    #[test]
+    fn multiline_text_stays_outside_row() {
+        let doc = Document::parse("Line 1\nLine 2", false);
+        let html = doc.to_authoring_html();
+        assert!(!html.contains("lbl-row"), "{html}");
     }
 
     #[test]

@@ -1,0 +1,6 @@
+[print]
+protocol  = "niimbot"
+bluetooth = "D110"
+
+[render]
+orientation = "landscape"

@@ -26,6 +26,8 @@ pub struct LabelStyle {
     pub barcode_module_width_px: f64,
     /// Inner padding between the label edge and its content, in pixels.
     pub padding_px: f64,
+    /// Gap between sibling flex items, in pixels.
+    pub element_gap_px: f64,
     /// Border drawn around the label, in pixels (0 = no border).
     pub border_width_px: f64,
     /// QR error-correction level (redundancy).
@@ -48,6 +50,7 @@ impl Default for LabelStyle {
             barcode_height_px: 100.0,
             barcode_module_width_px: 2.0,
             padding_px: 20.0,
+            element_gap_px: 8.0,
             border_width_px: 0.0,
             qr_error_correction: QrErrorCorrection::default(),
             qr_margin: 0,
@@ -71,6 +74,7 @@ impl LabelStyle {
         barcode_height_mm: f64,
         barcode_module_width_mm: f64,
         padding_mm: f64,
+        element_gap_mm: f64,
         border_width_mm: f64,
         dpi: f64,
         supersample: u32,
@@ -82,6 +86,7 @@ impl LabelStyle {
             barcode_height_px: barcode_height_mm * px_per_mm,
             barcode_module_width_px: barcode_module_width_mm * px_per_mm,
             padding_px: padding_mm * px_per_mm,
+            element_gap_px: element_gap_mm * px_per_mm,
             border_width_px: border_width_mm * px_per_mm,
             qr_error_correction: QrErrorCorrection::default(),
             qr_margin: 0,
@@ -116,7 +121,8 @@ impl LabelStyle {
         // `box-sizing:border-box` (from the base CSS) keeps the label within the
         // media width even with padding and a border applied.
         format!(
-            ".lbl-label{{font-size:{fs:.2}px;line-height:1.3;padding:{pad:.2}px;border:{bw:.2}px solid #000}}\n.lbl-qr{{width:{qr:.2}px;height:{qr:.2}px}}\n",
+            ".lbl-label,.lbl-row,.lbl-col{{gap:{gap:.2}px}}\n.lbl-label{{font-size:{fs:.2}px;line-height:1.3;padding:{pad:.2}px;border:{bw:.2}px solid #000}}\n.lbl-qr{{width:{qr:.2}px;height:{qr:.2}px}}\n",
+            gap = self.element_gap_px.max(0.0),
             fs = self.font_size_px.max(1.0),
             pad = self.padding_px.max(0.0),
             bw = self.border_width_px.max(0.0),
@@ -911,7 +917,7 @@ mod tests {
     #[test]
     fn from_mm_scales_with_dpi_and_supersample() {
         // 3mm at 300dpi, supersample 3 -> 3 * 300 * 3 / 25.4 = ~106.3px.
-        let s = LabelStyle::from_mm(3.0, 15.0, 12.0, 0.33, 2.0, 0.0, 300.0, 3);
+        let s = LabelStyle::from_mm(3.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 300.0, 3);
         assert!((s.font_size_px - 106.299).abs() < 0.1, "{}", s.font_size_px);
         // 2mm padding at the same density.
         assert!((s.padding_px - 70.866).abs() < 0.1, "{}", s.padding_px);

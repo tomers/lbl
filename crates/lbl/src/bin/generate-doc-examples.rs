@@ -7,7 +7,7 @@
 //!   cargo run -q -p lbl --bin generate-doc-examples
 //!   cargo run -q -p lbl --bin generate-doc-examples -- --check
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -55,7 +55,10 @@ struct ExampleFile {
 struct CompareVariant {
     #[serde(default)]
     label: Option<String>,
+    #[serde(default)]
     args: Vec<String>,
+    #[serde(default)]
+    env: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,9 +82,13 @@ struct Example {
     #[serde(default)]
     dir: Option<String>,
     #[serde(default)]
+    dir_comment: Option<String>,
+    #[serde(default)]
     files: Vec<ExampleFile>,
     #[serde(default)]
     composite: Option<String>,
+    #[serde(default)]
+    separate_images: bool,
     #[serde(default)]
     xargs: Option<String>,
     #[serde(default)]
@@ -124,15 +131,16 @@ fn run() -> Result<()> {
     let lbl_bin = resolve_lbl_binary(&root)?;
     let mut rows = Vec::new();
     let mut stale_pngs = Vec::new();
+    let mut keep_images = HashSet::new();
 
     for example in &manifest.example {
         let png_path = images_dir.join(format!("{}.png", example.id));
         let render_target = if cli.check {
-            std::env::temp_dir().join(format!("lbl-doc-example-{}.png", example.id))
+            std::env::temp_dir().join(format!("{}.png", example.id))
         } else {
             png_path.clone()
         };
-        let fresh = render_example(
+        let rendered_paths = render_example(
             &lbl_bin,
             &examples_root,
             &manifest.defaults,
@@ -140,23 +148,50 @@ fn run() -> Result<()> {
             &render_target,
         )?;
         if cli.check {
-            if png_path.is_file() {
-                if let Err(err) = compare_png(&png_path, &fresh) {
-                    stale_pngs.push(format!("{}: {err}", png_path.display()));
+            for path in &rendered_paths {
+                let committed = images_dir.join(path.file_name().unwrap());
+                if committed.is_file() {
+                    let fresh =
+                        fs::read(path).with_context(|| format!("read {}", path.display()))?;
+                    if let Err(err) = compare_png_bytes(
+                        &fs::read(&committed)
+                            .with_context(|| format!("read {}", committed.display()))?,
+                        &fresh,
+                    ) {
+                        stale_pngs.push(format!("{}: {err}", committed.display()));
+                    }
+                } else {
+                    stale_pngs.push(format!("missing {}", committed.display()));
                 }
-            } else {
-                stale_pngs.push(format!("missing {}", png_path.display()));
+                let _ = fs::remove_file(path);
             }
-            let _ = fs::remove_file(&render_target);
         } else {
-            if render_target != png_path {
-                fs::rename(&render_target, &png_path).or_else(|_| {
-                    fs::copy(&render_target, &png_path)?;
-                    fs::remove_file(&render_target)?;
-                    Ok::<(), std::io::Error>(())
-                })?;
+            for path in &rendered_paths {
+                let name = path.file_name().unwrap();
+                let committed = images_dir.join(name);
+                keep_images.insert(name.to_string_lossy().into_owned());
+                if path != &committed {
+                    fs::rename(path, &committed).or_else(|_| {
+                        fs::copy(path, &committed)?;
+                        fs::remove_file(path)?;
+                        Ok::<(), std::io::Error>(())
+                    })?;
+                }
             }
         }
+        let readme_images: Vec<String> = rendered_paths
+            .iter()
+            .map(|path| {
+                format!(
+                    "docs/src/generated/images/{}",
+                    path.file_name().unwrap().to_string_lossy()
+                )
+            })
+            .collect();
+        let book_images: Vec<String> = readme_images
+            .iter()
+            .map(|path| path.replacen("docs/src/generated/", "", 1))
+            .collect();
         rows.push(ExampleRow {
             title: example.title.clone(),
             description: example.description.clone(),
@@ -169,8 +204,8 @@ fn run() -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| default_doc_title(&example.doc)),
             files: load_example_files(&examples_root, example)?,
-            readme_image: format!("docs/src/generated/images/{}.png", example.id),
-            book_image: format!("images/{}.png", example.id),
+            readme_images,
+            book_images,
         });
     }
 
@@ -196,7 +231,7 @@ fn run() -> Result<()> {
         fs::create_dir_all(book_path.parent().unwrap())?;
         fs::write(&book_path, &book_page)
             .with_context(|| format!("write {}", book_path.display()))?;
-        prune_orphan_images(&images_dir, &manifest.example)?;
+        prune_orphan_images(&images_dir, &keep_images)?;
         eprintln!(
             "wrote {} preview(s), README section, and {}",
             manifest.example.len(),
@@ -216,8 +251,8 @@ struct ExampleRow {
     book_doc: String,
     doc_title: String,
     files: Vec<EmbeddedFile>,
-    readme_image: String,
-    book_image: String,
+    readme_images: Vec<String>,
+    book_images: Vec<String>,
 }
 
 struct EmbeddedFile {
@@ -265,14 +300,25 @@ fn render_example(
     defaults: &Defaults,
     example: &Example,
     png_path: &Path,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<PathBuf>> {
     let work_dir = example_work_dir(examples_root, example);
 
     if !example.compare.is_empty() {
         for (i, variant) in example.compare.iter().enumerate() {
             let target = numbered_output_path(png_path, i);
             let args = resolve_print_args(example, Some(&variant.args));
-            run_lbl_print(lbl_bin, &work_dir, defaults, example, &target, &args, None)?;
+            run_lbl_print(
+                lbl_bin,
+                defaults,
+                example,
+                LblPrintRequest {
+                    work_dir: &work_dir,
+                    png_path: &target,
+                    print_args: &args,
+                    data: None,
+                    env: &variant.env,
+                },
+            )?;
         }
     } else if let Some(xargs) = &example.xargs {
         let values = xargs_values(xargs)?;
@@ -281,23 +327,39 @@ fn render_example(
             let args = resolve_print_args(example, None);
             run_lbl_print(
                 lbl_bin,
-                &work_dir,
                 defaults,
                 example,
-                &target,
-                &args,
-                Some(value),
+                LblPrintRequest {
+                    work_dir: &work_dir,
+                    png_path: &target,
+                    print_args: &args,
+                    data: Some(value),
+                    env: &HashMap::new(),
+                },
             )?;
         }
     } else {
         let args = resolve_print_args(example, None);
-        run_lbl_print(lbl_bin, &work_dir, defaults, example, png_path, &args, None)?;
+        run_lbl_print(
+            lbl_bin,
+            defaults,
+            example,
+            LblPrintRequest {
+                work_dir: &work_dir,
+                png_path,
+                print_args: &args,
+                data: None,
+                env: &HashMap::new(),
+            },
+        )?;
     }
 
-    if example.composite.as_deref() == Some("side_by_side") {
+    let composite = example.composite.as_deref() == Some("side_by_side");
+    if composite && !example.separate_images {
         composite_side_by_side(png_path)?;
     }
-    fs::read(png_path).with_context(|| format!("read generated {}", png_path.display()))
+    let paths = collect_label_pngs(png_path)?;
+    Ok(paths)
 }
 
 fn resolve_print_args(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
@@ -354,19 +416,27 @@ fn merge_flag_args(base: Vec<String>, overlay: &[String]) -> Vec<String> {
     out
 }
 
+struct LblPrintRequest<'a> {
+    work_dir: &'a Path,
+    png_path: &'a Path,
+    print_args: &'a [String],
+    data: Option<&'a str>,
+    env: &'a HashMap<String, String>,
+}
+
 fn run_lbl_print(
     lbl_bin: &Path,
-    work_dir: &Path,
     defaults: &Defaults,
     example: &Example,
-    png_path: &Path,
-    print_args: &[String],
-    data: Option<&str>,
+    req: LblPrintRequest<'_>,
 ) -> Result<()> {
     let mut cmd = Command::new(lbl_bin);
     cmd.arg("print");
-    cmd.args(print_args);
-    if let Some(value) = data {
+    cmd.args(req.print_args);
+    for (key, value) in req.env {
+        cmd.env(key, value);
+    }
+    if let Some(value) = req.data {
         cmd.args(["--data", value]);
     }
     if !example.media.is_empty() {
@@ -383,16 +453,16 @@ fn run_lbl_print(
     if let Some(dpi) = example.dpi {
         cmd.args(["--dpi", &format_num(dpi)]);
     }
-    if !print_args.iter().any(|a| a == "--supersample") {
+    if !req.print_args.iter().any(|a| a == "--supersample") {
         cmd.args(["--supersample", &defaults.supersample.to_string()]);
     }
     cmd.args([
         "--protocol",
         &defaults.protocol,
         "--file",
-        &png_path.display().to_string(),
+        &req.png_path.display().to_string(),
     ]);
-    cmd.current_dir(work_dir);
+    cmd.current_dir(req.work_dir);
     cmd.stdout(Stdio::null());
 
     let output = cmd
@@ -403,7 +473,7 @@ fn run_lbl_print(
         bail!(
             "lbl print failed for {} (cwd {}):\n{stderr}",
             example.id,
-            work_dir.display()
+            req.work_dir.display()
         );
     }
     Ok(())
@@ -526,6 +596,11 @@ fn format_display_command(example: &Example) -> String {
         out.push_str("$ cd docs/examples/");
         out.push_str(dir);
         out.push('\n');
+        if let Some(comment) = &example.dir_comment {
+            out.push_str("# ");
+            out.push_str(comment);
+            out.push('\n');
+        }
     }
 
     if let Some(xargs) = &example.xargs {
@@ -550,9 +625,11 @@ fn format_display_command(example: &Example) -> String {
                 .label
                 .clone()
                 .unwrap_or_else(|| "variant".to_string());
+            let prefix = format_compare_env_prefix(&variant.env);
             blocks.push(format!(
-                "# {}\n{}",
+                "# {}\n{}{}",
                 label,
+                prefix,
                 format_lbl_print_block(&display_args_for(example, Some(&variant.args)))
             ));
         }
@@ -561,7 +638,18 @@ fn format_display_command(example: &Example) -> String {
     }
 
     out.push_str(&format_lbl_print_block(&display_args_for(example, None)));
+    ensure_command_block_has_context(&mut out);
     out.trim_end().to_string()
+}
+
+fn ensure_command_block_has_context(block: &mut String) {
+    let has_non_command = block.lines().any(|line| {
+        let t = line.trim();
+        !t.is_empty() && !t.starts_with('$')
+    });
+    if !has_non_command {
+        block.push_str("\n# (preview label written to file)");
+    }
 }
 
 fn display_args_for(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
@@ -606,6 +694,18 @@ fn display_media_args(example: &Example) -> Vec<String> {
     } else {
         Vec::new()
     }
+}
+
+fn format_compare_env_prefix(env: &HashMap<String, String>) -> String {
+    if env.is_empty() {
+        return String::new();
+    }
+    let mut parts: Vec<_> = env
+        .iter()
+        .map(|(key, value)| format!("{}={}", key, shell_quote(value)))
+        .collect();
+    parts.sort();
+    format!("{} ", parts.join(" "))
 }
 
 fn format_lbl_print_block(args: &[String]) -> String {
@@ -786,9 +886,7 @@ fn render_example_meta(row: &ExampleRow, doc_href: &str) -> String {
 }
 
 fn append_examples_intro(out: &mut String, regenerate_line: &str) {
-    out.push_str(
-        "Each preview highlights a different capability on **fixed-length** media. Commands show\n",
-    );
+    out.push_str("Each preview highlights a different `lbl print` capability. Commands show\n");
     out.push_str(
         "the flags that matter for each example; protocol and output path come from project\n",
     );
@@ -801,17 +899,22 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(README_START);
     out.push('\n');
-    out.push_str("\n## Fixed-size label examples\n\n");
+    out.push_str("\n## Examples\n\n");
     append_examples_intro(
         &mut out,
         "Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) with `just doc-examples`.",
     );
-    for row in rows {
+    for (idx, row) in rows.iter().enumerate() {
+        if idx > 0 {
+            out.push_str("---\n\n");
+        }
         out.push_str(&render_example_title(row));
-        out.push_str(&format!(
-            "<img src=\"{}\" alt=\"{}\" />\n\n",
-            row.readme_image, row.title
-        ));
+        for image in &row.readme_images {
+            out.push_str(&format!(
+                "<img src=\"{}\" alt=\"{}\" />\n\n",
+                image, row.title
+            ));
+        }
         out.push_str(&render_example_meta(row, &row.readme_doc));
         if !row.files.is_empty() {
             out.push_str(&render_embedded_files(&row.files, false));
@@ -828,12 +931,15 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
 fn render_book_page(rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(
-        "# Fixed-size label examples
+        "# Examples
 
 ",
     );
     append_examples_intro(&mut out, "Regenerate with `just doc-examples`.");
-    for row in rows {
+    for (idx, row) in rows.iter().enumerate() {
+        if idx > 0 {
+            out.push_str("---\n\n");
+        }
         out.push_str("## ");
         out.push_str(&row.title);
         out.push('\n');
@@ -853,15 +959,14 @@ fn render_book_page(rows: &[ExampleRow]) -> String {
         out.push_str("```console\n");
         out.push_str(&row.command);
         out.push_str("\n```\n\n");
-        out.push_str(&format!(
-            "<img src=\"{}\" alt=\"{}\" width=\"320\"/>\n",
-            row.book_image, row.title
-        ));
+        for image in &row.book_images {
+            out.push_str(&format!(
+                "<img src=\"{}\" alt=\"{}\" width=\"320\"/>\n",
+                image, row.title
+            ));
+        }
     }
-    if !out.ends_with('\n') {
-        out.push('\n');
-    }
-    out
+    out.trim_end_matches('\n').to_string() + "\n"
 }
 
 fn patch_readme(readme_path: &Path, section: &str) -> Result<()> {
@@ -908,8 +1013,7 @@ fn check_readme_section(readme_path: &Path, expected: &str) -> Result<()> {
     Ok(())
 }
 
-fn prune_orphan_images(images_dir: &Path, examples: &[Example]) -> Result<()> {
-    let keep: HashSet<String> = examples.iter().map(|e| format!("{}.png", e.id)).collect();
+fn prune_orphan_images(images_dir: &Path, keep: &HashSet<String>) -> Result<()> {
     if !images_dir.is_dir() {
         return Ok(());
     }
@@ -932,11 +1036,6 @@ fn check_file_contents(path: &Path, expected: &str) -> Result<()> {
         );
     }
     Ok(())
-}
-
-fn compare_png(expected_path: &Path, actual: &[u8]) -> Result<(), String> {
-    let expected = fs::read(expected_path).map_err(|e| format!("read: {e}"))?;
-    compare_png_bytes(&expected, actual)
 }
 
 fn compare_png_bytes(expected: &[u8], actual: &[u8]) -> Result<(), String> {
@@ -992,8 +1091,10 @@ mod tests {
             width_mm: None,
             length_mm: None,
             dir: None,
+            dir_comment: None,
             files: Vec::new(),
             composite: None,
+            separate_images: false,
             xargs: None,
             show_media: false,
             render_args: Vec::new(),
@@ -1031,17 +1132,12 @@ mod tests {
 
     #[test]
     fn format_display_command_formats_xargs_pipeline() {
-        let mut ex = example_with(vec![
-            "--template",
-            "Hello user #{{ it }}, my friend",
-            "--padding-mm",
-            "0",
-        ]);
+        let mut ex = example_with(vec!["--template", "User #{{ it }}", "--padding-mm", "0"]);
         ex.xargs = Some("seq 1 3".into());
         assert_eq!(
             format_display_command(&ex),
             "$ seq 1 3 | xargs -n1 lbl print \\\n  \
-             --template 'Hello user #{{ it }}, my friend' \\\n  \
+             --template 'User #{{ it }}' \\\n  \
              --padding-mm 0 \\\n  \
              --data"
         );

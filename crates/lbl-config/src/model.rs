@@ -89,6 +89,8 @@ pub struct StyleConfig {
     pub barcode_module_width_mm: f64,
     /// Inner padding between the label edge and its content, in mm.
     pub padding_mm: f64,
+    /// Gap between sibling elements inside `.lbl-label` / flex rows, in mm.
+    pub element_gap_mm: f64,
     /// Border drawn around the label, in mm (0 = no border).
     pub border_width_mm: f64,
     /// How `.lbl-label` fills the render viewport: `auto` (fill fixed-length
@@ -131,6 +133,7 @@ impl Default for StyleConfig {
             barcode_height_mm: 12.0,
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,
+            element_gap_mm: 2.0,
             border_width_mm: 0.0,
             label_fit: "auto".into(),
             label_align: "center".into(),

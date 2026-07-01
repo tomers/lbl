@@ -235,6 +235,7 @@ pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32
         style.barcode_height_mm,
         style.barcode_module_width_mm,
         style.padding_mm,
+        style.element_gap_mm,
         style.border_width_mm,
         dpi,
         supersample,

@@ -1,4 +1,4 @@
-# Source of truth for fixed-size label examples shown in the README and docs.
+# Source of truth for label examples shown in the README and docs.
 # Regenerate with: just doc-examples
 #
 # Each [[example]] defines:
@@ -15,8 +15,9 @@
 #   - args: lbl print flags shown in the abbreviated command (content/layout only)
 #   - render_args: extra lbl print flags used for rendering only (omitted from docs)
 #   - show_media: when true, include --media (and --dpi when set) in the documented command
-#   - compare: render each entry side by side (e.g. supersample 2 vs 8); args merge over `args`
+#   - compare: render each entry side by side (e.g. supersample 1 vs 8); args merge over `args`
 #   - composite: optional "side_by_side" to stitch multi-label batch output into one PNG
+#   - separate_images: keep one PNG per label instead of compositing (batch / xargs)
 #   - xargs: optional shell producer (e.g. "seq 1 2") — runs lbl print once per line via xargs
 
 [defaults]
@@ -25,16 +26,20 @@ supersample = 2
 
 [[example]]
 id = "inline-syntax"
-title = "Inline QR, barcode, and sizing"
-description = "Text mini-syntax embeds QR codes, barcodes, and relative font scaling in a plain string — no HTML required."
+title = "Inline mini-syntax"
+description = """Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
+On wide media the elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`)."""
 doc = "guides/printing-text.md"
 doc_title = "Printing text"
 doc_section = "inline-mini-syntax-default"
 caption = "DYMO 11352 · 25×54 mm"
 media = "11352"
+composite = "side_by_side"
 args = [
   "--text",
   "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}",
+  "--orientation",
+  "landscape",
   "--qr-size-mm",
   "9",
   "--barcode-height-mm",
@@ -42,11 +47,15 @@ args = [
   "--padding-mm",
   "1",
 ]
+compare = [
+  { label = "default element gap (left)" },
+  { label = "element gap 8 mm (right)", env = { LBL_STYLE__ELEMENT_GAP_MM = "8" } },
+]
 
 [[example]]
 id = "markdown-label"
 title = "Markdown input"
-description = "Headings, emphasis, and inline directives compose on fixed-length media via `--markdown`."
+description = "Headings, emphasis, and inline directives compose via `--markdown`."
 doc = "guides/printing-text.md"
 doc_title = "Printing text"
 caption = "DYMO 11352 · 25×54 mm"
@@ -67,7 +76,7 @@ doc_section = "template--data"
 caption = "DYMO 11352 · 25×54 mm"
 media = "11352"
 dir = "batch-card"
-composite = "side_by_side"
+separate_images = true
 files = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
 args = [
   "--template",
@@ -85,10 +94,35 @@ args = [
 ]
 
 [[example]]
+id = "batch-combined"
+title = "Single-file template and data"
+description = "Data and template can live in one file — frontmatter holds the records, the body is the layout."
+doc = "guides/batch-printing.md"
+doc_title = "Batch printing"
+doc_section = "single-file-frontmatter"
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+dir = "batch-combined"
+separate_images = true
+files = [{ path = "combined.html", lang = "html" }]
+args = [
+  "--template",
+  "combined.html",
+  "--template-format",
+  "html",
+  "--each",
+  "/items",
+  "--orientation",
+  "portrait",
+  "--padding-mm",
+  "1",
+]
+
+[[example]]
 id = "shell-template"
-title = "Shell iteration with seq | xargs"
-description = """`seq | xargs -n1 lbl print` runs once per value — each line becomes `--data`.
-`{{ it }}` is the scalar in the template."""
+title = "Linux pipeline batching"
+description = """Pipe shell output into `lbl print` — `seq | xargs -n1 lbl print … --data` runs once per value.
+`{{ it }}` is the scalar passed on each invocation."""
 doc = "guides/batch-printing.md"
 doc_title = "Batch printing"
 doc_section = "shell-iteration-seq-and-xargs"
@@ -96,50 +130,91 @@ caption = "NIIMBOT 12×22 mm @ 203 dpi"
 media = "niimbot-12x22"
 dpi = 203
 xargs = "seq 1 3"
-composite = "side_by_side"
-args = ["--template", "Hello user #{{ it }}, my friend", "--padding-mm", "0"]
+separate_images = true
+args = ["--template", "User #{{ it }}", "--padding-mm", "0"]
 
 [[example]]
-id          = "zero-padding"
-title       = "Zero padding on small tape"
-description = "Default inner padding is 2 mm; set `--padding-mm 0` (or `padding_mm` in config) so content uses the full printable area."
-doc         = "guides/configuration.md"
-doc_title   = "Configuration"
+id = "label-align"
+title = "Cross-axis alignment"
+description = "Position content across the label width with `--label-align` (`start`, `center`, or `end`)."
+doc = "guides/configuration.md"
+doc_title = "Configuration"
+doc_section = "style-fonts-qr-barcodes"
+caption = "DYMO 11352 · 25×54 mm"
+media = "11352"
+composite = "side_by_side"
+args = ["--text", "Align", "--orientation", "landscape"]
+compare = [
+  { label = "start (left)", args = [
+    "--label-align",
+    "start",
+  ] },
+  { label = "center (middle)", args = [
+    "--label-align",
+    "center",
+  ] },
+  { label = "end (right)", args = [
+    "--label-align",
+    "end",
+  ] },
+]
+
+[[example]]
+id = "zero-padding"
+title = "Inner padding"
+description = "Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge. Compare none vs generous padding."
+doc = "guides/configuration.md"
+doc_title = "Configuration"
 doc_section = "padding-and-insets"
-caption     = "NIIMBOT 12×30 mm @ 203 dpi"
-media       = "12x30"
-dpi         = 203
-args        = ["--text", "Aisle 4\nBin 12\nQty 60", "--padding-mm", "0"]
+caption = "NIIMBOT 12×30 mm @ 203 dpi"
+media = "12x30"
+dpi = 203
+composite = "side_by_side"
+args = ["--text", "ABC 123"]
+compare = [
+  { label = "padding 0 (left)", args = [
+    "--padding-mm",
+    "0",
+  ] },
+  { label = "padding 8 mm (right)", args = [
+    "--padding-mm",
+    "8",
+  ] },
+]
 
 [[example]]
 id          = "config-defaults"
 title       = "Config-driven print defaults"
-description = "With `[print] protocol`, `bluetooth`, and media set in `lbl.toml`, the command only needs the label content."
+description = "When transport and protocol live in `lbl.toml`, the run command only needs label content."
 doc         = "guides/configuration.md"
 doc_title   = "Configuration"
 doc_section = "print-defaults-lbl-print"
 caption     = "NIIMBOT 12×22 mm @ 203 dpi"
 media       = "niimbot-12x22"
 dpi         = 203
-args        = ["--text", "Scan {{qr:https://x/p}}"]
-render_args = ["--qr-size-mm", "7", "--padding-mm", "0"]
+dir         = "config-defaults"
+dir_comment = "lbl.toml in this directory applies"
+files       = [{ path = "lbl.toml", lang = "toml" }]
+args        = ["--text", "Hello {{qr:https://x/p}}"]
 
 [[example]]
 id = "supersample"
 title = "Supersampling for print quality"
-description = """Side by side: `--supersample 2` (left) vs `--supersample 8` (right).
+description = """Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
 More render dots before downscaling yield sharper barcodes and small type."""
 doc = "guides/rendering-quality.md"
 doc_title = "Rendering quality"
 doc_section = "how-to-set-it"
 caption = "DYMO 11352 · 25×54 mm"
 media = "11352"
+dir = "supersample"
 composite = "side_by_side"
-args = ["--text", "{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}"]
+files = [{ path = "pattern.html", lang = "html" }]
+args = ["--html", "pattern.html", "--orientation", "landscape"]
 compare = [
-  { label = "supersample 2 (left)", args = [
+  { label = "supersample 1 (left)", args = [
     "--supersample",
-    "2",
+    "1",
   ] },
   { label = "supersample 8 (right)", args = [
     "--supersample",
@@ -148,31 +223,22 @@ compare = [
 ]
 
 [[example]]
-id = "niimbot-catalog"
-title = "NIIMBOT catalog media"
-description = "Use `--media 12x40` to pick a die-cut size from the bundled catalog instead of passing raw `--width-mm` / `--length-mm`."
-doc = "guides/printers-media.md"
-doc_title = "Printers & media"
+id          = "niimbot-catalog"
+title       = "Catalog media SKU"
+description = "Pick a die-cut size from the bundled catalog with `--media` instead of passing raw `--width-mm` / `--length-mm`."
+doc         = "guides/printers-media.md"
+doc_title   = "Printers & media"
 doc_section = "niimbot"
-caption = "NIIMBOT 12×40 mm @ 203 dpi"
-media = "12x40"
-dpi = 203
-show_media = true
-args = [
-  "--text",
-  "Ship to {{size:1.2:Dock 4}}{{qr:https://t/42}}",
-  "--orientation",
-  "portrait",
-  "--padding-mm",
-  "0",
-  "--qr-size-mm",
-  "9",
-]
+caption     = "NIIMBOT 12×40 mm @ 203 dpi"
+media       = "12x40"
+dpi         = 203
+show_media  = true
+args        = ["--text", "Dock 4"]
 
 [[example]]
 id          = "fixed-dimensions"
 title       = "Explicit media dimensions"
-description = "When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly for fixed-size stock."
+description = "When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly."
 doc         = "guides/printers-media.md"
 doc_title   = "Printers & media"
 doc_section = "media"
