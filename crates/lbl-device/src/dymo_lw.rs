@@ -30,6 +30,12 @@ pub const LOCK_INTER_LABEL: u8 = 2;
 /// Lock byte for [`status_request`]: handshake after the last label in a job.
 pub const LOCK_RELEASE: u8 = 0;
 
+/// First byte of the 12-character SKU field in a 32-byte status reply.
+const STATUS_SKU_START: usize = 11;
+
+/// Length of the SKU field in a status reply.
+const STATUS_SKU_LEN: usize = 12;
+
 /// Build an `ESC A` status request with the given lock byte.
 pub fn status_request(lock: u8) -> [u8; 3] {
     [ESC, b'A', lock]
@@ -249,6 +255,36 @@ fn require_esc_cmd(payload: &[u8], pos: &mut usize, cmd: u8) -> Result<(), Devic
     }
     *pos += 2;
     Ok(())
+}
+
+/// Read the NFC-reported consumable SKU from a 32-byte LW5 status reply.
+pub fn parse_status_sku(status: &[u8]) -> Option<String> {
+    if status.len() < STATUS_SKU_START + 1 {
+        return None;
+    }
+    if status.len() > 10 && status[10] == 2 {
+        return None;
+    }
+    let end = STATUS_SKU_START + STATUS_SKU_LEN.min(status.len() - STATUS_SKU_START);
+    let raw = &status[STATUS_SKU_START..end];
+    let len = raw.iter().position(|&b| b == 0).unwrap_or(raw.len());
+    if len == 0 {
+        return None;
+    }
+    std::str::from_utf8(&raw[..len])
+        .ok()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Query the SKU of the roll currently loaded in the printer.
+pub fn query_loaded_media_sku(
+    session: &mut UsbPrinterSession,
+) -> Result<Option<String>, DeviceError> {
+    session.transfer_out(&status_request(LOCK_RELEASE))?;
+    let status = session.transfer_in(STATUS_REPLY_LEN)?;
+    Ok(parse_status_sku(&status))
 }
 
 fn interpret_status(status: &[u8], phase: &str) -> Result<(), DeviceError> {
