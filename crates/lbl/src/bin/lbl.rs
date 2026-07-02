@@ -624,8 +624,14 @@ struct PrintArgs {
     /// label and ask for confirmation. Ignored for `--protocol console` and
     /// `--protocol html`. Overrides config `[print] confirm` /
     /// `LBL_PRINT__CONFIRM`.
-    #[arg(long, action = clap::ArgAction::SetTrue)]
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "preview")]
     confirm: Option<bool>,
+
+    /// Show a terminal preview of each label and stop without printing. Same
+    /// art as `--confirm`, but no confirmation prompt. Ignored for
+    /// `--protocol console` and `--protocol html`.
+    #[arg(long, conflicts_with = "confirm")]
+    preview: bool,
 
     /// Serve the HTML preview on loopback and open it in the system browser.
     /// Requires `--protocol html`. The process stays running until Ctrl+C.
@@ -812,6 +818,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let want_trace = args.debug_html.is_some()
         || debug
         || confirm
+        || args.preview
         || protocol == Protocol::Console
         || protocol == Protocol::Html;
 
@@ -927,6 +934,12 @@ fn run_print(args: PrintArgs) -> Result<()> {
         } else {
             lbl::preview::print_open_hint(&paths.bundle_dir);
         }
+        return Ok(());
+    }
+
+    // Preview-only: show terminal art and stop before any device/file output.
+    if args.preview && protocol != Protocol::Console && protocol != Protocol::Html {
+        lbl::terminal::preview_print(&traces)?;
         return Ok(());
     }
 

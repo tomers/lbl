@@ -46,6 +46,7 @@ lbl device    Discover printers (list)
 --network <host:port> | --usb <vid:pid> | --serial <path[:baud]> | --out-dir <DIR> | --file <FILE>
 --confirm   Preview each label as terminal art, then ask before printing
             (or `[print] confirm` / `LBL_PRINT__CONFIRM=1` in config)
+--preview   Same terminal preview as `--confirm`, then stop (no print)
 --debug     Print effective configuration (syntax-highlighted JSON with
             provenance when stderr is a TTY), then dump every pipeline stage
 --debug-html <FILE>   Write a standalone HTML report of every pipeline stage
@@ -83,6 +84,7 @@ not work). Without `--open-browser`, serve the directory yourself, e.g.
 
 `--confirm` shows that same preview for each label and waits for a single
 `y` keypress (`n` or `q` cancels) before printing to any non-console output.
+`--preview` shows the preview and exits without printing.
 `--debug` is a
 terminal-native companion to `--debug-html`: it prints each stage's artifacts
 (syntax-highlighted when stderr is a TTY) as the pipeline runs. Color for both

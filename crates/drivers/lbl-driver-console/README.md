@@ -28,6 +28,7 @@ The same `render_terminal` function backs three `lbl` features so they all
 agree pixel-for-pixel:
 
 - `lbl print --protocol console` — dump the raster to the terminal.
+- `lbl print --preview …` — preview each label, then stop without printing.
 - `lbl print --confirm …` — preview each label, then ask before printing.
 - `lbl print --debug …` — show the dithered raster (and other stages) inline.
 

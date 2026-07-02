@@ -12,8 +12,9 @@
 //! * **Color**: each half-cell is painted with ANSI foreground/background so the
 //!   label appears as black ink on white media, the way it prints.
 //!
-//! The same renderer backs `lbl`'s `--protocol console` output, the `--confirm`
-//! preview, and the `--debug` dithered-raster dump, so all three agree.
+//! The same renderer backs `lbl`'s `--protocol console` output, `--preview`,
+//! the `--confirm` preview, and the `--debug` dithered-raster dump, so all
+//! agree.
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 

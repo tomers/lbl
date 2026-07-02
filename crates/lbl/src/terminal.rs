@@ -3,6 +3,7 @@
 //! Three user-facing features share this module so they stay consistent:
 //!
 //! * `--protocol console` — dump the dithered raster to stdout as text.
+//! * `--preview` — show the same terminal art as `--confirm`, then stop.
 //! * `--confirm` — preview each label and ask before printing to a device/file.
 //! * `--debug` — print the effective configuration (with provenance), then a
 //!   per-stage dump (syntax-highlighted HTML, the dithered raster as art, an
@@ -246,11 +247,9 @@ pub fn render_raster(bitmap: &lbl_core::bitmap::MonoBitmap, color: bool) -> Stri
     render_terminal(bitmap, &raster_options(color))
 }
 
-/// Preview every label, then prompt for confirmation with a single keypress
-/// (`y` to print, `n`/`q` or anything else to cancel). Returns whether the
-/// user approved the print. The preview and prompt go to stderr so stdout
-/// stays clean for any piped output.
-pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
+/// Preview every label on stderr as terminal art (same output as the first
+/// stage of `--confirm`, without the confirmation prompt).
+pub fn preview_print(traces: &[LabelTrace]) -> io::Result<()> {
     let color = stderr_color();
     let mut err = io::stderr();
     for t in traces {
@@ -261,6 +260,16 @@ pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
         )?;
         write!(err, "{}", render_raster(&t.dithered, color))?;
     }
+    err.flush()
+}
+
+/// Preview every label, then prompt for confirmation with a single keypress
+/// (`y` to print, `n`/`q` or anything else to cancel). Returns whether the
+/// user approved the print. The preview and prompt go to stderr so stdout
+/// stays clean for any piped output.
+pub fn confirm_print(traces: &[LabelTrace]) -> io::Result<bool> {
+    preview_print(traces)?;
+    let mut err = io::stderr();
     let n = traces.len();
     let plural = if n == 1 { "label" } else { "labels" };
     write!(err, "\nPrint {n} {plural}? [y/N] ")?;
