@@ -658,11 +658,10 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let print_cfg = &config.print;
 
     let catalog = Catalog::bundled()?;
-    let printer_entry = args.printer.as_deref().and_then(|key| {
-        catalog
-            .lookup_printer(key)
-            .or_else(|| catalog.match_printer(key))
-    });
+    let printer_entry = args
+        .printer
+        .as_deref()
+        .and_then(|key| catalog.resolve_printer(key));
 
     let protocol: Protocol = match args.protocol {
         Some(p) => p.into(),
@@ -709,11 +708,28 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .media
         .clone()
         .or_else(|| printer_entry.and_then(|p| p.default_media.clone()));
-    if let (Some(printer), Some(media_key)) = (&args.printer, &media_sku) {
-        if !catalog.supports_media(printer, media_key) {
-            bail!("media '{media_key}' is not supported by printer '{printer}'");
+    let media_entry = media_sku.as_deref().and_then(|key| catalog.lookup(key));
+    if let (Some(printer), Some(entry)) = (printer_entry, media_entry) {
+        if !catalog.supports_media(printer.canonical_key(), entry.canonical_key()) {
+            bail!(
+                "media '{}' is not supported by printer '{}'",
+                entry.canonical_key(),
+                printer.canonical_key()
+            );
         }
     }
+    lbl::terminal::print_catalog_resolution_hints(
+        lbl::terminal::CatalogEntryHint {
+            input: args.printer.as_deref(),
+            name: printer_entry.map(|p| p.name.as_str()),
+            key: printer_entry.map(|p| p.canonical_key()),
+        },
+        lbl::terminal::CatalogEntryHint {
+            input: media_sku.as_deref(),
+            name: media_entry.map(|e| e.name.as_str()),
+            key: media_entry.map(|e| e.canonical_key()),
+        },
+    )?;
     let media = resolve_media(
         &catalog,
         media_sku.as_deref(),

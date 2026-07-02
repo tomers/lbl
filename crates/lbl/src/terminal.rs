@@ -142,6 +142,58 @@ fn write_preprocess_mitigations(
     Ok(())
 }
 
+/// User input and resolved catalog metadata for a printer or media SKU.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CatalogEntryHint<'a> {
+    /// Value passed on the CLI (`--printer` / `--media`).
+    pub input: Option<&'a str>,
+    /// Catalog display name.
+    pub name: Option<&'a str>,
+    /// Catalog canonical key.
+    pub key: Option<&'a str>,
+}
+
+/// When the user passes a partial printer or media identifier, echo the
+/// resolved catalog entry so they can confirm the selection.
+pub fn print_catalog_resolution_hints(
+    printer: CatalogEntryHint<'_>,
+    media: CatalogEntryHint<'_>,
+) -> io::Result<()> {
+    print_catalog_resolution_hints_to(&mut io::stderr(), printer, media, stderr_color())
+}
+
+fn print_catalog_resolution_hints_to(
+    err: &mut impl Write,
+    printer: CatalogEntryHint<'_>,
+    media: CatalogEntryHint<'_>,
+    color: bool,
+) -> io::Result<()> {
+    let (d, r, v) = if color {
+        (DIM, RESET, VAL)
+    } else {
+        ("", "", "")
+    };
+    let mut wrote = false;
+
+    if let (Some(input), Some(name), Some(key)) = (printer.input, printer.name, printer.key) {
+        if !input.eq_ignore_ascii_case(name) {
+            writeln!(err, "{d}Printer: {v}{name}{r} ({v}{key}{r})")?;
+            wrote = true;
+        }
+    }
+    if let (Some(input), Some(name), Some(key)) = (media.input, media.name, media.key) {
+        if !input.eq_ignore_ascii_case(name) {
+            writeln!(err, "{d}Media: {v}{name}{r} ({v}{key}{r})")?;
+            wrote = true;
+        }
+    }
+
+    if wrote {
+        writeln!(err)?;
+    }
+    err.flush()
+}
+
 /// Summary after a successful hardware print.
 pub fn print_run_summary(input: &PrintSummaryInput<'_>) -> io::Result<()> {
     use crate::print_stats::{
@@ -791,6 +843,47 @@ mod tests {
         assert!(out.contains(PUNCT));
         assert!(out.contains("padding_mm"));
         assert!(out.contains("auto"));
+    }
+
+    #[test]
+    fn catalog_resolution_hints_skip_exact_name() {
+        let mut buf = Vec::new();
+        print_catalog_resolution_hints_to(
+            &mut buf,
+            CatalogEntryHint {
+                input: Some("550"),
+                name: Some("DYMO LabelWriter 550"),
+                key: Some("LabelWriter 550"),
+            },
+            CatalogEntryHint {
+                input: Some("30252"),
+                name: Some("DYMO 99010 28x89mm Standard Address Labels"),
+                key: Some("99010"),
+            },
+            false,
+        )
+        .unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("Printer: DYMO LabelWriter 550 (LabelWriter 550)"));
+        assert!(out.contains("Media: DYMO 99010 28x89mm Standard Address Labels (99010)"));
+
+        let mut buf = Vec::new();
+        print_catalog_resolution_hints_to(
+            &mut buf,
+            CatalogEntryHint {
+                input: Some("DYMO LabelWriter 550"),
+                name: Some("DYMO LabelWriter 550"),
+                key: Some("LabelWriter 550"),
+            },
+            CatalogEntryHint {
+                input: Some("DYMO 99010 28x89mm Standard Address Labels"),
+                name: Some("DYMO 99010 28x89mm Standard Address Labels"),
+                key: Some("99010"),
+            },
+            false,
+        )
+        .unwrap();
+        assert!(buf.is_empty());
     }
 
     #[test]

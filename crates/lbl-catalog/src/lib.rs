@@ -134,6 +134,12 @@ impl Catalog {
         self.printers.iter().find(|p| p.matches_key(key))
     }
 
+    /// Resolve a printer entry by key/alias, falling back to a best-effort
+    /// model-string match (case-insensitive).
+    pub fn resolve_printer(&self, key: &str) -> Option<&PrinterEntry> {
+        self.lookup_printer(key).or_else(|| self.match_printer(key))
+    }
+
     /// Find the best-matching printer for a free-form model string.
     ///
     /// Prefers the longest matching key so `"LabelWriter 550 Turbo"` beats
@@ -228,7 +234,7 @@ impl Catalog {
             return cli_dpi;
         }
         if let Some(key) = printer_key {
-            if let Some(printer) = self.lookup_printer(key).or_else(|| self.match_printer(key)) {
+            if let Some(printer) = self.resolve_printer(key) {
                 return printer.dpi;
             }
         }
@@ -376,6 +382,14 @@ mod tests {
         let transport = d110.default_transport();
         assert_eq!(transport.bluetooth.as_deref(), Some("D110"));
         assert!(transport.serial.is_none());
+    }
+
+    #[test]
+    fn resolve_printer_falls_back_to_match() {
+        let catalog = Catalog::bundled().unwrap();
+        assert!(catalog.lookup_printer("LW550").is_some());
+        let printer = catalog.resolve_printer("LW550").unwrap();
+        assert!(printer.matches_key("LabelWriter 550"));
     }
 
     #[test]
