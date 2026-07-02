@@ -42,7 +42,8 @@ struct Manifest {
 #[derive(Debug, Deserialize)]
 struct Defaults {
     protocol: String,
-    supersample: u32,
+    #[serde(default)]
+    supersample: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -483,8 +484,10 @@ fn run_lbl_print(
             cmd.args(["--dpi", &format_num(dpi)]);
         }
     }
-    if !req.print_args.iter().any(|a| a == "--supersample") {
-        cmd.args(["--supersample", &defaults.supersample.to_string()]);
+    if let Some(supersample) = defaults.supersample {
+        if !req.print_args.iter().any(|a| a == "--supersample") {
+            cmd.args(["--supersample", &supersample.to_string()]);
+        }
     }
     cmd.args([
         "--protocol",
@@ -652,11 +655,13 @@ fn format_display_command(example: &Example) -> String {
     if let Some(xargs) = &example.xargs {
         if example.single_line {
             let args = format_print_arg_lines(&display_args_for(example, None)).join(" ");
-            out.push_str("# example\n$ ");
+            let mut out = String::new();
+            out.push_str("$ ");
             out.push_str(xargs);
             out.push_str(" | xargs -n1 lbl print ");
             out.push_str(&args);
             out.push_str(" --data");
+            ensure_command_block_has_context(&mut out);
             return out;
         }
         out.push_str("$ ");
@@ -696,9 +701,7 @@ fn format_display_command(example: &Example) -> String {
     }
 
     let mut block = format_lbl_print_block(&display_args_for(example, None), example.single_line);
-    if !example.single_line {
-        ensure_command_block_has_context(&mut block);
-    }
+    ensure_command_block_has_context(&mut block);
     out.push_str(&block);
     out.trim_end().to_string()
 }
@@ -784,19 +787,20 @@ fn inject_env_into_command(block: &str, env_prefix: &str) -> String {
     if let Some(rest) = block.strip_prefix("$ ") {
         return format!("$ {env_prefix}{rest}");
     }
-    if let Some(rest) = block.strip_prefix("# example\n$ ") {
-        return format!("# example\n$ {env_prefix}{rest}");
-    }
     format!("{env_prefix}{block}")
 }
 
 fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
     let arg_lines = format_print_arg_lines(args);
     if arg_lines.is_empty() {
-        return "$ lbl print".to_string();
+        let mut out = "$ lbl print".to_string();
+        ensure_command_block_has_context(&mut out);
+        return out;
     }
     if single_line {
-        return format!("# example\n$ lbl print {}", arg_lines.join(" "));
+        let mut out = format!("$ lbl print {}", arg_lines.join(" "));
+        ensure_command_block_has_context(&mut out);
+        return out;
     }
     let mut out = String::from("$ lbl print \\\n");
     for (idx, line) in arg_lines.iter().enumerate() {
@@ -1256,7 +1260,7 @@ mod tests {
         ex.single_line = true;
         assert_eq!(
             format_display_command(&ex),
-            "# example\n$ lbl print --text hello"
+            "$ lbl print --text hello\n# (preview label written to file)"
         );
     }
 
@@ -1302,7 +1306,7 @@ mod tests {
         ex.single_line = true;
         assert_eq!(
             format_display_command(&ex),
-            "# example\n$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data"
+            "$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data\n# (preview label written to file)"
         );
     }
 

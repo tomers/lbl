@@ -51,6 +51,30 @@ pub enum TemplateFormat {
     Html,
 }
 
+/// Infer a template body format from a template path's extension.
+///
+/// Returns `None` for stdin (`-`), inline templates without an extension, and
+/// unknown extensions.
+pub fn infer_template_format_from_path(template: &str) -> Option<TemplateFormat> {
+    if template == "-" {
+        return None;
+    }
+    let ext = std::path::Path::new(template).extension()?.to_str()?;
+    match ext.to_ascii_lowercase().as_str() {
+        "html" | "htm" | "lbl" => Some(TemplateFormat::Html),
+        "md" | "markdown" => Some(TemplateFormat::Markdown),
+        "txt" | "text" => Some(TemplateFormat::Text),
+        _ => None,
+    }
+}
+
+/// Resolve the template body format, preferring an explicit override.
+pub fn resolve_template_format(template: &str, explicit: Option<TemplateFormat>) -> TemplateFormat {
+    explicit.unwrap_or_else(|| {
+        infer_template_format_from_path(template).unwrap_or(TemplateFormat::Text)
+    })
+}
+
 /// The input to a flow.
 #[derive(Debug, Clone)]
 pub enum Source {
@@ -727,6 +751,36 @@ mod tests {
         )
         .unwrap();
         assert_eq!(labels.len(), 2);
+    }
+
+    #[test]
+    fn infer_template_format_from_path_maps_extensions() {
+        assert_eq!(
+            infer_template_format_from_path("card.html"),
+            Some(TemplateFormat::Html)
+        );
+        assert_eq!(
+            infer_template_format_from_path("combined.lbl"),
+            Some(TemplateFormat::Html)
+        );
+        assert_eq!(
+            infer_template_format_from_path("note.md"),
+            Some(TemplateFormat::Markdown)
+        );
+        assert_eq!(infer_template_format_from_path("User #{{ it }}"), None);
+        assert_eq!(infer_template_format_from_path("-"), None);
+    }
+
+    #[test]
+    fn resolve_template_format_prefers_explicit_override() {
+        assert_eq!(
+            resolve_template_format("card.html", Some(TemplateFormat::Text)),
+            TemplateFormat::Text
+        );
+        assert_eq!(
+            resolve_template_format("card.html", None),
+            TemplateFormat::Html
+        );
     }
 
     #[test]

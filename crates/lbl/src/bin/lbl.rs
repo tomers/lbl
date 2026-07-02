@@ -14,8 +14,8 @@ use lbl::job_input;
 use lbl::pipeline::{
     authoring_labels, encode_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_style, EncodeLabelsOptions, EncodeLabelsResult,
-    PipelineOptions, Source,
+    resolve_print_transport, resolve_style, resolve_template_format, EncodeLabelsOptions,
+    EncodeLabelsResult, PipelineOptions, Source,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::Catalog;
@@ -108,10 +108,11 @@ struct SourceArgs {
     #[arg(long)]
     each: Option<String>,
 
-    /// How to interpret the rendered --template body: `text` (default),
-    /// `markdown`, or `html`.
-    #[arg(long, value_enum, default_value_t = TemplateFormatArg::Text)]
-    template_format: TemplateFormatArg,
+    /// Override how the rendered --template body is interpreted. When omitted,
+    /// the format is inferred from the template path extension (`.html`/`.lbl`
+    /// → html, `.md` → markdown; otherwise text).
+    #[arg(long, value_enum)]
+    template_format: Option<TemplateFormatArg>,
 }
 
 #[derive(Clone, Copy, ValueEnum, Default)]
@@ -1588,7 +1589,7 @@ fn read_source(args: &SourceArgs) -> Result<Source> {
             template: template_src,
             data,
             each: args.each.clone(),
-            format: args.template_format.into(),
+            format: resolve_template_format(template, args.template_format.map(Into::into)),
         });
     }
     bail!("no input; pass --text, --markdown, --html, or --template")

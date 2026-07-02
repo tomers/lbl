@@ -29,11 +29,12 @@ Batch printing renders one template against many records.
 A top-level array produces one label per element. Within the template you have
 the record's fields, plus `index`, `count`, `it`, and `data`.
 
-Templates default to plain **text**; HTML layouts like this one need
-`--template-format html`:
+Templates default to plain **text** for inline templates and unknown
+extensions. HTML layouts like `card.html` or `combined.lbl` are detected
+automatically; override with `--template-format` when needed:
 
 ```bash
-lbl print --template card.html --template-format html --data people.json \
+lbl print --template card.html --data people.json \
   --media 99014 --protocol zpl --network 192.168.1.50:9100 --cut --supports-cut
 ```
 
@@ -84,9 +85,9 @@ Put `--data` **last**. `xargs -n1` appends each line from `seq` as the value of
 `--data 3`. Inline JSON scalars are supported; in the template `{{ it }}` is
 that number (`index` is always `0` and `count` is `1` on each run).
 
-Templates default to **text** (`--template-format text`). Use
-`--template-format markdown` for Markdown, or `html` when the template body is
-already authoring HTML.
+Templates default to **text** for inline templates and unknown extensions.
+`.html`, `.htm`, and `.lbl` paths are treated as HTML; `.md` / `.markdown` as
+Markdown. Override with `--template-format` when inference is wrong.
 
 Inner **padding** (default 2 mm) is added automatically on `.lbl-label`; on
 small tape you may want `--padding-mm 0` (or `padding_mm = 0` in config). See

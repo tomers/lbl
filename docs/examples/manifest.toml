@@ -2,8 +2,24 @@
 # Regenerate with: just doc-examples
 
 [defaults]
-protocol    = "virtual"
-supersample = 2
+protocol = "virtual"
+
+[[example]]
+id          = "sopranos-cards"
+title       = "Complex HTML batch"
+description = "Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from the test suite."
+doc         = "guides/batch-printing.md"
+doc_title   = "Batch printing"
+doc_section = "template--data"
+caption     = "DYMO 99014 · 54×101 mm"
+media       = "99014"
+dir         = "sopranos"
+hide_cd     = true
+single_line = true
+composite   = "side_by_side"
+files       = [{ path = "sopranos.lbl", lang = "text" }]
+args        = ["--template", "sopranos.lbl", "--orientation", "portrait"]
+render_args = ["--font-size-mm", "2.6", "--qr-size-mm", "12", "--padding-mm", "1"]
 
 [[example]]
 id = "inline-syntax"
@@ -24,7 +40,7 @@ show_dpi = false
 hide_media_in_command = true
 separate_images = true
 render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
-args = ["--text", "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}"]
+args = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
 compare = [{ label = "default element gap" }, { label = "element gap 8 mm", args = ["--element-gap-mm", "8"] }]
 
 [[example]]
@@ -50,7 +66,7 @@ render_args = [
 ]
 args = ["--markdown", """# Order 44
 
-Ship **fast** to dock 4
+Ship **fast**
 
 {{qr:https://track/42}}"""]
 
@@ -215,23 +231,6 @@ show_dpi    = false
 args        = ["--text", "30×20"]
 
 [[example]]
-id          = "sopranos-cards"
-title       = "Complex HTML batch"
-description = "Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from the test suite."
-doc         = "guides/batch-printing.md"
-doc_title   = "Batch printing"
-doc_section = "template--data"
-caption     = "DYMO 99014 · 54×101 mm"
-media       = "99014"
-dir         = "sopranos"
-hide_cd     = true
-single_line = true
-composite   = "side_by_side"
-files       = [{ path = "sopranos.lbl", lang = "text" }]
-args        = ["--template", "sopranos.lbl", "--template-format", "html", "--orientation", "portrait"]
-render_args = ["--font-size-mm", "2.6", "--qr-size-mm", "12", "--padding-mm", "1"]
-
-[[example]]
 id          = "batch-card"
 section     = "Templating"
 title       = "HTML template"
@@ -245,7 +244,7 @@ dir         = "batch-card"
 composite   = "side_by_side"
 files       = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
 render_args = ["--padding-mm", "1", "--qr-size-mm", "10", "--font-size-mm", "1.8", "--element-gap-mm", "2"]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+args        = ["--template", "card.html", "--data", "people.json"]
 
 [[example]]
 id          = "batch-combined"
@@ -262,7 +261,7 @@ hide_cd     = false
 composite   = "side_by_side"
 files       = [{ path = "combined.html", lang = "html" }]
 render_args = ["--padding-mm", "1", "--qr-size-mm", "10", "--font-size-mm", "1.8", "--element-gap-mm", "2"]
-args        = ["--template", "combined.html", "--template-format", "html"]
+args        = ["--template", "combined.html"]
 
 [[example]]
 id          = "batch-combined-lbl"
@@ -279,7 +278,7 @@ hide_cd     = false
 composite   = "side_by_side"
 files       = [{ path = "combined.lbl", lang = "text" }]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "combined.lbl", "--template-format", "html"]
+args        = ["--template", "combined.lbl"]
 
 [[example]]
 id          = "shell-template"
@@ -292,11 +291,12 @@ doc_section = "shell-iteration-seq-and-xargs"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-card"
+hide_cd     = true
 xargs       = "cat people.ndjson"
 composite   = "side_by_side"
 single_line = true
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--template-format", "html"]
+args        = ["--template", "card.html"]
 
 [[example]]
 id          = "iter-one"
@@ -313,7 +313,7 @@ hide_cd     = false
 single_line = true
 batch_args  = ["--one"]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+args        = ["--template", "card.html", "--data", "people.json"]
 
 [[example]]
 id          = "iter-index"
@@ -330,7 +330,7 @@ hide_cd     = false
 single_line = true
 batch_args  = ["--index", "1"]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+args        = ["--template", "card.html", "--data", "people.json"]
 
 [[example]]
 id          = "iter-filter"
@@ -347,7 +347,7 @@ hide_cd     = false
 single_line = true
 batch_args  = ["--filter", "Bob"]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+args        = ["--template", "card.html", "--data", "people.json"]
 
 [[example]]
 id          = "iter-skip-take"
@@ -364,4 +364,4 @@ hide_cd     = false
 single_line = true
 batch_args  = ["--skip", "1", "--take", "1"]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
+args        = ["--template", "card.html", "--data", "people.json"]
