@@ -447,6 +447,8 @@ Same frontmatter pattern with a Markdown body (`.md` extension).
 **{{ name }}**
 
 *{{ title }}*
+
+{{ "{{qr:" ~ url ~ "}}" }}
 ```
 
 ```console
