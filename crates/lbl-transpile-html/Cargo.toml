@@ -13,12 +13,13 @@ name = "lbl-transpile-html"
 path = "src/bin/lbl-transpile-html.rs"
 
 [dependencies]
-lbl-core   = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-thiserror  = { workspace = true }
-clap       = { workspace = true }
-lbl-cli    = { workspace = true }
-anyhow     = { workspace = true }
-regex      = "1"
-once_cell  = "1"
+lbl-core      = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+thiserror     = { workspace = true }
+clap          = { workspace = true }
+lbl-cli       = { workspace = true }
+anyhow        = { workspace = true }
+regex         = "1"
+once_cell     = "1"
+unicode-width = { workspace = true }

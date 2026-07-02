@@ -2,6 +2,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use unicode_width::UnicodeWidthChar;
 
 use crate::transpile::{TranspileOptions, ViewportPx};
 
@@ -19,6 +20,12 @@ static BR_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<br\s*/?>").expec
 
 /// Line height for lone-text auto-fit (must match [`crate::assets::LABEL_FIT_TEXT_CSS`]).
 pub const LINE_HEIGHT: f64 = 1.1;
+
+/// Ink often extends past estimated advance width (diagonal strokes, serifs).
+const VISUAL_WIDTH_MARGIN: f64 = 1.35;
+
+/// Estimated em width of one terminal column at the transpiled font size.
+const EM_PER_COLUMN: f64 = 0.55;
 
 /// CSS rule setting a transpile-time font size, when viewport geometry is known.
 pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
@@ -65,12 +72,11 @@ fn html_to_plain_text(inner: &str) -> String {
 }
 
 fn char_width_em(c: char) -> f64 {
-    match c {
-        'i' | 'l' | '1' | '!' | '|' | '.' | ',' | ':' | ';' | '\'' => 0.35,
-        'M' | 'W' | '@' | '%' | '#' => 0.65,
-        ' ' => 0.28,
-        _ => 0.55,
+    if c.is_whitespace() {
+        return 0.28;
     }
+    let cols = c.width().unwrap_or(1).max(1);
+    cols as f64 * EM_PER_COLUMN
 }
 
 fn line_em_width(line: &str) -> f64 {
@@ -124,9 +130,15 @@ fn text_fits(font_px: f64, width_px: f64, height_px: f64, text: &str) -> bool {
     if font_px <= f64::EPSILON {
         return false;
     }
+    let fit_width = width_px / VISUAL_WIDTH_MARGIN;
+    for ch in text.chars() {
+        if !ch.is_whitespace() && char_width_em(ch) * font_px > fit_width + 0.5 {
+            return false;
+        }
+    }
     let mut total_lines = 0usize;
     for line in text.split('\n') {
-        total_lines += wrapped_line_count(line, font_px, width_px);
+        total_lines += wrapped_line_count(line, font_px, fit_width);
     }
     if total_lines == 0 {
         total_lines = 1;
@@ -161,6 +173,36 @@ mod tests {
         let font = max_fit_font_px(354.0, 142.0, "#1");
         assert!(font > 120.0, "font={font}");
         assert!(font <= 142.0 / LINE_HEIGHT + 0.01, "font={font}");
+    }
+
+    #[test]
+    fn lone_char_on_tall_narrow_media_is_width_limited() {
+        let width = 1135.0;
+        let height = 4015.0;
+        let font = max_fit_font_px(width, height, "A");
+        assert!(
+            font * char_width_em('A') * VISUAL_WIDTH_MARGIN <= width + 1.0,
+            "font={font} exceeds width"
+        );
+        assert!(
+            font < height / LINE_HEIGHT - 1.0,
+            "font={font} should not be height-limited"
+        );
+    }
+
+    #[test]
+    fn wide_unicode_char_is_width_limited() {
+        let width = 1135.0;
+        let height = 4015.0;
+        let font = max_fit_font_px(width, height, "字");
+        assert!(
+            font * char_width_em('字') * VISUAL_WIDTH_MARGIN <= width + 1.0,
+            "font={font} exceeds width"
+        );
+        assert!(
+            font < height / LINE_HEIGHT - 1.0,
+            "font={font} should not be height-limited"
+        );
     }
 
     #[test]

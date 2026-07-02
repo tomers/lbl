@@ -79,6 +79,7 @@ directories        = "6"
 reqwest            = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
 tempfile           = "3"
 console            = "0.16"
+unicode-width      = "0.2"
 # Serial (USB CDC-ACM) transport. `libudev` (default) is only needed for port
 # enumeration; we open ports by path, so it is disabled to avoid a system dep.
 serialport = { version = "4", default-features = false }
