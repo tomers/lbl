@@ -11,19 +11,20 @@
 # permits bundling/redistribution. Otherwise the URL is hotlinked for display.
 #
 # DYMO LabelWriter data sourced from https://dymo.eu/en/labels-tapes/labelwriter-labels.html
+# and US SKU cross-references from https://www.dymo.com/ and https://www.labelcity.com/
 
 # --- Address / Multi-Purpose / Name Badge / Shipping (paper) ---------------
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["99010", "S0722370"]
+keys         = ["99010", "S0722370", "30252", "30251", "30320", "SAP_30252"]
 name         = "DYMO 99010 28x89mm Standard Address Labels"
-purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+purchase_url = "https://www.dymo.com/labels-tapes/labelwriter-labels/dymo-labelwriter-mailing-address-labels/SAP_30252.html"
 media        = { width_mm = 28.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["99012", "S0722400"]
+keys         = ["99012", "S0722400", "30321"]
 name         = "DYMO 99012 36x89mm Large Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, material = "paper", adhesive = "permanent", color = "white" }
@@ -37,14 +38,21 @@ media        = { width_mm = 36.0, length = { kind = "fixed", mm = 89.0 }, materi
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["99014", "S0722430"]
+keys         = ["99014", "S0722430", "30323"]
 name         = "DYMO 99014 54x101mm Shipping / Name Badge Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 54.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["99015", "S0722440"]
+keys         = ["30256"]
+name         = "DYMO 30256 59x101mm Large Shipping Labels"
+purchase_url = "https://www.labelcity.com/DYMO-LARGE-SHIPPING-LABELS-30256"
+media        = { width_mm = 59.0, length = { kind = "fixed", mm = 101.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["99015", "S0722440", "30324", "30258"]
 name         = "DYMO 99015 54x70mm Large Multifunctional Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 54.0, length = { kind = "fixed", mm = 70.0 }, material = "paper", adhesive = "permanent", color = "white" }
@@ -72,14 +80,14 @@ media        = { width_mm = 59.0, length = { kind = "fixed", mm = 190.0 }, mater
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["11352", "S0722520"]
+keys         = ["11352", "S0722520", "30336"]
 name         = "DYMO 11352 25x54mm Return Address Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["11353", "S0722530"]
+keys         = ["11353", "S0722530", "30333"]
 name         = "DYMO 11353 13x25mm 2-in-1 Multi-Purpose Labels (removable)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 13.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "removable", color = "white" }
@@ -93,7 +101,7 @@ media        = { width_mm = 32.0, length = { kind = "fixed", mm = 57.0 }, materi
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["11355", "S0722550"]
+keys         = ["11355", "S0722550", "30330"]
 name         = "DYMO 11355 19x51mm Multi-Purpose Removable Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 19.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "removable", color = "white" }
@@ -118,6 +126,55 @@ keys         = ["2166659"]
 name         = "DYMO 2166659 102x210mm XL DHL Shipping Labels"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 102.0, length = { kind = "fixed", mm = 210.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["1744907", "904980"]
+name         = "DYMO 1744907 104x159mm XL Shipping Labels (4XL/5XL)"
+purchase_url = "https://www.labelcity.com/DYMO-4XL-4X6-SHIPPING-LABELS-1744907"
+media        = { width_mm = 104.0, length = { kind = "fixed", mm = 159.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["2191635"]
+name         = "DYMO 2191635 10x19mm Jewelry / Price Tag Labels"
+purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
+media        = { width_mm = 10.0, length = { kind = "fixed", mm = 19.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["30326"]
+name         = "DYMO 30326 46x78mm VHS Top Labels"
+purchase_url = "https://www.labelcity.com/DYMO-VHS-TOP-LABELS-WHITE-30326"
+media        = { width_mm = 46.0, length = { kind = "fixed", mm = 78.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["30327"]
+name         = "DYMO 30327 14x87mm File Folder Labels (1-up)"
+purchase_url = "https://www.labelcity.com/DYMO-FILE-FOLDER-LABELS-1-UP-30327"
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 87.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["30332"]
+name         = "DYMO 30332 25x25mm Multipurpose Labels"
+purchase_url = "https://www.labelcity.com/DYMO-MULTIPURPOSE-LABELS-30332"
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["30334"]
+name         = "DYMO 30334 57x32mm Multipurpose Labels"
+purchase_url = "https://www.labelcity.com/DYMO-MULTIPURPOSE-LABELS-121000-30334"
+media        = { width_mm = 57.0, length = { kind = "fixed", mm = 32.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["30339"]
+name         = "DYMO 30339 9x71mm 8mm Video Labels"
+purchase_url = "https://www.labelcity.com/DYMO-8MM-VIDEO-LABEL-WHITE-30339-120339"
+media        = { width_mm = 9.0, length = { kind = "fixed", mm = 71.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 # --- Durable (polypropylene, strong adhesive) ------------------------------
 
@@ -264,13 +321,20 @@ supported_media = [
   "11355",
   "2133399",
   "2133400",
+  "30256",
   "2112283",
   "2112284",
   "2112285",
   "2112286",
   "2112289",
   "2112290",
+  "2191635",
   "2191636",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0028 }]
 
@@ -298,13 +362,20 @@ supported_media = [
   "11355",
   "2133399",
   "2133400",
+  "30256",
   "2112283",
   "2112284",
   "2112285",
   "2112286",
   "2112289",
   "2112290",
+  "2191635",
   "2191636",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0029 }]
 
@@ -332,6 +403,7 @@ supported_media = [
   "11355",
   "2133399",
   "2133400",
+  "30256",
   "2112283",
   "2112284",
   "2112285",
@@ -340,6 +412,13 @@ supported_media = [
   "2112290",
   "2166659",
   "2112287",
+  "1744907",
+  "2191635",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x002A }]
 
@@ -366,12 +445,19 @@ supported_media = [
   "11355",
   "2133399",
   "2133400",
+  "30256",
   "2112283",
   "2112284",
   "2112285",
   "2112286",
   "2112289",
   "2112290",
+  "2191635",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922 }]
 

@@ -282,6 +282,10 @@ mod tests {
         let by_alias = catalog.lookup("s0722520").unwrap();
         assert_eq!(by_sku.canonical_key(), by_alias.canonical_key());
         assert_eq!(by_sku.media.width_mm, 25.0);
+        let us_address = catalog.lookup("30252").unwrap();
+        let eu_address = catalog.lookup("99010").unwrap();
+        assert_eq!(us_address.canonical_key(), eu_address.canonical_key());
+        assert_eq!(us_address.media.width_mm, 28.0);
     }
 
     #[test]
