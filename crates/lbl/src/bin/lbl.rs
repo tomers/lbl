@@ -140,16 +140,20 @@ struct BatchSelectArgs {
     #[arg(long)]
     filter: Option<String>,
 
-    /// Print only one label from the current selection (same as `--take 1`).
-    #[arg(long, conflicts_with = "take")]
-    one: bool,
+    /// Print only the first label from the current selection (same as `--take 1`).
+    #[arg(long, conflicts_with_all = ["take", "last"])]
+    first: bool,
+
+    /// Print only the last label from the current selection.
+    #[arg(long, conflicts_with_all = ["take", "first"])]
+    last: bool,
 
     /// Skip the first N labels in the current selection.
     #[arg(long, default_value_t = 0)]
     skip: usize,
 
     /// Print at most N labels from the current selection.
-    #[arg(long, conflicts_with = "one")]
+    #[arg(long, conflicts_with_all = ["first", "last"])]
     take: Option<usize>,
 
     /// Print only the label at this zero-based batch index. Repeat for multiple
@@ -163,7 +167,8 @@ impl BatchSelectArgs {
         lbl_template::BatchSelection {
             filter: self.filter.clone(),
             skip: self.skip,
-            take: self.take.or(if self.one { Some(1) } else { None }),
+            take: self.take.or(if self.first { Some(1) } else { None }),
+            last: self.last,
             indices: if self.indices.is_empty() {
                 None
             } else {

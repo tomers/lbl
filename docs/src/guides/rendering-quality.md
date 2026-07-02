@@ -149,7 +149,7 @@ Before rendering, `lbl print` estimates preprocessing cost from label count,
 device dot dimensions, supersample factor, and (via `sysinfo`) this machine's
 CPU core count and installed RAM. When the adjusted weight exceeds an internal
 threshold, a yellow callout on stderr suggests mitigations — typically lowering
-`--supersample` or printing fewer labels with `--one` / `--indices`.
+`--supersample` or printing fewer labels with `--first` / `--last` / `--indices`.
 
 During **batch** jobs, a similar reminder appears every **10 seconds** of
 accumulated render time so long runs are not silent. These warnings cover

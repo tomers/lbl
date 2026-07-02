@@ -4,8 +4,6 @@
   { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
 ]
 ---
-<div class="lbl-label lbl-col lbl-center">
-  <strong>{{ name }}</strong>
-  <span>{{ title }}</span>
-  <qr>{{ url }}</qr>
-</div>
+{{ "{{size:1.4:" ~ name ~ "}}" }}
+{{ title }}
+{{ "{{qr:" ~ url ~ "}}" }}

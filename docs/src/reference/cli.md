@@ -21,7 +21,8 @@ lbl device    Discover printers (list)
   --template <INLINE|FILE|-> [--data <INLINE|FILE|>] [--each <PTR>]
   [--template-format text|markdown|html]   Override inferred template body format
 --filter <TEXT>     Keep labels whose data fields contain TEXT (case-insensitive)
---one               Print one label from the selection (same as --take 1)
+--first             Print the first label from the selection (same as --take 1)
+--last              Print the last label from the selection
 --skip <N>          Skip the first N labels in the selection (default: 0)
 --take <N>          Print at most N labels from the selection
 --index <N>         Print only batch index N (zero-based; repeat for several)

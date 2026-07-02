@@ -398,11 +398,68 @@ $ lbl print \
 
 ---
 
-### Single-file template and data (HTML)
+### Single-file template and data (text)
 
-Data and template in one file — a JSON frontmatter array batches without `--each`.
+Data and template in one file — frontmatter plus a text body with inline mini-syntax.
 
-<img src="docs/src/generated/images/batch-combined.png" alt="Single-file template and data (HTML)" />
+<img src="docs/src/generated/images/batch-combined-text.png" alt="Single-file template and data (text)" />
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
+
+[combined.txt](docs/examples/batch-combined/combined.txt)
+
+```text
+---json
+[
+  { "name": "Alice", "title": "Engineer", "url": "https://example.com/alice" },
+  { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
+]
+---
+{{ "{{size:1.4:" ~ name ~ "}}" }}
+{{ title }}
+{{ "{{qr:" ~ url ~ "}}" }}
+```
+
+```console
+$ cd docs/examples/batch-combined
+$ lbl print \
+  --template combined.txt
+```
+
+---
+
+### Single-file template and data (markdown)
+
+Same frontmatter pattern with a Markdown body (`.md` extension).
+
+*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
+
+[combined.md](docs/examples/batch-combined/combined.md)
+
+```markdown
+<!-- markdownlint-disable-file MD022 MD041 MD036 -->
+---json
+[
+  { "name": "Alice", "title": "Engineer", "url": "https://example.com/alice" },
+  { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
+]
+---
+**{{ name }}**
+
+*{{ title }}*
+```
+
+```console
+$ cd docs/examples/batch-combined
+$ lbl print \
+  --template combined.md
+```
+
+---
+
+### Single-file template and data (html)
+
+Same frontmatter pattern with an HTML body (`.html` or `.lbl` extension).
 
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
 
@@ -430,38 +487,6 @@ $ lbl print \
 
 ---
 
-### Single-file template and data (LBL)
-
-The same frontmatter batch works in a `.lbl` file — HTML template syntax inside.
-
-<img src="docs/src/generated/images/batch-combined-lbl.png" alt="Single-file template and data (LBL)" />
-
-*DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#single-file-frontmatter)
-
-[combined.lbl](docs/examples/batch-combined/combined.lbl)
-
-```text
----json
-[
-  { "name": "Alice", "title": "Engineer", "url": "https://example.com/alice" },
-  { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
-]
----
-<div class="lbl-label lbl-col lbl-center">
-  <strong>{{ name }}</strong>
-  <span>{{ title }}</span>
-  <qr>{{ url }}</qr>
-</div>
-```
-
-```console
-$ cd docs/examples/batch-combined
-$ lbl print \
-  --template combined.lbl
-```
-
----
-
 ### Command pipelining
 
 Pipe one JSON object per line into `lbl print` — each line becomes `--data` for one badge.
@@ -479,17 +504,17 @@ $ cat people.ndjson | xargs -n1 lbl print --template card.html --data
 
 ## Iterators
 
-### `--one`
+### `--first`
 
 Print only the first label from a batch selection.
 
-<img src="docs/src/generated/images/iter-one.png" alt="`--one`" />
+<img src="docs/src/generated/images/iter-first.png" alt="`--first`" />
 
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
 
 ```console
 $ cd docs/examples/batch-card
-$ lbl print --template card.html --data people.json --one
+$ lbl print --template card.html --data people.json --first
 # (preview label written to file)
 ```
 
@@ -529,15 +554,14 @@ $ lbl print --template card.html --data people.json --filter Bob
 
 ### `--skip` and `--take`
 
-Skip the first N labels, then print at most M from the remainder.
+Skip the first five of ten shell-generated records, then print the next three (users 6–8).
 
-<img src="docs/src/generated/images/iter-skip-take.png" alt="`--skip` and `--take`" />
+<img src="docs/src/generated/images/iter-skip-take.png" alt="`--skip` and `--take`" width="100%" />
 
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](docs/src/guides/batch-printing.md#batch-selection)
 
 ```console
-$ cd docs/examples/batch-card
-$ lbl print --template card.html --data people.json --skip 1 --take 1
+$ seq 1 10 | xargs -n1 lbl print --template 'User #{{ it }}' --skip 5 --take 3 --data
 # (preview label written to file)
 ```
 

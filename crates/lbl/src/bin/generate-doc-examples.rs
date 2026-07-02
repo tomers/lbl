@@ -110,6 +110,9 @@ struct Example {
     compare: Vec<CompareVariant>,
     #[serde(default)]
     batch_args: Vec<String>,
+    /// When true, skip rendering a preview PNG (file-only examples).
+    #[serde(default)]
+    skip_preview: bool,
     args: Vec<String>,
 }
 
@@ -151,20 +154,26 @@ fn run() -> Result<()> {
     let mut keep_images = HashSet::new();
 
     for example in &manifest.example {
-        let png_path = images_dir.join(format!("{}.png", example.id));
-        let render_target = if cli.check {
-            std::env::temp_dir().join(format!("{}.png", example.id))
+        let rendered_paths = if example.skip_preview {
+            Vec::new()
         } else {
-            png_path.clone()
+            let png_path = images_dir.join(format!("{}.png", example.id));
+            let render_target = if cli.check {
+                std::env::temp_dir().join(format!("{}.png", example.id))
+            } else {
+                png_path.clone()
+            };
+            render_example(
+                &lbl_bin,
+                &examples_root,
+                &manifest.defaults,
+                example,
+                &render_target,
+            )?
         };
-        let rendered_paths = render_example(
-            &lbl_bin,
-            &examples_root,
-            &manifest.defaults,
-            example,
-            &render_target,
-        )?;
-        if cli.check {
+        if example.skip_preview {
+            // nothing to compare or keep
+        } else if cli.check {
             for path in &rendered_paths {
                 let committed = images_dir.join(path.file_name().unwrap());
                 if committed.is_file() {
@@ -347,10 +356,10 @@ fn render_example(
             )?;
         }
     } else if let Some(xargs) = &example.xargs {
-        let values = xargs_values(xargs, &work_dir)?;
+        let values = apply_batch_slice(xargs_values(xargs, &work_dir)?, &example.batch_args);
+        let args = resolve_xargs_print_args(example);
         for (i, value) in values.iter().enumerate() {
             let target = numbered_output_path(png_path, i);
-            let args = resolve_print_args(example, None);
             run_lbl_print(
                 lbl_bin,
                 defaults,
@@ -400,6 +409,46 @@ fn resolve_print_args(example: &Example, compare_extra: Option<&[String]>) -> Ve
         args = merge_flag_args(args, extra);
     }
     args
+}
+
+fn resolve_xargs_print_args(example: &Example) -> Vec<String> {
+    let mut args = example.args.clone();
+    args.extend(example.render_args.clone());
+    args
+}
+
+fn apply_batch_slice(values: Vec<String>, batch_args: &[String]) -> Vec<String> {
+    let (skip, take) = batch_slice_from_args(batch_args);
+    let mut out: Vec<_> = values.into_iter().skip(skip).collect();
+    if let Some(n) = take {
+        out.truncate(n);
+    }
+    out
+}
+
+fn batch_slice_from_args(batch_args: &[String]) -> (usize, Option<usize>) {
+    let mut skip = 0usize;
+    let mut take: Option<usize> = None;
+    let mut i = 0;
+    while i < batch_args.len() {
+        match batch_args[i].as_str() {
+            "--skip" if i + 1 < batch_args.len() => {
+                skip = batch_args[i + 1].parse().unwrap_or(0);
+                i += 2;
+            }
+            "--take" if i + 1 < batch_args.len() => {
+                take = batch_args[i + 1].parse().ok();
+                i += 2;
+            }
+            flag if flag.starts_with("--")
+                && batch_args.get(i + 1).is_some_and(|v| !v.starts_with("--")) =>
+            {
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+    (skip, take)
 }
 
 fn merge_flag_args(base: Vec<String>, overlay: &[String]) -> Vec<String> {
@@ -1237,6 +1286,7 @@ mod tests {
             render_args: Vec::new(),
             compare: Vec::new(),
             batch_args: Vec::new(),
+            skip_preview: false,
             args: args.into_iter().map(str::to_string).collect(),
         }
     }
@@ -1355,6 +1405,13 @@ mod tests {
         ex.show_media = true;
         ex.show_dpi = false;
         assert_eq!(display_media_args(&ex), vec!["--media", "12x40"]);
+    }
+
+    #[test]
+    fn apply_batch_slice_skips_and_takes() {
+        let values: Vec<_> = (1..=10).map(|n| n.to_string()).collect();
+        let batch_args = vec!["--skip".into(), "5".into(), "--take".into(), "3".into()];
+        assert_eq!(apply_batch_slice(values, &batch_args), vec!["6", "7", "8"]);
     }
 
     #[test]

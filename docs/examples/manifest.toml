@@ -263,38 +263,50 @@ render_args = ["--padding-mm", "1", "--qr-size-mm", "10", "--font-size-mm", "1.8
 args        = ["--template", "card.html", "--data", "people.json"]
 
 [[example]]
-id          = "batch-combined"
+id          = "batch-combined-text"
 section     = "Templating"
-title       = "Single-file template and data (HTML)"
-description = "Data and template in one file — a JSON frontmatter array batches without `--each`."
+title       = "Single-file template and data (text)"
+description = "Data and template in one file — frontmatter plus a text body with inline mini-syntax."
 doc         = "guides/batch-printing.md"
 doc_title   = "Batch printing"
 doc_section = "single-file-frontmatter"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-combined"
-hide_cd     = false
 composite   = "side_by_side"
-files       = [{ path = "combined.html", lang = "html" }]
+files       = [{ path = "combined.txt", lang = "text" }]
 render_args = ["--padding-mm", "1", "--qr-size-mm", "10", "--font-size-mm", "1.8", "--element-gap-mm", "2"]
-args        = ["--template", "combined.html"]
+args        = ["--template", "combined.txt"]
 
 [[example]]
-id          = "batch-combined-lbl"
-section     = "Templating"
-title       = "Single-file template and data (LBL)"
-description = "The same frontmatter batch works in a `.lbl` file — HTML template syntax inside."
-doc         = "guides/batch-printing.md"
-doc_title   = "Batch printing"
-doc_section = "single-file-frontmatter"
-caption     = "DYMO 2112286 · 25×25 mm"
-media       = "2112286"
-dir         = "batch-combined"
-hide_cd     = false
-composite   = "side_by_side"
-files       = [{ path = "combined.lbl", lang = "text" }]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "combined.lbl"]
+id           = "batch-combined-markdown"
+section      = "Templating"
+title        = "Single-file template and data (markdown)"
+description  = "Same frontmatter pattern with a Markdown body (`.md` extension)."
+doc          = "guides/batch-printing.md"
+doc_title    = "Batch printing"
+doc_section  = "single-file-frontmatter"
+caption      = "DYMO 2112286 · 25×25 mm"
+media        = "2112286"
+dir          = "batch-combined"
+skip_preview = true
+files        = [{ path = "combined.md", lang = "markdown" }]
+args         = ["--template", "combined.md"]
+
+[[example]]
+id           = "batch-combined-html"
+section      = "Templating"
+title        = "Single-file template and data (html)"
+description  = "Same frontmatter pattern with an HTML body (`.html` or `.lbl` extension)."
+doc          = "guides/batch-printing.md"
+doc_title    = "Batch printing"
+doc_section  = "single-file-frontmatter"
+caption      = "DYMO 2112286 · 25×25 mm"
+media        = "2112286"
+dir          = "batch-combined"
+skip_preview = true
+files        = [{ path = "combined.html", lang = "html" }]
+args         = ["--template", "combined.html"]
 
 [[example]]
 id          = "shell-template"
@@ -315,9 +327,9 @@ render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html"]
 
 [[example]]
-id          = "iter-one"
+id          = "iter-first"
 section     = "Iterators"
-title       = "`--one`"
+title       = "`--first`"
 description = "Print only the first label from a batch selection."
 doc         = "guides/batch-printing.md"
 doc_title   = "Batch printing"
@@ -327,7 +339,7 @@ media       = "2112286"
 dir         = "batch-card"
 hide_cd     = false
 single_line = true
-batch_args  = ["--one"]
+batch_args  = ["--first"]
 render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--data", "people.json"]
 
@@ -369,15 +381,16 @@ args        = ["--template", "card.html", "--data", "people.json"]
 id          = "iter-skip-take"
 section     = "Iterators"
 title       = "`--skip` and `--take`"
-description = "Skip the first N labels, then print at most M from the remainder."
+description = "Skip the first five of ten shell-generated records, then print the next three (users 6–8)."
 doc         = "guides/batch-printing.md"
 doc_title   = "Batch printing"
 doc_section = "batch-selection"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
-dir         = "batch-card"
-hide_cd     = false
+hide_cd     = true
+xargs       = "seq 1 10"
+composite   = "side_by_side"
 single_line = true
-batch_args  = ["--skip", "1", "--take", "1"]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
-args        = ["--template", "card.html", "--data", "people.json"]
+batch_args  = ["--skip", "5", "--take", "3"]
+render_args = ["--padding-mm", "0"]
+args        = ["--template", "User #{{ it }}"]

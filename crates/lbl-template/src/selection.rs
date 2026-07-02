@@ -13,15 +13,25 @@ pub struct BatchSelection {
     pub skip: usize,
     /// Keep at most this many labels.
     pub take: Option<usize>,
+    /// Keep only the last label after prior selection steps.
+    pub last: bool,
     /// Restrict to these zero-based batch indices before filter/skip/take.
     pub indices: Option<Vec<usize>>,
 }
 
 impl BatchSelection {
-    /// Convenience for `--one` / `--take 1`.
-    pub fn one() -> Self {
+    /// Convenience for `--first` / `--take 1`.
+    pub fn first() -> Self {
         Self {
             take: Some(1),
+            ..Self::default()
+        }
+    }
+
+    /// Convenience for `--last`.
+    pub fn last() -> Self {
+        Self {
+            last: true,
             ..Self::default()
         }
     }
@@ -77,7 +87,11 @@ pub fn select_batch_indices(
         }
     }
 
-    if let Some(take) = selection.take {
+    if selection.last {
+        if let Some(&last) = indices.last() {
+            indices = vec![last];
+        }
+    } else if let Some(take) = selection.take {
         indices.truncate(take);
     }
 
@@ -114,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn one_takes_first_after_filter() {
+    fn first_takes_first_after_filter() {
         let records = sopranos();
         let sel = BatchSelection {
             filter: Some("soprano".into()),
@@ -122,6 +136,28 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(select_batch_indices(&records, &sel).unwrap(), vec![0]);
+    }
+
+    #[test]
+    fn last_takes_last_after_filter() {
+        let records = sopranos();
+        let sel = BatchSelection {
+            filter: Some("soprano".into()),
+            last: true,
+            ..Default::default()
+        };
+        assert_eq!(select_batch_indices(&records, &sel).unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn last_after_skip() {
+        let records = sopranos();
+        let sel = BatchSelection {
+            skip: 1,
+            last: true,
+            ..Default::default()
+        };
+        assert_eq!(select_batch_indices(&records, &sel).unwrap(), vec![2]);
     }
 
     #[test]

@@ -135,7 +135,7 @@ fn write_preprocess_mitigations(
     if input.label_count > 1 {
         writeln!(
             err,
-            "{d}    • print fewer labels: {v}--one <index>{r}  or  {v}--indices 0,1,…{r}"
+            "{d}    • print fewer labels: {v}--first{r}  {v}--last{r}  or  {v}--indices 0,1,…{r}"
         )?;
     }
     Ok(())

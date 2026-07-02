@@ -56,7 +56,10 @@ HTML preview UI (`--filter`), or with iterator-style flags:
 lbl print --template card.html --data people.json --filter car ...
 
 # First label only
-lbl print --template card.html --data people.json --one ...
+lbl print --template card.html --data people.json --first ...
+
+# Last label only
+lbl print --template card.html --data people.json --last ...
 
 # Skip the first two, then print up to three
 lbl print --template card.html --data people.json --skip 2 --take 3 ...
@@ -66,7 +69,7 @@ lbl print --template card.html --data people.json --index 0 --index 2 ...
 ```
 
 Selection order: `--index` (if any) → `--filter` → `--skip` → `--take` /
-`--one`.
+`--first` / `--last`.
 
 ## Shell iteration (`seq` and `xargs`)
 
