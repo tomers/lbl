@@ -67,10 +67,13 @@ impl ChromiumBackend {
             .map_err(RenderError::Io)?;
 
         let (browser, handler) = rt.block_on(async {
-            let config = BrowserConfig::builder()
-                .arg("--no-sandbox")
-                .arg("--disable-gpu")
-                .arg("--hide-scrollbars")
+            // chromiumoxide `.arg()` expects bare flag names (e.g. `disable-gpu`),
+            // not `--`-prefixed strings; use `.no_sandbox()` for Docker/root.
+            let mut builder = BrowserConfig::builder().no_sandbox().arg("disable-gpu");
+            if let Ok(chrome) = std::env::var("CHROME") {
+                builder = builder.chrome_executable(chrome);
+            }
+            let config = builder
                 .user_data_dir(profile_dir.path())
                 .build()
                 .map_err(RenderError::Backend)?;

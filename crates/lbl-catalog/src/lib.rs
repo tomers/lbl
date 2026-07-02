@@ -200,11 +200,21 @@ impl Catalog {
     }
 
     /// Whether a media key is supported by the given printer model.
+    ///
+    /// Accepts any catalog alias for a supported SKU (e.g. `30252` when the
+    /// printer lists canonical key `99010`).
     pub fn supports_media(&self, printer_model: &str, media_key: &str) -> bool {
-        self.match_printer(printer_model).is_some_and(|p| {
-            p.supported_media
-                .iter()
-                .any(|k| k.eq_ignore_ascii_case(media_key))
+        let Some(printer) = self.match_printer(printer_model) else {
+            return false;
+        };
+        printer.supported_media.iter().any(|supported_key| {
+            supported_key.eq_ignore_ascii_case(media_key)
+                || self
+                    .lookup(supported_key)
+                    .zip(self.lookup(media_key))
+                    .is_some_and(|(supported, requested)| {
+                        supported.canonical_key() == requested.canonical_key()
+                    })
         })
     }
 
@@ -295,6 +305,14 @@ mod tests {
         assert!(lw.iter().any(|e| e.matches_key("2191636")));
         assert!(lw.iter().any(|e| e.matches_key("11352")));
         assert!(!lw.iter().any(|e| e.matches_key("2166659")));
+    }
+
+    #[test]
+    fn supports_media_resolves_aliases() {
+        let catalog = Catalog::bundled().unwrap();
+        assert!(catalog.supports_media("LabelWriter 550", "99010"));
+        assert!(catalog.supports_media("LabelWriter 550", "30252"));
+        assert!(!catalog.supports_media("LabelWriter 550", "2166659"));
     }
 
     #[test]

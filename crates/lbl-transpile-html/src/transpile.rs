@@ -144,12 +144,12 @@ pub struct ViewportPx {
 impl ViewportPx {
     /// CSS that pins the document to a known media viewport so previews and
     /// raster output show the full label width/length, not just the inked area.
-    fn to_css(&self, mode: OutputMode, label_fit: LabelFit) -> String {
+    fn to_css(&self, mode: OutputMode, _label_fit: LabelFit) -> String {
         let mut css = String::new();
         if self.width.is_some() {
             css.push_str("html,body{min-width:100%;width:100%}\n");
         }
-        if label_fit == LabelFit::Fill && self.height.is_some() {
+        if self.height.is_some() {
             css.push_str("html,body{min-height:100%;height:100%}\n");
         }
         if mode == OutputMode::Preview {
@@ -387,11 +387,10 @@ fn label_layout_css(
             valign.justify_content(),
             align.align_items(),
         ));
-    } else if !inset.is_zero() {
-        // Continuous/content mode: inset the shell even without a fill box.
+    } else if !inset.is_zero() || apply_main {
         let container = layout_shell_selector(mode);
         css.push_str(&format!(
-            "{container}{{display:flex;flex-direction:column}}\n"
+            "{container}{{display:flex;flex-direction:column;box-sizing:border-box}}\n"
         ));
     }
 
@@ -401,6 +400,10 @@ fn label_layout_css(
     }
     if apply_main {
         label_rules.push(format!("justify-content:{}", valign.justify_content()));
+        if label_fit == LabelFit::Content {
+            label_rules.push("flex:1 1 auto".into());
+            label_rules.push("min-height:0".into());
+        }
     }
     if !label_rules.is_empty() {
         css.push_str(&format!(".lbl-label{{{}}}\n", label_rules.join(";")));
@@ -973,6 +976,35 @@ mod tests {
         );
         assert!(!out.contains("html,body{height:100%"), "{out}");
         assert!(!out.contains(".lbl-label{height:100%"), "{out}");
+    }
+
+    #[test]
+    fn content_mode_valign_end_stretches_label_root() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: Some(400.0),
+                height: Some(200.0),
+            }),
+            label_valign: LabelValign::End,
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><span class="lbl-text">bottom</span></div>"#,
+            &opts,
+        );
+        assert!(
+            out.contains("html,body{min-height:100%;height:100%}"),
+            "{out}"
+        );
+        assert!(
+            out.contains("body{display:flex;flex-direction:column;box-sizing:border-box}"),
+            "{out}"
+        );
+        assert!(
+            out.contains("justify-content:flex-end") && out.contains("flex:1 1 auto"),
+            "{out}"
+        );
     }
 
     #[test]
