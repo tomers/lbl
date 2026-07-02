@@ -124,7 +124,7 @@ fn golden_labels() {
     failures.extend(run_case(
         &backend,
         "markdown",
-        Source::Markdown("# Order 44\n\nShip **fast** to dock 4\n\n{{qr:https://track/42}}".into()),
+        Source::Markdown("# Order 44\n\nShip **fast**\n\n{{qr:https://track/42}}".into()),
         &strip,
         &style,
         Algorithm::Auto,

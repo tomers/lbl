@@ -168,15 +168,29 @@ $ lbl print --template sopranos.lbl --orientation portrait
 ### Inline mini-syntax
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-Elements flow in a row; spacing comes from `element_gap_mm` in config
-(see [configuration precedence](docs/src/guides/configuration.md#configuration)).
-Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or other layers.
 
 <img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" width="100%" />
 
-<img src="docs/src/generated/images/inline-syntax-01.png" alt="Inline mini-syntax" width="100%" />
+*80×20 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
-*120×20 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
+```console
+$ lbl print \
+  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+```
+
+---
+
+### Element spacing
+
+Inline elements in a row are separated by `element_gap_mm` (default 4 mm).
+Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
+(see [configuration precedence](docs/src/guides/configuration.md#configuration)).
+
+<img src="docs/src/generated/images/element-gap.png" alt="Element spacing" width="100%" />
+
+<img src="docs/src/generated/images/element-gap-01.png" alt="Element spacing" width="100%" />
+
+*120×20 mm* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # default element gap

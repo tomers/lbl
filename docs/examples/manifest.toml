@@ -22,15 +22,31 @@ args        = ["--template", "sopranos.lbl", "--orientation", "portrait"]
 render_args = ["--font-size-mm", "2.6", "--qr-size-mm", "12", "--padding-mm", "1"]
 
 [[example]]
-id = "inline-syntax"
-title = "Inline mini-syntax"
-description = """Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-Elements flow in a row; spacing comes from `element_gap_mm` in config
-(see [configuration precedence](docs/src/guides/configuration.md#configuration)).
-Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or other layers."""
-doc = "guides/printing-text.md"
-doc_title = "Printing text"
-doc_section = "inline-mini-syntax-default"
+id                    = "inline-syntax"
+title                 = "Inline mini-syntax"
+description           = "Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string."
+doc                   = "guides/printing-text.md"
+doc_title             = "Printing text"
+doc_section           = "inline-mini-syntax-default"
+caption               = "80×20 mm"
+media                 = ""
+width_mm              = 80
+length_mm             = 20
+dpi                   = 203
+show_dpi              = false
+hide_media_in_command = true
+render_args           = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
+args                  = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
+
+[[example]]
+id = "element-gap"
+title = "Element spacing"
+description = """Inline elements in a row are separated by `element_gap_mm` (default 4 mm).
+Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
+(see [configuration precedence](docs/src/guides/configuration.md#configuration))."""
+doc = "guides/configuration.md"
+doc_title = "Configuration"
+doc_section = "style-fonts-qr-barcodes"
 caption = "120×20 mm"
 media = ""
 width_mm = 120

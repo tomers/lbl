@@ -384,7 +384,11 @@ fn render_example(
     if composite && !example.separate_images {
         composite_side_by_side(png_path)?;
     }
-    let paths = collect_label_pngs(png_path)?;
+    let paths = if example.compare.len() > 1 || example.xargs.is_some() {
+        collect_label_pngs(png_path)?
+    } else {
+        vec![png_path.to_path_buf()]
+    };
     Ok(paths)
 }
 
