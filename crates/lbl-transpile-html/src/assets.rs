@@ -40,6 +40,10 @@ pub const BASE_CSS: &str = r#"
 html,body{margin:0;padding:0}
 .lbl-label{display:flex;flex-direction:column}
 .lbl-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center}
+.lbl-row>.lbl-text,.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>.lbl-col{flex:0 0 auto;min-width:0}
+.lbl-row>.lbl-col{flex:1 1 auto}
+.lbl-row .lbl-barcode{width:auto;height:auto}
+.lbl-row .lbl-barcode svg{display:block;width:auto;max-width:none;height:auto}
 .lbl-col{display:flex;flex-direction:column}
 .lbl-center{align-items:center;justify-content:center}
 .lbl-between{justify-content:space-between}

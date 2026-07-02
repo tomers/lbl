@@ -13,10 +13,15 @@ Elements flow in a row; spacing comes from `element_gap_mm` in config (override 
 doc = "guides/printing-text.md"
 doc_title = "Printing text"
 doc_section = "inline-mini-syntax-default"
-caption = "DYMO 11352 · 25×54 mm"
-media = "11352"
+caption = "54×15 mm"
+media = ""
+width_mm = 54
+length_mm = 15
+dpi = 203
+show_dpi = false
+hide_media_in_command = true
 separate_images = true
-render_args = ["--orientation", "landscape"]
+render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
 args = ["--text", "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}"]
 compare = [{ label = "default element gap" }, { label = "element gap 8 mm", env = { LBL_STYLE__ELEMENT_GAP_MM = "8" } }]
 
@@ -47,9 +52,10 @@ media = ""
 width_mm = 54
 length_mm = 15
 dpi = 300
+hide_media_in_command = true
 separate_images = true
 single_line = true
-render_args = ["--orientation", "landscape"]
+render_args = ["--orientation", "portrait"]
 args = []
 compare = [
   { label = "align left", args = [
@@ -84,9 +90,10 @@ media = ""
 width_mm = 54
 length_mm = 15
 dpi = 300
+hide_media_in_command = true
 composite = "side_by_side"
 single_line = true
-render_args = ["--orientation", "landscape"]
+render_args = ["--orientation", "portrait"]
 args = ["--text", "Hi"]
 compare = [
   { label = "padding 0 (left)", args = [
@@ -112,6 +119,7 @@ dpi         = 203
 dir         = "config-defaults"
 hide_cd     = true
 single_line = true
+render_args = ["--qr-size-mm", "10"]
 files       = [{ path = "lbl.toml", lang = "toml" }]
 args        = ["--text", "Hello {{qr:https://x/p}}"]
 
@@ -119,7 +127,7 @@ args        = ["--text", "Hello {{qr:https://x/p}}"]
 id = "supersample"
 title = "Supersampling for print quality"
 description = """Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
-More render dots before downscaling yield sharper barcodes and small type."""
+More render dots before downscaling yield sharper text and fine detail."""
 doc = "guides/rendering-quality.md"
 doc_title = "Rendering quality"
 doc_section = "how-to-set-it"
@@ -127,61 +135,66 @@ caption = "DYMO 11352 · 25×54 mm"
 media = "11352"
 composite = "side_by_side"
 single_line = true
-args = ["--text", "{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}"]
+args = ["--text", "Supersample"]
 compare = [
-  { label = "supersample 1 (left)", args = [
+  { label = "Supersample 1", args = [
     "--supersample",
     "1",
+    "--text",
+    "Supersample 1",
   ] },
-  { label = "supersample 8 (right)", args = [
+  { label = "Supersample 8", args = [
     "--supersample",
     "8",
+    "--text",
+    "Supersample 8",
   ] },
 ]
 
 [[example]]
-id          = "niimbot-catalog"
-title       = "Catalog media SKU"
+id = "niimbot-catalog"
+title = "Catalog media SKU"
 description = "Pick a die-cut size from the bundled catalog with `--media` instead of raw `--width-mm` / `--length-mm`."
-doc         = "guides/printers-media.md"
-doc_title   = "Printers & media"
+doc = "guides/printers-media.md"
+doc_title = "Printers & media"
 doc_section = "niimbot"
-caption     = "NIIMBOT 12×40 mm @ 203 dpi"
-media       = "12x40"
-dpi         = 203
-show_media  = true
-show_dpi    = false
+caption = "NIIMBOT 12×40 & 12×22 mm @ 203 dpi"
+media = ""
+dpi = 203
+show_media = true
+show_dpi = false
+composite = "side_by_side"
 single_line = true
-args        = ["--text", "12x40"]
-
-[[example]]
-id          = "niimbot-catalog-2"
-title       = "Another catalog SKU"
-description = "Another die-cut size from the same catalog — only `--media` and content change."
-doc         = "guides/printers-media.md"
-doc_title   = "Printers & media"
-doc_section = "niimbot"
-caption     = "NIIMBOT 12×22 mm @ 203 dpi"
-media       = "12x22"
-dpi         = 203
-show_media  = true
-show_dpi    = false
-single_line = true
-args        = ["--text", "12x22"]
+args = []
+compare = [
+  { label = "12×40", args = [
+    "--media",
+    "12x40",
+    "--text",
+    "12x40",
+  ] },
+  { label = "12×22", args = [
+    "--media",
+    "12x22",
+    "--text",
+    "12x22",
+  ] },
+]
 
 [[example]]
 id          = "fixed-dimensions"
 title       = "Explicit media dimensions"
-description = "When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly."
+description = "When no catalog SKU fits, pass `--width-mm` and `--length-mm` directly."
 doc         = "guides/printers-media.md"
 doc_title   = "Printers & media"
 doc_section = "media"
-caption     = "48×76 mm @ 300 dpi"
+caption     = "30×20 mm"
 media       = ""
-width_mm    = 48
-length_mm   = 76
-dpi         = 300
-args        = ["--text", "Receipt\nItem ×2  $18.00\nTotal      $36.00"]
+width_mm    = 30
+length_mm   = 20
+dpi         = 203
+show_dpi    = false
+args        = ["--text", "30×20"]
 
 [[example]]
 id          = "sopranos-cards"
@@ -197,7 +210,7 @@ hide_cd     = true
 single_line = true
 composite   = "side_by_side"
 files       = [{ path = "sopranos.lbl", lang = "text" }]
-args        = ["--template", "sopranos.lbl", "--template-format", "html"]
+args        = ["--template", "sopranos.lbl", "--template-format", "html", "--orientation", "portrait"]
 render_args = ["--qr-size-mm", "12", "--padding-mm", "1"]
 
 [[example]]
@@ -213,7 +226,7 @@ media       = "2112286"
 dir         = "batch-card"
 composite   = "side_by_side"
 files       = [{ path = "card.html", lang = "html" }, { path = "people.json", lang = "json" }]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
 
 [[example]]
@@ -227,10 +240,10 @@ doc_section = "single-file-frontmatter"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-combined"
-hide_cd     = true
+hide_cd     = false
 composite   = "side_by_side"
 files       = [{ path = "combined.html", lang = "html" }]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "combined.html", "--template-format", "html"]
 
 [[example]]
@@ -244,10 +257,10 @@ doc_section = "single-file-frontmatter"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-combined"
-hide_cd     = true
+hide_cd     = false
 composite   = "side_by_side"
 files       = [{ path = "combined.lbl", lang = "text" }]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "combined.lbl", "--template-format", "html"]
 
 [[example]]
@@ -264,7 +277,7 @@ dir         = "batch-card"
 xargs       = "cat people.ndjson"
 composite   = "side_by_side"
 single_line = true
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html"]
 
 [[example]]
@@ -278,10 +291,10 @@ doc_section = "batch-selection"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-card"
-hide_cd     = true
+hide_cd     = false
 single_line = true
 batch_args  = ["--one"]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
 
 [[example]]
@@ -295,10 +308,10 @@ doc_section = "batch-selection"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-card"
-hide_cd     = true
+hide_cd     = false
 single_line = true
 batch_args  = ["--index", "1"]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
 
 [[example]]
@@ -312,10 +325,10 @@ doc_section = "batch-selection"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-card"
-hide_cd     = true
+hide_cd     = false
 single_line = true
 batch_args  = ["--filter", "Bob"]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]
 
 [[example]]
@@ -329,8 +342,8 @@ doc_section = "batch-selection"
 caption     = "DYMO 2112286 · 25×25 mm"
 media       = "2112286"
 dir         = "batch-card"
-hide_cd     = true
+hide_cd     = false
 single_line = true
 batch_args  = ["--skip", "1", "--take", "1"]
-render_args = ["--padding-mm", "0", "--qr-size-mm", "8"]
+render_args = ["--padding-mm", "0", "--qr-size-mm", "5"]
 args        = ["--template", "card.html", "--template-format", "html", "--data", "people.json"]

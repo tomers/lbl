@@ -11,7 +11,7 @@ Regenerate with `just doc-examples`.
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
 Elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`).
 
-*DYMO 11352 · 25×54 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
+*54×15 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
 # default element gap
@@ -50,15 +50,15 @@ Position content across the label width with `--label-align` (`start`, `center`,
 ```console
 # align left
 # example
-$ lbl print --label-align start --text 'align left' --width-mm 54 --length-mm 15 --dpi 300
+$ lbl print --label-align start --text 'align left'
 
 # align center
 # example
-$ lbl print --label-align center --text 'align center' --width-mm 54 --length-mm 15 --dpi 300
+$ lbl print --label-align center --text 'align center'
 
 # align right
 # example
-$ lbl print --label-align end --text 'align right' --width-mm 54 --length-mm 15 --dpi 300
+$ lbl print --label-align end --text 'align right'
 ```
 
 <img src="images/label-align.png" alt="Cross-axis alignment" width="320"/>
@@ -75,11 +75,11 @@ Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge
 ```console
 # padding 0 (left)
 # example
-$ lbl print --text Hi --padding-mm 0 --width-mm 54 --length-mm 15 --dpi 300
+$ lbl print --text Hi --padding-mm 0
 
 # padding 4 mm (right)
 # example
-$ lbl print --text Hi --padding-mm 4 --width-mm 54 --length-mm 15 --dpi 300
+$ lbl print --text Hi --padding-mm 4
 ```
 
 <img src="images/zero-padding.png" alt="Inner padding" width="320"/>
@@ -113,18 +113,18 @@ $ lbl print --text 'Hello {{qr:https://x/p}}'
 ## Supersampling for print quality
 
 Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
-More render dots before downscaling yield sharper barcodes and small type.
+More render dots before downscaling yield sharper text and fine detail.
 
 *DYMO 11352 · 25×54 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
 
 ```console
-# supersample 1 (left)
+# Supersample 1
 # example
-$ lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 1
+$ lbl print --text 'Supersample 1' --supersample 1
 
-# supersample 8 (right)
+# Supersample 8
 # example
-$ lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --supersample 8
+$ lbl print --text 'Supersample 8' --supersample 8
 ```
 
 <img src="images/supersample.png" alt="Supersampling for print quality" width="320"/>
@@ -134,42 +134,32 @@ $ lbl print --text '{{barcode:EAN13:4006381333931}} {{size:0.7:SKU 7788}}' --sup
 
 Pick a die-cut size from the bundled catalog with `--media` instead of raw `--width-mm` / `--length-mm`.
 
-*NIIMBOT 12×40 mm @ 203 dpi* · [Printers & media →](../guides/printers-media.md#niimbot)
+*NIIMBOT 12×40 & 12×22 mm @ 203 dpi* · [Printers & media →](../guides/printers-media.md#niimbot)
 
 ```console
+# 12×40
 # example
 $ lbl print --media 12x40 --text 12x40
+
+# 12×22
+# example
+$ lbl print --media 12x22 --text 12x22
 ```
 
 <img src="images/niimbot-catalog.png" alt="Catalog media SKU" width="320"/>
 ---
 
-## Another catalog SKU
-
-Another die-cut size from the same catalog — only `--media` and content change.
-
-*NIIMBOT 12×22 mm @ 203 dpi* · [Printers & media →](../guides/printers-media.md#niimbot)
-
-```console
-# example
-$ lbl print --media 12x22 --text 12x22
-```
-
-<img src="images/niimbot-catalog-2.png" alt="Another catalog SKU" width="320"/>
----
-
 ## Explicit media dimensions
 
-When no catalog SKU fits, pass `--width-mm`, `--length-mm`, and `--dpi` directly.
+When no catalog SKU fits, pass `--width-mm` and `--length-mm` directly.
 
-*48×76 mm @ 300 dpi* · [Printers & media →](../guides/printers-media.md#media)
+*30×20 mm* · [Printers & media →](../guides/printers-media.md#media)
 
 ```console
 $ lbl print \
-  --text $'Receipt\nItem ×2  $18.00\nTotal      $36.00' \
-  --width-mm 48 \
-  --length-mm 76 \
-  --dpi 300
+  --text '30×20' \
+  --width-mm 30 \
+  --length-mm 20
 ```
 
 <img src="images/fixed-dimensions.png" alt="Explicit media dimensions" width="320"/>
@@ -224,7 +214,7 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 
 ```console
 # example
-$ lbl print --template sopranos.lbl --template-format html
+$ lbl print --template sopranos.lbl --template-format html --orientation portrait
 ```
 
 <img src="images/sopranos-cards.png" alt="Complex HTML batch" width="320"/>
@@ -241,11 +231,9 @@ One HTML layout rendered against a JSON array — name badges with QR for Alice 
 [card.html](../../examples/batch-card/card.html)
 
 ```html
-<div class="lbl-label lbl-row lbl-center">
-  <div class="lbl-col">
-    <strong>{{ name }}</strong>
-    <span>{{ title }}</span>
-  </div>
+<div class="lbl-label lbl-col lbl-center">
+  <strong>{{ name }}</strong>
+  <span>{{ title }}</span>
   <qr>{{ url }}</qr>
 </div>
 ```
@@ -293,16 +281,15 @@ Data and template in one file — a JSON frontmatter array batches without `--ea
   { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
 ]
 ---
-<div class="lbl-label lbl-row lbl-center">
-  <div class="lbl-col">
-    <strong>{{ name }}</strong>
-    <span>{{ title }}</span>
-  </div>
+<div class="lbl-label lbl-col lbl-center">
+  <strong>{{ name }}</strong>
+  <span>{{ title }}</span>
   <qr>{{ url }}</qr>
 </div>
 ```
 
 ```console
+$ cd docs/examples/batch-combined
 $ lbl print \
   --template combined.html \
   --template-format html
@@ -326,16 +313,15 @@ The same frontmatter batch works in a `.lbl` file — HTML template syntax insid
   { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
 ]
 ---
-<div class="lbl-label lbl-row lbl-center">
-  <div class="lbl-col">
-    <strong>{{ name }}</strong>
-    <span>{{ title }}</span>
-  </div>
+<div class="lbl-label lbl-col lbl-center">
+  <strong>{{ name }}</strong>
+  <span>{{ title }}</span>
   <qr>{{ url }}</qr>
 </div>
 ```
 
 ```console
+$ cd docs/examples/batch-combined
 $ lbl print \
   --template combined.lbl \
   --template-format html
@@ -368,6 +354,7 @@ Print only the first label from a batch selection.
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](../guides/batch-printing.md#batch-selection)
 
 ```console
+$ cd docs/examples/batch-card
 # example
 $ lbl print --template card.html --template-format html --data people.json --one
 ```
@@ -382,6 +369,7 @@ Select a label by zero-based index — here, Bob at index 1.
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](../guides/batch-printing.md#batch-selection)
 
 ```console
+$ cd docs/examples/batch-card
 # example
 $ lbl print --template card.html --template-format html --data people.json --index 1
 ```
@@ -396,6 +384,7 @@ Keep only labels whose data fields contain a substring (case-insensitive).
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](../guides/batch-printing.md#batch-selection)
 
 ```console
+$ cd docs/examples/batch-card
 # example
 $ lbl print --template card.html --template-format html --data people.json --filter Bob
 ```
@@ -410,6 +399,7 @@ Skip the first N labels, then print at most M from the remainder.
 *DYMO 2112286 · 25×25 mm* · [Batch printing →](../guides/batch-printing.md#batch-selection)
 
 ```console
+$ cd docs/examples/batch-card
 # example
 $ lbl print --template card.html --template-format html --data people.json --skip 1 --take 1
 ```

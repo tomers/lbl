@@ -100,6 +100,8 @@ struct Example {
     #[serde(default)]
     hide_cd: bool,
     #[serde(default)]
+    hide_media_in_command: bool,
+    #[serde(default)]
     single_line: bool,
     #[serde(default)]
     render_args: Vec<String>,
@@ -289,25 +291,32 @@ fn workspace_root() -> Result<PathBuf> {
 }
 
 fn resolve_lbl_binary(root: &Path) -> Result<PathBuf> {
-    let release = root.join("target/release/lbl");
-    if release.is_file() {
-        return Ok(release);
+    let target_dir = root.join("target");
+    let status = Command::new("cargo")
+        .args([
+            "build",
+            "-q",
+            "-p",
+            "lbl-text",
+            "-p",
+            "lbl-transpile-html",
+            "-p",
+            "lbl",
+            "--bin",
+            "lbl",
+        ])
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .current_dir(root)
+        .status()
+        .context("cargo build lbl stack for doc examples")?;
+    if !status.success() {
+        bail!("cargo build -p lbl --bin lbl failed");
     }
     let debug = root.join("target/debug/lbl");
     if debug.is_file() {
         return Ok(debug);
     }
-
-    eprintln!("building lbl …");
-    let status = Command::new("cargo")
-        .args(["build", "-q", "-p", "lbl", "--bin", "lbl"])
-        .current_dir(root)
-        .status()
-        .context("cargo build -p lbl")?;
-    if !status.success() {
-        bail!("cargo build -p lbl failed");
-    }
-    Ok(root.join("target/debug/lbl"))
+    bail!("lbl binary missing at {}", debug.display())
 }
 
 fn render_example(
@@ -456,9 +465,11 @@ fn run_lbl_print(
     if let Some(value) = req.data {
         cmd.args(["--data", value]);
     }
-    if !example.media.is_empty() {
+    if print_args_has_flag(req.print_args, "--media") {
+        // media supplied via print args (e.g. compare variants)
+    } else if !example.media.is_empty() {
         cmd.args(["--media", &example.media]);
-    } else {
+    } else if !print_args_has_flag(req.print_args, "--width-mm") {
         let width = example
             .width_mm
             .context("example needs media or width_mm")?;
@@ -467,8 +478,10 @@ fn run_lbl_print(
             cmd.args(["--length-mm", &format_num(length)]);
         }
     }
-    if let Some(dpi) = example.dpi {
-        cmd.args(["--dpi", &format_num(dpi)]);
+    if !print_args_has_flag(req.print_args, "--dpi") {
+        if let Some(dpi) = example.dpi {
+            cmd.args(["--dpi", &format_num(dpi)]);
+        }
     }
     if !req.print_args.iter().any(|a| a == "--supersample") {
         cmd.args(["--supersample", &defaults.supersample.to_string()]);
@@ -494,6 +507,10 @@ fn run_lbl_print(
         );
     }
     Ok(())
+}
+
+fn print_args_has_flag(args: &[String], flag: &str) -> bool {
+    args.iter().any(|a| a == flag)
 }
 
 fn xargs_values(spec: &str, work_dir: &Path) -> Result<Vec<String>> {
@@ -710,6 +727,9 @@ fn display_args_for(example: &Example, compare_extra: Option<&[String]>) -> Vec<
 }
 
 fn display_media_args(example: &Example) -> Vec<String> {
+    if example.hide_media_in_command {
+        return Vec::new();
+    }
     if example.media.is_empty() {
         let mut out = Vec::new();
         if let Some(width) = example.width_mm {
@@ -720,9 +740,11 @@ fn display_media_args(example: &Example) -> Vec<String> {
             out.push("--length-mm".to_string());
             out.push(format_num(length));
         }
-        if let Some(dpi) = example.dpi {
-            out.push("--dpi".to_string());
-            out.push(format_num(dpi));
+        if example.show_dpi {
+            if let Some(dpi) = example.dpi {
+                out.push("--dpi".to_string());
+                out.push(format_num(dpi));
+            }
         }
         out
     } else if example.show_media {
@@ -1170,6 +1192,7 @@ mod tests {
             show_media: false,
             show_dpi: true,
             hide_cd: false,
+            hide_media_in_command: false,
             single_line: false,
             render_args: Vec::new(),
             compare: Vec::new(),
