@@ -244,6 +244,11 @@ struct StyleArgs {
     #[arg(long)]
     padding_mm: Option<f64>,
 
+    /// Gap between flex children (text, QR, barcode, …), in mm (overrides config
+    /// `style.element_gap_mm`).
+    #[arg(long)]
+    element_gap_mm: Option<f64>,
+
     /// Border drawn around the label, in mm; 0 disables it (overrides config
     /// `style.border_width_mm`).
     #[arg(long)]
@@ -354,6 +359,9 @@ impl StyleArgs {
         }
         if let Some(v) = self.padding_mm {
             style.padding_mm = v;
+        }
+        if let Some(v) = self.element_gap_mm {
+            style.element_gap_mm = v;
         }
         if let Some(v) = self.border_mm {
             style.border_width_mm = v;

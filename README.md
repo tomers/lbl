@@ -112,13 +112,15 @@ Regenerate from [`docs/examples/manifest.toml`](docs/examples/manifest.toml) wit
 ### Inline mini-syntax
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-Elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`).
+Elements flow in a row; spacing comes from `element_gap_mm` in config
+(see [configuration precedence](docs/src/guides/configuration.md#configuration)).
+Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or other layers.
 
-<img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" />
+<img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" width="100%" />
 
-<img src="docs/src/generated/images/inline-syntax-01.png" alt="Inline mini-syntax" />
+<img src="docs/src/generated/images/inline-syntax-01.png" alt="Inline mini-syntax" width="100%" />
 
-*54×15 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
+*120×20 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
 # default element gap
@@ -126,8 +128,9 @@ $ lbl print \
   --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
 
 # element gap 8 mm
-LBL_STYLE__ELEMENT_GAP_MM=8 $ lbl print \
-  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
+$ lbl print \
+  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
+  --element-gap-mm 8
 ```
 
 ---
@@ -138,7 +141,7 @@ Headings, emphasis, and inline directives compose via `--markdown`.
 
 <img src="docs/src/generated/images/markdown-label.png" alt="Markdown input" />
 
-*NIIMBOT 12×22 mm @ 203 dpi* · [Printing text →](docs/src/guides/printing-text.md)
+*NIIMBOT 12×40 mm @ 203 dpi* · [Printing text →](docs/src/guides/printing-text.md)
 
 ```console
 $ lbl print \
@@ -151,13 +154,13 @@ $ lbl print \
 
 Position content across the label width with `--label-align` (`start`, `center`, or `end`).
 
-<img src="docs/src/generated/images/label-align.png" alt="Cross-axis alignment" />
+<img src="docs/src/generated/images/label-align.png" alt="Cross-axis alignment" width="100%" />
 
-<img src="docs/src/generated/images/label-align-01.png" alt="Cross-axis alignment" />
+<img src="docs/src/generated/images/label-align-01.png" alt="Cross-axis alignment" width="100%" />
 
-<img src="docs/src/generated/images/label-align-02.png" alt="Cross-axis alignment" />
+<img src="docs/src/generated/images/label-align-02.png" alt="Cross-axis alignment" width="100%" />
 
-*54×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
+*90×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # align left
@@ -179,7 +182,7 @@ $ lbl print --label-align end --text 'align right'
 
 Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge.
 
-<img src="docs/src/generated/images/zero-padding.png" alt="Inner padding" />
+<img src="docs/src/generated/images/zero-padding.png" alt="Inner padding" width="100%" />
 
 *54×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 
@@ -199,7 +202,7 @@ $ lbl print --text Hi --padding-mm 4
 
 When transport and protocol live in `lbl.toml`, the run command only needs label content.
 
-<img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" />
+<img src="docs/src/generated/images/config-defaults.png" alt="Config-driven print defaults" width="100%" />
 
 *NIIMBOT 12×40 mm @ 203 dpi* · [Configuration →](docs/src/guides/configuration.md#print-defaults-lbl-print)
 
@@ -228,7 +231,7 @@ More render dots before downscaling yield sharper text and fine detail.
 
 <img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" />
 
-*DYMO 11352 · 25×54 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
+*50×108 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
 
 ```console
 # Supersample 1
@@ -246,7 +249,7 @@ $ lbl print --text 'Supersample 8' --supersample 8
 
 Pick a die-cut size from the bundled catalog with `--media` instead of raw `--width-mm` / `--length-mm`.
 
-<img src="docs/src/generated/images/niimbot-catalog.png" alt="Catalog media SKU" />
+<img src="docs/src/generated/images/niimbot-catalog.png" alt="Catalog media SKU" width="100%" />
 
 *NIIMBOT 12×40 & 12×22 mm @ 203 dpi* · [Printers & media →](docs/src/guides/printers-media.md#niimbot)
 
@@ -315,15 +318,15 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 ]
 ---
 <div class="lbl-label lbl-col lbl-center">
-  <div class="lbl-text" style="font-size:0.62em">{{ event }}</div>
+  <div class="lbl-text" style="font-size:0.8em">{{ event }}</div>
   <img src="{{ photo }}" alt="" style="width:12em;height:14em;object-fit:cover" />
-  <span class="lbl-text" style="font-size:1.2em;font-weight:bold">{{ name }}</span>
-  <span class="lbl-text" style="font-size:0.85em">{{ role }} · {{ department }}</span>
+  <span class="lbl-text" style="font-size:1.45em;font-weight:bold">{{ name }}</span>
+  <span class="lbl-text" style="font-size:1em">{{ role }} · {{ department }}</span>
   <qr>https://id.lbl.example/{{ employee_id }}</qr>
   <barcode type="CODE128">{{ employee_id }}</barcode>
   <div class="lbl-row lbl-between" style="width:100%">
-    <span class="lbl-text" style="font-size:0.55em">{{ access }}</span>
-    <span class="lbl-text" style="font-size:0.55em">#{{ badge_number }}</span>
+    <span class="lbl-text" style="font-size:0.68em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.68em">#{{ badge_number }}</span>
   </div>
 </div>
 ```

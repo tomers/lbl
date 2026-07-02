@@ -23,14 +23,14 @@
 ]
 ---
 <div class="lbl-label lbl-col lbl-center">
-  <div class="lbl-text" style="font-size:0.62em">{{ event }}</div>
+  <div class="lbl-text" style="font-size:0.8em">{{ event }}</div>
   <img src="{{ photo }}" alt="" style="width:12em;height:14em;object-fit:cover" />
-  <span class="lbl-text" style="font-size:1.2em;font-weight:bold">{{ name }}</span>
-  <span class="lbl-text" style="font-size:0.85em">{{ role }} · {{ department }}</span>
+  <span class="lbl-text" style="font-size:1.45em;font-weight:bold">{{ name }}</span>
+  <span class="lbl-text" style="font-size:1em">{{ role }} · {{ department }}</span>
   <qr>https://id.lbl.example/{{ employee_id }}</qr>
   <barcode type="CODE128">{{ employee_id }}</barcode>
   <div class="lbl-row lbl-between" style="width:100%">
-    <span class="lbl-text" style="font-size:0.55em">{{ access }}</span>
-    <span class="lbl-text" style="font-size:0.55em">#{{ badge_number }}</span>
+    <span class="lbl-text" style="font-size:0.68em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.68em">#{{ badge_number }}</span>
   </div>
 </div>

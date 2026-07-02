@@ -52,6 +52,12 @@ html,body{margin:0;padding:0}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
 .lbl-qr canvas,.lbl-qr img{max-width:100%;height:auto}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
+.lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}
+.lbl-label h1{font-size:1.35em;font-weight:700}
+.lbl-label h2{font-size:1.2em;font-weight:700}
+.lbl-label h3{font-size:1.1em;font-weight:700}
+.lbl-label h4,.lbl-label h5,.lbl-label h6{font-size:1em;font-weight:700}
+.lbl-label p,.lbl-label li{font-size:1em}
 "#;
 
 /// CSS injected when [`LabelFit::Fill`] is active: stretch the document to the
@@ -61,17 +67,15 @@ html,body{height:100%;width:100%;margin:0}
 "#;
 
 /// When [`LabelFit::Fill`] is active, grow a lone `.lbl-text` block to use the
-/// printable area on fixed die-cut labels.
+/// printable area on fixed die-cut labels. Cross/main-axis alignment is injected
+/// at transpile time from [`LabelAlign`] / [`LabelValign`].
 pub const LABEL_FIT_TEXT_CSS: &str = r#"
 .lbl-label{container-type:size}
 .lbl-label>.lbl-text:only-child{
   flex:1 1 auto;
   display:flex;
   flex-direction:column;
-  align-items:center;
-  justify-content:center;
   width:100%;
-  text-align:center;
   line-height:1.1;
   font-size:min(calc(100cqh / 1.1),100cqw);
   white-space:pre-wrap;

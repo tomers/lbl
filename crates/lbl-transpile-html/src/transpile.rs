@@ -326,6 +326,14 @@ impl LabelAlign {
     fn align_items(self) -> &'static str {
         self.flex_keyword()
     }
+
+    fn text_align(self) -> &'static str {
+        match self {
+            Self::Start => "left",
+            Self::Center => "center",
+            Self::End => "right",
+        }
+    }
 }
 
 impl LabelValign {
@@ -399,6 +407,17 @@ fn label_layout_css(
     }
 
     css
+}
+
+/// Alignment for a lone `.lbl-text` child in fill mode (must follow
+/// [`assets::LABEL_FIT_TEXT_CSS`]).
+fn lone_text_align_css(align: LabelAlign, valign: LabelValign) -> String {
+    format!(
+        ".lbl-label>.lbl-text:only-child{{align-items:{};justify-content:{};text-align:{}}}\n",
+        align.align_items(),
+        valign.justify_content(),
+        align.text_align(),
+    )
 }
 
 /// How `.lbl-label` is sized within the render viewport.
@@ -584,6 +603,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     if opts.label_fit == LabelFit::Fill {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
+        head.push_str(&lone_text_align_css(opts.label_align, opts.label_valign));
         if let Some(fit_css) = crate::text_fit::lone_text_fit_css(body, opts) {
             head.push_str(&fit_css);
         }
@@ -708,6 +728,19 @@ mod tests {
     }
 
     #[test]
+    fn markdown_typography_resets_block_margins() {
+        let out = transpile(
+            r#"<div class="lbl-label"><h1>Title</h1><p>Body</p></div>"#,
+            &TranspileOptions::default(),
+        );
+        assert!(
+            out.contains(".lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote){margin:0}"),
+            "{out}"
+        );
+        assert!(out.contains(".lbl-label h1{font-size:1.35em"), "{out}");
+    }
+
+    #[test]
     fn fill_mode_injects_text_fit_css() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
@@ -746,6 +779,40 @@ mod tests {
         assert!(
             out.contains(".lbl-label>.lbl-text:only-child{font-size:129."),
             "{out}"
+        );
+    }
+
+    #[test]
+    fn fill_mode_fits_single_line_span_text() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\">30×20</span></div>",
+            &opts,
+        );
+        assert!(
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:"),
+            "{out}"
+        );
+        let fit = out
+            .rsplit(".lbl-label>.lbl-text:only-child{font-size:")
+            .next()
+            .and_then(|s| s.split("px}").next())
+            .and_then(|s| s.parse::<f64>().ok())
+            .expect("computed lone-text font size");
+        assert!(
+            fit > 20.0 && fit < 142.0 / crate::text_fit::LINE_HEIGHT,
+            "fit={fit}"
         );
     }
 
@@ -853,6 +920,49 @@ mod tests {
         };
         let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
         assert!(out.contains("align-items:flex-start"), "{out}");
+    }
+
+    #[test]
+    fn lone_text_respects_label_align() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(400.0),
+                height: Some(200.0),
+            }),
+            label_align: LabelAlign::Start,
+            label_valign: LabelValign::Center,
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><span class="lbl-text">align left</span></div>"#,
+            &opts,
+        );
+        assert!(
+            out.contains(
+                ".lbl-label>.lbl-text:only-child{align-items:flex-start;justify-content:center;text-align:left}"
+            ),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn lone_text_label_align_end() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(400.0),
+                height: Some(200.0),
+            }),
+            label_align: LabelAlign::End,
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><span class="lbl-text">align right</span></div>"#,
+            &opts,
+        );
+        assert!(out.contains("text-align:right"), "{out}");
+        assert!(out.contains("align-items:flex-end"), "{out}");
     }
 
     #[test]

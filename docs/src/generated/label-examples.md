@@ -9,9 +9,11 @@ Regenerate with `just doc-examples`.
 ## Inline mini-syntax
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
-Elements flow in a row; spacing comes from `element_gap_mm` in config (override with `LBL_STYLE__ELEMENT_GAP_MM`).
+Elements flow in a row; spacing comes from `element_gap_mm` in config
+(see [configuration precedence](docs/src/guides/configuration.md#configuration)).
+Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or other layers.
 
-*54×15 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
+*120×20 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
 # default element gap
@@ -19,8 +21,9 @@ $ lbl print \
   --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
 
 # element gap 8 mm
-LBL_STYLE__ELEMENT_GAP_MM=8 $ lbl print \
-  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}'
+$ lbl print \
+  --text 'Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}' \
+  --element-gap-mm 8
 ```
 
 <img src="images/inline-syntax.png" alt="Inline mini-syntax" width="320"/>
@@ -31,7 +34,7 @@ LBL_STYLE__ELEMENT_GAP_MM=8 $ lbl print \
 
 Headings, emphasis, and inline directives compose via `--markdown`.
 
-*NIIMBOT 12×22 mm @ 203 dpi* · [Printing text →](../guides/printing-text.md)
+*NIIMBOT 12×40 mm @ 203 dpi* · [Printing text →](../guides/printing-text.md)
 
 ```console
 $ lbl print \
@@ -45,7 +48,7 @@ $ lbl print \
 
 Position content across the label width with `--label-align` (`start`, `center`, or `end`).
 
-*54×15 mm @ 300 dpi* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
+*90×15 mm @ 300 dpi* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # align left
@@ -115,7 +118,7 @@ $ lbl print --text 'Hello {{qr:https://x/p}}'
 Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
 More render dots before downscaling yield sharper text and fine detail.
 
-*DYMO 11352 · 25×54 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
+*50×108 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
 
 ```console
 # Supersample 1
@@ -199,15 +202,15 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 ]
 ---
 <div class="lbl-label lbl-col lbl-center">
-  <div class="lbl-text" style="font-size:0.62em">{{ event }}</div>
+  <div class="lbl-text" style="font-size:0.8em">{{ event }}</div>
   <img src="{{ photo }}" alt="" style="width:12em;height:14em;object-fit:cover" />
-  <span class="lbl-text" style="font-size:1.2em;font-weight:bold">{{ name }}</span>
-  <span class="lbl-text" style="font-size:0.85em">{{ role }} · {{ department }}</span>
+  <span class="lbl-text" style="font-size:1.45em;font-weight:bold">{{ name }}</span>
+  <span class="lbl-text" style="font-size:1em">{{ role }} · {{ department }}</span>
   <qr>https://id.lbl.example/{{ employee_id }}</qr>
   <barcode type="CODE128">{{ employee_id }}</barcode>
   <div class="lbl-row lbl-between" style="width:100%">
-    <span class="lbl-text" style="font-size:0.55em">{{ access }}</span>
-    <span class="lbl-text" style="font-size:0.55em">#{{ badge_number }}</span>
+    <span class="lbl-text" style="font-size:0.68em">{{ access }}</span>
+    <span class="lbl-text" style="font-size:0.68em">#{{ badge_number }}</span>
   </div>
 </div>
 ```

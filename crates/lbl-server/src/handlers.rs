@@ -124,6 +124,53 @@ pub async fn delete_profile(State(state): State<AppState>, Path(id): Path<String
     Ok((StatusCode::OK, Json(json!({ "ok": true }))).into_response())
 }
 
+pub async fn profile_detected_media(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let profiles = state.profiles.load()?;
+    let profile = profiles
+        .iter()
+        .find(|p| p.id.0 == id)
+        .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, format!("no profile '{id}'")))?;
+
+    if !profile.model.capabilities.reports_media {
+        return Ok(Json(json!({ "detected": null })).into_response());
+    }
+
+    let connected = profile_is_connected(profile);
+    if !connected {
+        return Ok(Json(json!({ "detected": null })).into_response());
+    }
+
+    // Device SKU detection is not wired yet; return null until drivers expose it.
+    Ok(Json(json!({ "detected": null })).into_response())
+}
+
+fn profile_is_connected(profile: &PrinterProfile) -> bool {
+    let discovered = lbl_device::discover_usb();
+    match &profile.transport {
+        lbl_core::printer::Transport::Usb {
+            vendor_id,
+            product_id,
+            serial,
+        } => discovered.iter().any(|d| {
+            d.vendor_id == Some(*vendor_id)
+                && d.product_id == Some(*product_id)
+                && serial
+                    .as_ref()
+                    .zip(d.serial.as_ref())
+                    .map(|(a, b)| a == b)
+                    .unwrap_or(true)
+        }),
+        lbl_core::printer::Transport::Serial { path, .. } => lbl_device::discover_serial()
+            .iter()
+            .any(|d| d.path.as_deref() == Some(path.as_str())),
+        lbl_core::printer::Transport::Ble { .. } => false,
+        lbl_core::printer::Transport::Network { .. } => false,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // preview / print
 // ---------------------------------------------------------------------------
@@ -201,6 +248,17 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, PREVIEW_SUPERSAMPLE);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
+    let media_info = json!({
+        "width_mm": media.width_mm,
+        "length_mm": match media.length {
+            lbl_core::media::MediaLength::Fixed(mm) => serde_json::Value::from(mm),
+            lbl_core::media::MediaLength::Continuous => serde_json::Value::Null,
+        },
+        "continuous": matches!(media.length, lbl_core::media::MediaLength::Continuous),
+        "dpi": media.dpi.0,
+        "width_px": viewport.width,
+        "height_px": viewport.height,
+    });
     let out: Vec<_> = labels
         .into_iter()
         .map(|l| {
@@ -223,7 +281,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             json!({ "index": l.index, "html": html })
         })
         .collect();
-    Ok(Json(json!({ "count": count, "labels": out })).into_response())
+    Ok(Json(json!({ "count": count, "labels": out, "media": media_info })).into_response())
 }
 
 #[derive(Deserialize)]

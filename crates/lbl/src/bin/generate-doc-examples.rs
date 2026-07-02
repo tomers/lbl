@@ -233,7 +233,7 @@ fn run() -> Result<()> {
         );
     }
 
-    let readme_section = render_readme_section(&rows);
+    let readme_section = render_readme_section(&root, &rows);
     let book_page = render_book_page(&rows);
 
     let readme_path = root.join("README.md");
@@ -685,7 +685,11 @@ fn format_display_command(example: &Example) -> String {
                 &display_args_for(example, Some(&variant.args)),
                 example.single_line,
             );
-            blocks.push(format!("# {}\n{}{}", label, prefix, block));
+            blocks.push(format!(
+                "# {}\n{}",
+                label,
+                inject_env_into_command(&block, &prefix)
+            ));
         }
         out.push_str(&blocks.join("\n\n"));
         return out.trim_end().to_string();
@@ -771,6 +775,19 @@ fn format_compare_env_prefix(env: &HashMap<String, String>) -> String {
         .collect();
     parts.sort();
     format!("{} ", parts.join(" "))
+}
+
+fn inject_env_into_command(block: &str, env_prefix: &str) -> String {
+    if env_prefix.is_empty() {
+        return block.to_string();
+    }
+    if let Some(rest) = block.strip_prefix("$ ") {
+        return format!("$ {env_prefix}{rest}");
+    }
+    if let Some(rest) = block.strip_prefix("# example\n$ ") {
+        return format!("# example\n$ {env_prefix}{rest}");
+    }
+    format!("{env_prefix}{block}")
 }
 
 fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
@@ -963,7 +980,23 @@ fn append_examples_intro(out: &mut String, regenerate_line: &str) {
     out.push_str("\n\n");
 }
 
-fn render_readme_section(rows: &[ExampleRow]) -> String {
+fn format_readme_img(root: &Path, src: &str, alt: &str) -> String {
+    const WIDE_ASPECT: f64 = 3.0;
+    let path = root.join(src);
+    let width_attr = image::image_dimensions(&path).ok().and_then(|(w, h)| {
+        if h > 0 && (w as f64 / h as f64) >= WIDE_ASPECT {
+            Some(r#" width="100%""#)
+        } else {
+            None
+        }
+    });
+    match width_attr {
+        Some(attr) => format!(r#"<img src="{src}" alt="{alt}"{attr} />"#),
+        None => format!(r#"<img src="{src}" alt="{alt}" />"#),
+    }
+}
+
+fn render_readme_section(root: &Path, rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(README_START);
     out.push('\n');
@@ -988,10 +1021,9 @@ fn render_readme_section(rows: &[ExampleRow]) -> String {
         }
         out.push_str(&render_example_title(row));
         for image in &row.readme_images {
-            out.push_str(&format!(
-                "<img src=\"{}\" alt=\"{}\" />\n\n",
-                image, row.title
-            ));
+            out.push_str(&format_readme_img(root, image, &row.title));
+            out.push('\n');
+            out.push('\n');
         }
         out.push_str(&render_example_meta(row, &row.readme_doc));
         if !row.files.is_empty() {
@@ -1225,6 +1257,20 @@ mod tests {
         assert_eq!(
             format_display_command(&ex),
             "# example\n$ lbl print --text hello"
+        );
+    }
+
+    #[test]
+    fn format_display_command_injects_compare_env_after_prompt() {
+        let mut ex = example_with(vec!["--text", "hello"]);
+        ex.compare = vec![CompareVariant {
+            label: Some("with env".into()),
+            args: Vec::new(),
+            env: HashMap::from([("LBL_STYLE__ELEMENT_GAP_MM".into(), "8".into())]),
+        }];
+        assert_eq!(
+            format_display_command(&ex),
+            "# with env\n$ LBL_STYLE__ELEMENT_GAP_MM=8 lbl print \\\n  --text hello"
         );
     }
 

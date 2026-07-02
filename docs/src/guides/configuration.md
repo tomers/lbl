@@ -71,6 +71,7 @@ qr_margin = 0
 qr_dark = "#000000"
 qr_light = "#ffffff"
 padding_mm = 2.0
+element_gap_mm = 4.0
 border_width_mm = 0.0
 # How the label root fills the media: auto (fill fixed-length media), fill, content
 label_fit = "auto"
@@ -119,7 +120,7 @@ export LBL_STYLE__PADDING_MM=0
 ```
 
 Override per run with `--font-size-mm`, `--qr-size-mm`, `--qr-ec`, `--qr-margin`,
-`--qr-dark`, `--qr-light`, `--padding-mm`, `--border-mm`, `--label-fit`
+`--qr-dark`, `--qr-light`, `--padding-mm`, `--element-gap-mm`, `--border-mm`, `--label-fit`
 (`auto`, `fill`, or `content`), `--label-align` (`start`, `center`, or `end`),
 `--label-valign` (`start`, `center`, or `end`), `--label-fit-scale` (`0.8`,
 `80%`, …), and `--media-inset-mm` / `--media-inset-horizontal-mm` /

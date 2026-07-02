@@ -5,10 +5,10 @@ use regex::Regex;
 
 use crate::transpile::{TranspileOptions, ViewportPx};
 
-/// Matches `.lbl-label` containing a single `.lbl-text` child.
+/// Matches `.lbl-label` containing a single `.lbl-text` child (`div` or `span`).
 static LONE_TEXT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"(?is)^\s*<div\s+class="lbl-label"[^>]*>\s*<div\s+class="lbl-text"[^>]*>([\s\S]*?)</div>\s*</div>\s*$"#,
+        r#"(?is)^\s*<div\s+class="lbl-label"[^>]*>\s*<(?:div|span)\s+class="lbl-text"[^>]*>([\s\S]*?)</(?:div|span)>\s*</div>\s*$"#,
     )
     .expect("lone text regex")
 });
@@ -211,5 +211,39 @@ mod tests {
         )
         .expect("css");
         assert!(css.contains("font-size:"), "{css}");
+    }
+
+    #[test]
+    fn injects_px_rule_for_span_lone_text() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            media_inset: MediaInsetPx::default(),
+            ..Default::default()
+        };
+        let css = lone_text_fit_css(
+            r#"<div class="lbl-label"><span class="lbl-text">30×20</span></div>"#,
+            &opts,
+        )
+        .expect("css");
+        assert!(css.contains("font-size:"), "{css}");
+        let font: f64 = css
+            .split("font-size:")
+            .nth(1)
+            .unwrap()
+            .trim_end_matches("px}\n")
+            .parse()
+            .unwrap();
+        assert!(
+            font > 20.0 && font <= 142.0 / LINE_HEIGHT + 0.01,
+            "font={font}"
+        );
     }
 }

@@ -133,7 +133,7 @@ impl Default for StyleConfig {
             barcode_height_mm: 12.0,
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,
-            element_gap_mm: 2.0,
+            element_gap_mm: 4.0,
             border_width_mm: 0.0,
             label_fit: "auto".into(),
             label_align: "center".into(),
