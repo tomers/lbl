@@ -20,13 +20,15 @@
 //!                         start of label print data (width = number of lines,
 //!                         height = dots across the head); data is width lines of
 //!                         roundup(height/8) bytes, MSB-first, 1 = dot printed
-//!   ESC G | ESC E         short form feed (between labels) | feed to tear (last)
+//!   ESC G                   short form feed (every label; mandatory footer)
+//! [host: ESC A handshake after each ESC G]
+//! ESC E                   feed to tear position (once, after the last handshake)
 //! ESC Q                   end of print job
 //! ```
 //!
-//! Multi-byte fields are encoded little-endian. The label data layout (row-major,
-//! `bytes_per_line = roundup(width_dots/8)`, `1` = ink) is exactly the
-//! [`MonoBitmap`] layout, so the dithered bitmap is emitted without conversion.
+//! Multi-byte fields are encoded little-endian. Raster rows are left-aligned on
+//! the physical print head (672 dots on 57 mm models; 1248 on the 5XL); the
+//! `ESC D` height field is always the full head width, not the media width.
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
@@ -50,6 +52,12 @@ const ALIGN_BOTTOM: u8 = 0x02;
 /// Default print density (100 %) for `ESC C`.
 const DEFAULT_DENSITY: u8 = 100;
 
+/// Dots across the 57 mm print head (550 / 550 Turbo).
+const HEAD_DOTS_57MM: u32 = 672;
+
+/// Dots across the 101 mm print head (5XL).
+const HEAD_DOTS_5XL: u32 = 1248;
+
 /// Driver for the DYMO LabelWriter 550 series (550 / 550 Turbo / 5XL).
 #[derive(Debug, Clone, Copy)]
 pub struct LabelWriter550Driver {
@@ -68,6 +76,43 @@ impl LabelWriter550Driver {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Physical head width in dots for the target chassis.
+    ///
+    /// [`PrinterCapabilities::max_width_mm`] often carries the loaded media width
+    /// rather than the printer head; treat anything below the 5XL span as the
+    /// 672-dot head.
+    fn head_dots(ctx: &EncodeContext<'_>) -> u32 {
+        let from_caps = lbl_core::units::Millimeters(ctx.capabilities.max_width_mm)
+            .to_dots(ctx.capabilities.dpi);
+        if from_caps.0 > 900 {
+            HEAD_DOTS_5XL
+        } else {
+            HEAD_DOTS_57MM
+        }
+    }
+
+    /// Left-align `bitmap` on a full-width head row (`head_dots` wide).
+    fn pad_to_head(bitmap: &MonoBitmap, head_dots: u32) -> Result<MonoBitmap, DriverError> {
+        if bitmap.width > head_dots {
+            return Err(DriverError::Unsupported(format!(
+                "bitmap width {} exceeds print head width {head_dots} dots",
+                bitmap.width
+            )));
+        }
+        if bitmap.width == head_dots {
+            return Ok(bitmap.clone());
+        }
+        let mut out = MonoBitmap::new(head_dots, bitmap.height);
+        for y in 0..bitmap.height {
+            for x in 0..bitmap.width {
+                if bitmap.get(x, y) {
+                    out.set(x, y, true);
+                }
+            }
+        }
+        Ok(out)
+    }
 }
 
 impl Driver for LabelWriter550Driver {
@@ -84,9 +129,10 @@ impl Driver for LabelWriter550Driver {
             return Err(DriverError::Unsupported("empty bitmap".into()));
         }
 
-        // ESC D fields: the head spans the bitmap's width in dots; the label is
-        // printed as `lines` raster lines (the feed direction = bitmap height).
-        let dots_across_head = bitmap.width;
+        let head_dots = Self::head_dots(ctx);
+        let bitmap = Self::pad_to_head(bitmap, head_dots)?;
+        // ESC D fields: height is dots across the physical head; width is feed lines.
+        let dots_across_head = head_dots;
         let lines = bitmap.height;
         let continuous = matches!(
             ctx.job.media.length,
@@ -117,16 +163,12 @@ impl Driver for LabelWriter550Driver {
             out.extend_from_slice(&dots_across_head.to_le_bytes()); // Height = dots
             out.extend_from_slice(&bitmap.data);
 
-            // Short form feed between labels; feed to tear after the last so the
-            // finished label can be removed.
-            if index + 1 < copies {
-                out.extend_from_slice(&[ESC, SHORT_FORM_FEED]);
-            } else {
-                out.extend_from_slice(&[ESC, FORM_FEED_TEAR]);
-            }
+            // Every label footer is ESC G; tear feed happens once in the trailer.
+            out.extend_from_slice(&[ESC, SHORT_FORM_FEED]);
         }
 
-        // --- Print job trailer ---
+        // --- Print job trailer (after the last label's status handshake) ---
+        out.extend_from_slice(&[ESC, FORM_FEED_TEAR]);
         out.extend_from_slice(&[ESC, END_JOB]);
         Ok(out)
     }
@@ -166,14 +208,17 @@ mod tests {
         // ESC n <index=0 le16>
         assert_eq!(&bytes[11..13], &[ESC, b'n']);
         assert_eq!(&bytes[13..15], &[0, 0]);
-        // ESC D BPP Align Width(=2 lines) Height(=8 dots)
+        // ESC D BPP Align Width(=2 lines) Height(=672 head dots)
         assert_eq!(&bytes[15..19], &[ESC, b'D', 0x01, 0x02]);
         assert_eq!(&bytes[19..23], &[2, 0, 0, 0]); // width = lines
-        assert_eq!(&bytes[23..27], &[8, 0, 0, 0]); // height = dots
-                                                   // data: 2 bytes (first line 0x80, second 0x00)
-        assert_eq!(&bytes[27..29], &[0x80, 0x00]);
-        // trailer: ESC E (feed to tear, last label) then ESC Q
-        assert_eq!(&bytes[29..33], &[ESC, b'E', ESC, b'Q']);
+        assert_eq!(&bytes[23..27], &[160, 2, 0, 0]); // height = 672 le
+        assert_eq!(bytes.len(), 27 + 2 * 84 + 6); // raster + ESC G ESC E ESC Q
+        assert_eq!(
+            &bytes[bytes.len() - 6..],
+            &[ESC, b'G', ESC, b'E', ESC, b'Q']
+        );
+        assert_eq!(bytes[27], 0x80); // first row, first dot
+        assert_eq!(bytes[27 + 84], 0x00); // second row blank
     }
 
     #[test]
@@ -195,10 +240,10 @@ mod tests {
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 3);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
-        // Two short form feeds (between 3 labels) + one tear feed.
+        // One short form feed per label + one tear feed in the trailer.
         let short = bytes.windows(2).filter(|w| w == &[ESC, b'G']).count();
         let tear = bytes.windows(2).filter(|w| w == &[ESC, b'E']).count();
-        assert_eq!(short, 2);
+        assert_eq!(short, 3);
         assert_eq!(tear, 1);
         // Three label indices 0,1,2.
         assert_eq!(bytes.windows(2).filter(|w| w == &[ESC, b'n']).count(), 3);

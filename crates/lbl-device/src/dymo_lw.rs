@@ -143,38 +143,62 @@ fn dispatch_job_segments(
 
     skip_job_header(payload, &mut pos)?;
 
-    let mut segment_start = 0usize;
-    loop {
-        if pos + 1 >= payload.len() {
+    let preamble_end = pos;
+    let mut label_ranges = Vec::new();
+    while pos + 1 < payload.len() {
+        if payload[pos] == ESC && payload[pos + 1] == b'E' {
             break;
         }
         if payload[pos] == ESC && payload[pos + 1] == b'Q' {
-            session.transfer_out(&payload[pos..pos + 2])?;
-            return Ok(());
+            return Err(DeviceError::Transport(
+                "dymo-lw job missing ESC E before ESC Q".into(),
+            ));
         }
 
+        let label_start = pos;
         require_esc_cmd(payload, &mut pos, b'n')?;
         pos += 2; // label index
 
-        let _data_end = skip_label_data(payload, &mut pos)?;
-        let feed = feed_command(payload, pos)?;
-        pos += 2;
-
-        session.transfer_out(&payload[segment_start..pos])?;
-        handshake(
-            session,
-            if feed == b'G' {
-                LOCK_INTER_LABEL
-            } else {
-                LOCK_RELEASE
-            },
-        )?;
-        segment_start = pos;
+        skip_label_data(payload, &mut pos)?;
+        require_esc_cmd(payload, &mut pos, b'G')?;
+        label_ranges.push((label_start, pos));
     }
 
-    Err(DeviceError::Transport(
-        "dymo-lw job missing ESC Q trailer".into(),
-    ))
+    if label_ranges.is_empty() {
+        return Err(DeviceError::Transport(
+            "dymo-lw job missing label data".into(),
+        ));
+    }
+
+    require_esc_cmd(payload, &mut pos, b'E')?;
+    require_esc_cmd(payload, &mut pos, b'Q')?;
+    if pos != payload.len() {
+        return Err(DeviceError::Transport(format!(
+            "dymo-lw job has {0} trailing bytes after ESC Q",
+            payload.len() - pos
+        )));
+    }
+
+    let finalize = &payload[payload.len() - 4..];
+
+    if preamble_end > 0 {
+        session.transfer_out(&payload[..preamble_end])?;
+    }
+
+    for (i, &(start, end)) in label_ranges.iter().enumerate() {
+        session.transfer_out(&payload[start..end])?;
+        handshake(
+            session,
+            if i + 1 == label_ranges.len() {
+                LOCK_RELEASE
+            } else {
+                LOCK_INTER_LABEL
+            },
+        )?;
+    }
+
+    session.transfer_out(finalize)?;
+    Ok(())
 }
 
 fn skip_job_header(payload: &[u8], pos: &mut usize) -> Result<(), DeviceError> {
@@ -199,7 +223,7 @@ fn skip_job_header(payload: &[u8], pos: &mut usize) -> Result<(), DeviceError> {
     Ok(())
 }
 
-fn skip_label_data(payload: &[u8], pos: &mut usize) -> Result<usize, DeviceError> {
+fn skip_label_data(payload: &[u8], pos: &mut usize) -> Result<(), DeviceError> {
     require_esc_cmd(payload, pos, b'D')?;
     *pos += 2; // bpp + align
     let width = read_u32_le(payload, *pos)?;
@@ -220,21 +244,7 @@ fn skip_label_data(payload: &[u8], pos: &mut usize) -> Result<usize, DeviceError
         )));
     }
     *pos = end;
-    Ok(end)
-}
-
-fn feed_command(payload: &[u8], pos: usize) -> Result<u8, DeviceError> {
-    if pos + 1 >= payload.len() || payload[pos] != ESC {
-        return Err(DeviceError::Transport(
-            "dymo-lw label missing feed command (ESC G or ESC E)".into(),
-        ));
-    }
-    match payload[pos + 1] {
-        b'G' | b'E' => Ok(payload[pos + 1]),
-        other => Err(DeviceError::Transport(format!(
-            "expected ESC G/E after label data, got ESC {other:#04x}"
-        ))),
-    }
+    Ok(())
 }
 
 fn read_u32_le(payload: &[u8], pos: usize) -> Result<u32, DeviceError> {
@@ -358,7 +368,7 @@ mod tests {
         out.extend_from_slice(&1u32.to_le_bytes()); // width = 1 line
         out.extend_from_slice(&8u32.to_le_bytes()); // height = 8 dots
         out.push(0x80); // one line of print data
-        out.extend_from_slice(&[ESC, b'E', ESC, b'Q']);
+        out.extend_from_slice(&[ESC, b'G', ESC, b'E', ESC, b'Q']);
         out
     }
 
@@ -385,11 +395,9 @@ mod tests {
         skip_job_header(&job, &mut pos).unwrap();
         require_esc_cmd(&job, &mut pos, b'n').unwrap();
         pos += 2;
-        let data_end = skip_label_data(&job, &mut pos).unwrap();
-        assert_eq!(feed_command(&job, pos).unwrap(), b'E');
-        pos += 2;
-        assert_eq!(pos, job.len() - 2);
-        assert_eq!(&job[pos..], &[ESC, b'Q']);
-        assert_eq!(data_end, 25);
+        skip_label_data(&job, &mut pos).unwrap();
+        require_esc_cmd(&job, &mut pos, b'G').unwrap();
+        assert_eq!(pos, 27);
+        assert_eq!(&job[pos..], &[ESC, b'E', ESC, b'Q']);
     }
 }
