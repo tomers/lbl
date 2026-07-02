@@ -15,6 +15,27 @@ pub trait RenderBackend {
     /// lets the content determine that dimension (continuous media). At most
     /// one axis is normally `None`.
     fn rasterize(&self, html: &str, width: Option<u32>, height: Option<u32>) -> Result<RgbaImage>;
+
+    /// Export `html` as a vector PDF sized to the given page dimensions.
+    ///
+    /// The HTML is expected to include an `@page` rule (via transpilation) when
+    /// `prefer_css_page_size` is used. Backends that cannot emit PDF return
+    /// [`RenderError::Backend`].
+    fn export_pdf(&self, html: &str, req: &PdfExportRequest) -> Result<Vec<u8>> {
+        let _ = (html, req);
+        Err(RenderError::Backend(
+            "PDF export is not supported by this render backend".into(),
+        ))
+    }
+}
+
+/// Physical page size for vector PDF export.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PdfExportRequest {
+    /// Page width in millimetres (reading frame).
+    pub width_mm: f64,
+    /// Page height in millimetres, if fixed by the media.
+    pub height_mm: Option<f64>,
 }
 
 /// Drives an external renderer process (e.g. a Node + Playwright script) behind

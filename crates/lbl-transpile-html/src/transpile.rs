@@ -141,6 +141,29 @@ pub struct ViewportPx {
     pub height: Option<f64>,
 }
 
+/// Physical page size for vector PDF export, in millimetres (reading frame).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PageSizeMm {
+    /// Page width across the reading frame.
+    pub width_mm: f64,
+    /// Page height along the feed, if fixed by the media.
+    pub height_mm: Option<f64>,
+}
+
+impl PageSizeMm {
+    /// CSS `@page` rule that pins the PDF to these dimensions.
+    pub fn to_css(&self) -> String {
+        match self.height_mm {
+            Some(h) => format!(
+                "@page{{size:{w:.4}mm {h:.4}mm;margin:0}}\n",
+                w = self.width_mm,
+                h = h
+            ),
+            None => format!("@page{{size:{w:.4}mm auto;margin:0}}\n", w = self.width_mm),
+        }
+    }
+}
+
 impl ViewportPx {
     /// CSS that pins the document to a known media viewport so previews and
     /// raster output show the full label width/length, not just the inked area.
@@ -497,6 +520,8 @@ pub struct TranspileOptions {
     pub label_fit_scale: f64,
     /// Inset from the physical media edge (calibration margin).
     pub media_inset: MediaInsetPx,
+    /// Physical page size for vector PDF export (`@page` rule).
+    pub page_size: Option<PageSizeMm>,
 }
 
 impl Default for TranspileOptions {
@@ -513,6 +538,7 @@ impl Default for TranspileOptions {
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
+            page_size: None,
         }
     }
 }
@@ -601,6 +627,9 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     let mut head = String::new();
     head.push_str("<meta charset=\"utf-8\">\n");
     head.push_str("<style>");
+    if let Some(page) = opts.page_size {
+        head.push_str(&page.to_css());
+    }
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
     if opts.label_fit == LabelFit::Fill {
@@ -728,6 +757,28 @@ mod tests {
     fn print_mode_has_no_preview_chrome() {
         let out = transpile("<div>hi</div>", &TranspileOptions::default());
         assert!(!out.contains("lbl-preview"));
+    }
+
+    #[test]
+    fn vector_page_size_injects_at_page_rule() {
+        let opts = TranspileOptions {
+            page_size: Some(PageSizeMm {
+                width_mm: 40.0,
+                height_mm: Some(30.0),
+            }),
+            ..Default::default()
+        };
+        let out = transpile("<div>hi</div>", &opts);
+        assert!(
+            out.contains("@page{size:40.0000mm 30.0000mm;margin:0}"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn qr_uses_svg_init() {
+        let out = transpile("<qr>x</qr>", &TranspileOptions::default());
+        assert!(out.contains("type:'svg'"), "{out}");
     }
 
     #[test]

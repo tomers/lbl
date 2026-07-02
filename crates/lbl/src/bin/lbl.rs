@@ -14,8 +14,8 @@ use lbl::job_input;
 use lbl::pipeline::{
     authoring_labels, encode_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_style, resolve_template_format, EncodeLabelsOptions,
-    EncodeLabelsResult, PipelineOptions, Source,
+    resolve_print_transport, resolve_style, resolve_style_vector, resolve_template_format,
+    EncodeLabelsOptions, EncodeLabelsResult, PipelineOptions, Source, VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::Catalog;
@@ -24,7 +24,7 @@ use lbl_core::job::OutputMode;
 use lbl_core::printer::Protocol;
 use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
-use lbl_driver_file::MediaType;
+use lbl_driver_file::{MediaType, VirtualExportMode};
 use lbl_encode::Registry;
 use lbl_pattern::resolve_head_dots;
 use lbl_render::{ChromiumBackend, SidecarBackend};
@@ -523,9 +523,16 @@ struct PrintArgs {
     printer: Option<String>,
 
     /// For `--protocol virtual`: the output image format ("media type"):
-    /// png | bmp | tiff | gif | pbm. Defaults to png.
+    /// png | bmp | tiff | gif | pbm. Defaults to png. Ignored in vector export
+    /// mode (PDF is always emitted).
     #[arg(long)]
     media_type: Option<String>,
+
+    /// For `--protocol virtual`: how labels are stored — `raster` (dithered
+    /// bitmap, emulates a printed label) or `vector` (PDF with vector text,
+    /// barcodes, and QR codes). Overrides config `print.export_mode`.
+    #[arg(long, value_name = "MODE")]
+    export_mode: Option<String>,
 
     /// Supersample factor for the high-resolution render pass (>= 1). Controls
     /// the two-pass downscale in `lbl-render` and CSS pixel sizing during
@@ -701,6 +708,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         args.bluetooth.or_else(|| print_cfg.bluetooth.clone()),
     )?;
     let media_type_name = args.media_type.or_else(|| print_cfg.media_type.clone());
+    let export_mode_name = args.export_mode.or_else(|| print_cfg.export_mode.clone());
 
     let dpi = catalog.resolve_dpi(args.printer.as_deref(), protocol, args.media.dpi);
     let media_sku = args
@@ -738,12 +746,31 @@ fn run_print(args: PrintArgs) -> Result<()> {
         dpi,
     )?;
 
-    // The virtual printer's "media type" is its output file format.
+    // The virtual printer's export mode and output file format.
+    let virtual_export_mode = if protocol == Protocol::Virtual {
+        match &export_mode_name {
+            Some(name) => VirtualExportMode::parse(name).map_err(|e| anyhow!(e))?,
+            None => VirtualExportMode::Raster,
+        }
+    } else {
+        if export_mode_name.is_some() {
+            bail!("--export-mode only applies to --protocol virtual");
+        }
+        VirtualExportMode::Raster
+    };
+
     let media_type = if protocol == Protocol::Virtual {
-        Some(match &media_type_name {
-            Some(name) => MediaType::parse(name).map_err(|e| anyhow!(e))?,
-            None => MediaType::Png,
-        })
+        if virtual_export_mode == VirtualExportMode::Vector {
+            if media_type_name.is_some() {
+                bail!("--media-type is ignored in vector export mode (output is always PDF)");
+            }
+            Some(MediaType::Pdf)
+        } else {
+            Some(match &media_type_name {
+                Some(name) => MediaType::parse(name).map_err(|e| anyhow!(e))?,
+                None => MediaType::Png,
+            })
+        }
     } else {
         if media_type_name.is_some() {
             bail!("--media-type only applies to --protocol virtual");
@@ -764,7 +791,17 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let rotation = Rotation::for_print(orientation, args.rotate_cw as u32, args.rotate_ccw as u32);
 
     let style_cfg = args.style.resolve();
-    let style = resolve_style(&style_cfg, media.dpi.0, supersample);
+    let (style, media_inset) = if virtual_export_mode == VirtualExportMode::Vector {
+        (
+            resolve_style_vector(&style_cfg),
+            resolve_media_inset(&style_cfg).to_px(VECTOR_CSS_DPI, 1),
+        )
+    } else {
+        (
+            resolve_style(&style_cfg, media.dpi.0, supersample),
+            resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample),
+        )
+    };
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
@@ -772,7 +809,6 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
-    let media_inset = resolve_media_inset(&style_cfg).to_px(media.dpi.0, supersample);
 
     let preview_media = media.clone();
 
@@ -796,6 +832,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         assets_base: AssetsBase::Cdn,
         style,
         media_type,
+        virtual_export_mode,
         label_fit,
         label_align,
         label_valign,
@@ -818,7 +855,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     // The virtual driver carries its selected media type, so register an
     // instance configured for this run (overriding the PNG default).
     let mut registry = Registry::with_builtin_drivers();
-    if let Some(mt) = media_type {
+    if let Some(mt) = media_type.filter(|_| virtual_export_mode == VirtualExportMode::Raster) {
         registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
     }
     if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::V4 {
@@ -1206,6 +1243,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 label_valign,
                 label_fit_scale,
                 media_inset,
+                ..Default::default()
             },
         );
         let html_name = format!("preview-{:04}.html", label.index);
@@ -1424,6 +1462,7 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         label_valign: LabelValign::default(),
         label_fit_scale: 1.0,
         media_inset: MediaInsetPx::default(),
+        ..Default::default()
     };
     print!("{}", transpile(&input, &opts));
     Ok(())

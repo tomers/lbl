@@ -4,16 +4,18 @@ use std::time::Duration;
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::emulation::SetDeviceMetricsOverrideParams;
+use chromiumoxide::cdp::browser_protocol::page::PrintToPdfParams;
 use chromiumoxide::page::ScreenshotParams;
 use chromiumoxide::Page;
 use futures::StreamExt;
 use image::RgbaImage;
+use lbl_core::CSS_LAYOUT_REFERENCE_DPI;
 use tempfile::{Builder, TempDir};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
 
-use crate::backend::RenderBackend;
+use crate::backend::{PdfExportRequest, RenderBackend};
 use crate::{RenderError, Result};
 
 /// Upper bound on how long a single page is allowed to load and render before
@@ -182,6 +184,66 @@ impl RenderBackend for ChromiumBackend {
         }
         Ok(img)
     }
+
+    fn export_pdf(&self, html: &str, req: &PdfExportRequest) -> Result<Vec<u8>> {
+        self.rt.block_on(async {
+            timeout(NAV_TIMEOUT, async {
+                let data_url =
+                    format!("data:text/html;charset=utf-8,{}", urlencoding::encode(html));
+                let page = self
+                    .browser
+                    .new_page(data_url.as_str())
+                    .await
+                    .map_err(|e| RenderError::Backend(e.to_string()))?;
+
+                let width_px = css_px_for_mm(req.width_mm);
+                let height_px = req.height_mm.map(css_px_for_mm).unwrap_or(800).max(1);
+                let metrics = SetDeviceMetricsOverrideParams::builder()
+                    .width(width_px.max(1) as i64)
+                    .height(height_px.max(1) as i64)
+                    .device_scale_factor(1.0)
+                    .mobile(false)
+                    .build()
+                    .map_err(RenderError::Backend)?;
+                page.execute(metrics)
+                    .await
+                    .map_err(|e| RenderError::Backend(e.to_string()))?;
+
+                wait_for_load(&page).await?;
+                let _ = page
+                    .evaluate("document.fonts && document.fonts.ready")
+                    .await;
+                sleep(Duration::from_millis(200)).await;
+
+                let params = PrintToPdfParams::builder()
+                    .print_background(true)
+                    .prefer_css_page_size(true)
+                    .margin_top(0.0)
+                    .margin_bottom(0.0)
+                    .margin_left(0.0)
+                    .margin_right(0.0)
+                    .build();
+                let pdf = page
+                    .pdf(params)
+                    .await
+                    .map_err(|e| RenderError::Backend(e.to_string()))?;
+                let _ = page.close().await;
+                Ok::<Vec<u8>, RenderError>(pdf)
+            })
+            .await
+            .map_err(|_| {
+                RenderError::Backend(format!(
+                    "page did not finish PDF export within {}s",
+                    NAV_TIMEOUT.as_secs()
+                ))
+            })?
+        })
+    }
+}
+
+/// CSS pixels at [`CSS_LAYOUT_REFERENCE_DPI`] for vector PDF viewport sizing.
+fn css_px_for_mm(mm: f64) -> u32 {
+    (mm * CSS_LAYOUT_REFERENCE_DPI / 25.4).round().max(1.0) as u32
 }
 
 /// Pad `img` to at least `min_w` x `min_h` with white, keeping existing pixels

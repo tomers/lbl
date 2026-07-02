@@ -15,10 +15,11 @@ pub mod terminal;
 
 pub use pipeline::{
     authoring_labels, encode_label, encode_label_traced, encode_labels, encode_sample_pattern,
-    encode_sample_pattern_traced, render_viewport_px, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_template_format, AuthoringLabel, BatchSelection,
-    EncodeLabelsOptions, EncodeLabelsResult, PipelineOptions, Source, TemplateFormat,
+    encode_sample_pattern_traced, page_size_mm, render_viewport_px, render_viewport_vector,
+    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
+    resolve_media, resolve_media_inset, resolve_print_transport, resolve_style_vector,
+    resolve_template_format, AuthoringLabel, BatchSelection, EncodeLabelsOptions,
+    EncodeLabelsResult, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 pub use preprocess::{
     estimate_job, estimate_render_dimensions, hires_pixels_per_label, job_input,

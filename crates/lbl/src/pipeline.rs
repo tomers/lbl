@@ -7,14 +7,15 @@ use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
-use lbl_core::units::Dpi;
+use lbl_core::units::{Dpi, CSS_LAYOUT_REFERENCE_DPI};
+use lbl_core::MonoBitmap;
 use lbl_core::Rotation;
 use lbl_dither::{dither, Algorithm};
 use lbl_driver_api::EncodeContext;
-use lbl_driver_file::MediaType;
+use lbl_driver_file::{MediaType, VirtualExportMode};
 use lbl_encode::Registry;
 use lbl_pattern::sample_pattern_for_media;
-use lbl_render::{apply_rotation, render_two_pass, RenderBackend, RenderRequest};
+use lbl_render::{apply_rotation, render_two_pass, PdfExportRequest, RenderBackend, RenderRequest};
 
 type PrintTransportTargets = (
     Option<String>,
@@ -26,8 +27,13 @@ pub use lbl_template::BatchSelection;
 use lbl_template::{select_batch_indices, Engine, RenderOptions};
 use lbl_transpile_html::{
     transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    MediaInset, MediaInsetPx, QrErrorCorrection, TranspileOptions, ViewportPx,
+    MediaInset, MediaInsetPx, PageSizeMm, QrErrorCorrection, TranspileOptions, ViewportPx,
 };
+
+/// CSS reference resolution for vector PDF export. Alias for
+/// [`CSS_LAYOUT_REFERENCE_DPI`]; the configured printer DPI does not affect
+/// vector output.
+pub const VECTOR_CSS_DPI: f64 = CSS_LAYOUT_REFERENCE_DPI;
 
 /// A single authoring-HTML label with its batch index.
 #[derive(Debug, Clone)]
@@ -272,6 +278,11 @@ pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32
     label
 }
 
+/// Resolve style for vector PDF export (96 CSS dpi, no supersampling).
+pub fn resolve_style_vector(style: &lbl_config::StyleConfig) -> LabelStyle {
+    resolve_style(style, VECTOR_CSS_DPI, 1)
+}
+
 /// Options for encoding a label all the way to protocol bytes.
 #[derive(Debug, Clone)]
 pub struct PipelineOptions {
@@ -298,8 +309,10 @@ pub struct PipelineOptions {
     /// DPI and supersample factor; see [`resolve_style`]).
     pub style: LabelStyle,
     /// For the virtual (`Protocol::Virtual`) printer, the output file format
-    /// ("media type"). Ignored by hardware protocols.
+    /// ("media type"). Ignored by hardware protocols and vector export mode.
     pub media_type: Option<MediaType>,
+    /// Virtual-printer export mode: raster image vs vector PDF.
+    pub virtual_export_mode: VirtualExportMode,
     /// How the label root fills the render viewport (resolved from config/CLI).
     pub label_fit: LabelFit,
     /// Cross-axis alignment when the viewport width is known (resolved from config/CLI).
@@ -459,6 +472,43 @@ pub fn render_viewport_px(media: &Media, supersample: u32, rotation: Rotation) -
     }
 }
 
+/// CSS-pixel viewport for vector PDF export (reference DPI, no supersampling).
+pub fn render_viewport_vector(media: &Media, rotation: Rotation) -> ViewportPx {
+    let px_per_mm = CSS_LAYOUT_REFERENCE_DPI / 25.4;
+    let head_mm = media.width_mm;
+    let feed_mm = match media.length {
+        lbl_core::media::MediaLength::Fixed(len) => Some(len),
+        lbl_core::media::MediaLength::Continuous => None,
+    };
+    let (width_mm, height_mm) = if rotation.swaps_axes() {
+        (feed_mm, Some(head_mm))
+    } else {
+        (Some(head_mm), feed_mm)
+    };
+    ViewportPx {
+        width: width_mm.map(|w| w * px_per_mm),
+        height: height_mm.map(|h| h * px_per_mm),
+    }
+}
+
+/// Physical page size for vector PDF export in the label reading frame.
+pub fn page_size_mm(media: &Media, rotation: Rotation) -> PageSizeMm {
+    let (width_mm, height_mm) = match media.length {
+        lbl_core::media::MediaLength::Fixed(len) => {
+            if rotation.swaps_axes() {
+                (len, Some(media.width_mm))
+            } else {
+                (media.width_mm, Some(len))
+            }
+        }
+        lbl_core::media::MediaLength::Continuous => (media.width_mm, None),
+    };
+    PageSizeMm {
+        width_mm,
+        height_mm,
+    }
+}
+
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
 /// producing printer-native bytes.
 pub fn encode_label<B: RenderBackend>(
@@ -481,6 +531,10 @@ pub fn encode_label_traced<B: RenderBackend>(
     authoring_html: &str,
     opts: &PipelineOptions,
 ) -> Result<crate::debug::LabelTrace> {
+    if opts.protocol == Protocol::Virtual && opts.virtual_export_mode == VirtualExportMode::Vector {
+        return encode_label_vector_traced(backend, index, authoring_html, opts);
+    }
+
     let viewport = render_viewport_px(&opts.media, opts.supersample, opts.rotation);
     let transpiled = transpile(
         authoring_html,
@@ -496,6 +550,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             label_valign: opts.label_valign,
             label_fit_scale: opts.label_fit_scale,
             media_inset: opts.media_inset,
+            ..Default::default()
         },
     );
 
@@ -567,6 +622,69 @@ pub fn encode_label_traced<B: RenderBackend>(
         protocol: opts.protocol,
         driver_name,
         media_type: opts.media_type,
+        encoded,
+    })
+}
+
+fn encode_label_vector_traced<B: RenderBackend>(
+    backend: &B,
+    index: usize,
+    authoring_html: &str,
+    opts: &PipelineOptions,
+) -> Result<crate::debug::LabelTrace> {
+    let applied_rotation = Rotation::None;
+    let viewport = render_viewport_vector(&opts.media, opts.rotation);
+    let page_size = page_size_mm(&opts.media, opts.rotation);
+    let transpiled = transpile(
+        authoring_html,
+        &TranspileOptions {
+            mode: OutputMode::Print,
+            assets_base: opts.assets_base.clone(),
+            index: None,
+            count: None,
+            style: opts.style.clone(),
+            label_fit: opts.label_fit,
+            viewport: Some(viewport),
+            label_align: opts.label_align,
+            label_valign: opts.label_valign,
+            label_fit_scale: opts.label_fit_scale,
+            media_inset: opts.media_inset,
+            page_size: Some(page_size),
+        },
+    );
+
+    let head_dots = opts.media.width_dots().0;
+    let feed_dots = opts.media.length_dots().map(|d| d.0);
+    let (req_width, req_height) = if opts.rotation.swaps_axes() {
+        (feed_dots, Some(head_dots))
+    } else {
+        (Some(head_dots), feed_dots)
+    };
+
+    let pdf_req = PdfExportRequest {
+        width_mm: page_size.width_mm,
+        height_mm: page_size.height_mm,
+    };
+    let encoded = backend
+        .export_pdf(&transpiled, &pdf_req)
+        .map_err(|e| anyhow!(e.to_string()))
+        .context("exporting vector PDF")?;
+
+    Ok(crate::debug::LabelTrace {
+        index,
+        authoring_html: authoring_html.to_string(),
+        transpiled_html: transpiled,
+        assets_base: opts.assets_base.clone(),
+        width_dots: req_width,
+        height_dots: req_height,
+        rotation: applied_rotation,
+        supersample: 1,
+        rendered: mono_preview_rgba(&MonoBitmap::new(1, 1)),
+        dither: opts.dither,
+        dithered: MonoBitmap::new(1, 1),
+        protocol: opts.protocol,
+        driver_name: "vector-pdf".to_string(),
+        media_type: Some(MediaType::Pdf),
         encoded,
     })
 }
@@ -680,6 +798,7 @@ mod tests {
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
             media_type: None,
+            virtual_export_mode: VirtualExportMode::Raster,
             label_fit: LabelFit::Fill,
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
@@ -837,6 +956,7 @@ mod tests {
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
             media_type: None,
+            virtual_export_mode: VirtualExportMode::Raster,
             label_fit: LabelFit::Fill,
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
@@ -866,6 +986,7 @@ mod tests {
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
             media_type: None,
+            virtual_export_mode: VirtualExportMode::Raster,
             label_fit: LabelFit::Fill,
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),

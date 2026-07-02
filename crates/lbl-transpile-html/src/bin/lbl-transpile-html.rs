@@ -155,6 +155,7 @@ fn main() -> Result<()> {
         label_valign: LabelValign::default(),
         label_fit_scale: 1.0,
         media_inset: MediaInsetPx::default(),
+        ..Default::default()
     };
 
     let out = transpile(&input, &opts);

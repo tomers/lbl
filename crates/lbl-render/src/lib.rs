@@ -17,7 +17,7 @@ mod downscale;
 #[cfg(feature = "chromium")]
 mod chromium;
 
-pub use backend::{RenderBackend, SidecarBackend};
+pub use backend::{PdfExportRequest, RenderBackend, SidecarBackend};
 pub use downscale::downscale;
 
 #[cfg(feature = "chromium")]

@@ -10,6 +10,11 @@ use serde::{Deserialize, Serialize};
 
 const MM_PER_INCH: f64 = 25.4;
 
+/// Reference DPI for converting millimetres to CSS pixels during browser layout
+/// (vector PDF export and Chromium viewport sizing). Independent of printer DPI;
+/// vector output stays resolution-independent regardless of this value.
+pub const CSS_LAYOUT_REFERENCE_DPI: f64 = 300.0;
+
 /// A length in millimeters.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]

@@ -14,6 +14,35 @@ use std::io::Cursor;
 use image::{DynamicImage, GrayImage, ImageFormat, Luma};
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
+/// How the virtual printer stores labels to disk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum VirtualExportMode {
+    /// Rasterize, dither, and encode as a bitmap image (emulates a printed label).
+    #[default]
+    Raster,
+    /// Skip rasterization; emit a vector PDF sized to the configured media.
+    Vector,
+}
+
+impl VirtualExportMode {
+    /// Parse a CLI/config value (case-insensitive).
+    pub fn parse(name: &str) -> Result<Self, String> {
+        Ok(match name.trim().to_ascii_lowercase().as_str() {
+            "raster" | "bitmap" | "image" => VirtualExportMode::Raster,
+            "vector" | "pdf" => VirtualExportMode::Vector,
+            other => return Err(format!("unknown export mode: {other}")),
+        })
+    }
+
+    /// The lowercase canonical name.
+    pub fn name(&self) -> &'static str {
+        match self {
+            VirtualExportMode::Raster => "raster",
+            VirtualExportMode::Vector => "vector",
+        }
+    }
+}
+
 /// The output file format the virtual printer emits — its "media type".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MediaType {
@@ -27,16 +56,28 @@ pub enum MediaType {
     Gif,
     /// Portable Bitmap (binary P4) — the native 1-bit interchange format.
     Pbm,
+    /// Vector PDF (vector export mode only; not produced via [`encode_image`]).
+    Pdf,
 }
 
 impl MediaType {
-    /// Every supported media type, in display order.
-    pub const ALL: [MediaType; 5] = [
+    /// Every raster image format supported in raster export mode.
+    pub const RASTER: [MediaType; 5] = [
         MediaType::Png,
         MediaType::Bmp,
         MediaType::Tiff,
         MediaType::Gif,
         MediaType::Pbm,
+    ];
+
+    /// Every supported media type, in display order.
+    pub const ALL: [MediaType; 6] = [
+        MediaType::Png,
+        MediaType::Bmp,
+        MediaType::Tiff,
+        MediaType::Gif,
+        MediaType::Pbm,
+        MediaType::Pdf,
     ];
 
     /// Parse a CLI-friendly media-type name (case-insensitive).
@@ -47,6 +88,7 @@ impl MediaType {
             "tif" | "tiff" => MediaType::Tiff,
             "gif" => MediaType::Gif,
             "pbm" => MediaType::Pbm,
+            "pdf" => MediaType::Pdf,
             other => return Err(format!("unknown media type: {other}")),
         })
     }
@@ -59,6 +101,7 @@ impl MediaType {
             MediaType::Tiff => "tiff",
             MediaType::Gif => "gif",
             MediaType::Pbm => "pbm",
+            MediaType::Pdf => "pdf",
         }
     }
 
@@ -78,6 +121,7 @@ impl MediaType {
             MediaType::Tiff => "image/tiff",
             MediaType::Gif => "image/gif",
             MediaType::Pbm => "image/x-portable-bitmap",
+            MediaType::Pdf => "application/pdf",
         }
     }
 
@@ -89,7 +133,7 @@ impl MediaType {
             MediaType::Bmp => Some(ImageFormat::Bmp),
             MediaType::Tiff => Some(ImageFormat::Tiff),
             MediaType::Gif => Some(ImageFormat::Gif),
-            MediaType::Pbm => None,
+            MediaType::Pbm | MediaType::Pdf => None,
         }
     }
 }
@@ -216,6 +260,19 @@ mod tests {
         }
         assert_eq!(MediaType::parse("TIF").unwrap(), MediaType::Tiff);
         assert!(MediaType::parse("jpeg").is_err());
+    }
+
+    #[test]
+    fn export_mode_parse() {
+        assert_eq!(
+            VirtualExportMode::parse("vector").unwrap(),
+            VirtualExportMode::Vector
+        );
+        assert_eq!(
+            VirtualExportMode::parse("RASTER").unwrap(),
+            VirtualExportMode::Raster
+        );
+        assert!(VirtualExportMode::parse("svg").is_err());
     }
 
     #[test]

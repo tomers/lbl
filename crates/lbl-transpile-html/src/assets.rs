@@ -50,7 +50,7 @@ html,body{margin:0;padding:0}
 .lbl-grow{flex:1 1 auto}
 .lbl-wrap{flex-wrap:wrap}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
-.lbl-qr canvas,.lbl-qr img{max-width:100%;height:auto}
+.lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;height:auto}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
 .lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}
 .lbl-label h1{font-size:1.35em;font-weight:700}
@@ -97,10 +97,11 @@ body{background:#e9e9ee;display:flex;align-items:center;justify-content:center;m
 .lbl-preview{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);outline:1px dashed #b9b9c4;outline-offset:4px}
 "#;
 
-/// JS that renders QR placeholders (`.lbl-qr[data-qr]`) into canvases.
+/// JS that renders QR placeholders (`.lbl-qr[data-qr]`) as SVG.
 ///
 /// Honors `window.__LBL_STYLE.qr.width` (pixels) when present, so the rendered
-/// QR matches the configured physical size.
+/// QR matches the configured physical size. SVG keeps modules sharp in both
+/// raster screenshots and vector PDF export.
 pub const QR_INIT_JS: &str = r#"
 (function(){
   function render(){
@@ -108,10 +109,8 @@ pub const QR_INIT_JS: &str = r#"
     document.querySelectorAll('.lbl-qr').forEach(function(el){
       if(el.dataset.rendered) return;
       var value = el.getAttribute('data-qr') || '';
-      var canvas = document.createElement('canvas');
-      el.appendChild(canvas);
-      if(window.QRCode && QRCode.toCanvas){
-        var opts={margin:0};
+      if(window.QRCode && QRCode.toString){
+        var opts={type:'svg',margin:0};
         if(st.width){opts.width=st.width;}
         if(st.errorCorrectionLevel){opts.errorCorrectionLevel=st.errorCorrectionLevel;}
         if(typeof st.margin==='number'){opts.margin=st.margin;}
@@ -127,7 +126,9 @@ pub const QR_INIT_JS: &str = r#"
           if(dark){opts.color.dark=dark;}
           if(light){opts.color.light=light;}
         }
-        QRCode.toCanvas(canvas, value, opts, function(){});
+        QRCode.toString(value, opts, function(err, svg){
+          if(!err && svg){ el.innerHTML = svg; }
+        });
       }
       el.dataset.rendered = '1';
     });

@@ -27,4 +27,4 @@ pub use orientation::{Orientation, Rotation};
 pub use printer::{
     PrinterCapabilities, PrinterId, PrinterModel, PrinterProfile, Protocol, Transport,
 };
-pub use units::{Dots, Dpi, Millimeters};
+pub use units::{Dots, Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};

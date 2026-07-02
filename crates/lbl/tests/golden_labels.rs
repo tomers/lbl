@@ -428,7 +428,7 @@ fn golden_labels() {
         SUPERSAMPLE,
         Algorithm::Auto,
     );
-    for media_type in MediaType::ALL {
+    for media_type in MediaType::RASTER {
         match encode_image(&formats_bitmap, media_type) {
             Ok(bytes) => {
                 let name = format!("formats_{}", media_type.name());
@@ -445,6 +445,39 @@ fn golden_labels() {
             Err(err) => failures.push(format!("formats_{}: {err}", media_type.name())),
         }
     }
+
+    // --- Vector PDF export ---------------------------------------------------
+    let vector_style = vector_style();
+    failures.extend(run_vector_case(
+        &backend,
+        "vector_text_plain",
+        Source::Text {
+            text: "Hello, lbl!".into(),
+            raw: false,
+        },
+        &small,
+        &vector_style,
+    ));
+    failures.extend(run_vector_case(
+        &backend,
+        "vector_qr",
+        Source::Text {
+            text: "{{qr:https://lbl.example/42}}".into(),
+            raw: false,
+        },
+        &small,
+        &vector_style,
+    ));
+    failures.extend(run_vector_case(
+        &backend,
+        "vector_barcode_code128",
+        Source::Text {
+            text: "{{barcode:LBL-128}}".into(),
+            raw: false,
+        },
+        &wide,
+        &vector_style,
+    ));
 
     assert!(
         failures.is_empty(),
@@ -487,6 +520,36 @@ fn run_case(
             name.to_string()
         };
         if let Err(err) = check_png(&golden, &png) {
+            failures.push(err);
+        }
+    }
+    failures
+}
+
+/// Author `source`, export as vector PDF, and compare against `tests/golden/<name>.pdf`.
+fn run_vector_case(
+    backend: &ChromiumBackend,
+    name: &str,
+    source: Source,
+    media: &Media,
+    style: &LabelStyle,
+) -> Vec<String> {
+    let labels = match authoring_labels(source, &lbl_template::BatchSelection::default()) {
+        Ok(labels) => labels,
+        Err(err) => return vec![format!("{name}: authoring failed: {err}")],
+    };
+
+    let page = lbl::page_size_mm(media, lbl_core::Rotation::None);
+    let mut failures = Vec::new();
+    let batched = labels.len() > 1;
+    for label in &labels {
+        let pdf = render_vector_pdf(backend, &label.html, media, style);
+        let golden = if batched {
+            format!("{name}-{}", label.index)
+        } else {
+            name.to_string()
+        };
+        if let Err(err) = check_pdf(&golden, &pdf, page) {
             failures.push(err);
         }
     }

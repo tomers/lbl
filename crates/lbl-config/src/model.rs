@@ -183,6 +183,8 @@ pub struct PrintConfig {
     pub niimbot_task: String,
     /// Virtual-printer output format (`png`, `bmp`, …).
     pub media_type: Option<String>,
+    /// Virtual-printer export mode: `raster` (default) or `vector` (PDF).
+    pub export_mode: Option<String>,
 }
 
 impl Default for PrintConfig {
@@ -202,6 +204,7 @@ impl Default for PrintConfig {
             network: None,
             niimbot_task: "standard".into(),
             media_type: None,
+            export_mode: None,
         }
     }
 }

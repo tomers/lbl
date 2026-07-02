@@ -10,7 +10,7 @@ use serde_json::json;
 use lbl::pipeline::{
     authoring_labels, encode_label, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_style, PipelineOptions, Source, TemplateFormat,
+    resolve_style, resolve_style_vector, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;
@@ -269,6 +269,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     label_valign,
                     label_fit_scale,
                     media_inset,
+                    ..Default::default()
                 },
             );
             json!({ "index": l.index, "html": html })
@@ -316,6 +317,9 @@ pub struct PrintReq {
     /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
     #[serde(default)]
     media_type: Option<String>,
+    /// For the virtual printer: `raster` (default) or `vector` (PDF).
+    #[serde(default)]
+    export_mode: Option<String>,
     /// Layout orientation (`portrait`|`landscape`). Falls back to the
     /// configured default (landscape) when omitted.
     #[serde(default)]
@@ -416,6 +420,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         assets_base: AssetsBase::Cdn,
         style,
         media_type: None,
+        virtual_export_mode: lbl_driver_file::VirtualExportMode::Raster,
         label_fit,
         label_align,
         label_valign,
@@ -483,18 +488,43 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let protocol = parse_protocol(&req.protocol)?;
-    let media_type = if protocol == Protocol::Virtual {
-        Some(match &req.media_type {
-            Some(name) => lbl_driver_file::MediaType::parse(name)
+    let virtual_export_mode = if protocol == Protocol::Virtual {
+        match &req.export_mode {
+            Some(name) => lbl_driver_file::VirtualExportMode::parse(name)
                 .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?,
-            None => lbl_driver_file::MediaType::Png,
-        })
+            None => lbl_driver_file::VirtualExportMode::Raster,
+        }
+    } else {
+        lbl_driver_file::VirtualExportMode::Raster
+    };
+
+    let media_type = if protocol == Protocol::Virtual {
+        if virtual_export_mode == lbl_driver_file::VirtualExportMode::Vector {
+            Some(lbl_driver_file::MediaType::Pdf)
+        } else {
+            Some(match &req.media_type {
+                Some(name) => lbl_driver_file::MediaType::parse(name)
+                    .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?,
+                None => lbl_driver_file::MediaType::Png,
+            })
+        }
     } else {
         None
     };
 
     let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
-    let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+    let (style, media_inset) = if virtual_export_mode == lbl_driver_file::VirtualExportMode::Vector
+    {
+        (
+            resolve_style_vector(&style_cfg),
+            resolve_media_inset(&style_cfg).to_px(VECTOR_CSS_DPI, 1),
+        )
+    } else {
+        (
+            resolve_style(&style_cfg, req.dpi, req.supersample),
+            resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample),
+        )
+    };
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
@@ -502,7 +532,6 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
 
     let rotation = req.rotation(&state);
     let opts = PipelineOptions {
@@ -518,6 +547,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         assets_base: AssetsBase::Cdn,
         style,
         media_type,
+        virtual_export_mode,
         label_fit,
         label_align,
         label_valign,
@@ -536,7 +566,9 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
 
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let mut registry = Registry::with_builtin_drivers();
-        if let Some(mt) = media_type {
+        if let Some(mt) =
+            media_type.filter(|_| virtual_export_mode == lbl_driver_file::VirtualExportMode::Raster)
+        {
             registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
         }
 

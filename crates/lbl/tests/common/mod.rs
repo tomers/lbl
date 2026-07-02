@@ -32,10 +32,12 @@ use lbl_core::media::Media;
 use lbl_core::MonoBitmap;
 use lbl_core::OutputMode;
 use lbl_dither::{dither, Algorithm};
-use lbl_render::{render_two_pass, ChromiumBackend, RenderRequest};
+use lbl_render::{
+    render_two_pass, ChromiumBackend, PdfExportRequest, RenderBackend, RenderRequest,
+};
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
 use lbl_transpile_html::{
-    transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx,
+    transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx, PageSizeMm,
     TranspileOptions,
 };
 
@@ -166,6 +168,7 @@ pub fn render_bitmap_with_layout(
             label_valign: layout.label_valign,
             label_fit_scale: layout.label_fit_scale,
             media_inset: layout.media_inset,
+            ..Default::default()
         },
     );
     let html = inline_assets(&transpiled);
@@ -177,6 +180,73 @@ pub fn render_bitmap_with_layout(
     };
     let raster = render_two_pass(backend, &html, &req).expect("render label");
     dither(&raster, algorithm)
+}
+
+/// Run a label through the vector PDF export path (no rasterization/dithering).
+pub fn render_vector_pdf(
+    backend: &ChromiumBackend,
+    authoring_html: &str,
+    media: &Media,
+    style: &LabelStyle,
+) -> Vec<u8> {
+    let layout = if media.length_dots().is_some() {
+        LayoutOptions::fill_defaults()
+    } else {
+        LayoutOptions::continuous_defaults()
+    };
+    render_vector_pdf_with_layout(backend, authoring_html, media, style, layout)
+}
+
+/// Like [`render_vector_pdf`], but with explicit fit/alignment options.
+pub fn render_vector_pdf_with_layout(
+    backend: &ChromiumBackend,
+    authoring_html: &str,
+    media: &Media,
+    style: &LabelStyle,
+    layout: LayoutOptions,
+) -> Vec<u8> {
+    use lbl::pipeline::{page_size_mm, render_viewport_vector};
+
+    let viewport = render_viewport_vector(media, lbl_core::Rotation::None);
+    let page_size = page_size_mm(media, lbl_core::Rotation::None);
+    let transpiled = transpile(
+        authoring_html,
+        &TranspileOptions {
+            mode: OutputMode::Print,
+            assets_base: AssetsBase::Cdn,
+            index: None,
+            count: None,
+            style: style.clone(),
+            label_fit: layout.label_fit,
+            viewport: Some(viewport),
+            label_align: layout.label_align,
+            label_valign: layout.label_valign,
+            label_fit_scale: layout.label_fit_scale,
+            media_inset: layout.media_inset,
+            page_size: Some(page_size),
+        },
+    );
+    let html = inline_assets(&transpiled);
+    let req = PdfExportRequest {
+        width_mm: page_size.width_mm,
+        height_mm: page_size.height_mm,
+    };
+    backend.export_pdf(&html, &req).expect("export vector PDF")
+}
+
+/// A readable vector-export label style (mm sizes at the CSS reference DPI).
+pub fn vector_style() -> LabelStyle {
+    LabelStyle::from_mm(
+        4.0,
+        18.0,
+        10.0,
+        0.33,
+        2.0,
+        2.0,
+        0.0,
+        lbl::pipeline::VECTOR_CSS_DPI,
+        1,
+    )
 }
 
 /// Absolute path to the directory holding the reference images.
@@ -191,6 +261,69 @@ pub fn blessing() -> bool {
     std::env::var("LBL_BLESS")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
+}
+
+/// Compare `bytes` (a PDF) against `tests/golden/<name>.pdf`.
+///
+/// Validates the PDF header and that the first page's MediaBox matches the
+/// expected physical dimensions (within ~0.5 mm). In bless mode, or when the
+/// reference does not yet exist, the bytes are written to disk.
+pub fn check_pdf(name: &str, bytes: &[u8], expected: PageSizeMm) -> Result<(), String> {
+    let dir = golden_dir();
+    fs::create_dir_all(&dir).map_err(|e| format!("create golden dir: {e}"))?;
+    let path = dir.join(format!("{name}.pdf"));
+
+    if blessing() || !path.exists() {
+        fs::write(&path, bytes).map_err(|e| format!("write {}: {e}", path.display()))?;
+        eprintln!("blessed reference {}", path.display());
+        return Ok(());
+    }
+
+    let expected_bytes = fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    validate_pdf_structure(&expected_bytes, expected)
+        .map_err(|e| format!("reference {name}.pdf: {e}"))?;
+    validate_pdf_structure(bytes, expected)
+        .map_err(|e| format!("{name}.pdf: {e} (re-run with LBL_BLESS=1 to update)"))
+}
+
+fn validate_pdf_structure(bytes: &[u8], expected: PageSizeMm) -> Result<(), String> {
+    if !bytes.starts_with(b"%PDF-") {
+        return Err("missing %PDF- header".into());
+    }
+    let (w_pt, h_pt) = pdf_media_box_pt(bytes)?;
+    let w_mm = w_pt * 25.4 / 72.0;
+    let h_mm = h_pt * 25.4 / 72.0;
+    if (w_mm - expected.width_mm).abs() > 0.6 {
+        return Err(format!(
+            "page width {w_mm:.2} mm, expected {:.2} mm",
+            expected.width_mm
+        ));
+    }
+    if let Some(exp_h) = expected.height_mm {
+        if (h_mm - exp_h).abs() > 0.6 {
+            return Err(format!("page height {h_mm:.2} mm, expected {exp_h:.2} mm"));
+        }
+    }
+    Ok(())
+}
+
+fn pdf_media_box_pt(bytes: &[u8]) -> Result<(f64, f64), String> {
+    let text = String::from_utf8_lossy(bytes);
+    let start = text
+        .find("/MediaBox")
+        .ok_or_else(|| "MediaBox not found".to_string())?;
+    let slice = &text[start..];
+    let open = slice.find('[').ok_or_else(|| "MediaBox [".to_string())? + start;
+    let close = text[open..]
+        .find(']')
+        .ok_or_else(|| "MediaBox ]".to_string())?
+        + open;
+    let inner = text[open + 1..close].split_whitespace();
+    let nums: Vec<f64> = inner.filter_map(|s| s.parse().ok()).collect();
+    if nums.len() != 4 {
+        return Err("MediaBox values".into());
+    }
+    Ok((nums[2] - nums[0], nums[3] - nums[1]))
 }
 
 /// Compare `bytes` (an encoded PNG) against `tests/golden/<name>.png`.
