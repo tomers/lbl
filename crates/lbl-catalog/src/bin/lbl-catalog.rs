@@ -83,7 +83,10 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(entry)?);
         }
         Command::Compatible { printer } => {
-            for e in catalog.compatible_with(&printer) {
+            let printer = catalog
+                .require_printer(&printer)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            for e in catalog.media_for_printer(printer) {
                 println!("{:<12} {}", e.canonical_key(), e.name);
             }
         }
@@ -103,9 +106,8 @@ fn main() -> Result<()> {
             }
             PrinterCommand::Show { key } => {
                 let printer = catalog
-                    .lookup_printer(&key)
-                    .or_else(|| catalog.match_printer(&key))
-                    .with_context(|| format!("no printer entry for key '{key}'"))?;
+                    .require_printer(&key)
+                    .map_err(|e| anyhow::anyhow!(e))?;
                 println!("{}", serde_json::to_string_pretty(printer)?);
             }
         },

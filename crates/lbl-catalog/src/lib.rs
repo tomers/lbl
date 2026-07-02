@@ -47,7 +47,34 @@ pub type Result<T> = std::result::Result<T, CatalogError>;
 /// Default DPI assumed by the CLI when the user does not pass `--dpi`.
 pub const CLI_DEFAULT_DPI: f64 = 300.0;
 
+/// Result of resolving a free-form printer query against the catalog.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrinterLookup<'a> {
+    /// Exactly one catalog entry matches.
+    Found(&'a PrinterEntry),
+    /// No catalog entry matches.
+    NotFound,
+    /// More than one entry matches the query.
+    Ambiguous(Vec<&'a PrinterEntry>),
+}
+
 const BUNDLED: &str = include_str!("../data/catalog.toml");
+
+fn split_printer_tokens(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() {
+            current.push(c);
+        } else if !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
 
 /// An in-memory catalog of known media and printers.
 #[derive(Debug, Clone, Default)]
@@ -134,32 +161,127 @@ impl Catalog {
         self.printers.iter().find(|p| p.matches_key(key))
     }
 
-    /// Resolve a printer entry by key/alias, falling back to a best-effort
-    /// model-string match (case-insensitive).
+    /// Resolve a printer entry by key/alias, falling back to a free-form
+    /// model-string match when it identifies exactly one catalog entry.
     pub fn resolve_printer(&self, key: &str) -> Option<&PrinterEntry> {
-        self.lookup_printer(key).or_else(|| self.match_printer(key))
+        match self.lookup_printer_query(key) {
+            PrinterLookup::Found(printer) => Some(printer),
+            PrinterLookup::NotFound | PrinterLookup::Ambiguous(_) => None,
+        }
     }
 
-    /// Find the best-matching printer for a free-form model string.
-    ///
-    /// Prefers the longest matching key so `"LabelWriter 550 Turbo"` beats
-    /// `"LabelWriter 550"`.
-    pub fn match_printer(&self, printer_model: &str) -> Option<&PrinterEntry> {
+    /// Resolve a printer query, distinguishing not-found from ambiguous matches.
+    pub fn lookup_printer_query(&self, query: &str) -> PrinterLookup<'_> {
+        if let Some(printer) = self.lookup_printer(query) {
+            return PrinterLookup::Found(printer);
+        }
+        let matches = self.matching_printers(query);
+        match matches.len() {
+            0 => PrinterLookup::NotFound,
+            1 => PrinterLookup::Found(matches[0]),
+            _ => PrinterLookup::Ambiguous(matches),
+        }
+    }
+
+    /// All catalog printers matching a free-form model string.
+    pub fn matching_printers(&self, printer_model: &str) -> Vec<&PrinterEntry> {
         self.printers
             .iter()
             .filter(|p| p.matches_model(printer_model))
-            .max_by_key(|p| {
-                p.keys
-                    .iter()
-                    .filter(|k| {
-                        let key = k.to_ascii_lowercase();
-                        let needle = printer_model.to_ascii_lowercase();
-                        needle.contains(&key) || key.contains(&needle)
-                    })
-                    .map(|k| k.len())
-                    .max()
-                    .unwrap_or(0)
-            })
+            .collect()
+    }
+
+    /// Shortest `--printer` term that matches only this entry in the catalog.
+    pub fn suggest_unique_printer_term(&self, printer: &PrinterEntry) -> String {
+        let mut candidates: Vec<(u8, String)> = Vec::new();
+
+        let mut keys: Vec<String> = printer.keys.clone();
+        keys.sort_by_key(|k| k.len());
+        for key in keys {
+            candidates.push((0, key));
+        }
+
+        for source in printer.keys.iter().chain(std::iter::once(&printer.name)) {
+            let words = split_printer_tokens(source);
+            for token in &words {
+                if token.len() >= 2 {
+                    candidates.push((1, token.clone()));
+                }
+            }
+            for pair in words.windows(2) {
+                candidates.push((2, format!("{} {}", pair[0], pair[1])));
+            }
+        }
+
+        for key in &printer.keys {
+            let chars: Vec<char> = key.chars().collect();
+            for len in 4..=chars.len() {
+                for start in 0..=chars.len() - len {
+                    let sub: String = chars[start..start + len].iter().collect();
+                    if sub.trim().is_empty() {
+                        continue;
+                    }
+                    candidates.push((3, sub));
+                }
+            }
+        }
+
+        candidates.sort_by(|(ta, a), (tb, b)| {
+            ta.cmp(tb)
+                .then_with(|| a.len().cmp(&b.len()))
+                .then_with(|| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()))
+        });
+
+        let mut seen = std::collections::HashSet::new();
+        for (_, term) in candidates {
+            let norm = term.to_ascii_lowercase();
+            if !seen.insert(norm) {
+                continue;
+            }
+            if self.is_unique_printer_term(printer, &term) {
+                return term;
+            }
+        }
+
+        printer.canonical_key().to_string()
+    }
+
+    fn is_unique_printer_term(&self, printer: &PrinterEntry, term: &str) -> bool {
+        let matches = self.matching_printers(term);
+        matches.len() == 1 && matches[0].canonical_key() == printer.canonical_key()
+    }
+
+    /// Human-readable error for an ambiguous printer query.
+    pub fn ambiguous_printer_message(&self, query: &str, matches: &[&PrinterEntry]) -> String {
+        let mut lines = vec![format!(
+            "ambiguous printer '{query}': multiple catalog entries match:"
+        )];
+        for printer in matches {
+            let suggest = self.suggest_unique_printer_term(printer);
+            lines.push(format!(
+                "  {} ({}) — try: --printer {suggest}",
+                printer.name,
+                printer.canonical_key()
+            ));
+        }
+        lines.join("\n")
+    }
+
+    /// Resolve a printer query or return a user-facing error message.
+    pub fn require_printer(&self, query: &str) -> std::result::Result<&PrinterEntry, String> {
+        match self.lookup_printer_query(query) {
+            PrinterLookup::Found(printer) => Ok(printer),
+            PrinterLookup::NotFound => Err(format!("unknown printer '{query}'")),
+            PrinterLookup::Ambiguous(matches) => {
+                Err(self.ambiguous_printer_message(query, &matches))
+            }
+        }
+    }
+
+    /// Find a printer entry matching a free-form model string when the match
+    /// is unambiguous.
+    pub fn match_printer(&self, printer_model: &str) -> Option<&PrinterEntry> {
+        self.resolve_printer(printer_model)
     }
 
     /// Find a printer entry that matches a USB vendor/product id.
@@ -390,6 +512,38 @@ mod tests {
         assert!(catalog.lookup_printer("LW550").is_some());
         let printer = catalog.resolve_printer("LW550").unwrap();
         assert!(printer.matches_key("LabelWriter 550"));
+    }
+
+    #[test]
+    fn ambiguous_printer_query_fails() {
+        let catalog = Catalog::bundled().unwrap();
+        assert!(matches!(
+            catalog.lookup_printer_query("550"),
+            PrinterLookup::Ambiguous(_)
+        ));
+        assert!(catalog.resolve_printer("550").is_none());
+        let err = catalog.require_printer("550").unwrap_err();
+        assert!(err.contains("ambiguous printer '550'"));
+        assert!(err.contains("DYMO LabelWriter 550"));
+        assert!(err.contains("DYMO LabelWriter 550 Turbo"));
+        assert!(err.contains("--printer Turbo") || err.contains("--printer turbo"));
+    }
+
+    #[test]
+    fn suggest_unique_printer_terms_for_550_family() {
+        let catalog = Catalog::bundled().unwrap();
+        let base = catalog.lookup_printer("LabelWriter 550").unwrap();
+        let turbo = catalog.lookup_printer("LabelWriter 550 Turbo").unwrap();
+        let base_term = catalog.suggest_unique_printer_term(base);
+        let turbo_term = catalog.suggest_unique_printer_term(turbo);
+        assert_eq!(catalog.matching_printers(&base_term).len(), 1);
+        assert_eq!(catalog.matching_printers(&turbo_term).len(), 1);
+        assert!(base.matches_model(&base_term));
+        assert!(turbo.matches_model(&turbo_term));
+        assert_ne!(
+            base_term.to_ascii_lowercase(),
+            turbo_term.to_ascii_lowercase()
+        );
     }
 
     #[test]

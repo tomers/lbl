@@ -658,10 +658,10 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let print_cfg = &config.print;
 
     let catalog = Catalog::bundled()?;
-    let printer_entry = args
-        .printer
-        .as_deref()
-        .and_then(|key| catalog.resolve_printer(key));
+    let printer_entry = match args.printer.as_deref() {
+        Some(key) => Some(catalog.require_printer(key).map_err(|e| anyhow!(e))?),
+        None => None,
+    };
 
     let protocol: Protocol = match args.protocol {
         Some(p) => p.into(),
@@ -1475,7 +1475,8 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(e)?);
         }
         CatalogCommand::Compatible { printer } => {
-            for e in catalog.compatible_with(&printer) {
+            let printer = catalog.require_printer(&printer).map_err(|e| anyhow!(e))?;
+            for e in catalog.media_for_printer(printer) {
                 println!("{:<12} {}", e.canonical_key(), e.name);
             }
         }
@@ -1494,10 +1495,7 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
                 }
             }
             CatalogPrinterCommand::Show { key } => {
-                let p = catalog
-                    .lookup_printer(&key)
-                    .or_else(|| catalog.match_printer(&key))
-                    .ok_or_else(|| anyhow!("no printer entry for '{key}'"))?;
+                let p = catalog.require_printer(&key).map_err(|e| anyhow!(e))?;
                 println!("{}", serde_json::to_string_pretty(p)?);
             }
         },
