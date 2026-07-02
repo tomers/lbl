@@ -68,8 +68,8 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one str
 *80×20 mm* · [Printing text →](../guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
-$ lbl print \
-  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+# (preview label written to file)
 ```
 
 <img src="images/inline-syntax.png" alt="Inline mini-syntax" width="320"/>
@@ -88,10 +88,10 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 $ lbl print \
   --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
 
-# element gap 8 mm
+# element gap 10 mm
 $ lbl print \
   --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' \
-  --element-gap-mm 8
+  --element-gap-mm 10
 ```
 
 <img src="images/element-gap.png" alt="Element spacing" width="320"/>
@@ -106,35 +106,40 @@ Headings, emphasis, and inline directives compose via `--markdown`.
 
 ```console
 $ lbl print \
-  --markdown $'# Order 44\n\nShip **fast**\n\n{{qr:https://track/42}}'
+  --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n{{qr:https://track/1234}}'
 ```
 
 <img src="images/markdown-label.png" alt="Markdown input" width="320"/>
 ---
 
-## Cross-axis alignment
+## Label alignment
 
-Position content across the label width with `--label-align` (`start`, `center`, or `end`).
+Position content on the label with `--label-align` and `--label-valign`.
 
 *90×15 mm @ 300 dpi* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
-# align left
-$ lbl print --label-align start --text 'align left'
-# (preview label written to file)
+$ lbl print --label-align start --label-valign start --text top-left
 
-# align center
-$ lbl print --label-align center --text 'align center'
-# (preview label written to file)
+$ lbl print --label-align center --label-valign start --text top-center
 
-# align right
-$ lbl print --label-align end --text 'align right'
+$ lbl print --label-align end --label-valign start --text top-right
+
+$ lbl print --label-align start --label-valign center --text center-left
+
+$ lbl print --label-align center --label-valign center --text center
+
+$ lbl print --label-align end --label-valign center --text center-right
+
+$ lbl print --label-align start --label-valign end --text bottom-left
+
+$ lbl print --label-align center --label-valign end --text bottom-center
+
+$ lbl print --label-align end --label-valign end --text bottom-right
 # (preview label written to file)
 ```
 
-<img src="images/label-align.png" alt="Cross-axis alignment" width="320"/>
-<img src="images/label-align-01.png" alt="Cross-axis alignment" width="320"/>
-<img src="images/label-align-02.png" alt="Cross-axis alignment" width="320"/>
+<img src="images/label-align.png" alt="Label alignment" width="320"/>
 ---
 
 ## Inner padding

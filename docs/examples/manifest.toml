@@ -35,6 +35,7 @@ length_mm             = 20
 dpi                   = 203
 show_dpi              = false
 hide_media_in_command = true
+single_line           = true
 render_args           = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
 args                  = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
 
@@ -57,7 +58,7 @@ hide_media_in_command = true
 separate_images = true
 render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
 args = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
-compare = [{ label = "default element gap" }, { label = "element gap 8 mm", args = ["--element-gap-mm", "8"] }]
+compare = [{ label = "default element gap" }, { label = "element gap 10 mm", args = ["--element-gap-mm", "10"] }]
 
 [[example]]
 id = "markdown-label"
@@ -80,16 +81,16 @@ render_args = [
   "--element-gap-mm",
   "2",
 ]
-args = ["--markdown", """# Order 44
+args = ["--markdown", """# Order #1234
 
-Ship **fast**
+⚠️ Caution **fragile**
 
-{{qr:https://track/42}}"""]
+{{qr:https://track/1234}}"""]
 
 [[example]]
 id = "label-align"
-title = "Cross-axis alignment"
-description = "Position content across the label width with `--label-align` (`start`, `center`, or `end`)."
+title = "Label alignment"
+description = "Position content on the label with `--label-align` and `--label-valign`."
 doc = "guides/configuration.md"
 doc_title = "Configuration"
 doc_section = "style-fonts-qr-barcodes"
@@ -99,28 +100,83 @@ width_mm = 90
 length_mm = 15
 dpi = 300
 hide_media_in_command = true
-separate_images = true
+compare_command_comments = false
 single_line = true
-render_args = ["--orientation", "portrait"]
+composite = "grid_3x3"
+render_args = ["--orientation", "portrait", "--padding-mm", "0", "--font-size-mm", "3", "--label-fit", "content"]
 args = []
 compare = [
-  { label = "align left", args = [
+  { args = [
     "--label-align",
     "start",
+    "--label-valign",
+    "start",
     "--text",
-    "align left",
+    "top-left",
   ] },
-  { label = "align center", args = [
+  { args = [
     "--label-align",
     "center",
+    "--label-valign",
+    "start",
     "--text",
-    "align center",
+    "top-center",
   ] },
-  { label = "align right", args = [
+  { args = [
     "--label-align",
     "end",
+    "--label-valign",
+    "start",
     "--text",
-    "align right",
+    "top-right",
+  ] },
+  { args = [
+    "--label-align",
+    "start",
+    "--label-valign",
+    "center",
+    "--text",
+    "center-left",
+  ] },
+  { args = [
+    "--label-align",
+    "center",
+    "--label-valign",
+    "center",
+    "--text",
+    "center",
+  ] },
+  { args = [
+    "--label-align",
+    "end",
+    "--label-valign",
+    "center",
+    "--text",
+    "center-right",
+  ] },
+  { args = [
+    "--label-align",
+    "start",
+    "--label-valign",
+    "end",
+    "--text",
+    "bottom-left",
+  ] },
+  { args = [
+    "--label-align",
+    "center",
+    "--label-valign",
+    "end",
+    "--text",
+    "bottom-center",
+  ] },
+  { args = [
+    "--label-align",
+    "end",
+    "--label-valign",
+    "end",
+    "--text",
+    "bottom-right",
   ] },
 ]
 

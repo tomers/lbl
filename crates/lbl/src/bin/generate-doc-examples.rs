@@ -92,6 +92,8 @@ struct Example {
     composite: Option<String>,
     #[serde(default)]
     separate_images: bool,
+    #[serde(default = "default_true")]
+    compare_command_comments: bool,
     #[serde(default)]
     xargs: Option<String>,
     #[serde(default)]
@@ -389,9 +391,12 @@ fn render_example(
         )?;
     }
 
-    let composite = example.composite.as_deref() == Some("side_by_side");
-    if composite && !example.separate_images {
-        composite_side_by_side(png_path)?;
+    if !example.separate_images {
+        match example.composite.as_deref() {
+            Some("side_by_side") => composite_side_by_side(png_path)?,
+            Some("grid_3x3") => composite_grid(png_path, 3, 3)?,
+            _ => {}
+        }
     }
     let paths = if example.compare.len() > 1 || example.xargs.is_some() {
         collect_label_pngs(png_path)?
@@ -640,6 +645,75 @@ fn collect_label_pngs(base: &Path) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
+/// Stitch numbered batch PNGs into a rows×cols grid (row-major order).
+fn composite_grid(base: &Path, cols: u32, rows: u32) -> Result<()> {
+    let paths = collect_label_pngs(base)?;
+    let expected = (cols * rows) as usize;
+    if paths.len() != expected {
+        bail!(
+            "grid {cols}x{rows} expected {expected} images, got {}",
+            paths.len()
+        );
+    }
+
+    let images: Vec<_> = paths
+        .iter()
+        .map(|path| {
+            image::open(path)
+                .with_context(|| format!("open {}", path.display()))
+                .map(|img| img.to_rgba8())
+        })
+        .collect::<Result<_>>()?;
+
+    let gap = COMPOSITE_GAP_PX;
+    let divider = gap / 3;
+    let cell_w = images
+        .iter()
+        .map(image::RgbaImage::width)
+        .max()
+        .unwrap_or(0);
+    let cell_h = images
+        .iter()
+        .map(image::RgbaImage::height)
+        .max()
+        .unwrap_or(0);
+    let total_w = cols * cell_w + divider * cols.saturating_sub(1) + gap * cols.saturating_sub(1);
+    let total_h = rows * cell_h + divider * rows.saturating_sub(1) + gap * rows.saturating_sub(1);
+
+    let mut canvas = image::RgbaImage::from_pixel(total_w, total_h, image::Rgba(COMPOSITE_BG));
+    for (idx, img) in images.iter().enumerate() {
+        let col = (idx as u32) % cols;
+        let row = (idx as u32) / cols;
+        let x = col * (cell_w + divider + gap);
+        let y = row * (cell_h + divider + gap);
+        let ox = x + (cell_w.saturating_sub(img.width())) / 2;
+        let oy = y + (cell_h.saturating_sub(img.height())) / 2;
+        image::imageops::overlay(&mut canvas, img, i64::from(ox), i64::from(oy));
+        if col + 1 < cols {
+            for dx in 0..divider {
+                for dy in 0..cell_h {
+                    canvas.put_pixel(x + cell_w + dx, y + dy, image::Rgba(COMPOSITE_DIVIDER));
+                }
+            }
+        }
+        if row + 1 < rows {
+            for dy in 0..divider {
+                for dx in 0..cell_w {
+                    canvas.put_pixel(x + dx, y + cell_h + dy, image::Rgba(COMPOSITE_DIVIDER));
+                }
+            }
+        }
+    }
+
+    canvas
+        .save(base)
+        .with_context(|| format!("write composite {}", base.display()))?;
+    for path in paths.iter().skip(1) {
+        fs::remove_file(path).with_context(|| format!("remove {}", path.display()))?;
+    }
+    Ok(())
+}
+
 /// Stitch a multi-label batch into one preview image.
 fn composite_side_by_side(base: &Path) -> Result<()> {
     let paths = collect_label_pngs(base)?;
@@ -734,26 +808,32 @@ fn format_display_command(example: &Example) -> String {
     if !example.compare.is_empty() {
         let mut blocks = Vec::new();
         for variant in &example.compare {
-            let label = variant
-                .label
-                .clone()
-                .unwrap_or_else(|| "variant".to_string());
             let prefix = format_compare_env_prefix(&variant.env);
             let block = format_lbl_print_block(
                 &display_args_for(example, Some(&variant.args)),
                 example.single_line,
+                !example.compare_command_comments,
             );
-            blocks.push(format!(
-                "# {}\n{}",
-                label,
-                inject_env_into_command(&block, &prefix)
-            ));
+            let block = inject_env_into_command(&block, &prefix);
+            if example.compare_command_comments {
+                let label = variant
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| "variant".to_string());
+                blocks.push(format!("# {}\n{block}", label));
+            } else {
+                blocks.push(block);
+            }
         }
         out.push_str(&blocks.join("\n\n"));
+        if !example.compare_command_comments {
+            ensure_command_block_has_context(&mut out);
+        }
         return out.trim_end().to_string();
     }
 
-    let mut block = format_lbl_print_block(&display_args_for(example, None), example.single_line);
+    let mut block =
+        format_lbl_print_block(&display_args_for(example, None), example.single_line, false);
     ensure_command_block_has_context(&mut block);
     out.push_str(&block);
     out.trim_end().to_string()
@@ -843,16 +923,24 @@ fn inject_env_into_command(block: &str, env_prefix: &str) -> String {
     format!("{env_prefix}{block}")
 }
 
-fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
+fn format_lbl_print_block(
+    args: &[String],
+    single_line: bool,
+    skip_preview_context: bool,
+) -> String {
     let arg_lines = format_print_arg_lines(args);
     if arg_lines.is_empty() {
         let mut out = "$ lbl print".to_string();
-        ensure_command_block_has_context(&mut out);
+        if !skip_preview_context {
+            ensure_command_block_has_context(&mut out);
+        }
         return out;
     }
     if single_line {
         let mut out = format!("$ lbl print {}", arg_lines.join(" "));
-        ensure_command_block_has_context(&mut out);
+        if !skip_preview_context {
+            ensure_command_block_has_context(&mut out);
+        }
         return out;
     }
     let mut out = String::from("$ lbl print \\\n");
@@ -1277,6 +1365,7 @@ mod tests {
             files: Vec::new(),
             composite: None,
             separate_images: false,
+            compare_command_comments: true,
             xargs: None,
             show_media: false,
             show_dpi: true,
@@ -1315,6 +1404,40 @@ mod tests {
         assert_eq!(
             format_display_command(&ex),
             "$ lbl print --text hello\n# (preview label written to file)"
+        );
+    }
+
+    #[test]
+    fn format_display_command_compare_without_comments() {
+        let mut ex = example_with(vec![]);
+        ex.compare_command_comments = false;
+        ex.single_line = true;
+        ex.compare = vec![
+            CompareVariant {
+                label: None,
+                args: vec![
+                    "--label-align".into(),
+                    "start".into(),
+                    "--text".into(),
+                    "top-left".into(),
+                ],
+                env: HashMap::new(),
+            },
+            CompareVariant {
+                label: None,
+                args: vec![
+                    "--label-align".into(),
+                    "center".into(),
+                    "--text".into(),
+                    "center".into(),
+                ],
+                env: HashMap::new(),
+            },
+        ];
+        assert_eq!(
+            format_display_command(&ex),
+            "$ lbl print --label-align start --text top-left\n\n\
+             $ lbl print --label-align center --text center"
         );
     }
 
