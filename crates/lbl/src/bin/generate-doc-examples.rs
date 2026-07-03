@@ -19,6 +19,9 @@ use serde::Deserialize;
 const README_START: &str = "<!-- doc-examples:start -->";
 const README_END: &str = "<!-- doc-examples:end -->";
 
+/// Wrap display commands only when a single line would exceed this length.
+const DISPLAY_CMD_MAX_LINE: usize = 120;
+
 const PIXEL_DELTA: i16 = 8;
 const PNG_TOLERANCE: f64 = 0.02;
 
@@ -790,18 +793,11 @@ fn format_display_command(example: &Example) -> String {
             out.push_str(" --data");
             return out;
         }
-        out.push_str("$ ");
-        out.push_str(xargs);
-        out.push_str(" | xargs -n1 lbl print \\\n");
         let arg_lines = format_print_arg_lines(&display_args_for(example, None));
-        for line in &arg_lines {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push_str(" \\");
-            out.push('\n');
-        }
-        out.push_str("  --data");
-        return out.trim_end().to_string();
+        let mut args = arg_lines.join(" ");
+        args.push_str(" --data");
+        let prefix = format!("$ {} | xargs -n1 lbl print", xargs);
+        return format_multiline_command(&prefix, &[args], "  ");
     }
 
     if !example.compare.is_empty() {
@@ -914,9 +910,25 @@ fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
     if single_line {
         return format!("$ lbl print {}", arg_lines.join(" "));
     }
-    let mut out = String::from("$ lbl print \\\n");
+    format_multiline_command("$ lbl print", &arg_lines, "  ")
+}
+
+fn format_multiline_command(
+    prefix: &str,
+    arg_lines: &[String],
+    continuation_indent: &str,
+) -> String {
+    let single = if arg_lines.is_empty() {
+        prefix.to_string()
+    } else {
+        format!("{} {}", prefix, arg_lines.join(" "))
+    };
+    if single.len() <= DISPLAY_CMD_MAX_LINE {
+        return single;
+    }
+    let mut out = format!("{prefix} \\\n");
     for (idx, line) in arg_lines.iter().enumerate() {
-        out.push_str("  ");
+        out.push_str(continuation_indent);
         out.push_str(line);
         if idx < arg_lines.len() - 1 {
             out.push_str(" \\");
@@ -1366,9 +1378,28 @@ mod tests {
 
     #[test]
     fn format_display_command_uses_continuations() {
-        let cmd =
-            format_display_command(&example_with(vec!["--text", "hello", "--padding-mm", "0"]));
-        assert_eq!(cmd, "$ lbl print \\\n  --text hello \\\n  --padding-mm 0");
+        let cmd = format_display_command(&example_with(vec![
+            "--text",
+            "hello",
+            "--padding-mm",
+            "0",
+            "--width-mm",
+            "25",
+            "--length-mm",
+            "54",
+            "--protocol",
+            "virtual",
+            "--export-mode",
+            "vector",
+            "--file",
+            "label.pdf",
+        ]));
+        assert_eq!(
+            cmd,
+            "$ lbl print \\\n  --text hello \\\n  --padding-mm 0 \\\n  --width-mm 25 \\\n  \
+             --length-mm 54 \\\n  --protocol virtual \\\n  --export-mode vector \\\n  \
+             --file label.pdf"
+        );
     }
 
     #[test]
@@ -1422,7 +1453,7 @@ mod tests {
         }];
         assert_eq!(
             format_display_command(&ex),
-            "# with env\n$ LBL_STYLE__ELEMENT_GAP_MM=8 lbl print \\\n  --text hello"
+            "# with env\n$ LBL_STYLE__ELEMENT_GAP_MM=8 lbl print --text hello"
         );
     }
 
@@ -1433,7 +1464,7 @@ mod tests {
         ex.hide_cd = true;
         assert_eq!(
             format_display_command(&ex),
-            "$ lbl print \\\n  --template card.html"
+            "$ lbl print --template card.html"
         );
     }
 
@@ -1443,7 +1474,7 @@ mod tests {
         ex.dir = Some("batch-card".into());
         assert_eq!(
             format_display_command(&ex),
-            "$ cd docs/examples/batch-card\n$ lbl print \\\n  --template card.html"
+            "$ cd docs/examples/batch-card\n$ lbl print --template card.html"
         );
     }
 

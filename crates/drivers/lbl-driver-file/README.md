@@ -22,12 +22,10 @@ bypasses the driver — the orchestrator calls `lbl-render`'s `export_pdf` direc
 
 ```bash
 # Raster PNG (default virtual export)
-lbl print --text "Hi" --width-mm 25 --length-mm 54 \
-  --protocol virtual --file label.png
+lbl print --text "Hi" --width-mm 25 --length-mm 54 --protocol virtual --file label.png
 
 # Vector PDF
-lbl print --text "Hi {{qr:x}}" --media 30252 \
-  --protocol virtual --export-mode vector --file label.pdf
+lbl print --text "Hi {{qr:x}}" --media 30252 --protocol virtual --export-mode vector --file label.pdf
 ```
 
 See `docs/src/guides/rendering-quality.md` and `docs/src/reference/cli.md`.

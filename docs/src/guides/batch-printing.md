@@ -77,10 +77,7 @@ When values come from the shell instead of a JSON file, run `lbl print` once per
 value:
 
 ```bash
-seq 1 3 | xargs -n1 lbl print \
-  --template 'User #{{ it }}' \
-  --media 12x30 --dpi 203 --protocol console \
-  --data
+seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --media 12x30 --dpi 203 --protocol console --data
 ```
 
 Put `--data` **last**. `xargs -n1` appends each line from `seq` as the value of
@@ -108,10 +105,7 @@ seq 1 3 | xargs -n1 cargo run -q -p lbl --bin lbl -- print \
 For a named field, substitute into a small JSON object with `xargs -I`:
 
 ```bash
-seq 1 3 | xargs -I%n lbl print \
-  --template 'User #{{ n }}' \
-  --media 12x30 --dpi 203 --protocol console \
-  --data '{"n":%n}'
+seq 1 3 | xargs -I%n lbl print --template 'User #{{ n }}' --media 12x30 --dpi 203 --protocol console --data '{"n":%n}'
 ```
 
 (`-I` runs one command per input line, like `-n1`, but replaces `%n` in the

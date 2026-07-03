@@ -219,8 +219,7 @@ Headings, emphasis, and inline directives compose via `--markdown`.
 *NIIMBOT 12×40 mm @ 203 dpi* · [Printing text →](docs/src/guides/printing-text.md)
 
 ```console
-$ lbl print \
-  --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n{{qr:https://track/1234}}'
+$ lbl print --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n{{qr:https://track/1234}}'
 ```
 
 ---
@@ -344,10 +343,7 @@ When no catalog SKU fits, pass `--width-mm` and `--length-mm` directly.
 *30×20 mm* · [Printers & media →](docs/src/guides/printers-media.md#media)
 
 ```console
-$ lbl print \
-  --text '30×20' \
-  --width-mm 30 \
-  --length-mm 20
+$ lbl print --text '30×20' --width-mm 30 --length-mm 20
 ```
 
 ---
@@ -391,9 +387,7 @@ One HTML layout rendered against a JSON array — name badges with QR for Alice 
 
 ```console
 $ cd docs/examples/batch-card
-$ lbl print \
-  --template card.html \
-  --data people.json
+$ lbl print --template card.html --data people.json
 ```
 
 ---
@@ -422,8 +416,7 @@ Data and template in one file — frontmatter plus a text body with inline mini-
 
 ```console
 $ cd docs/examples/batch-combined
-$ lbl print \
-  --template combined.txt
+$ lbl print --template combined.txt
 ```
 
 ---
@@ -453,8 +446,7 @@ Same frontmatter pattern with a Markdown body (`.md` extension).
 
 ```console
 $ cd docs/examples/batch-combined
-$ lbl print \
-  --template combined.md
+$ lbl print --template combined.md
 ```
 
 ---
@@ -483,8 +475,7 @@ Same frontmatter pattern with an HTML body (`.html` or `.lbl` extension).
 
 ```console
 $ cd docs/examples/batch-combined
-$ lbl print \
-  --template combined.html
+$ lbl print --template combined.html
 ```
 
 ---

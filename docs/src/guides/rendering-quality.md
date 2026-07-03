@@ -81,8 +81,7 @@ Values below `1` are treated as `1` (no supersampling).
 ### CLI — full print pipeline
 
 ```bash
-lbl print --text "Hello" --media 11352 --protocol zpl \
-  --network 192.168.1.50:9100 --supersample 4
+lbl print --text "Hello" --media 11352 --protocol zpl --network 192.168.1.50:9100 --supersample 4
 ```
 
 ### CLI — render stage only

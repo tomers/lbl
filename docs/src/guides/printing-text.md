@@ -50,6 +50,5 @@ config with `padding_mm`, or via `LBL_STYLE__PADDING_MM`. See
 ## End to end
 
 ```bash
-lbl print --text "Hello {{qr:https://example.com}}" \
-  --media 11352 --protocol dymo --usb 0922:1001
+lbl print --text "Hello {{qr:https://example.com}}" --media 11352 --protocol dymo --usb 0922:1001
 ```
