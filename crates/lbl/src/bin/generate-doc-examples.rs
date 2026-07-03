@@ -788,7 +788,6 @@ fn format_display_command(example: &Example) -> String {
             out.push_str(" | xargs -n1 lbl print ");
             out.push_str(&args);
             out.push_str(" --data");
-            ensure_command_block_has_context(&mut out);
             return out;
         }
         out.push_str("$ ");
@@ -812,7 +811,6 @@ fn format_display_command(example: &Example) -> String {
             let block = format_lbl_print_block(
                 &display_args_for(example, Some(&variant.args)),
                 example.single_line,
-                !example.compare_command_comments,
             );
             let block = inject_env_into_command(&block, &prefix);
             if example.compare_command_comments {
@@ -826,27 +824,12 @@ fn format_display_command(example: &Example) -> String {
             }
         }
         out.push_str(&blocks.join("\n\n"));
-        if !example.compare_command_comments {
-            ensure_command_block_has_context(&mut out);
-        }
         return out.trim_end().to_string();
     }
 
-    let mut block =
-        format_lbl_print_block(&display_args_for(example, None), example.single_line, false);
-    ensure_command_block_has_context(&mut block);
+    let block = format_lbl_print_block(&display_args_for(example, None), example.single_line);
     out.push_str(&block);
     out.trim_end().to_string()
-}
-
-fn ensure_command_block_has_context(block: &mut String) {
-    let has_non_command = block.lines().any(|line| {
-        let t = line.trim();
-        !t.is_empty() && !t.starts_with('$')
-    });
-    if !has_non_command {
-        block.push_str("\n# (preview label written to file)");
-    }
 }
 
 fn display_args_for(example: &Example, compare_extra: Option<&[String]>) -> Vec<String> {
@@ -923,25 +906,13 @@ fn inject_env_into_command(block: &str, env_prefix: &str) -> String {
     format!("{env_prefix}{block}")
 }
 
-fn format_lbl_print_block(
-    args: &[String],
-    single_line: bool,
-    skip_preview_context: bool,
-) -> String {
+fn format_lbl_print_block(args: &[String], single_line: bool) -> String {
     let arg_lines = format_print_arg_lines(args);
     if arg_lines.is_empty() {
-        let mut out = "$ lbl print".to_string();
-        if !skip_preview_context {
-            ensure_command_block_has_context(&mut out);
-        }
-        return out;
+        return "$ lbl print".to_string();
     }
     if single_line {
-        let mut out = format!("$ lbl print {}", arg_lines.join(" "));
-        if !skip_preview_context {
-            ensure_command_block_has_context(&mut out);
-        }
-        return out;
+        return format!("$ lbl print {}", arg_lines.join(" "));
     }
     let mut out = String::from("$ lbl print \\\n");
     for (idx, line) in arg_lines.iter().enumerate() {
@@ -1145,6 +1116,7 @@ fn render_readme_section(root: &Path, rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(README_START);
     out.push('\n');
+    out.push_str("<!-- markdownlint-disable MD014 -->\n");
     out.push_str("\n## Examples\n\n");
     append_examples_intro(
         &mut out,
@@ -1187,6 +1159,8 @@ fn render_book_page(rows: &[ExampleRow]) -> String {
     let mut out = String::new();
     out.push_str(
         "# Examples
+
+<!-- markdownlint-disable-file MD014 -->
 
 ",
     );
@@ -1401,10 +1375,7 @@ mod tests {
     fn format_display_command_single_line() {
         let mut ex = example_with(vec!["--text", "hello"]);
         ex.single_line = true;
-        assert_eq!(
-            format_display_command(&ex),
-            "$ lbl print --text hello\n# (preview label written to file)"
-        );
+        assert_eq!(format_display_command(&ex), "$ lbl print --text hello");
     }
 
     #[test]
@@ -1483,7 +1454,7 @@ mod tests {
         ex.single_line = true;
         assert_eq!(
             format_display_command(&ex),
-            "$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data\n# (preview label written to file)"
+            "$ seq 1 3 | xargs -n1 lbl print --template 'User #{{ it }}' --data"
         );
     }
 

@@ -263,6 +263,17 @@ mod tests {
     }
 
     #[test]
+    fn frontmatter_after_html_comment_renders_batch() {
+        let src = "<!-- markdownlint-disable-file -->\n---json\n[{\"name\":\"A\"},{\"name\":\"B\"}]\n---\n{{ name }}";
+        let labels = Engine::new()
+            .render(src, None, &RenderOptions::default())
+            .unwrap();
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].html, "A");
+        assert_eq!(labels[1].html, "B");
+    }
+
+    #[test]
     fn resolve_batch_without_rendering() {
         let batch = resolve_batch(
             "---json\n[{\"name\":\"A\"},{\"name\":\"B\"}]\n---\n<div>{{ name }}</div>",

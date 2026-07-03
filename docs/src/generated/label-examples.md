@@ -1,5 +1,7 @@
 # Examples
 
+<!-- markdownlint-disable-file MD014 -->
+
 Each preview highlights a different `lbl print` capability. Commands show
 the flags that matter for each example; protocol and output path come from project
 config (`lbl.toml`) or the doc generator defaults.
@@ -55,7 +57,6 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 
 ```console
 $ lbl print --template sopranos.lbl --orientation portrait
-# (preview label written to file)
 ```
 
 <img src="images/sopranos-cards.png" alt="Complex HTML batch" width="320"/>
@@ -69,7 +70,6 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one str
 
 ```console
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
-# (preview label written to file)
 ```
 
 <img src="images/inline-syntax.png" alt="Inline mini-syntax" width="320"/>
@@ -86,11 +86,9 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 ```console
 # default element gap
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
-# (preview label written to file)
 
 # element gap 10 mm
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' --element-gap-mm 10
-# (preview label written to file)
 ```
 
 <img src="images/element-gap.png" alt="Element spacing" width="320"/>
@@ -135,7 +133,6 @@ $ lbl print --label-align start --label-valign end --text bottom-left
 $ lbl print --label-align center --label-valign end --text bottom-center
 
 $ lbl print --label-align end --label-valign end --text bottom-right
-# (preview label written to file)
 ```
 
 <img src="images/label-align.png" alt="Label alignment" width="320"/>
@@ -150,11 +147,9 @@ Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge
 ```console
 # padding 0 (left)
 $ lbl print --text Hi --padding-mm 0
-# (preview label written to file)
 
 # padding 4 mm (right)
 $ lbl print --text Hi --padding-mm 4
-# (preview label written to file)
 ```
 
 <img src="images/zero-padding.png" alt="Inner padding" width="320"/>
@@ -179,7 +174,6 @@ orientation = "landscape"
 
 ```console
 $ lbl print --text 'Hello {{qr:https://x/p}}'
-# (preview label written to file)
 ```
 
 <img src="images/config-defaults.png" alt="Config-driven print defaults" width="320"/>
@@ -195,11 +189,9 @@ More render dots before downscaling yield sharper text and fine detail.
 ```console
 # Supersample 1
 $ lbl print --text 'Supersample 1' --supersample 1
-# (preview label written to file)
 
 # Supersample 8
 $ lbl print --text 'Supersample 8' --supersample 8
-# (preview label written to file)
 ```
 
 <img src="images/supersample.png" alt="Supersampling for print quality" width="320"/>
@@ -214,11 +206,9 @@ Pick a die-cut size from the bundled catalog with `--media` instead of raw `--wi
 ```console
 # 12×40
 $ lbl print --media 12x40 --text 12x40
-# (preview label written to file)
 
 # 12×22
 $ lbl print --media 12x22 --text 12x22
-# (preview label written to file)
 ```
 
 <img src="images/niimbot-catalog.png" alt="Catalog media SKU" width="320"/>
@@ -383,7 +373,6 @@ Pipe one JSON object per line into `lbl print` — each line becomes `--data` fo
 
 ```console
 $ cat people.ndjson | xargs -n1 lbl print --template card.html --data
-# (preview label written to file)
 ```
 
 <img src="images/shell-template.png" alt="Command pipelining" width="320"/>
@@ -400,7 +389,6 @@ Print only the first label from a batch selection.
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --first
-# (preview label written to file)
 ```
 
 <img src="images/iter-first.png" alt="`--first`" width="320"/>
@@ -415,7 +403,6 @@ Select a label by zero-based index — here, Bob at index 1.
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --index 1
-# (preview label written to file)
 ```
 
 <img src="images/iter-index.png" alt="`--index`" width="320"/>
@@ -430,7 +417,6 @@ Keep only labels whose data fields contain a substring (case-insensitive).
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --filter Bob
-# (preview label written to file)
 ```
 
 <img src="images/iter-filter.png" alt="`--filter`" width="320"/>
@@ -444,7 +430,6 @@ Skip the first five of ten shell-generated records, then print the next three (u
 
 ```console
 $ seq 1 10 | xargs -n1 lbl print --template 'User #{{ it }}' --skip 5 --take 3 --data
-# (preview label written to file)
 ```
 
 <img src="images/iter-skip-take.png" alt="`--skip` and `--take`" width="320"/>

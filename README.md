@@ -109,6 +109,7 @@ cargo test            # run the test suite
 See [Rendering quality — raster vs vector](docs/src/guides/rendering-quality.md#raster-vs-vector-virtual-export).
 
 <!-- doc-examples:start -->
+<!-- markdownlint-disable MD014 -->
 
 ## Examples
 
@@ -169,7 +170,6 @@ Rich HTML with photos, QR, and barcodes — Tony and Carmela identity cards from
 
 ```console
 $ lbl print --template sopranos.lbl --orientation portrait
-# (preview label written to file)
 ```
 
 ---
@@ -184,7 +184,6 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one str
 
 ```console
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
-# (preview label written to file)
 ```
 
 ---
@@ -204,11 +203,9 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 ```console
 # default element gap
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
-# (preview label written to file)
 
 # element gap 10 mm
 $ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' --element-gap-mm 10
-# (preview label written to file)
 ```
 
 ---
@@ -254,7 +251,6 @@ $ lbl print --label-align start --label-valign end --text bottom-left
 $ lbl print --label-align center --label-valign end --text bottom-center
 
 $ lbl print --label-align end --label-valign end --text bottom-right
-# (preview label written to file)
 ```
 
 ---
@@ -270,11 +266,9 @@ Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge
 ```console
 # padding 0 (left)
 $ lbl print --text Hi --padding-mm 0
-# (preview label written to file)
 
 # padding 4 mm (right)
 $ lbl print --text Hi --padding-mm 4
-# (preview label written to file)
 ```
 
 ---
@@ -300,7 +294,6 @@ orientation = "landscape"
 
 ```console
 $ lbl print --text 'Hello {{qr:https://x/p}}'
-# (preview label written to file)
 ```
 
 ---
@@ -317,11 +310,9 @@ More render dots before downscaling yield sharper text and fine detail.
 ```console
 # Supersample 1
 $ lbl print --text 'Supersample 1' --supersample 1
-# (preview label written to file)
 
 # Supersample 8
 $ lbl print --text 'Supersample 8' --supersample 8
-# (preview label written to file)
 ```
 
 ---
@@ -337,11 +328,9 @@ Pick a die-cut size from the bundled catalog with `--media` instead of raw `--wi
 ```console
 # 12×40
 $ lbl print --media 12x40 --text 12x40
-# (preview label written to file)
 
 # 12×22
 $ lbl print --media 12x22 --text 12x22
-# (preview label written to file)
 ```
 
 ---
@@ -510,7 +499,6 @@ Pipe one JSON object per line into `lbl print` — each line becomes `--data` fo
 
 ```console
 $ cat people.ndjson | xargs -n1 lbl print --template card.html --data
-# (preview label written to file)
 ```
 
 ---
@@ -528,7 +516,6 @@ Print only the first label from a batch selection.
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --first
-# (preview label written to file)
 ```
 
 ---
@@ -544,7 +531,6 @@ Select a label by zero-based index — here, Bob at index 1.
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --index 1
-# (preview label written to file)
 ```
 
 ---
@@ -560,7 +546,6 @@ Keep only labels whose data fields contain a substring (case-insensitive).
 ```console
 $ cd docs/examples/batch-card
 $ lbl print --template card.html --data people.json --filter Bob
-# (preview label written to file)
 ```
 
 ---
@@ -575,7 +560,6 @@ Skip the first five of ten shell-generated records, then print the next three (u
 
 ```console
 $ seq 1 10 | xargs -n1 lbl print --template 'User #{{ it }}' --skip 5 --take 3 --data
-# (preview label written to file)
 ```
 
 <!-- doc-examples:end -->
