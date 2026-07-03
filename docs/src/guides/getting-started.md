@@ -20,9 +20,18 @@ cargo test --workspace
 
 ## Your first label (dry run)
 
-No printer required — write the encoded bytes to a directory:
+No printer required — write encoded bytes or a preview file:
 
 ```bash
+# Vector PDF (no dithering; sized to media mm)
+lbl print --text "Hello, world!" --width-mm 25 --length-mm 54 \
+  --protocol virtual --export-mode vector --file hello.pdf
+
+# Raster PNG (emulates 1-bit printed output)
+lbl print --text "Hello, world!" --width-mm 25 --length-mm 54 \
+  --protocol virtual --file hello.png
+
+# Hardware protocol bytes (no image viewer needed)
 lbl print --text "Hello, world!" --width-mm 25 --protocol escpos --out-dir out/
 ls out/   # label-0000.bin
 ```

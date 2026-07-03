@@ -45,3 +45,18 @@ Because the contracts are explicit, you can start anywhere:
 - Calibrating margins? Use `lbl-pattern` (or `lbl print --sample-pattern`) to
   emit a fixed test raster straight into `lbl-encode` — no render or dither.
 - Want only an image? Stop after `lbl-render` or `lbl-dither --preview-png`.
+- Want a vector PDF (no dither)? Use
+  `lbl print --protocol virtual --export-mode vector --file out.pdf`
+  (orchestrator only; skips render/dither).
+
+## Virtual export modes
+
+When `--protocol virtual` is selected, the orchestrator branches:
+
+| Mode | Steps | Output |
+| ---- | ----- | ------ |
+| **Raster** (default) | transpile → render → dither → `lbl-driver-file` | PNG / BMP / TIFF / GIF / PBM |
+| **Vector** | transpile → Chromium `export_pdf` | PDF sized to media mm |
+
+Vector export skips `lbl-dither` and the file driver; QR/barcodes are SVG in
+the transpiled HTML. See [Rendering Quality](../guides/rendering-quality.md#raster-vs-vector-virtual-export).

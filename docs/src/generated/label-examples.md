@@ -81,17 +81,16 @@ Inline elements in a row are separated by `element_gap_mm` (default 4 mm).
 Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 (see [configuration precedence](docs/src/guides/configuration.md#configuration)).
 
-*120×20 mm* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
+*200×30 mm @ 300 dpi* · [Configuration →](../guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # default element gap
-$ lbl print \
-  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+# (preview label written to file)
 
 # element gap 10 mm
-$ lbl print \
-  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' \
-  --element-gap-mm 10
+$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' --element-gap-mm 10
+# (preview label written to file)
 ```
 
 <img src="images/element-gap.png" alt="Element spacing" width="320"/>
@@ -191,7 +190,7 @@ $ lbl print --text 'Hello {{qr:https://x/p}}'
 Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
 More render dots before downscaling yield sharper text and fine detail.
 
-*50×108 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
+*12×40 mm* · [Rendering quality →](../guides/rendering-quality.md#how-to-set-it)
 
 ```console
 # Supersample 1

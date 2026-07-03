@@ -18,10 +18,31 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 | DELETE | `/api/printers/profiles/:id` | Remove a printer profile |
 | POST | `/api/preview` | Transpile source into preview HTML (gallery) |
 | POST | `/api/print` | Run the full pipeline and dispatch to a printer |
+| POST | `/api/print/file` | Virtual printer: return encoded files inline (raster or vector PDF) |
 
 `POST /api/preview` and `/api/print` accept a source body with one of `text`,
 `html`, or `template` (+ `data`, `each`). Printing runs the browser render on a
 blocking task and dispatches via the internal spooler.
+
+### Virtual file export (`POST /api/print/file`)
+
+Set `"protocol": "virtual"`. Optional fields:
+
+```json
+{
+  "text": "Hello {{qr:https://x}}",
+  "media": "30252",
+  "protocol": "virtual",
+  "export_mode": "vector",
+  "media_type": "png"
+}
+```
+
+- **`export_mode`**: `"raster"` (default) or `"vector"` / `"pdf"`.
+- **`media_type`**: `"png"`, `"bmp"`, `"tiff"`, `"gif"`, or `"pbm"` — raster
+  only; ignored when `export_mode` is `vector` (response is always PDF).
+
+`POST /api/preview` and hardware `/api/print` do not use `export_mode`.
 
 ## Run
 

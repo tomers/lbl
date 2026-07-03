@@ -48,15 +48,16 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 doc = "guides/configuration.md"
 doc_title = "Configuration"
 doc_section = "style-fonts-qr-barcodes"
-caption = "120×20 mm"
+caption = "200×30 mm @ 300 dpi"
 media = ""
-width_mm = 120
-length_mm = 20
-dpi = 203
+width_mm = 200
+length_mm = 30
+dpi = 300
 show_dpi = false
 hide_media_in_command = true
 separate_images = true
-render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
+single_line = true
+render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "10", "--barcode-height-mm", "9"]
 args = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
 compare = [{ label = "default element gap" }, { label = "element gap 10 mm", args = ["--element-gap-mm", "10"] }]
 
@@ -233,12 +234,10 @@ More render dots before downscaling yield sharper text and fine detail."""
 doc = "guides/rendering-quality.md"
 doc_title = "Rendering quality"
 doc_section = "how-to-set-it"
-caption = "50×108 mm"
-media = ""
-width_mm = 50
-length_mm = 108
+caption = "12×40 mm"
+media = "12x40"
 hide_media_in_command = true
-render_args = ["--orientation", "portrait"]
+render_args = ["--orientation", "landscape", "--padding-mm", "0", "--font-size-mm", "3"]
 composite = "side_by_side"
 single_line = true
 args = ["--text", "Supersample"]

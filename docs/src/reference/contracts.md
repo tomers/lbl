@@ -40,9 +40,11 @@ See [Configuration](../guides/configuration.md#padding-and-insets).
 
 The output of `lbl-transpile-html`. Custom elements are rewritten to placeholder
 `<div>`s (`.lbl-qr[data-qr]`, `.lbl-barcode[data-symbology][data-value]`), the
-base/flex CSS is inlined, and only the needed JS libraries are referenced.
+base/flex CSS is inlined, and only the needed JS libraries are referenced. QR
+codes render to **SVG**; barcodes render to **SVG** via JsBarcode.
 
-- **Print mode**: bare, deterministic document for the rasterizer.
+- **Print mode**: bare, deterministic document for the rasterizer and vector PDF
+  export.
 - **Preview mode**: wrapped in `.lbl-preview[data-label-index][data-label-count]`
   with screen-friendly chrome, for the gallery.
 
@@ -55,6 +57,19 @@ converting millimetre style sizes (font, QR, barcode, padding) to CSS pixels
 during transpilation.
 
 See [Rendering Quality & Supersampling](../guides/rendering-quality.md).
+
+## Vector PDF
+
+Produced by `lbl print --protocol virtual --export-mode vector` (Chromium
+PrintToPdf). Input is browser-ready HTML with an `@page { size: Wmm Hmm }` rule
+sized to the configured media. Output is a PDF whose page dimensions match the
+physical label; text, QR, and barcode paths stay vector. This format is **not**
+interchangeable with PBM or hardware driver hand-off — it is for file export and
+professional print workflows.
+
+Embedded images remain raster inside the PDF. Layout uses a fixed 300 CSS dpi
+reference (`CSS_LAYOUT_REFERENCE_DPI`); printer `--dpi` sets page size via media
+mm, not PDF resolution.
 
 ## MonoBitmap / PBM (P4)
 

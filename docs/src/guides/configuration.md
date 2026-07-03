@@ -136,27 +136,39 @@ do not need long flag lists. CLI flags always win when explicitly passed.
 
 ```toml
 [print]
-confirm = true
-protocol = "niimbot"
-bluetooth = "D110"
-dither = "auto"
-copies = 1
-backend = "chromium"
+# Example: default to vector PDF file export
+protocol = "virtual"
+export_mode = "vector"   # raster | vector | pdf (aliases: bitmap/image → raster)
+media_type = "png"       # raster only: png | bmp | tiff | gif | pbm
+
+# Example: default to a Bluetooth NIIMBOT printer instead
+# protocol = "niimbot"
+# bluetooth = "D110"
+# dither = "auto"
+# copies = 1
+# backend = "chromium"
 # niimbot_task = "standard"
 ```
+
+`export_mode = "vector"` makes `--protocol virtual` emit PDF without passing
+`--export-mode` on every run. `media_type` is ignored when `export_mode` is
+`vector`.
 
 Environment (same keys, nested with `__`):
 
 ```bash
-export LBL_PRINT__CONFIRM=1
+export LBL_PRINT__PROTOCOL=virtual
+export LBL_PRINT__EXPORT_MODE=vector
+lbl print --text "Hello {{qr:https://x}}" --media 30252 --file hello.pdf
+
 export LBL_PRINT__PROTOCOL=niimbot
 export LBL_PRINT__BLUETOOTH=D110
 lbl print --text "Hello" --media niimbot-12x22
 ```
 
 Supported `[print]` / `LBL_PRINT__*` keys: `confirm`, `debug`, `cut`,
-`supports_cut`, `copies`, `dither`, `protocol`, `backend`, `bluetooth`,
-`serial`, `usb`, `network`, `niimbot_task`, `media_type`.
+`supports_cut`, `copies`, `dither`, `protocol`, `export_mode`, `media_type`,
+`backend`, `bluetooth`, `serial`, `usb`, `network`, `niimbot_task`.
 
 ## Printer profiles
 

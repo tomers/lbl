@@ -32,8 +32,19 @@ lbl device    Discover printers (list)
                     [style] padding_mm / border_width_mm, currently 2.0 / 0)
 --protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console|html>
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;
-                     virtual = image file; console = terminal art;
+                     virtual = file output (raster image or vector PDF);
+                     console = terminal art;
                      html = browser gallery of PNG previews)
+--export-mode <raster|vector|pdf|bitmap|image>
+                    Virtual printer only (default: raster). `raster` runs the
+                    full pipeline (supersample → dither → bitmap file).
+                    `vector` / `pdf` skip rasterization and emit a vector PDF
+                    sized to the configured media via Chromium PrintToPdf.
+                    Overrides `[print] export_mode` / `LBL_PRINT__EXPORT_MODE`.
+--media-type <png|bmp|tiff|gif|pbm>
+                    Virtual printer + raster export only (default: png).
+                    Ignored when `--export-mode vector` (output is always PDF).
+                    Overrides `[print] media_type` / `LBL_PRINT__MEDIA_TYPE`.
 --supersample <N>   High-res render factor before downscale (default: 4, or
                     `[render] supersample` from config). See Rendering Quality guide.
 --dither <auto|floyd-steinberg|ordered|none>
@@ -98,6 +109,40 @@ onto the head; `portrait` keeps the media's natural `width × length` frame.
 `--rotate-cw` / `--rotate-ccw` add further 90° turns on top (repeat them for
 180°/270°), so e.g. `--orientation landscape --rotate-cw` prints upside-down
 landscape.
+
+### Virtual printer (`--protocol virtual`)
+
+Save labels to disk without hardware. Two export modes:
+
+| Mode | Flag | Pipeline | Output |
+| ---- | ---- | -------- | ------ |
+| **Raster** (default) | `--export-mode raster` | transpile → render → dither → encode image | PNG, BMP, TIFF, GIF, or PBM |
+| **Vector** | `--export-mode vector` | transpile → PrintToPdf (no dither) | PDF |
+
+```bash
+# Vector PDF — sharp text/QR/barcode at any zoom; page size = media mm
+lbl print --text "Hello {{qr:https://x}}" --media 30252 \
+  --protocol virtual --export-mode vector --file label.pdf
+
+# Raster PNG — emulates how ink looks after 1-bit dithering on a print head
+lbl print --text "Hello {{qr:https://x}}" --media 30252 \
+  --protocol virtual --file label.png
+
+# Raster TIFF
+lbl print --text "Hello" --width-mm 25 --length-mm 54 \
+  --protocol virtual --media-type tiff --file label.tiff
+```
+
+- **`--file out.pdf`** / **`--file out.png`**: write one label. With multiple
+  labels, siblings are numbered (`out-01.pdf`, `out-02.pdf`, …).
+- **`--out-dir dir/`**: write `label-0000.ext`, `label-0001.ext`, …
+- **`--supersample`** and **`--dither`** apply to **raster** export only.
+- **`--media-type`** is ignored in vector mode (always PDF).
+- QR codes and barcodes are rendered as **SVG** in the browser document (sharp
+  in both raster screenshots and vector PDF).
+
+See [Rendering Quality — Raster vs vector](../guides/rendering-quality.md#raster-vs-vector-virtual-export)
+for a catalog-media PDF example.
 
 ### `lbl preview`
 

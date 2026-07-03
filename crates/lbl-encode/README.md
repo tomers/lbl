@@ -7,8 +7,11 @@ PBM) into printer-native protocol bytes.
 includes every bundled driver: DYMO LabelManager tape (`dymo`), DYMO
 LabelWriter 550 raster (`dymo-lw`), ESC/POS, ZPL, TSPL, NIIMBOT
 (`niimbot`; D11/D110 family), and the non-hardware preview drivers `virtual`
-(image file) and `console` (terminal art). Additional drivers can be registered
-into a custom `Registry`.
+(raster image file or vector PDF via the orchestrator) and `console` (terminal
+art). Additional drivers can be registered into a custom `Registry`.
+
+The virtual driver's raster path encodes a dithered bitmap to PNG/BMP/TIFF/GIF/PBM.
+Vector PDF export skips `lbl-encode` and uses `lbl-render::export_pdf` instead.
 
 ## CLI
 

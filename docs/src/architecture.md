@@ -51,7 +51,7 @@ and `preview` flows, and also exposes the individual stages as subcommands.
 | Rasterizer | `lbl-render` | HTML → raster image, two-pass (supersample then downscale) |
 | Ditherer | `lbl-dither` | Raster → 1-bit `MonoBitmap`, photo-aware |
 | Encoder | `lbl-encode` | Select a driver by protocol, encode `MonoBitmap` → protocol bytes |
-| Drivers | `drivers/lbl-driver-*` | Protocol-specific encoders (DYMO, NIIMBOT, ESC/POS, ZPL, TSPL) plus non-hardware previews (virtual image file, console terminal art) |
+| Drivers | `drivers/lbl-driver-*` | Protocol-specific encoders (DYMO, NIIMBOT, ESC/POS, ZPL, TSPL) plus non-hardware previews (virtual file: raster image or vector PDF, console terminal art) |
 | Spooler | `lbl-spool` | Job queue, sequential dispatch, per-item cut, retry, disconnect handling |
 | Device | `lbl-device` | Discovery (USB) and transport (USB bulk / TCP / bidirectional serial) |
 | Catalog | `lbl-catalog` | Known media SKUs and printer compatibility |
@@ -68,6 +68,7 @@ Stages communicate through a few stable, inspectable formats:
   `<qr>` / `<barcode>` elements and flex utility classes.
 - **Browser-ready HTML** — standard HTML with libraries/CSS injected.
 - **Raster** — PNG (RGBA) between render and dither.
+- **Vector PDF** — optional virtual-printer output (PrintToPdf; skips dither).
 - **`MonoBitmap` / PBM (P4)** — 1-bit packed image (MSB-first, `1` = ink); the
   driver hand-off format.
 - **Protocol bytes** — the final printer-native stream.

@@ -13,7 +13,7 @@ text/data/HTML
   -> lbl-text         (plain text / CLI args -> authoring HTML)
   -> lbl-template     (data + template -> N authoring HTML, resource fetch)
   -> lbl-transpile-html (custom <qr>/<barcode> + flex -> browser-ready HTML)
-  -> lbl-render       (HTML -> raster, 2-pass via headless Chromium)
+  -> lbl-render       (HTML -> raster, 2-pass via headless Chromium; PrintToPdf for vector PDF)
   -> lbl-dither       (raster -> printer bit depth, photo-aware)
   -> lbl-encode       (bitmap -> protocol bytes; pluggable drivers)
   -> lbl-spool        (internal spooler; queue + cut control)
@@ -31,9 +31,9 @@ text/data/HTML
 | `lbl-text` | Plain text / CLI args -> authoring HTML |
 | `lbl-template` | Data + template -> N HTML, with resource fetching |
 | `lbl-transpile-html` | Custom elements + flex -> browser-ready HTML |
-| `lbl-render` | HTML -> raster (headless Chromium, two-pass) |
+| `lbl-render` | HTML -> raster (headless Chromium, two-pass); PrintToPdf for vector PDF export |
 | `lbl-dither` | Raster -> printer bit depth (photo-aware dithering) |
-| `crates/drivers/*` | Printer drivers: api, dymo, escpos, zpl, tspl, niimbot, file (virtual), console (terminal) |
+| `crates/drivers/*` | Printer drivers: api, dymo, escpos, zpl, tspl, niimbot, file (virtual raster/PDF), console (terminal) |
 | `lbl-encode` | Bitmap -> protocol bytes (driver selection) |
 | `lbl-device` | Device discovery + USB/network transport |
 | `lbl-spool` | Internal print spooler |
@@ -98,6 +98,15 @@ just pre-commit-all                 # run the full pre-commit suite on all files
 cargo build           # build the whole workspace
 cargo test            # run the test suite
 ```
+
+## Print to file (no printer)
+
+`--protocol virtual` saves labels to disk in two modes:
+
+- **Raster** (default): dithered PNG/BMP/TIFF/GIF/PBM — emulates printed output.
+- **Vector** (`--export-mode vector`): PDF sized to catalog media; sharp text/QR.
+
+See [Rendering quality — raster vs vector](docs/src/guides/rendering-quality.md#raster-vs-vector-virtual-export).
 
 <!-- doc-examples:start -->
 
@@ -190,17 +199,16 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 
 <img src="docs/src/generated/images/element-gap-01.png" alt="Element spacing" width="100%" />
 
-*120×20 mm* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
+*200×30 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
 ```console
 # default element gap
-$ lbl print \
-  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+# (preview label written to file)
 
 # element gap 10 mm
-$ lbl print \
-  --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' \
-  --element-gap-mm 10
+$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' --element-gap-mm 10
+# (preview label written to file)
 ```
 
 ---
@@ -302,9 +310,9 @@ $ lbl print --text 'Hello {{qr:https://x/p}}'
 Side by side: `--supersample 1` (left) vs `--supersample 8` (right).
 More render dots before downscaling yield sharper text and fine detail.
 
-<img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" />
+<img src="docs/src/generated/images/supersample.png" alt="Supersampling for print quality" width="100%" />
 
-*50×108 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
+*12×40 mm* · [Rendering quality →](docs/src/guides/rendering-quality.md#how-to-set-it)
 
 ```console
 # Supersample 1

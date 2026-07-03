@@ -4,8 +4,8 @@ Transpile *authoring HTML* into *browser-ready HTML*.
 
 Authoring HTML uses compact custom concepts that this stage expands:
 
-- `<qr>PAYLOAD</qr>` -> a placeholder rendered by a QR JS library
-- `<barcode type="CODE128">DATA</barcode>` -> a placeholder rendered by JsBarcode
+- `<qr>PAYLOAD</qr>` -> SVG via the QR JS library (`QRCode.toString`, `type: 'svg'`)
+- `<barcode type="CODE128">DATA</barcode>` -> SVG via JsBarcode
 - flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
   `lbl-grow`, `lbl-wrap`
 
@@ -13,7 +13,8 @@ It injects the base/flex CSS and only the third-party libraries actually needed.
 
 ## Output modes
 
-- `--mode print` (default): a bare, deterministic document for the rasterizer.
+- `--mode print` (default): a bare, deterministic document for raster rendering
+  and vector PDF export (`@page` sizing when `page_size` is set).
 - `--mode preview`: a screen-oriented, **gallery-friendly** document. The label
   is wrapped in `.lbl-preview[data-label-index][data-label-count]` so the
   gallery viewers can page through `--index N` of `--count M`.

@@ -137,11 +137,47 @@ POST /api/print
 | **Photos or gradients** | `4` noticeably reduces stair-stepping and dither noise. |
 | **Fine detail / small type** | Try `4`–`6`; diminishing returns beyond that for typical 203–300 DPI heads. |
 | **Batch size / speed** | Each step up multiplies first-pass pixel count. Large batches on a slow machine may prefer `3`. |
-| **Virtual / file output** | Same rules apply — the PNG or PBM reflects the chosen factor. |
+| **Virtual / file output (raster)** | Same rules apply — the PNG or PBM reflects the chosen factor. |
+| **Virtual / file output (vector PDF)** | Supersample and dither are **not used** — see below. |
 
 There is no single “best” value: it trades **quality vs render time**. When
 debugging quality, compare outputs at `3`, `4`, and `6` with
 `--protocol virtual --file out.png` before printing hardware labels.
+
+## Raster vs vector virtual export
+
+The virtual printer (`--protocol virtual`) supports two export modes:
+
+| | **Raster** (default) | **Vector** |
+| --- | --- | --- |
+| **Flag** | `--export-mode raster` (default) | `--export-mode vector` |
+| **Use when** | Preview how ink will look after 1-bit dithering | Share/print PDFs; sharp text & codes at any zoom |
+| **Pipeline** | transpile → render → dither → encode image | transpile → Chromium PrintToPdf |
+| **Supersample** | Yes (same as hardware) | No |
+| **Dither** | Yes | No |
+| **Printer DPI** | Sets dot grid and style px scale | Page size only (mm from media); layout uses 300 CSS dpi |
+| **Output** | PNG / BMP / TIFF / GIF / PBM | PDF |
+
+```bash
+# Vector PDF on catalog media
+lbl print --markdown "# Invite\n\n{{qr:https://example.com/invite}}" \
+  --printer LW550 --media 30252 --orientation portrait \
+  --protocol virtual --export-mode vector --file invite.pdf
+
+# Raster PNG for comparison (same label, dithered)
+lbl print --markdown "# Invite\n\n{{qr:https://example.com/invite}}" \
+  --printer LW550 --media 30252 --orientation portrait \
+  --protocol virtual --file invite.png
+```
+
+**Layout reference DPI:** vector export converts millimetre style sizes to CSS
+pixels at **300 dpi** (`CSS_LAYOUT_REFERENCE_DPI` in `lbl-core`). This affects
+browser layout math only — text, QR, and barcodes remain **vectors** in the PDF
+and scale cleanly for professional print. Embedded `<img>` / `{{image:…}}`
+content is still raster inside the PDF.
+
+QR codes and barcodes are drawn as **SVG** in the transpiled HTML (then either
+screenshot or embedded as vectors in the PDF).
 
 ## Preprocessing warnings
 

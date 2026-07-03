@@ -1,6 +1,6 @@
 # lbl-render
 
-Render HTML to a raster image sized for printer media.
+Render HTML to a raster image sized for printer media, or export vector PDF.
 
 ## Two-pass rendering
 
@@ -26,6 +26,14 @@ A `RenderBackend` rasterizes the HTML:
 
 Build without the in-process browser using `--no-default-features` and select
 `--backend sidecar` at runtime.
+
+## Vector PDF export
+
+`RenderBackend::export_pdf` drives Chromium PrintToPdf for the orchestrator's
+vector virtual export (`--protocol virtual --export-mode vector`). The HTML is
+expected to include an `@page` rule from transpilation; page dimensions come from
+configured media in millimetres. Layout uses `CSS_LAYOUT_REFERENCE_DPI` (300) in
+`lbl-core`.
 
 ## CLI
 
