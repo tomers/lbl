@@ -29,16 +29,7 @@ pub struct SplitSource {
 /// Split a source into optional frontmatter and the template body.
 pub fn split(source: &str) -> SplitSource {
     let trimmed_start = source.trim_start_matches(['\u{feff}']);
-    let mut lines = trimmed_start.lines().peekable();
-
-    while let Some(line) = lines.peek() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || is_html_comment(trimmed) {
-            lines.next();
-            continue;
-        }
-        break;
-    }
+    let mut lines = trimmed_start.lines();
 
     let first = match lines.next() {
         Some(l) => l,
@@ -89,10 +80,6 @@ pub fn split(source: &str) -> SplitSource {
     }
 }
 
-fn is_html_comment(line: &str) -> bool {
-    line.starts_with("<!--") && line.ends_with("-->")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,23 +105,6 @@ mod tests {
         let src = "---\n{\"name\":\"Bob\"}\n---\nbody";
         let s = split(src);
         assert_eq!(s.data_format, None);
-        assert_eq!(s.template, "body");
-    }
-
-    #[test]
-    fn leading_html_comment_before_frontmatter() {
-        let src = "<!-- lint -->\n---json\n[{\"name\":\"A\"}]\n---\n**{{ name }}**";
-        let s = split(src);
-        assert_eq!(s.data_format, Some(DataFormat::Json));
-        assert_eq!(s.data_text.as_deref(), Some("[{\"name\":\"A\"}]"));
-        assert_eq!(s.template, "**{{ name }}**");
-    }
-
-    #[test]
-    fn leading_blank_lines_before_frontmatter() {
-        let src = "\n\n---toml\nname = \"X\"\n---\nbody";
-        let s = split(src);
-        assert_eq!(s.data_format, Some(DataFormat::Toml));
         assert_eq!(s.template, "body");
     }
 }
