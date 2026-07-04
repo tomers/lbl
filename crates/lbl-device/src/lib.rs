@@ -32,7 +32,7 @@ pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 
 #[cfg(feature = "usb")]
-pub use transport::{DymoLwUsbTransport, UsbTransport};
+pub use transport::{query_dymo_lw_loaded_media, DymoLwUsbTransport, UsbTransport};
 
 #[cfg(feature = "serial")]
 pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};

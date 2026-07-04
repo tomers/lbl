@@ -336,6 +336,16 @@ fn open_usb_printer_session(usb: &UsbTransport) -> Result<UsbPrinterSession, Dev
     Ok(UsbPrinterSession::new(interface, ep_out, ep_in))
 }
 
+/// Query the NFC-reported media SKU from a DYMO LW5 printer over USB.
+///
+/// Opens a short-lived session, sends a lock-release status request, and
+/// parses the 12-character SKU field from the 32-byte reply.
+#[cfg(feature = "usb")]
+pub fn query_dymo_lw_loaded_media(usb: &UsbTransport) -> Result<Option<String>, DeviceError> {
+    let mut session = open_usb_printer_session(usb)?;
+    crate::dymo_lw::query_loaded_media_sku(&mut session)
+}
+
 /// USB transport for the DYMO LabelWriter 550-series (LW5) protocol.
 ///
 /// Unlike [`UsbTransport`], this keeps the device open across jobs and performs

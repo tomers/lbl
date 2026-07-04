@@ -137,8 +137,38 @@ pub async fn profile_detected_media(
         return Ok(Json(json!({ "detected": null })).into_response());
     }
 
-    // Device SKU detection is not wired yet; return null until drivers expose it.
-    Ok(Json(json!({ "detected": null })).into_response())
+    let profile = profile.clone();
+    let sku = tokio::task::spawn_blocking(move || detect_loaded_media_sku(&profile))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let detected = sku.and_then(|sku| detected_media_from_catalog(&state.catalog, &sku));
+    Ok(Json(json!({ "detected": detected })).into_response())
+}
+
+fn detect_loaded_media_sku(profile: &PrinterProfile) -> Option<String> {
+    if profile.model.protocol != Protocol::DymoLw {
+        return None;
+    }
+    match &profile.transport {
+        lbl_core::printer::Transport::Usb {
+            vendor_id,
+            product_id,
+            serial,
+        } => {
+            let usb = lbl_device::UsbTransport::new(*vendor_id, *product_id, serial.clone());
+            lbl_device::query_dymo_lw_loaded_media(&usb).ok().flatten()
+        }
+        _ => None,
+    }
+}
+
+fn detected_media_from_catalog(catalog: &Catalog, sku: &str) -> Option<serde_json::Value> {
+    let name = catalog.lookup(sku).map(|e| e.name.clone());
+    Some(json!({
+        "sku": sku,
+        "name": name,
+    }))
 }
 
 fn profile_is_connected(profile: &PrinterProfile) -> bool {
@@ -922,5 +952,13 @@ mod browser_hints_tests {
         assert_eq!(resp["handshake"], "fire_and_forget");
         assert_eq!(resp["labels"].as_array().unwrap().len(), 1);
         assert!(resp["labels"][0]["data_base64"].is_string());
+    }
+
+    #[test]
+    fn detected_media_resolves_catalog_name() {
+        let catalog = Catalog::bundled().unwrap();
+        let detected = detected_media_from_catalog(&catalog, "11352").unwrap();
+        assert_eq!(detected["sku"], "11352");
+        assert!(detected["name"].as_str().unwrap().contains("11352"));
     }
 }
