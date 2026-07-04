@@ -41,8 +41,29 @@ const VISUAL_WIDTH_MARGIN: f64 = 1.35;
 /// Estimated em width of one terminal column at the transpiled font size.
 const EM_PER_COLUMN: f64 = 0.55;
 
-/// CSS rule setting a transpile-time font size, when viewport geometry is known.
-pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
+fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
+    (px * opts.font_fit_scale.clamp(0.01, 5.0)).max(1.0)
+}
+
+/// Parse the auto-fit font size actually injected into transpiled HTML.
+pub fn injected_fit_font_px(html: &str) -> Option<f64> {
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
+            r"(?:\.lbl-label>\.lbl-text:only-child|\.lbl-row:has\(\.lbl-qr\)>\.lbl-text)\{font-size:([\d.]+)px\}",
+        )
+        .expect("injected fit font regex")
+    });
+    RE.captures(html)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse().ok())
+}
+
+/// Largest auto-fit text size in pixels for this body, if computable.
+pub fn fitted_font_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
+    row_text_qr_fit_px(body, opts).or_else(|| lone_text_fit_px(body, opts))
+}
+
+fn lone_text_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
     let (width, height) = fit_box_px(opts)?;
     let caps = LONE_TEXT_RE.captures(body)?;
     let inner = caps.get(1)?.as_str();
@@ -50,14 +71,10 @@ pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> 
         return None;
     }
     let text = html_to_plain_text(inner);
-    let font_px = max_fit_font_px(width, height, &text);
-    Some(format!(
-        ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px}}\n"
-    ))
+    Some(scaled_fit_px(max_fit_font_px(width, height, &text), opts))
 }
 
-/// CSS rule setting a transpile-time font size for text beside a QR in a row.
-pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
+fn row_text_qr_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
     let (box_w, box_h) = fit_box_px(opts)?;
     let caps = ROW_TEXT_QR_RE.captures(body)?;
     let inner = caps.get(1)?.as_str();
@@ -69,7 +86,20 @@ pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String
     let qr_w = qr_width_px(qr_attrs, opts.style.qr_size_px);
     let gap = opts.style.element_gap_px.max(0.0);
     let text_w = (box_w - qr_w - gap).max(1.0);
-    let font_px = max_fit_font_px(text_w, box_h, &text);
+    Some(scaled_fit_px(max_fit_font_px(text_w, box_h, &text), opts))
+}
+
+/// CSS rule setting a transpile-time font size, when viewport geometry is known.
+pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
+    let font_px = lone_text_fit_px(body, opts)?;
+    Some(format!(
+        ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px}}\n"
+    ))
+}
+
+/// CSS rule setting a transpile-time font size for text beside a QR in a row.
+pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
+    let font_px = row_text_qr_fit_px(body, opts)?;
     Some(format!(
         ".lbl-row:has(.lbl-qr)>.lbl-text{{font-size:{font_px:.2}px}}\n"
     ))
@@ -330,6 +360,91 @@ mod tests {
             font > 20.0 && font <= 142.0 / LINE_HEIGHT + 0.01,
             "font={font}"
         );
+    }
+
+    #[test]
+    fn font_fit_scale_can_exceed_maximum_fit() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 160.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            font_fit_scale: 1.5,
+            media_inset: MediaInsetPx::default(),
+            ..Default::default()
+        };
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        let full_css = row_text_qr_fit_css(
+            body,
+            &TranspileOptions {
+                font_fit_scale: 1.0,
+                ..opts.clone()
+            },
+        )
+        .expect("full css");
+        let enlarged_css = row_text_qr_fit_css(body, &opts).expect("enlarged css");
+        let parse_font = |css: &str| -> f64 {
+            css.split("font-size:")
+                .nth(1)
+                .unwrap()
+                .trim_end_matches("px}\n")
+                .parse()
+                .unwrap()
+        };
+        let full = parse_font(&full_css);
+        let enlarged = parse_font(&enlarged_css);
+        assert!(
+            (enlarged - full * 1.5).abs() < 0.05,
+            "full={full} enlarged={enlarged}"
+        );
+    }
+
+    #[test]
+    fn font_fit_scale_shrinks_row_text_beside_qr() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 160.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            font_fit_scale: 0.5,
+            media_inset: MediaInsetPx::default(),
+            ..Default::default()
+        };
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        let full_css = row_text_qr_fit_css(
+            body,
+            &TranspileOptions {
+                font_fit_scale: 1.0,
+                ..opts.clone()
+            },
+        )
+        .expect("full css");
+        let half_css = row_text_qr_fit_css(body, &opts).expect("half css");
+        let parse_font = |css: &str| -> f64 {
+            css.split("font-size:")
+                .nth(1)
+                .unwrap()
+                .trim_end_matches("px}\n")
+                .parse()
+                .unwrap()
+        };
+        let full = parse_font(&full_css);
+        let half = parse_font(&half_css);
+        assert!((half - full * 0.5).abs() < 0.05, "full={full} half={half}");
     }
 
     #[test]

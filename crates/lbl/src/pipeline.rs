@@ -492,6 +492,8 @@ pub struct PipelineOptions {
     pub label_valign: LabelValign,
     /// Fit-box scale in fill mode (resolved from config/CLI).
     pub label_fit_scale: f64,
+    /// Auto-fit text scale in fill mode (resolved from config/CLI).
+    pub font_fit_scale: f64,
     /// Inset from the physical media edge (resolved from config/CLI).
     pub media_inset: MediaInsetPx,
 }
@@ -614,6 +616,11 @@ pub fn resolve_label_fit_scale(scale: f64) -> f64 {
     scale.clamp(0.01, 1.0)
 }
 
+/// Resolve a configured auto-fit text scale (clamped to `(0.01, 5.0]`).
+pub fn resolve_font_fit_scale(scale: f64) -> f64 {
+    scale.clamp(0.01, 5.0)
+}
+
 /// Build a [`MediaInset`] from the style configuration.
 pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     MediaInset {
@@ -720,6 +727,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             label_align: opts.label_align,
             label_valign: opts.label_valign,
             label_fit_scale: opts.label_fit_scale,
+            font_fit_scale: opts.font_fit_scale,
             media_inset: opts.media_inset,
             ..Default::default()
         },
@@ -819,6 +827,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
             label_align: opts.label_align,
             label_valign: opts.label_valign,
             label_fit_scale: opts.label_fit_scale,
+            font_fit_scale: opts.font_fit_scale,
             media_inset: opts.media_inset,
             page_size: Some(page_size),
         },
@@ -974,6 +983,7 @@ mod tests {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
         }
     }
@@ -1142,6 +1152,7 @@ mod tests {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 64, &opts).unwrap();
@@ -1172,6 +1183,7 @@ mod tests {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 96, &opts).unwrap();

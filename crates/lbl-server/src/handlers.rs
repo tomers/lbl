@@ -8,9 +8,10 @@ use serde::Deserialize;
 use serde_json::json;
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, render_viewport_px, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_style, resolve_style_vector, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
+    authoring_labels, encode_label, render_viewport_px, resolve_font_fit_scale,
+    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
+    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, PipelineOptions,
+    Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::printer::{PrinterProfile, Protocol};
@@ -18,7 +19,9 @@ use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{transpile, AssetsBase, LabelFitSetting, TranspileOptions};
+use lbl_transpile_html::{
+    fitted_font_px, injected_fit_font_px, transpile, AssetsBase, LabelFitSetting, TranspileOptions,
+};
 
 use crate::AppState;
 
@@ -327,6 +330,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
     let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, PREVIEW_SUPERSAMPLE);
     let rotation = resolve_rotation(&state, req.orientation, req.rotate_cw, req.rotate_ccw);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, rotation);
@@ -345,27 +349,34 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             lbl_core::media::MediaLength::Continuous => 0.0,
         },
     });
+    let px_per_mm = req.dpi * PREVIEW_SUPERSAMPLE as f64 / 25.4;
     let out: Vec<_> = labels
         .into_iter()
         .map(|l| {
-            let html = transpile(
-                &l.html,
-                &TranspileOptions {
-                    mode: lbl_core::job::OutputMode::Preview,
-                    assets_base: AssetsBase::Cdn,
-                    index: Some(l.index),
-                    count: Some(count),
-                    style: style.clone(),
-                    label_fit,
-                    viewport: Some(viewport.clone()),
-                    label_align,
-                    label_valign,
-                    label_fit_scale,
-                    media_inset,
-                    ..Default::default()
-                },
-            );
-            json!({ "index": l.index, "html": html })
+            let transpile_opts = TranspileOptions {
+                mode: lbl_core::job::OutputMode::Preview,
+                assets_base: AssetsBase::Cdn,
+                index: Some(l.index),
+                count: Some(count),
+                style: style.clone(),
+                label_fit,
+                viewport: Some(viewport.clone()),
+                label_align,
+                label_valign,
+                label_fit_scale,
+                font_fit_scale,
+                media_inset,
+                ..Default::default()
+            };
+            let html = transpile(&l.html, &transpile_opts);
+            let computed_font_size_mm = injected_fit_font_px(&html)
+                .or_else(|| fitted_font_px(&l.html, &transpile_opts))
+                .map(|px| px / px_per_mm);
+            let mut label_json = json!({ "index": l.index, "html": html });
+            if let Some(mm) = computed_font_size_mm {
+                label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
+            }
+            label_json
         })
         .collect();
     Ok(Json(json!({ "count": count, "labels": out, "media": media_info })).into_response())
@@ -377,6 +388,7 @@ pub struct StyleReqOverrides {
     element_gap_mm: Option<f64>,
     border_width_mm: Option<f64>,
     font_size_mm: Option<f64>,
+    font_fit_scale: Option<f64>,
     label_fit: Option<String>,
     label_align: Option<String>,
     label_valign: Option<String>,
@@ -395,6 +407,9 @@ fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config
     }
     if let Some(v) = overrides.font_size_mm {
         style.font_size_mm = v;
+    }
+    if let Some(v) = overrides.font_fit_scale {
+        style.font_fit_scale = v;
     }
     if let Some(v) = &overrides.label_fit {
         style.label_fit = v.clone();
@@ -570,6 +585,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
     let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
 
     let protocol = parse_protocol(&req.protocol)?;
@@ -604,6 +620,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         label_align,
         label_valign,
         label_fit_scale,
+        font_fit_scale,
         media_inset,
     };
 
@@ -719,6 +736,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
 
     let rotation = req.rotation(&state);
     let opts = PipelineOptions {
@@ -739,6 +757,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         label_align,
         label_valign,
         label_fit_scale,
+        font_fit_scale,
         media_inset,
     };
 

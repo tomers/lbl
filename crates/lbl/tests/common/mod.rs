@@ -222,6 +222,7 @@ pub fn render_vector_pdf_with_layout(
             label_align: layout.label_align,
             label_valign: layout.label_valign,
             label_fit_scale: layout.label_fit_scale,
+            font_fit_scale: 1.0,
             media_inset: layout.media_inset,
             page_size: Some(page_size),
         },

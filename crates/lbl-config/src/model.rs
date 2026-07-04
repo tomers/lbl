@@ -106,6 +106,9 @@ pub struct StyleConfig {
     pub label_valign: String,
     /// Fit-box scale in fill mode (`1.0` = 100%; also accepts `0.8` or `80%`).
     pub label_fit_scale: f64,
+    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = grow to
+    /// fill; `0.8` = 80% of the computed maximum).
+    pub font_fit_scale: f64,
     /// Inset from the physical media edge, uniform (mm). See also the axis and
     /// side-specific `media_inset_*` fields.
     pub media_inset_mm: f64,
@@ -142,6 +145,7 @@ impl Default for StyleConfig {
             label_align: "center".into(),
             label_valign: "center".into(),
             label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
             media_inset_mm: 0.0,
             media_inset_horizontal_mm: None,
             media_inset_vertical_mm: None,

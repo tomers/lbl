@@ -12,11 +12,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use lbl::job_input;
 use lbl::pipeline::{
-    authoring_labels, encode_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_status_target, resolve_style, resolve_style_vector,
-    resolve_template_format, EncodeLabelsOptions, EncodeLabelsResult, PipelineOptions, Source,
-    VECTOR_CSS_DPI,
+    authoring_labels, encode_labels, render_viewport_px, resolve_font_fit_scale,
+    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
+    resolve_media, resolve_media_inset, resolve_print_transport, resolve_status_target,
+    resolve_style, resolve_style_vector, resolve_template_format, EncodeLabelsOptions,
+    EncodeLabelsResult, PipelineOptions, Source, VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::Catalog;
@@ -282,6 +282,11 @@ struct StyleArgs {
     #[arg(long)]
     label_fit_scale: Option<String>,
 
+    /// Auto-fit text scale in fill mode (`0.8`, `80%`, …; overrides config
+    /// `style.font_fit_scale`).
+    #[arg(long)]
+    font_fit_scale: Option<String>,
+
     /// Inset from the physical media edge, all sides (overrides config
     /// `style.media_inset_mm`).
     #[arg(long)]
@@ -426,6 +431,14 @@ impl StyleArgs {
             parse_fit_scale(raw).unwrap_or(style.label_fit_scale)
         } else {
             style.label_fit_scale
+        }
+    }
+
+    fn font_scale(&self, style: &StyleConfig) -> f64 {
+        if let Some(raw) = &self.font_fit_scale {
+            parse_fit_scale(raw).unwrap_or(style.font_fit_scale)
+        } else {
+            style.font_fit_scale
         }
     }
 }
@@ -810,6 +823,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
+    let font_fit_scale = resolve_font_fit_scale(args.style.font_scale(&style_cfg));
 
     let preview_media = media.clone();
 
@@ -838,6 +852,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         label_align,
         label_valign,
         label_fit_scale,
+        font_fit_scale,
         media_inset,
     };
 
@@ -1219,6 +1234,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
     let label_align = resolve_label_align(&style_cfg.label_align);
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
+    let font_fit_scale = resolve_font_fit_scale(args.style.font_scale(&style_cfg));
     let media_inset = resolve_media_inset(&style_cfg).to_px(args.media.dpi, PREVIEW_SUPERSAMPLE);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
 
@@ -1243,6 +1259,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
                 label_align,
                 label_valign,
                 label_fit_scale,
+                font_fit_scale,
                 media_inset,
                 ..Default::default()
             },

@@ -527,6 +527,8 @@ pub struct TranspileOptions {
     pub label_valign: LabelValign,
     /// Fraction of the viewport used by the fit box in fill mode (`1.0` = 100%).
     pub label_fit_scale: f64,
+    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = maximum).
+    pub font_fit_scale: f64,
     /// Inset from the physical media edge (calibration margin).
     pub media_inset: MediaInsetPx,
     /// Physical page size for vector PDF export (`@page` rule).
@@ -546,6 +548,7 @@ impl Default for TranspileOptions {
             label_align: LabelAlign::default(),
             label_valign: LabelValign::default(),
             label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
             page_size: None,
         }
@@ -659,6 +662,10 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
     if opts.label_fit == LabelFit::Fill {
+        head.push_str(&format!(
+            ".lbl-label{{--lbl-font-fit-scale:{:.4}}}\n",
+            opts.font_fit_scale.clamp(0.01, 5.0)
+        ));
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
         head.push_str(assets::LABEL_FIT_ROW_TEXT_CSS);
@@ -859,6 +866,31 @@ mod tests {
             "{out}"
         );
         assert!(out.contains(".lbl-label h1{font-size:1.35em"), "{out}");
+    }
+
+    #[test]
+    fn fill_mode_scales_lone_text_by_font_fit_scale() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            font_fit_scale: 0.5,
+            ..Default::default()
+        };
+        let out = transpile(
+            "<div class=\"lbl-label\"><div class=\"lbl-text\">#1</div></div>",
+            &opts,
+        );
+        assert!(
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:64."),
+            "{out}"
+        );
     }
 
     #[test]

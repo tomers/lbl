@@ -79,7 +79,7 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
   flex-direction:column;
   width:100%;
   line-height:1.1;
-  font-size:min(calc(100cqh / 1.1),100cqw);
+  font-size:calc(min(calc(100cqh / 1.1), 100cqw) * var(--lbl-font-fit-scale, 1));
   white-space:pre-wrap;
   overflow:hidden;
   word-break:break-word;
