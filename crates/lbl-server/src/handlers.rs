@@ -218,6 +218,8 @@ pub struct SourceReq {
     #[serde(default)]
     raw: bool,
     #[serde(default)]
+    markdown: Option<String>,
+    #[serde(default)]
     html: Option<String>,
     #[serde(default)]
     template: Option<String>,
@@ -237,6 +239,9 @@ impl SourceReq {
                 raw: self.raw,
             });
         }
+        if let Some(markdown) = self.markdown {
+            return Ok(Source::Markdown(markdown));
+        }
         if let Some(html) = self.html {
             return Ok(Source::Html(html));
         }
@@ -250,7 +255,7 @@ impl SourceReq {
         }
         Err(ApiError(
             StatusCode::BAD_REQUEST,
-            "provide one of: text, html, template".into(),
+            "provide one of: text, markdown, html, template".into(),
         ))
     }
 }

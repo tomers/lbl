@@ -22,6 +22,7 @@ impl MarkdownDocument {
     /// authoring element; everything else is converted from Markdown to HTML.
     pub fn parse(input: &str) -> Self {
         let (template, directives) = extract_directives(input);
+        let template = expand_underline(&template);
         let mut body = markdown_to_html(&template);
         for (placeholder, block) in directives {
             body = body.replace(&placeholder, &block.to_authoring_html());
@@ -105,6 +106,48 @@ fn extract_directives(input: &str) -> (String, Vec<(String, Block)>) {
     }
 
     (out, directives)
+}
+
+/// Expand `++underline++` spans to `<u>…</u>` before Markdown parsing.
+///
+/// Skips fenced and inline code so literal `++` in code is preserved.
+fn expand_underline(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+
+    while i < input.len() {
+        if input[i..].starts_with("```") {
+            if let Some(end) = input[i + 3..].find("```") {
+                let end_idx = i + 3 + end + 3;
+                out.push_str(&input[i..end_idx]);
+                i = end_idx;
+                continue;
+            }
+        }
+        if input.as_bytes()[i] == b'`' {
+            if let Some(end) = input[i + 1..].find('`') {
+                let end_idx = i + 1 + end + 1;
+                out.push_str(&input[i..end_idx]);
+                i = end_idx;
+                continue;
+            }
+        }
+        if input[i..].starts_with("++") {
+            if let Some(rel) = input[i + 2..].find("++") {
+                let inner = &input[i + 2..i + 2 + rel];
+                out.push_str("<u>");
+                out.push_str(inner);
+                out.push_str("</u>");
+                i = i + 2 + rel + 2;
+                continue;
+            }
+        }
+        let ch = input[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+
+    out
 }
 
 fn markdown_to_html(input: &str) -> String {
@@ -221,6 +264,29 @@ mod tests {
             html.contains("<barcode type=\"EAN13\">42</barcode>"),
             "{html}"
         );
+    }
+
+    #[test]
+    fn underline_marker_becomes_u_tag() {
+        let doc = MarkdownDocument::parse("Ship ++fast++");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<u>fast</u>"), "{html}");
+        assert!(!html.contains("++"), "{html}");
+    }
+
+    #[test]
+    fn underline_with_nested_emphasis() {
+        let doc = MarkdownDocument::parse("++**fast**++");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<u><strong>fast</strong></u>"), "{html}");
+    }
+
+    #[test]
+    fn underline_marker_skipped_in_inline_code() {
+        let doc = MarkdownDocument::parse("use `++x++` literal");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<code>++x++</code>"), "{html}");
+        assert!(!html.contains("<u>"), "{html}");
     }
 
     #[test]
