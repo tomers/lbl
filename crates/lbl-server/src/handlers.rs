@@ -310,7 +310,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     const PREVIEW_SUPERSAMPLE: u32 = 2;
     // Resolve the configured physical sizes against the standard preview DPI and
     // supersample factor so the browser preview matches printed sizing.
-    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style_cfg = load_style_cfg(&state, &req.style);
     let style = resolve_style(&style_cfg, req.dpi, PREVIEW_SUPERSAMPLE);
     let media = resolve_media(
         &state.catalog,
@@ -371,6 +371,43 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     Ok(Json(json!({ "count": count, "labels": out, "media": media_info })).into_response())
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct StyleReqOverrides {
+    padding_mm: Option<f64>,
+    element_gap_mm: Option<f64>,
+    border_width_mm: Option<f64>,
+    font_size_mm: Option<f64>,
+    label_fit: Option<String>,
+    label_align: Option<String>,
+    label_valign: Option<String>,
+}
+
+fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config::StyleConfig {
+    let mut style = state.loader.load().map(|c| c.style).unwrap_or_default();
+    if let Some(v) = overrides.padding_mm {
+        style.padding_mm = v;
+    }
+    if let Some(v) = overrides.element_gap_mm {
+        style.element_gap_mm = v;
+    }
+    if let Some(v) = overrides.border_width_mm {
+        style.border_width_mm = v;
+    }
+    if let Some(v) = overrides.font_size_mm {
+        style.font_size_mm = v;
+    }
+    if let Some(v) = &overrides.label_fit {
+        style.label_fit = v.clone();
+    }
+    if let Some(v) = &overrides.label_align {
+        style.label_align = v.clone();
+    }
+    if let Some(v) = &overrides.label_valign {
+        style.label_valign = v.clone();
+    }
+    style
+}
+
 #[derive(Deserialize)]
 pub struct PreviewReq {
     #[serde(flatten)]
@@ -390,6 +427,8 @@ pub struct PreviewReq {
     /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
     #[serde(default)]
     rotate_ccw: u32,
+    #[serde(flatten, default)]
+    style: StyleReqOverrides,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -447,6 +486,8 @@ pub struct PrintReq {
     /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
     #[serde(default)]
     rotate_ccw: u32,
+    #[serde(flatten, default)]
+    style: StyleReqOverrides,
     /// Also build the HTML pipeline debug report.
     #[serde(default)]
     debug: bool,
@@ -520,7 +561,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style_cfg = load_style_cfg(&state, &req.style);
     let style = resolve_style(&style_cfg, req.dpi, req.supersample);
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
@@ -658,7 +699,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         None
     };
 
-    let style_cfg = state.loader.load().map(|c| c.style).unwrap_or_default();
+    let style_cfg = load_style_cfg(&state, &req.style);
     let (style, media_inset) = if virtual_export_mode == lbl_driver_file::VirtualExportMode::Vector
     {
         (
