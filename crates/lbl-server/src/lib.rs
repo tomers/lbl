@@ -125,4 +125,97 @@ mod tests {
             .unwrap()
             .contains("lbl-qr"));
     }
+
+    #[tokio::test]
+    async fn preview_uses_landscape_viewport_by_default() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"text":"hi","media":"30252","dpi":300}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let width = json["media"]["width_px"].as_f64().unwrap();
+        let height = json["media"]["height_px"].as_f64().unwrap();
+        assert!(
+            width > height,
+            "expected landscape preview viewport, got {width}×{height}"
+        );
+    }
+
+    #[tokio::test]
+    async fn preview_portrait_orientation_swaps_viewport() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"hi","media":"30252","dpi":300,"orientation":"portrait"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let width = json["media"]["width_px"].as_f64().unwrap();
+        let height = json["media"]["height_px"].as_f64().unwrap();
+        assert!(
+            width < height,
+            "expected portrait preview viewport, got {width}×{height}"
+        );
+    }
+
+    #[tokio::test]
+    async fn upsert_browser_profile() {
+        let state = test_state();
+        let app = router(state);
+        let profile = serde_json::json!({
+            "id": "browser-test",
+            "name": "My DYMO",
+            "model": {
+                "brand": "DYMO",
+                "model": "LabelWriter 550",
+                "protocol": "dymolw",
+                "capabilities": {
+                    "dpi": 300.0,
+                    "max_width_mm": 57.0,
+                    "supports_cut": false,
+                    "reports_media": true
+                }
+            },
+            "transport": {
+                "type": "browser",
+                "connection": "usb",
+                "api": "webusb",
+                "vendor_id": 2338,
+                "product_id": 40
+            },
+            "default": false
+        });
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/api/printers/profiles")
+                    .header("content-type", "application/json")
+                    .body(Body::from(profile.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
 }

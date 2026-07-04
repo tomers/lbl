@@ -12,6 +12,7 @@ use lbl::pipeline::{
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
     resolve_style, resolve_style_vector, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
+use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;
 use lbl_dither::Algorithm;
@@ -95,7 +96,7 @@ pub async fn compatible_catalog(
 }
 
 pub async fn list_printers(State(_state): State<AppState>) -> ApiResult {
-    let discovered = lbl_device::discover_usb();
+    let discovered = lbl_device::discover();
     Ok(Json(discovered).into_response())
 }
 
@@ -141,7 +142,7 @@ pub async fn profile_detected_media(
 }
 
 fn profile_is_connected(profile: &PrinterProfile) -> bool {
-    let discovered = lbl_device::discover_usb();
+    let discovered = lbl_device::discover();
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
             vendor_id,
@@ -156,11 +157,17 @@ fn profile_is_connected(profile: &PrinterProfile) -> bool {
                     .map(|(a, b)| a == b)
                     .unwrap_or(true)
         }),
-        lbl_core::printer::Transport::Serial { path, .. } => lbl_device::discover_serial()
+        lbl_core::printer::Transport::Serial { path, .. } => discovered
             .iter()
-            .any(|d| d.path.as_deref() == Some(path.as_str())),
-        lbl_core::printer::Transport::Ble { .. } => false,
+            .any(|d| d.connection == "serial" && d.path.as_deref() == Some(path.as_str())),
+        lbl_core::printer::Transport::Ble { name, .. } => discovered.iter().any(|d| {
+            d.connection == "ble"
+                && d.path
+                    .as_deref()
+                    .is_some_and(|p| p.to_ascii_lowercase().contains(&name.to_ascii_lowercase()))
+        }),
         lbl_core::printer::Transport::Network { .. } => false,
+        lbl_core::printer::Transport::Browser { .. } => false,
     }
 }
 
@@ -240,7 +247,8 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, PREVIEW_SUPERSAMPLE);
-    let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None);
+    let rotation = resolve_rotation(&state, req.orientation, req.rotate_cw, req.rotate_ccw);
+    let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, rotation);
     let media_info = json!({
         "width_mm": media.width_mm,
         "length_mm": match media.length {
@@ -287,6 +295,24 @@ pub struct PreviewReq {
     length_mm: Option<f64>,
     #[serde(default = "default_dpi")]
     dpi: f64,
+    /// Layout orientation (`portrait`|`landscape`). Falls back to the
+    /// configured default (landscape) when omitted.
+    #[serde(default)]
+    orientation: Option<lbl_core::Orientation>,
+    /// Extra clockwise quarter-turns, composed on top of the orientation.
+    #[serde(default)]
+    rotate_cw: u32,
+    /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
+    #[serde(default)]
+    rotate_ccw: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DispatchMode {
+    #[default]
+    Server,
+    Client,
 }
 
 #[derive(Deserialize)]
@@ -299,6 +325,11 @@ pub struct PrintReq {
     #[serde(default = "default_dpi")]
     dpi: f64,
     protocol: String,
+    /// Catalog printer key for browser transport hints (e.g. `LabelWriter 550`).
+    #[serde(default)]
+    printer: Option<String>,
+    #[serde(default)]
+    dispatch_mode: DispatchMode,
     #[serde(default)]
     cut: bool,
     #[serde(default)]
@@ -312,6 +343,7 @@ pub struct PrintReq {
     network: Option<String>,
     usb: Option<String>,
     serial: Option<String>,
+    bluetooth: Option<String>,
     #[serde(default)]
     use_sidecar: bool,
     /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
@@ -339,15 +371,24 @@ impl PrintReq {
     /// Resolve the net [`lbl_core::Rotation`] for this request: the explicit
     /// orientation (or the configured default) plus any extra quarter-turns.
     fn rotation(&self, state: &AppState) -> lbl_core::Rotation {
-        let orientation = self.orientation.unwrap_or_else(|| {
-            state
-                .loader
-                .load()
-                .map(|c| c.render.orientation)
-                .unwrap_or_default()
-        });
-        lbl_core::Rotation::for_print(orientation, self.rotate_cw, self.rotate_ccw)
+        resolve_rotation(state, self.orientation, self.rotate_cw, self.rotate_ccw)
     }
+}
+
+fn resolve_rotation(
+    state: &AppState,
+    orientation: Option<lbl_core::Orientation>,
+    rotate_cw: u32,
+    rotate_ccw: u32,
+) -> Rotation {
+    let orientation = orientation.unwrap_or_else(|| {
+        state
+            .loader
+            .load()
+            .map(|c| c.render.orientation)
+            .unwrap_or_default()
+    });
+    Rotation::for_print(orientation, rotate_cw, rotate_ccw)
 }
 
 fn default_dpi() -> f64 {
@@ -406,6 +447,18 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
 
     let protocol = parse_protocol(&req.protocol)?;
+    if req.dispatch_mode == DispatchMode::Client
+        && matches!(
+            protocol,
+            Protocol::Virtual | Protocol::Console | Protocol::Html
+        )
+    {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "client dispatch_mode does not support virtual, console, or html protocols".into(),
+        ));
+    }
+
     let rotation = req.rotation(&state);
     let opts = PipelineOptions {
         protocol,
@@ -431,9 +484,13 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
         .map_err(ApiError::from)?;
     let use_sidecar = req.use_sidecar;
+    let dispatch_mode = req.dispatch_mode;
     let network = req.network.clone();
     let usb = req.usb.clone();
     let serial = req.serial.clone();
+    let bluetooth = req.bluetooth.clone();
+    let catalog = state.catalog.clone();
+    let printer_key = req.printer.clone();
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
     let report = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
@@ -444,7 +501,11 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             let backend = ChromiumBackend::launch()?;
             encode_all(&backend, &registry, &labels, &opts)?
         };
-        dispatch(encoded, protocol, network, usb, serial)
+        if dispatch_mode == DispatchMode::Client {
+            build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
+        } else {
+            dispatch(encoded, protocol, network, usb, serial, bluetooth)
+        }
     })
     .await
     .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -653,6 +714,7 @@ fn dispatch(
     network: Option<String>,
     usb: Option<String>,
     serial: Option<String>,
+    bluetooth: Option<String>,
 ) -> anyhow::Result<serde_json::Value> {
     use lbl::dispatch::{dispatch_encoded, parse_serial_target};
     let total = encoded.len();
@@ -681,14 +743,184 @@ fn dispatch(
         let (path, baud) = parse_serial_target(&target);
         let mut t = lbl_device::SerialTransport::new(path, baud);
         dispatch_encoded(encoded, protocol, &mut t)
+    } else if let Some(target) = bluetooth {
+        dispatch_bluetooth(encoded, protocol, target)?
     } else {
-        anyhow::bail!("no target; provide network, usb, or serial");
+        anyhow::bail!("no target; provide network, usb, serial, or bluetooth");
     };
 
     Ok(json!({
+        "dispatch_mode": "server",
         "total": total,
         "completed": report.completed,
         "remaining": report.remaining,
         "disconnected": report.disconnected,
     }))
+}
+
+#[cfg(feature = "ble")]
+fn dispatch_bluetooth(
+    encoded: Vec<(String, Vec<u8>)>,
+    protocol: Protocol,
+    target: String,
+) -> anyhow::Result<lbl_spool::SpoolReport> {
+    let mut t = lbl_device::BleTransport::new(target);
+    Ok(lbl::dispatch::dispatch_encoded(encoded, protocol, &mut t))
+}
+
+#[cfg(not(feature = "ble"))]
+fn dispatch_bluetooth(
+    _encoded: Vec<(String, Vec<u8>)>,
+    _protocol: Protocol,
+    _target: String,
+) -> anyhow::Result<lbl_spool::SpoolReport> {
+    anyhow::bail!(
+        "Bluetooth LE support is not compiled in; rebuild lbl-server with `--features ble`"
+    )
+}
+
+fn handshake_for_protocol(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::DymoLw => "dymo_lw",
+        Protocol::Niimbot => "niimbot_poll",
+        _ => "fire_and_forget",
+    }
+}
+
+fn resolve_catalog_printer<'a>(
+    catalog: &'a Catalog,
+    printer_key: Option<&str>,
+    protocol: Protocol,
+) -> Option<&'a PrinterEntry> {
+    if let Some(key) = printer_key {
+        return catalog.lookup_printer(key);
+    }
+    catalog.printers().iter().find(|p| p.protocol == protocol)
+}
+
+/// Build browser transport hints from catalog connection entries.
+pub fn browser_transport_hints(
+    catalog: &Catalog,
+    protocol: Protocol,
+    printer_key: Option<&str>,
+) -> serde_json::Value {
+    let Some(printer) = resolve_catalog_printer(catalog, printer_key, protocol) else {
+        return json!({ "api": default_browser_api(protocol) });
+    };
+
+    let mut webusb_filters = Vec::new();
+    let mut ble_names = Vec::new();
+    let mut has_serial = false;
+
+    for conn in &printer.connections {
+        match conn {
+            ConnectionHint::Usb {
+                vendor_id,
+                product_id,
+            } => {
+                let mut filter = json!({ "vendorId": vendor_id });
+                if let Some(pid) = product_id {
+                    filter["productId"] = json!(pid);
+                }
+                webusb_filters.push(filter);
+            }
+            ConnectionHint::Serial { .. } => has_serial = true,
+            ConnectionHint::Ble { name } => ble_names.push(name.clone()),
+            ConnectionHint::Network { .. } => {}
+        }
+    }
+
+    if !webusb_filters.is_empty() {
+        return json!({ "api": "webusb", "filters": webusb_filters });
+    }
+    if has_serial {
+        return json!({ "api": "web_serial" });
+    }
+    if !ble_names.is_empty() {
+        return json!({ "api": "web_bluetooth", "names": ble_names });
+    }
+
+    json!({ "api": default_browser_api(protocol) })
+}
+
+fn default_browser_api(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Niimbot => "web_serial",
+        Protocol::Dymo | Protocol::DymoLw => "webusb",
+        _ => "webusb",
+    }
+}
+
+fn build_client_print_response(
+    catalog: &Catalog,
+    protocol: Protocol,
+    printer_key: Option<&str>,
+    encoded: Vec<(String, Vec<u8>)>,
+) -> anyhow::Result<serde_json::Value> {
+    use base64::Engine as _;
+
+    let labels: Vec<serde_json::Value> = encoded
+        .iter()
+        .enumerate()
+        .map(|(i, (name, bytes))| {
+            json!({
+                "index": i,
+                "filename": name,
+                "size": bytes.len(),
+                "data_base64": base64::engine::general_purpose::STANDARD.encode(bytes),
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "dispatch_mode": "client",
+        "protocol": opts_protocol_name(protocol),
+        "handshake": handshake_for_protocol(protocol),
+        "transport": browser_transport_hints(catalog, protocol, printer_key),
+        "labels": labels,
+    }))
+}
+
+#[cfg(test)]
+mod browser_hints_tests {
+    use super::*;
+    use lbl_catalog::Catalog;
+
+    #[test]
+    fn dymo_lw_hints_webusb_with_filters() {
+        let catalog = Catalog::bundled().unwrap();
+        let hints = browser_transport_hints(&catalog, Protocol::DymoLw, Some("LabelWriter 550"));
+        assert_eq!(hints["api"], "webusb");
+        assert!(hints["filters"].as_array().unwrap().iter().any(|f| {
+            f["vendorId"].as_u64() == Some(0x0922) && f["productId"].as_u64() == Some(0x0028)
+        }));
+    }
+
+    #[test]
+    fn niimbot_ble_hints() {
+        let catalog = Catalog::bundled().unwrap();
+        let hints = browser_transport_hints(&catalog, Protocol::Niimbot, Some("D110"));
+        assert_eq!(hints["api"], "web_bluetooth");
+        assert!(hints["names"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n.as_str() == Some("D110")));
+    }
+
+    #[test]
+    fn client_response_shape() {
+        let catalog = Catalog::bundled().unwrap();
+        let resp = build_client_print_response(
+            &catalog,
+            Protocol::Dymo,
+            Some("LabelWriter 450"),
+            vec![("label-0000.bin".into(), vec![0x01, 0x02])],
+        )
+        .unwrap();
+        assert_eq!(resp["dispatch_mode"], "client");
+        assert_eq!(resp["handshake"], "fire_and_forget");
+        assert_eq!(resp["labels"].as_array().unwrap().len(), 1);
+        assert!(resp["labels"][0]["data_base64"].is_string());
+    }
 }

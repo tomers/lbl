@@ -99,6 +99,28 @@ pub enum Transport {
         /// (e.g. `D110` or `D110-1A2B3C4D`).
         name: String,
     },
+    /// Browser-side delivery (WebUSB, Web Serial, or Web Bluetooth). Device I/O
+    /// runs in the user's browser; the server only encodes label bytes.
+    Browser {
+        /// User-facing connection: `usb` or `bluetooth`.
+        connection: String,
+        /// Internal API: `webusb`, `web_serial`, or `web_bluetooth`.
+        api: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        vendor_id: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        product_id: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        serial_number: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        port_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ble_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ble_name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        device_label: Option<String>,
+    },
 }
 
 /// Default baud rate for serial printers (NIIMBOT family).

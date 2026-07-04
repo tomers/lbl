@@ -12,7 +12,7 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 | GET | `/api/catalog` | List media entries |
 | GET | `/api/catalog/:key` | Resolve a media SKU/alias |
 | GET | `/api/catalog/compatible?printer=` | Media compatible with a printer |
-| GET | `/api/printers` | Discovered (USB) printers |
+| GET | `/api/printers` | Discovered printers (USB bulk, serial, BLE when enabled) |
 | GET | `/api/printers/profiles` | Persisted printer profiles |
 | PUT | `/api/printers/profiles` | Upsert a printer profile |
 | DELETE | `/api/printers/profiles/:id` | Remove a printer profile |
@@ -23,6 +23,40 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 `POST /api/preview` and `/api/print` accept a source body with one of `text`,
 `html`, or `template` (+ `data`, `each`). Printing runs the browser render on a
 blocking task and dispatches via the internal spooler.
+
+### Print dispatch modes (`POST /api/print`)
+
+`dispatch_mode` selects where encoded protocol bytes are delivered:
+
+- **`server`** (default): encode and dispatch to a host device via `network`,
+  `usb`, `serial`, or `bluetooth`.
+- **`client`**: encode only; return protocol bytes for browser-side delivery
+  (WebUSB, Web Serial, Web Bluetooth). Optional `printer` catalog key improves
+  transport hints.
+
+```json
+{
+  "text": "Hello",
+  "media": "11352",
+  "protocol": "dymo-lw",
+  "dispatch_mode": "client",
+  "printer": "LabelWriter 550"
+}
+```
+
+Client-mode response:
+
+```json
+{
+  "dispatch_mode": "client",
+  "protocol": "dymo-lw",
+  "handshake": "dymo_lw",
+  "transport": { "api": "webusb", "filters": [{ "vendorId": 2338, "productId": 40 }] },
+  "labels": [{ "index": 0, "filename": "label-0000.bin", "size": 1234, "data_base64": "..." }]
+}
+```
+
+`handshake` is one of `fire_and_forget`, `dymo_lw`, or `niimbot_poll`.
 
 ### Virtual file export (`POST /api/print/file`)
 
