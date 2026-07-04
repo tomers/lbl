@@ -295,6 +295,10 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         "dpi": media.dpi.0,
         "width_px": viewport.width,
         "height_px": viewport.height,
+        "corner_radius_px": match media.length {
+            lbl_core::media::MediaLength::Fixed(_) => style.corner_radius_px,
+            lbl_core::media::MediaLength::Continuous => 0.0,
+        },
     });
     let out: Vec<_> = labels
         .into_iter()

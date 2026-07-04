@@ -111,7 +111,7 @@ function recordEntries(record: unknown): Array<[string, string]> {
                     :alt="`Label ${label.index}`"
                     :width="label.width"
                     :height="label.height"
-                    class="max-w-full h-auto bg-white image-rendering-pixelated"
+                    class="max-w-full h-auto bg-white image-rendering-pixelated rounded-[2mm]"
                   />
                 </div>
 

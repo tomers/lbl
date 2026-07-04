@@ -94,7 +94,7 @@ pub const LABEL_FIT_FILL_PREVIEW_CSS: &str = r#"
 /// the document reads well in a browser/gallery.
 pub const PREVIEW_CSS: &str = r#"
 body{background:#e9e9ee;display:flex;align-items:center;justify-content:center;min-height:100vh}
-.lbl-preview{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);outline:1px dashed #b9b9c4;outline-offset:4px}
+.lbl-preview{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25)}
 "#;
 
 /// JS that renders QR placeholders (`.lbl-qr[data-qr]`) as SVG.

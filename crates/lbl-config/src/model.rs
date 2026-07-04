@@ -93,6 +93,8 @@ pub struct StyleConfig {
     pub element_gap_mm: f64,
     /// Border drawn around the label, in mm (0 = no border).
     pub border_width_mm: f64,
+    /// Corner radius on fixed die-cut labels, in mm (preview only).
+    pub corner_radius_mm: f64,
     /// How `.lbl-label` fills the render viewport: `auto` (fill fixed-length
     /// media, shrink on continuous), `fill`, or `content`.
     pub label_fit: String,
@@ -135,6 +137,7 @@ impl Default for StyleConfig {
             padding_mm: 2.0,
             element_gap_mm: 4.0,
             border_width_mm: 0.0,
+            corner_radius_mm: 2.0,
             label_fit: "auto".into(),
             label_align: "center".into(),
             label_valign: "center".into(),

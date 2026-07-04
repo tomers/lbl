@@ -30,6 +30,8 @@ pub struct LabelStyle {
     pub element_gap_px: f64,
     /// Border drawn around the label, in pixels (0 = no border).
     pub border_width_px: f64,
+    /// Corner radius for fixed die-cut labels in preview, in pixels (0 = square).
+    pub corner_radius_px: f64,
     /// QR error-correction level (redundancy).
     pub qr_error_correction: QrErrorCorrection,
     /// QR quiet zone, in modules (0 = none).
@@ -52,6 +54,7 @@ impl Default for LabelStyle {
             padding_px: 20.0,
             element_gap_px: 8.0,
             border_width_px: 0.0,
+            corner_radius_px: 0.0,
             qr_error_correction: QrErrorCorrection::default(),
             qr_margin: 0,
             qr_dark: "#000000".into(),
@@ -76,6 +79,7 @@ impl LabelStyle {
         padding_mm: f64,
         element_gap_mm: f64,
         border_width_mm: f64,
+        corner_radius_mm: f64,
         dpi: f64,
         supersample: u32,
     ) -> Self {
@@ -88,6 +92,7 @@ impl LabelStyle {
             padding_px: padding_mm * px_per_mm,
             element_gap_px: element_gap_mm * px_per_mm,
             border_width_px: border_width_mm * px_per_mm,
+            corner_radius_px: corner_radius_mm * px_per_mm,
             qr_error_correction: QrErrorCorrection::default(),
             qr_margin: 0,
             qr_dark: "#000000".into(),
@@ -623,6 +628,16 @@ fn rewrite_barcode(body: &str, features: &mut Features) -> String {
         .into_owned()
 }
 
+fn preview_corner_radius_css(style: &LabelStyle) -> String {
+    if style.corner_radius_px <= f64::EPSILON {
+        return String::new();
+    }
+    format!(
+        ".lbl-preview{{border-radius:{:.2}px;overflow:hidden}}\n",
+        style.corner_radius_px
+    )
+}
+
 fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     let mut head = String::new();
     head.push_str("<meta charset=\"utf-8\">\n");
@@ -657,6 +672,13 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     }
     if opts.mode == OutputMode::Preview {
         head.push_str(assets::PREVIEW_CSS);
+        if opts
+            .viewport
+            .as_ref()
+            .is_some_and(|viewport| viewport.height.is_some())
+        {
+            head.push_str(&preview_corner_radius_css(&opts.style));
+        }
     }
     head.push_str("</style>\n");
 
@@ -751,6 +773,36 @@ mod tests {
         assert!(out.contains("data-label-index=\"7\""));
         assert!(out.contains("data-label-count=\"200\""));
         assert!(out.contains("background")); // preview CSS present
+    }
+
+    #[test]
+    fn preview_fixed_media_has_rounded_corners() {
+        let opts = TranspileOptions {
+            mode: OutputMode::Preview,
+            viewport: Some(ViewportPx {
+                width: Some(100.0),
+                height: Some(200.0),
+            }),
+            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 300.0, 2),
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(out.contains("border-radius:47.24px"), "{out}");
+        assert!(out.contains("overflow:hidden"), "{out}");
+    }
+
+    #[test]
+    fn preview_continuous_media_has_no_rounded_corners() {
+        let opts = TranspileOptions {
+            mode: OutputMode::Preview,
+            viewport: Some(ViewportPx {
+                width: Some(100.0),
+                height: None,
+            }),
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(!out.contains("border-radius"), "{out}");
     }
 
     #[test]
@@ -1110,7 +1162,7 @@ mod tests {
     #[test]
     fn from_mm_scales_with_dpi_and_supersample() {
         // 3mm at 300dpi, supersample 3 -> 3 * 300 * 3 / 25.4 = ~106.3px.
-        let s = LabelStyle::from_mm(3.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 300.0, 3);
+        let s = LabelStyle::from_mm(3.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 300.0, 3);
         assert!((s.font_size_px - 106.299).abs() < 0.1, "{}", s.font_size_px);
         // 2mm padding at the same density.
         assert!((s.padding_px - 70.866).abs() < 0.1, "{}", s.padding_px);

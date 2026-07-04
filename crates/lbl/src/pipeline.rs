@@ -267,6 +267,7 @@ pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32
         style.padding_mm,
         style.element_gap_mm,
         style.border_width_mm,
+        style.corner_radius_mm,
         dpi,
         supersample,
     );
