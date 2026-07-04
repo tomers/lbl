@@ -6,14 +6,10 @@
 //! firmware until power-cycle. See DYMO's *LabelWriter 550 Series Technical
 //! Reference* and <https://thermal-label.github.io/labelwriter/protocol/lw5-raster>.
 
-use std::time::Duration;
-
 use crate::DeviceError;
 
 #[cfg(feature = "usb")]
-use nusb::transfer::{Buffer, Bulk, In, Out};
-#[cfg(feature = "usb")]
-use nusb::Interface;
+use crate::transport::{open_usb_bulk_session, Transport, UsbBulkSession, UsbTransport};
 
 /// ESC prefix byte for LW5 commands.
 pub const ESC: u8 = 0x1B;
@@ -50,70 +46,301 @@ const BAY_MEDIA_COUNTERFEIT: u8 = 10;
 /// Print-engine status: reply before lock is granted to this host.
 const PRINT_STATUS_NO_LOCK: u8 = 5;
 
-#[cfg(feature = "usb")]
-const USB_TIMEOUT: Duration = Duration::from_secs(30);
-
-#[cfg(feature = "usb")]
-const STATUS_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// A claimed USB printer interface kept open for an LW5 print session.
-#[cfg(feature = "usb")]
-pub struct UsbPrinterSession {
-    _interface: Interface,
-    ep_out: nusb::Endpoint<Bulk, Out>,
-    ep_in: nusb::Endpoint<Bulk, In>,
+/// Parsed fields from the 32-byte `ESC A` print-engine status reply.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Lw550PrintStatus {
+    /// Byte 0 — print engine state (idle, printing, error, …).
+    pub print_status: Lw550PrintEngineStatus,
+    /// Raw byte 0.
+    pub print_status_code: u8,
+    /// Bytes 1–4 — job id of the ongoing print process (0 when idle).
+    pub print_job_id: u32,
+    /// Bytes 5–6 — label/page index currently being printed.
+    pub label_index: u16,
+    /// Byte 8 — thermal print head health.
+    pub print_head_status: Lw550PrintHeadStatus,
+    /// Raw byte 8.
+    pub print_head_status_code: u8,
+    /// Byte 9 — print density setting in percent (0 disables printing; 1–200).
+    pub print_density: u8,
+    /// Byte 10 — main media bay / NFC roll state.
+    pub main_bay_status: Lw550MainBayStatus,
+    /// Raw byte 10.
+    pub main_bay_status_code: u8,
+    /// Bytes 11–22 — NFC-reported consumable SKU (when present).
+    pub sku: Option<String>,
+    /// Bytes 23–26 — present error code (0 = none).
+    pub error_id: u32,
+    /// Bytes 27–28 — remaining label count on the inserted roll.
+    pub label_count: u16,
+    /// Byte 29 (low nibble) — external power supply detected.
+    pub eps_present: bool,
+    /// Byte 30 (low nibble) — print head supply voltage.
+    pub print_head_voltage: Lw550PrintHeadVoltage,
+    /// Raw byte 30 low nibble.
+    pub print_head_voltage_code: u8,
 }
 
-#[cfg(feature = "usb")]
-impl UsbPrinterSession {
-    pub(crate) fn new(
-        interface: Interface,
-        ep_out: nusb::Endpoint<Bulk, Out>,
-        ep_in: nusb::Endpoint<Bulk, In>,
-    ) -> Self {
+/// JSON-friendly view of [`Lw550PrintStatus`] for APIs and CLI output.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Lw550PrintStatusView {
+    pub print_status: String,
+    pub print_status_code: u8,
+    pub print_job_id: u32,
+    pub label_index: u16,
+    pub print_head_status: String,
+    pub print_head_status_code: u8,
+    pub print_density: u8,
+    pub main_bay_status: String,
+    pub main_bay_status_code: u8,
+    pub sku: Option<String>,
+    pub error_id: u32,
+    pub label_count: u16,
+    pub eps_present: bool,
+    pub print_head_voltage: String,
+    pub print_head_voltage_code: u8,
+}
+
+impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
+    fn from(status: &Lw550PrintStatus) -> Self {
         Self {
-            _interface: interface,
-            ep_out,
-            ep_in,
+            print_status: status.print_status.label().into(),
+            print_status_code: status.print_status_code,
+            print_job_id: status.print_job_id,
+            label_index: status.label_index,
+            print_head_status: status.print_head_status.label().into(),
+            print_head_status_code: status.print_head_status_code,
+            print_density: status.print_density,
+            main_bay_status: status.main_bay_status.label().into(),
+            main_bay_status_code: status.main_bay_status_code,
+            sku: status.sku.clone(),
+            error_id: status.error_id,
+            label_count: status.label_count,
+            eps_present: status.eps_present,
+            print_head_voltage: status.print_head_voltage.label().into(),
+            print_head_voltage_code: status.print_head_voltage_code,
+        }
+    }
+}
+
+impl Lw550PrintStatus {
+    /// Convert to a JSON-friendly view with human-readable status strings.
+    pub fn to_view(&self) -> Lw550PrintStatusView {
+        Lw550PrintStatusView::from(self)
+    }
+}
+
+/// Byte 0 of the status reply (`Print status`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lw550PrintEngineStatus {
+    Idle,
+    Printing,
+    Error,
+    Cancel,
+    Busy,
+    NoLock,
+    Unknown(u8),
+}
+
+impl Lw550PrintEngineStatus {
+    pub fn from_byte(value: u8) -> Self {
+        match value {
+            0 => Self::Idle,
+            1 => Self::Printing,
+            2 => Self::Error,
+            3 => Self::Cancel,
+            4 => Self::Busy,
+            5 => Self::NoLock,
+            other => Self::Unknown(other),
         }
     }
 
-    pub(crate) fn transfer_out(&mut self, data: &[u8]) -> Result<(), DeviceError> {
-        let completion = self
-            .ep_out
-            .transfer_blocking(data.to_vec().into(), USB_TIMEOUT);
-        completion
-            .status
-            .map_err(|e| DeviceError::Transport(format!("bulk out: {e}")))
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Printing => "printing",
+            Self::Error => "error",
+            Self::Cancel => "cancel",
+            Self::Busy => "busy",
+            Self::NoLock => "no lock (another host may be printing)",
+            Self::Unknown(_) => "unknown",
+        }
+    }
+}
+
+/// Byte 8 of the status reply (`Print head status`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lw550PrintHeadStatus {
+    Ok,
+    Overheated,
+    Unknown,
+    UnknownCode(u8),
+}
+
+impl Lw550PrintHeadStatus {
+    pub fn from_byte(value: u8) -> Self {
+        match value {
+            0 => Self::Ok,
+            1 => Self::Overheated,
+            2 => Self::Unknown,
+            other => Self::UnknownCode(other),
+        }
     }
 
-    pub(crate) fn transfer_in(&mut self, len: usize) -> Result<Vec<u8>, DeviceError> {
-        let mut out = Vec::with_capacity(len);
-        while out.len() < len {
-            let chunk = (len - out.len()).max(64);
-            let completion = self
-                .ep_in
-                .transfer_blocking(Buffer::new(chunk), STATUS_TIMEOUT);
-            completion
-                .status
-                .map_err(|e| DeviceError::Transport(format!("bulk in: {e}")))?;
-            let buf = completion.buffer;
-            let received = completion.actual_len.min(buf.len());
-            if received == 0 {
-                return Err(DeviceError::Transport(
-                    "bulk in: printer returned no status bytes".into(),
-                ));
-            }
-            out.extend_from_slice(&buf[..received]);
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Overheated => "overheated",
+            Self::Unknown => "status unknown",
+            Self::UnknownCode(_) => "unknown",
         }
-        out.truncate(len);
-        Ok(out)
     }
+}
+
+/// Byte 10 of the status reply (`Main bay status`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lw550MainBayStatus {
+    BayUnknown,
+    BayOpen,
+    NoMedia,
+    MediaNotInsertedProperly,
+    MediaPresentUnknown,
+    MediaEmpty,
+    MediaCriticallyLow,
+    MediaLow,
+    MediaOk,
+    MediaJammed,
+    MediaCounterfeit,
+    Unknown(u8),
+}
+
+impl Lw550MainBayStatus {
+    pub fn from_byte(value: u8) -> Self {
+        match value {
+            0 => Self::BayUnknown,
+            1 => Self::BayOpen,
+            2 => Self::NoMedia,
+            3 => Self::MediaNotInsertedProperly,
+            4 => Self::MediaPresentUnknown,
+            5 => Self::MediaEmpty,
+            6 => Self::MediaCriticallyLow,
+            7 => Self::MediaLow,
+            8 => Self::MediaOk,
+            9 => Self::MediaJammed,
+            10 => Self::MediaCounterfeit,
+            other => Self::Unknown(other),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::BayUnknown => "bay status unknown",
+            Self::BayOpen => "bay open; media presence unknown",
+            Self::NoMedia => "no media present",
+            Self::MediaNotInsertedProperly => "media not inserted properly",
+            Self::MediaPresentUnknown => "media present — status unknown",
+            Self::MediaEmpty => "media present — empty",
+            Self::MediaCriticallyLow => "media present — critically low",
+            Self::MediaLow => "media present — low",
+            Self::MediaOk => "media present — ok",
+            Self::MediaJammed => "media present — jammed",
+            Self::MediaCounterfeit => "media present — counterfeit media",
+            Self::Unknown(_) => "unknown",
+        }
+    }
+}
+
+/// Byte 30 (low nibble) of the status reply (`Print head voltage`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Lw550PrintHeadVoltage {
+    Unknown,
+    Ok,
+    Low,
+    CriticallyLow,
+    TooLowForPrinting,
+    UnknownCode(u8),
+}
+
+impl Lw550PrintHeadVoltage {
+    pub fn from_nibble(value: u8) -> Self {
+        match value & 0x0f {
+            0 => Self::Unknown,
+            1 => Self::Ok,
+            2 => Self::Low,
+            3 => Self::CriticallyLow,
+            4 => Self::TooLowForPrinting,
+            other => Self::UnknownCode(other),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Ok => "ok",
+            Self::Low => "low",
+            Self::CriticallyLow => "critically low",
+            Self::TooLowForPrinting => "too low for printing",
+            Self::UnknownCode(_) => "unknown",
+        }
+    }
+}
+
+/// Parse a 32-byte `ESC A` print-engine status reply.
+pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, DeviceError> {
+    if status.len() < STATUS_REPLY_LEN {
+        return Err(DeviceError::Transport(format!(
+            "short status reply ({} bytes, expected {STATUS_REPLY_LEN})",
+            status.len()
+        )));
+    }
+
+    Ok(Lw550PrintStatus {
+        print_status: Lw550PrintEngineStatus::from_byte(status[0]),
+        print_status_code: status[0],
+        print_job_id: u32::from_le_bytes(status[1..5].try_into().unwrap()),
+        label_index: u16::from_le_bytes(status[5..7].try_into().unwrap()),
+        print_head_status: Lw550PrintHeadStatus::from_byte(status[8]),
+        print_head_status_code: status[8],
+        print_density: status[9],
+        main_bay_status: Lw550MainBayStatus::from_byte(status[10]),
+        main_bay_status_code: status[10],
+        sku: parse_status_sku(status),
+        error_id: u32::from_le_bytes(status[23..27].try_into().unwrap()),
+        label_count: u16::from_le_bytes(status[27..29].try_into().unwrap()),
+        eps_present: status[29] & 0x0f == 1,
+        print_head_voltage: Lw550PrintHeadVoltage::from_nibble(status[30]),
+        print_head_voltage_code: status[30] & 0x0f,
+    })
+}
+
+/// Query the full print-engine status without acquiring the print lock.
+pub fn query_print_status(session: &mut UsbBulkSession) -> Result<Lw550PrintStatus, DeviceError> {
+    session.transfer_out(&status_request(LOCK_RELEASE))?;
+    let status = session.transfer_in(STATUS_REPLY_LEN)?;
+    parse_print_status(&status)
+}
+
+/// Query print-engine status over USB.
+#[cfg(feature = "usb")]
+pub fn query_status(usb: &UsbTransport) -> Result<Lw550PrintStatus, DeviceError> {
+    let mut session = open_usb_bulk_session(usb)?;
+    query_print_status(&mut session)
+}
+
+/// Query the loaded media SKU over USB.
+#[cfg(feature = "usb")]
+pub fn query_loaded_media(usb: &UsbTransport) -> Result<Option<String>, DeviceError> {
+    let mut session = open_usb_bulk_session(usb)?;
+    query_loaded_media_sku(&mut session)
 }
 
 #[cfg(feature = "usb")]
 pub(crate) fn send_dymo_lw_job(
-    session: &mut UsbPrinterSession,
+    session: &mut UsbBulkSession,
     payload: &[u8],
 ) -> Result<(), DeviceError> {
     acquire_lock(session)?;
@@ -121,22 +348,56 @@ pub(crate) fn send_dymo_lw_job(
     Ok(())
 }
 
-fn acquire_lock(session: &mut UsbPrinterSession) -> Result<(), DeviceError> {
+/// USB transport for the DYMO LabelWriter 550-series (LW5) protocol.
+///
+/// Unlike [`UsbTransport`], this keeps the device open across jobs and performs
+/// the mandatory lock acquisition and 32-byte status handshakes on bulk IN.
+#[cfg(feature = "usb")]
+pub struct DymoLwUsbTransport {
+    usb: UsbTransport,
+    session: Option<UsbBulkSession>,
+}
+
+#[cfg(feature = "usb")]
+impl DymoLwUsbTransport {
+    /// Wrap a [`UsbTransport`] configured for the target printer.
+    pub fn new(usb: UsbTransport) -> Self {
+        Self { usb, session: None }
+    }
+
+    fn ensure_session(&mut self) -> Result<&mut UsbBulkSession, DeviceError> {
+        if self.session.is_none() {
+            self.session = Some(open_usb_bulk_session(&self.usb)?);
+        }
+        Ok(self.session.as_mut().expect("session opened"))
+    }
+}
+
+#[cfg(feature = "usb")]
+impl Transport for DymoLwUsbTransport {
+    fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
+        let session = self.ensure_session()?;
+        send_dymo_lw_job(session, data)
+    }
+
+    fn is_bidirectional(&self) -> bool {
+        true
+    }
+}
+
+fn acquire_lock(session: &mut UsbBulkSession) -> Result<(), DeviceError> {
     session.transfer_out(&status_request(LOCK_ACQUIRE))?;
     let status = session.transfer_in(STATUS_REPLY_LEN)?;
     interpret_status(&status, "acquiring print lock")
 }
 
-fn handshake(session: &mut UsbPrinterSession, lock: u8) -> Result<(), DeviceError> {
+fn handshake(session: &mut UsbBulkSession, lock: u8) -> Result<(), DeviceError> {
     session.transfer_out(&status_request(lock))?;
     let status = session.transfer_in(STATUS_REPLY_LEN)?;
     interpret_status(&status, "label handshake")
 }
 
-fn dispatch_job_segments(
-    session: &mut UsbPrinterSession,
-    payload: &[u8],
-) -> Result<(), DeviceError> {
+fn dispatch_job_segments(session: &mut UsbBulkSession, payload: &[u8]) -> Result<(), DeviceError> {
     let mut pos = 0usize;
     require_esc_cmd(payload, &mut pos, b's')?;
     pos += 4; // job id
@@ -289,12 +550,8 @@ pub fn parse_status_sku(status: &[u8]) -> Option<String> {
 }
 
 /// Query the SKU of the roll currently loaded in the printer.
-pub fn query_loaded_media_sku(
-    session: &mut UsbPrinterSession,
-) -> Result<Option<String>, DeviceError> {
-    session.transfer_out(&status_request(LOCK_RELEASE))?;
-    let status = session.transfer_in(STATUS_REPLY_LEN)?;
-    Ok(parse_status_sku(&status))
+pub fn query_loaded_media_sku(session: &mut UsbBulkSession) -> Result<Option<String>, DeviceError> {
+    Ok(query_print_status(session)?.sku)
 }
 
 fn interpret_status(status: &[u8], phase: &str) -> Result<(), DeviceError> {
@@ -384,6 +641,34 @@ mod tests {
         status[10] = BAY_MEDIA_COUNTERFEIT;
         let err = interpret_status(&status, "test").unwrap_err();
         assert!(err.to_string().contains("non-genuine"));
+    }
+
+    #[test]
+    fn parse_print_status_fields() {
+        let mut raw = vec![0u8; STATUS_REPLY_LEN];
+        raw[0] = 1; // printing
+        raw[1..5].copy_from_slice(&42u32.to_le_bytes());
+        raw[5..7].copy_from_slice(&3u16.to_le_bytes());
+        raw[8] = 0; // head ok
+        raw[9] = 100;
+        raw[10] = BAY_MEDIA_OK;
+        raw[11..15].copy_from_slice(b"3025");
+        raw[23..27].copy_from_slice(&7u32.to_le_bytes());
+        raw[27..29].copy_from_slice(&250u16.to_le_bytes());
+        raw[29] = 1; // EPS present
+        raw[30] = 1; // voltage ok
+
+        let parsed = parse_print_status(&raw).unwrap();
+        assert_eq!(parsed.print_status, Lw550PrintEngineStatus::Printing);
+        assert_eq!(parsed.print_job_id, 42);
+        assert_eq!(parsed.label_index, 3);
+        assert_eq!(parsed.print_density, 100);
+        assert_eq!(parsed.main_bay_status, Lw550MainBayStatus::MediaOk);
+        assert_eq!(parsed.sku.as_deref(), Some("3025"));
+        assert_eq!(parsed.error_id, 7);
+        assert_eq!(parsed.label_count, 250);
+        assert!(parsed.eps_present);
+        assert_eq!(parsed.print_head_voltage, Lw550PrintHeadVoltage::Ok);
     }
 
     #[test]

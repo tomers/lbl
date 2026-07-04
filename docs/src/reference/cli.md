@@ -11,7 +11,9 @@ lbl text      Text/CLI → authoring HTML
 lbl transpile Authoring HTML → browser-ready HTML
 lbl catalog   Browse the media catalog (list|show|compatible|search)
 lbl config    Inspect layered configuration (show|sources|paths)
-lbl device    Discover printers (list)
+lbl device    Discover printers (list|status). Status uses the same printer
+              resolution as print: --printer, [print] usb, --profile /
+              default_printer, or a single connected LW550.
 ```
 
 ### `lbl print`
@@ -170,7 +172,7 @@ Same as the standalone `lbl-config` binary.
 | `lbl-pattern` | `--height [<DOTS>]`, `--width-mm`, `--dpi`, `--out` (calibration PBM) |
 | `lbl-encode` | `--protocol`, `--sample-pattern [<DOTS>]`, `--width-mm`, `--length-mm`, |
 | | `--dpi`, `--cut`, `--supports-cut` |
-| `lbl-device` | `list`; `send --network host:port | --usb vid:pid | --serial path[:baud]` |
+| `lbl-device` | `list`; `status --usb vid:pid`; `send --network host:port | --usb vid:pid | --serial path[:baud]` |
 | `lbl-spool` | `--network|--usb|--serial` plus encoded files to queue |
 | `lbl-config` | `show`, `sources`, `paths` |
 | `lbl-catalog` | `list`, `show <key>`, `compatible --printer <m>`, `search <q>` |

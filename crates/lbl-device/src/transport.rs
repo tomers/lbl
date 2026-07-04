@@ -33,9 +33,6 @@ use nusb::transfer::{Bulk, Direction, In, Out};
 #[cfg(feature = "usb")]
 use nusb::{Device, MaybeFuture};
 
-#[cfg(feature = "usb")]
-use crate::dymo_lw::{send_dymo_lw_job, UsbPrinterSession};
-
 /// A transport sends a finished protocol byte stream to a printer, and — for
 /// bidirectional links — can read responses back.
 ///
@@ -300,7 +297,73 @@ fn resolve_bulk_in_endpoint(device: &Device, interface: u8) -> Result<u8, Device
 }
 
 #[cfg(feature = "usb")]
-fn open_usb_printer_session(usb: &UsbTransport) -> Result<UsbPrinterSession, DeviceError> {
+const USB_BULK_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[cfg(feature = "usb")]
+const USB_BULK_STATUS_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// A claimed USB interface with bulk IN and OUT endpoints for bidirectional I/O.
+#[cfg(feature = "usb")]
+pub struct UsbBulkSession {
+    _interface: nusb::Interface,
+    ep_out: nusb::Endpoint<Bulk, Out>,
+    ep_in: nusb::Endpoint<Bulk, In>,
+}
+
+#[cfg(feature = "usb")]
+impl UsbBulkSession {
+    pub(crate) fn new(
+        interface: nusb::Interface,
+        ep_out: nusb::Endpoint<Bulk, Out>,
+        ep_in: nusb::Endpoint<Bulk, In>,
+    ) -> Self {
+        Self {
+            _interface: interface,
+            ep_out,
+            ep_in,
+        }
+    }
+
+    /// Send bytes on the bulk OUT endpoint.
+    pub fn transfer_out(&mut self, data: &[u8]) -> Result<(), DeviceError> {
+        let completion = self
+            .ep_out
+            .transfer_blocking(data.to_vec().into(), USB_BULK_TIMEOUT);
+        completion
+            .status
+            .map_err(|e| DeviceError::Transport(format!("bulk out: {e}")))
+    }
+
+    /// Read exactly `len` bytes from the bulk IN endpoint.
+    pub fn transfer_in(&mut self, len: usize) -> Result<Vec<u8>, DeviceError> {
+        use nusb::transfer::Buffer;
+
+        let mut out = Vec::with_capacity(len);
+        while out.len() < len {
+            let chunk = (len - out.len()).max(64);
+            let completion = self
+                .ep_in
+                .transfer_blocking(Buffer::new(chunk), USB_BULK_STATUS_TIMEOUT);
+            completion
+                .status
+                .map_err(|e| DeviceError::Transport(format!("bulk in: {e}")))?;
+            let buf = completion.buffer;
+            let received = completion.actual_len.min(buf.len());
+            if received == 0 {
+                return Err(DeviceError::Transport(
+                    "bulk in: printer returned no status bytes".into(),
+                ));
+            }
+            out.extend_from_slice(&buf[..received]);
+        }
+        out.truncate(len);
+        Ok(out)
+    }
+}
+
+/// Open a bidirectional USB bulk session to the device described by `usb`.
+#[cfg(feature = "usb")]
+pub fn open_usb_bulk_session(usb: &UsbTransport) -> Result<UsbBulkSession, DeviceError> {
     let device_info = nusb::list_devices()
         .wait()
         .map_err(|e| DeviceError::Transport(format!("listing usb devices: {e}")))?
@@ -333,54 +396,7 @@ fn open_usb_printer_session(usb: &UsbTransport) -> Result<UsbPrinterSession, Dev
     let ep_in = interface
         .endpoint::<Bulk, In>(ep_in_addr)
         .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_in_addr:#02x}: {e}")))?;
-    Ok(UsbPrinterSession::new(interface, ep_out, ep_in))
-}
-
-/// Query the NFC-reported media SKU from a DYMO LW5 printer over USB.
-///
-/// Opens a short-lived session, sends a lock-release status request, and
-/// parses the 12-character SKU field from the 32-byte reply.
-#[cfg(feature = "usb")]
-pub fn query_dymo_lw_loaded_media(usb: &UsbTransport) -> Result<Option<String>, DeviceError> {
-    let mut session = open_usb_printer_session(usb)?;
-    crate::dymo_lw::query_loaded_media_sku(&mut session)
-}
-
-/// USB transport for the DYMO LabelWriter 550-series (LW5) protocol.
-///
-/// Unlike [`UsbTransport`], this keeps the device open across jobs and performs
-/// the mandatory lock acquisition and 32-byte status handshakes on bulk IN.
-#[cfg(feature = "usb")]
-pub struct DymoLwUsbTransport {
-    usb: UsbTransport,
-    session: Option<UsbPrinterSession>,
-}
-
-#[cfg(feature = "usb")]
-impl DymoLwUsbTransport {
-    /// Wrap a [`UsbTransport`] configured for the target printer.
-    pub fn new(usb: UsbTransport) -> Self {
-        Self { usb, session: None }
-    }
-
-    fn ensure_session(&mut self) -> Result<&mut UsbPrinterSession, DeviceError> {
-        if self.session.is_none() {
-            self.session = Some(open_usb_printer_session(&self.usb)?);
-        }
-        Ok(self.session.as_mut().expect("session opened"))
-    }
-}
-
-#[cfg(feature = "usb")]
-impl Transport for DymoLwUsbTransport {
-    fn send(&mut self, data: &[u8]) -> Result<(), DeviceError> {
-        let session = self.ensure_session()?;
-        send_dymo_lw_job(session, data)
-    }
-
-    fn is_bidirectional(&self) -> bool {
-        true
-    }
+    Ok(UsbBulkSession::new(interface, ep_out, ep_in))
 }
 
 #[cfg(feature = "usb")]

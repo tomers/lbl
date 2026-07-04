@@ -242,6 +242,176 @@ pub fn resolve_print_transport(
     Ok((network, usb, serial, bluetooth))
 }
 
+/// USB target for querying print-engine status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusTarget {
+    /// Protocol spoken by the printer.
+    pub protocol: Protocol,
+    /// `vid:pid` in hex for [`lbl_device::UsbTransport`].
+    pub usb: String,
+    /// Optional serial to disambiguate when several identical models are connected.
+    pub serial: Option<String>,
+}
+
+/// Resolve which USB printer to query for status, using the same sources as
+/// [`resolve_print_transport`] (`--usb`, `[print] usb`, `--printer` catalog
+/// defaults), then saved profiles (`--profile`, `[general] default_printer`),
+/// then auto-discovery when exactly one status-capable printer is connected.
+pub fn resolve_status_target(
+    catalog: &Catalog,
+    config: &lbl_config::Config,
+    printer_key: Option<&str>,
+    profile_id: Option<&str>,
+    usb_override: Option<String>,
+) -> Result<StatusTarget> {
+    if let Some(usb) = usb_override {
+        let protocol = infer_usb_protocol(&usb)?;
+        return Ok(StatusTarget {
+            protocol,
+            usb,
+            serial: None,
+        });
+    }
+
+    let printer_entry = match printer_key {
+        Some(key) => Some(catalog.require_printer(key).map_err(|e| anyhow!(e))?),
+        None => None,
+    };
+
+    if let Some(printer) = printer_entry {
+        if !lbl_device::status_supported(printer.protocol) {
+            bail!(
+                "printer '{}' does not support status queries",
+                printer.canonical_key()
+            );
+        }
+    }
+
+    let (_, usb, _, _) =
+        resolve_print_transport(printer_entry, None, config.print.usb.clone(), None, None)?;
+
+    if let Some(usb) = usb {
+        let protocol = match printer_entry {
+            Some(p) => p.protocol,
+            None => infer_usb_protocol(&usb)?,
+        };
+        if !lbl_device::status_supported(protocol) {
+            bail!("printer at USB {usb} does not support status queries");
+        }
+        return Ok(StatusTarget {
+            protocol,
+            usb,
+            serial: None,
+        });
+    }
+
+    if let Some(id) = profile_id.or(config.general.default_printer.as_deref()) {
+        return status_usb_from_profile(id);
+    }
+
+    discover_status_usb_target(printer_entry.map(|p| p.protocol))
+}
+
+fn infer_usb_protocol(usb: &str) -> Result<Protocol> {
+    let (vid, pid) = parse_usb_vid_pid(usb)?;
+    lbl_device::discover_usb()
+        .into_iter()
+        .find(|d| d.vendor_id == Some(vid) && d.product_id == Some(pid))
+        .and_then(|d| d.protocol)
+        .filter(|&p| lbl_device::status_supported(p))
+        .ok_or_else(|| {
+            anyhow!(
+                "cannot determine printer protocol for USB {usb}; \
+                 pass --printer or --profile"
+            )
+        })
+}
+
+fn parse_usb_vid_pid(usb: &str) -> Result<(u16, u16)> {
+    let (vid, pid) = usb
+        .split_once(':')
+        .ok_or_else(|| anyhow!("usb target must be vid:pid (hex)"))?;
+    Ok((u16::from_str_radix(vid, 16)?, u16::from_str_radix(pid, 16)?))
+}
+
+fn status_usb_from_profile(profile_id: &str) -> Result<StatusTarget> {
+    use lbl_config::ProfileStore;
+    use lbl_core::printer::Transport;
+
+    let loader = lbl_config::Loader::new();
+    let store = ProfileStore::new(loader.paths().profiles.clone());
+    let profiles = store.load()?;
+    let profile = profiles
+        .iter()
+        .find(|p| p.id.0 == profile_id)
+        .ok_or_else(|| anyhow!("no profile '{profile_id}'"))?;
+    if !lbl_device::status_supported(profile.model.protocol) {
+        bail!("profile '{profile_id}' does not support status queries");
+    }
+    match &profile.transport {
+        Transport::Usb {
+            vendor_id,
+            product_id,
+            serial,
+        } => Ok(StatusTarget {
+            protocol: profile.model.protocol,
+            usb: format!("{vendor_id:04x}:{product_id:04x}"),
+            serial: serial.clone(),
+        }),
+        _ => bail!("profile '{profile_id}' has no USB transport"),
+    }
+}
+
+fn discover_status_usb_target(expected: Option<Protocol>) -> Result<StatusTarget> {
+    let candidates: Vec<_> = lbl_device::discover_usb()
+        .into_iter()
+        .filter(|d| {
+            d.protocol
+                .is_some_and(|p| lbl_device::status_supported(p) && expected.is_none_or(|e| e == p))
+        })
+        .collect();
+    match candidates.len() {
+        0 => bail!(
+            "no printer supporting status queries found; connect one or pass \
+             --printer, --profile, or --usb (same targets as lbl print)"
+        ),
+        1 => {
+            let d = &candidates[0];
+            Ok(StatusTarget {
+                protocol: d.protocol.expect("filtered for protocol"),
+                usb: format!(
+                    "{:04x}:{:04x}",
+                    d.vendor_id
+                        .ok_or_else(|| anyhow!("discovered printer missing vendor id"))?,
+                    d.product_id
+                        .ok_or_else(|| anyhow!("discovered printer missing product id"))?
+                ),
+                serial: d.serial.clone(),
+            })
+        }
+        n => {
+            let lines: Vec<String> = candidates
+                .iter()
+                .map(|d| {
+                    format!(
+                        "  {:04x}:{:04x}{}",
+                        d.vendor_id.unwrap_or(0),
+                        d.product_id.unwrap_or(0),
+                        d.serial
+                            .as_ref()
+                            .map(|s| format!(" (serial {s})"))
+                            .unwrap_or_default()
+                    )
+                })
+                .collect();
+            bail!(
+                "{n} printers supporting status queries found; pass --usb or --profile:\n{}",
+                lines.join("\n")
+            )
+        }
+    }
+}
+
 fn discover_serial_port(printer: &PrinterEntry) -> Option<String> {
     lbl_device::discover_serial()
         .into_iter()
@@ -926,6 +1096,16 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let media = resolve_media(&catalog, Some("11352"), None, None, 300.0).unwrap();
         assert_eq!(media.width_mm, 25.0);
+    }
+
+    #[test]
+    fn resolve_status_from_catalog_printer() {
+        let catalog = Catalog::bundled().unwrap();
+        let config = lbl_config::Config::default();
+        let target =
+            resolve_status_target(&catalog, &config, Some("LabelWriter 550"), None, None).unwrap();
+        assert_eq!(target.usb, "0922:0028");
+        assert_eq!(target.protocol, Protocol::DymoLw);
     }
 
     #[test]

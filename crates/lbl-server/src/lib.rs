@@ -41,6 +41,10 @@ pub fn router(state: AppState) -> Router {
             "/api/printers/profiles/{id}/media",
             get(handlers::profile_detected_media),
         )
+        .route(
+            "/api/printers/profiles/{id}/status",
+            get(handlers::profile_printer_status),
+        )
         .route("/api/preview", post(handlers::preview))
         .route("/api/print", post(handlers::print))
         .route("/api/print/file", post(handlers::print_file))

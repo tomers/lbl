@@ -21,6 +21,7 @@ pub mod discovery;
 #[cfg(feature = "usb")]
 pub mod dymo_lw;
 pub mod media;
+pub mod status;
 pub mod transport;
 pub mod troubleshoot;
 
@@ -32,7 +33,15 @@ pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 
 #[cfg(feature = "usb")]
-pub use transport::{query_dymo_lw_loaded_media, DymoLwUsbTransport, UsbTransport};
+pub use dymo_lw::{
+    parse_print_status, query_loaded_media, query_status, DymoLwUsbTransport, Lw550MainBayStatus,
+    Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage, Lw550PrintStatus,
+    STATUS_REPLY_LEN,
+};
+#[cfg(feature = "usb")]
+pub use status::{query_loaded_media_sku, query_print_status, status_supported, PrintStatus};
+#[cfg(feature = "usb")]
+pub use transport::{open_usb_bulk_session, UsbBulkSession, UsbTransport};
 
 #[cfg(feature = "serial")]
 pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};

@@ -149,10 +149,34 @@ pub async fn profile_detected_media(
     Ok(Json(json!({ "detected": detected })).into_response())
 }
 
-fn detect_loaded_media_sku(profile: &PrinterProfile) -> Option<String> {
-    if profile.model.protocol != Protocol::DymoLw {
-        return None;
+pub async fn profile_printer_status(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let profiles = state.profiles.load()?;
+    let profile = profiles
+        .iter()
+        .find(|p| p.id.0 == id)
+        .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, format!("no profile '{id}'")))?;
+
+    let connected = profile_is_connected(profile, state.host_discovery_enabled);
+    if !connected {
+        return Err(ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "printer is not connected".into(),
+        ));
     }
+
+    let profile = profile.clone();
+    let status = tokio::task::spawn_blocking(move || query_profile_print_status(&profile))
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+
+    Ok(Json(status).into_response())
+}
+
+fn query_profile_print_status(profile: &PrinterProfile) -> Result<lbl_device::PrintStatus, String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
             vendor_id,
@@ -160,7 +184,23 @@ fn detect_loaded_media_sku(profile: &PrinterProfile) -> Option<String> {
             serial,
         } => {
             let usb = lbl_device::UsbTransport::new(*vendor_id, *product_id, serial.clone());
-            lbl_device::query_dymo_lw_loaded_media(&usb).ok().flatten()
+            lbl_device::query_print_status(profile.model.protocol, &usb).map_err(|e| e.to_string())
+        }
+        _ => Err("profile transport does not support status queries".into()),
+    }
+}
+
+fn detect_loaded_media_sku(profile: &PrinterProfile) -> Option<String> {
+    match &profile.transport {
+        lbl_core::printer::Transport::Usb {
+            vendor_id,
+            product_id,
+            serial,
+        } => {
+            let usb = lbl_device::UsbTransport::new(*vendor_id, *product_id, serial.clone());
+            lbl_device::query_loaded_media_sku(profile.model.protocol, &usb)
+                .ok()
+                .flatten()
         }
         _ => None,
     }

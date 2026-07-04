@@ -22,6 +22,12 @@ struct Cli {
 enum Command {
     /// List discovered printers (USB bulk + serial ports) as JSON.
     List,
+    /// Query LabelWriter 550-series print-engine status (`ESC A` reply).
+    Status {
+        /// USB target `vid:pid` in hex (e.g. `0922:0028`).
+        #[arg(long)]
+        usb: Option<String>,
+    },
     /// Send bytes (stdin or a file) to a printer.
     Send {
         /// Network target `host:port` (e.g. `192.168.1.50:9100`).
@@ -53,6 +59,27 @@ fn main() -> Result<()> {
         Command::List => {
             let printers = discover();
             println!("{}", serde_json::to_string_pretty(&printers)?);
+        }
+        Command::Status { usb } => {
+            #[cfg(feature = "usb")]
+            {
+                let target = usb.ok_or_else(|| {
+                    anyhow::anyhow!("pass --usb vid:pid (e.g. 0922:0028 for LabelWriter 550)")
+                })?;
+                let (vid, pid) = target
+                    .split_once(':')
+                    .ok_or_else(|| anyhow::anyhow!("usb target must be vid:pid (hex)"))?;
+                let vendor_id = u16::from_str_radix(vid, 16)?;
+                let product_id = u16::from_str_radix(pid, 16)?;
+                let transport = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+                let status = lbl_device::query_status(&transport)?;
+                println!("{}", serde_json::to_string_pretty(&status.to_view())?);
+            }
+            #[cfg(not(feature = "usb"))]
+            {
+                let _ = usb;
+                bail!("USB support is not compiled in");
+            }
         }
         Command::Send {
             network,

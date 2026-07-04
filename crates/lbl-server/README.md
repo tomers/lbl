@@ -16,6 +16,8 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 | GET | `/api/printers/profiles` | Persisted printer profiles |
 | PUT | `/api/printers/profiles` | Upsert a printer profile |
 | DELETE | `/api/printers/profiles/:id` | Remove a printer profile |
+| GET | `/api/printers/profiles/:id/media` | Detected media SKU when connected (if the profile reports media) |
+| GET | `/api/printers/profiles/:id/status` | Print-engine status when connected (if supported by the profile protocol) |
 | POST | `/api/preview` | Transpile source into preview HTML (gallery) |
 | POST | `/api/print` | Run the full pipeline and dispatch to a printer |
 | POST | `/api/print/file` | Virtual printer: return encoded files inline (raster or vector PDF) |

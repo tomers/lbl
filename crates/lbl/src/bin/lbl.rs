@@ -14,8 +14,9 @@ use lbl::job_input;
 use lbl::pipeline::{
     authoring_labels, encode_labels, render_viewport_px, resolve_label_align, resolve_label_fit,
     resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_style, resolve_style_vector, resolve_template_format,
-    EncodeLabelsOptions, EncodeLabelsResult, PipelineOptions, Source, VECTOR_CSS_DPI,
+    resolve_print_transport, resolve_status_target, resolve_style, resolve_style_vector,
+    resolve_template_format, EncodeLabelsOptions, EncodeLabelsResult, PipelineOptions, Source,
+    VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::Catalog;
@@ -1603,6 +1604,25 @@ struct DeviceArgs {
 #[derive(Subcommand)]
 enum DeviceCommand {
     List,
+    /// Query print-engine status when supported by the printer protocol.
+    Status(StatusArgs),
+}
+
+#[derive(Args)]
+struct StatusArgs {
+    /// Printer model key from the catalog (e.g. `LabelWriter 550`, `LW550`).
+    /// Uses the catalog's default USB target when no `--usb` is set (same as
+    /// `lbl print`).
+    #[arg(long)]
+    printer: Option<String>,
+
+    /// USB target `vid:pid` in hex. Overrides config and catalog defaults.
+    #[arg(long)]
+    usb: Option<String>,
+
+    /// Printer profile id from `printers.toml` (or `[general] default_printer`).
+    #[arg(long)]
+    profile: Option<String>,
 }
 
 fn run_device(args: DeviceArgs) -> Result<()> {
@@ -1611,7 +1631,36 @@ fn run_device(args: DeviceArgs) -> Result<()> {
             let printers = lbl_device::discover();
             println!("{}", serde_json::to_string_pretty(&printers)?);
         }
+        DeviceCommand::Status(status) => run_device_status(status)?,
     }
+    Ok(())
+}
+
+fn run_device_status(args: StatusArgs) -> Result<()> {
+    let loader = lbl_config::Loader::new();
+    let config = loader
+        .load()
+        .unwrap_or_else(|_| lbl_config::Config::default());
+    let catalog = Catalog::bundled()?;
+
+    let target = resolve_status_target(
+        &catalog,
+        &config,
+        args.printer.as_deref(),
+        args.profile.as_deref(),
+        args.usb,
+    )?;
+
+    let (vid, pid) = target
+        .usb
+        .split_once(':')
+        .ok_or_else(|| anyhow!("usb target must be vid:pid (hex)"))?;
+    let vendor_id = u16::from_str_radix(vid, 16)?;
+    let product_id = u16::from_str_radix(pid, 16)?;
+    let transport = lbl_device::UsbTransport::new(vendor_id, product_id, target.serial);
+    let status =
+        lbl_device::query_print_status(target.protocol, &transport).map_err(|e| anyhow!("{e}"))?;
+    println!("{}", serde_json::to_string_pretty(&status)?);
     Ok(())
 }
 
