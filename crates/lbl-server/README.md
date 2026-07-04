@@ -84,4 +84,7 @@ Set `"protocol": "virtual"`. Optional fields:
 lbl-server --bind 127.0.0.1:8787
 ```
 
+Set `LBL_HOST_DISCOVERY=0` (or `false` / `off`) to disable local device
+enumeration on `GET /api/printers`. Host discovery is enabled by default.
+
 CORS is permissive for local development and browser clients.

@@ -95,7 +95,10 @@ pub async fn compatible_catalog(
     Ok(Json(entries).into_response())
 }
 
-pub async fn list_printers(State(_state): State<AppState>) -> ApiResult {
+pub async fn list_printers(State(state): State<AppState>) -> ApiResult {
+    if !state.host_discovery_enabled {
+        return Ok(Json(Vec::<lbl_device::DiscoveredPrinter>::new()).into_response());
+    }
     let discovered = lbl_device::discover();
     Ok(Json(discovered).into_response())
 }
@@ -132,7 +135,7 @@ pub async fn profile_detected_media(
         return Ok(Json(json!({ "detected": null })).into_response());
     }
 
-    let connected = profile_is_connected(profile);
+    let connected = profile_is_connected(profile, state.host_discovery_enabled);
     if !connected {
         return Ok(Json(json!({ "detected": null })).into_response());
     }
@@ -171,7 +174,10 @@ fn detected_media_from_catalog(catalog: &Catalog, sku: &str) -> Option<serde_jso
     }))
 }
 
-fn profile_is_connected(profile: &PrinterProfile) -> bool {
+fn profile_is_connected(profile: &PrinterProfile, host_discovery_enabled: bool) -> bool {
+    if !host_discovery_enabled {
+        return false;
+    }
     let discovered = lbl_device::discover();
     match &profile.transport {
         lbl_core::printer::Transport::Usb {

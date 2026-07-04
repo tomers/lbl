@@ -66,6 +66,7 @@ mod tests {
                 std::env::temp_dir().join("lbl-server-test-printers.toml"),
             )),
             loader: Arc::new(Loader::new()),
+            host_discovery_enabled: true,
         }
     }
 
@@ -176,6 +177,28 @@ mod tests {
             width < height,
             "expected portrait preview viewport, got {width}×{height}"
         );
+    }
+
+    #[tokio::test]
+    async fn list_printers_empty_when_host_discovery_disabled() {
+        let state = AppState {
+            host_discovery_enabled: false,
+            ..test_state()
+        };
+        let app = router(state);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/printers")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert!(json.is_empty());
     }
 
     #[tokio::test]
