@@ -41,10 +41,11 @@ impl QrErrorCorrection {
 }
 
 /// Optional QR settings from a directive or flag.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct QrOptions {
     pub error_correction: Option<QrErrorCorrection>,
     pub margin: Option<u32>,
+    pub size_mm: Option<f64>,
     pub dark: Option<String>,
     pub light: Option<String>,
 }
@@ -58,6 +59,9 @@ impl QrOptions {
         }
         if let Some(m) = self.margin {
             out.push_str(&format!(" margin=\"{m}\""));
+        }
+        if let Some(s) = self.size_mm {
+            out.push_str(&format!(" size_mm=\"{s}\""));
         }
         if let Some(d) = &self.dark {
             out.push_str(&format!(" dark=\"{}\"", escape_attr(d)));
@@ -118,6 +122,9 @@ fn apply_option(options: &mut QrOptions, token: &str) {
         }
         "margin" => {
             options.margin = val.parse().ok();
+        }
+        "size_mm" | "size-mm" | "size" => {
+            options.size_mm = val.parse().ok().filter(|v| *v > 0.0);
         }
         "dark" => {
             options.dark = Some(val.to_string());

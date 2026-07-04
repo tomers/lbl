@@ -14,6 +14,20 @@ static LONE_TEXT_RE: Lazy<Regex> = Lazy::new(|| {
     .expect("lone text regex")
 });
 
+/// Matches `.lbl-label` > `.lbl-row` with plain text then a QR sibling.
+static ROW_TEXT_QR_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r#"(?is)^\s*<div\s+class="lbl-label"[^>]*>\s*<div\s+class="lbl-row[^"]*"[^>]*>\s*<(?:div|span)\s+class="lbl-text"[^>]*>([\s\S]*?)</(?:div|span)>\s*<div\s+class="lbl-qr"([^>]*)>"#,
+    )
+    .expect("row text qr regex")
+});
+
+static DATA_WIDTH_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"\bdata-width\s*=\s*"(\d+)""#).expect("data-width regex"));
+
+static STYLE_WIDTH_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"style\s*=\s*"[^"]*width:\s*(\d+)px"#).expect("style width regex"));
+
 static ANY_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<[^>]+>").expect("any tag regex"));
 
 static BR_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<br\s*/?>").expect("br tag regex"));
@@ -40,6 +54,35 @@ pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> 
     Some(format!(
         ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px}}\n"
     ))
+}
+
+/// CSS rule setting a transpile-time font size for text beside a QR in a row.
+pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
+    let (box_w, box_h) = fit_box_px(opts)?;
+    let caps = ROW_TEXT_QR_RE.captures(body)?;
+    let inner = caps.get(1)?.as_str();
+    if !is_plain_text_html(inner) {
+        return None;
+    }
+    let text = html_to_plain_text(inner);
+    let qr_attrs = caps.get(2)?.as_str();
+    let qr_w = qr_width_px(qr_attrs, opts.style.qr_size_px);
+    let gap = opts.style.element_gap_px.max(0.0);
+    let text_w = (box_w - qr_w - gap).max(1.0);
+    let font_px = max_fit_font_px(text_w, box_h, &text);
+    Some(format!(
+        ".lbl-row:has(.lbl-qr)>.lbl-text{{font-size:{font_px:.2}px}}\n"
+    ))
+}
+
+fn qr_width_px(qr_attrs: &str, default_qr_px: f64) -> f64 {
+    if let Some(caps) = DATA_WIDTH_RE.captures(qr_attrs) {
+        return caps[1].parse().unwrap_or(default_qr_px);
+    }
+    if let Some(caps) = STYLE_WIDTH_RE.captures(qr_attrs) {
+        return caps[1].parse().unwrap_or(default_qr_px);
+    }
+    default_qr_px
 }
 
 fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
@@ -286,6 +329,43 @@ mod tests {
         assert!(
             font > 20.0 && font <= 142.0 / LINE_HEIGHT + 0.01,
             "font={font}"
+        );
+    }
+
+    #[test]
+    fn smaller_qr_yields_larger_row_text() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 160.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            media_inset: MediaInsetPx::default(),
+            ..Default::default()
+        };
+        let small_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-width="50" style="width:50px;height:50px;flex:0 0 auto"></div></div></div>"#;
+        let large_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        let small_css = row_text_qr_fit_css(small_qr_body, &opts).expect("small qr css");
+        let large_css = row_text_qr_fit_css(large_qr_body, &opts).expect("large qr css");
+        let parse_font = |css: &str| -> f64 {
+            css.split("font-size:")
+                .nth(1)
+                .unwrap()
+                .trim_end_matches("px}\n")
+                .parse()
+                .unwrap()
+        };
+        let font_small_qr = parse_font(&small_css);
+        let font_large_qr = parse_font(&large_css);
+        assert!(
+            font_small_qr > font_large_qr,
+            "small_qr={font_small_qr} large_qr={font_large_qr}"
         );
     }
 }

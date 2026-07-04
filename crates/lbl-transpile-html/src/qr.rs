@@ -56,12 +56,16 @@ static QR_DARK_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)\bdark\s*=\s*"([^"]*)""#).expect("qr dark attr regex"));
 static QR_LIGHT_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)\blight\s*=\s*"([^"]*)""#).expect("qr light attr regex"));
+static QR_SIZE_MM_ATTR_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"(?i)\b(?:size_mm|size-mm|size)\s*=\s*"([^"]*)""#).expect("qr size attr regex")
+});
 
 /// Per-element overrides parsed from a `<qr …>` opening tag.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct QrElementOverrides {
     pub error_correction: Option<QrErrorCorrection>,
     pub margin: Option<u32>,
+    pub size_mm: Option<f64>,
     pub dark: Option<String>,
     pub light: Option<String>,
 }
@@ -76,6 +80,10 @@ impl QrElementOverrides {
             margin: QR_MARGIN_ATTR_RE
                 .captures(attrs)
                 .and_then(|c| c[1].trim().parse().ok()),
+            size_mm: QR_SIZE_MM_ATTR_RE
+                .captures(attrs)
+                .and_then(|c| c[1].trim().parse().ok())
+                .filter(|v| *v > 0.0),
             dark: QR_DARK_ATTR_RE
                 .captures(attrs)
                 .map(|c| c[1].trim().to_string())

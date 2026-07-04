@@ -20,6 +20,8 @@ pub struct LabelStyle {
     pub font_size_px: f64,
     /// QR code edge length, in pixels.
     pub qr_size_px: f64,
+    /// Default QR edge length in millimetres (used to scale per-element overrides).
+    pub qr_size_mm: f64,
     /// Barcode bar height, in pixels.
     pub barcode_height_px: f64,
     /// Barcode single-module (narrowest bar) width, in pixels.
@@ -49,6 +51,7 @@ impl Default for LabelStyle {
         Self {
             font_size_px: 32.0,
             qr_size_px: 160.0,
+            qr_size_mm: 15.0,
             barcode_height_px: 100.0,
             barcode_module_width_px: 2.0,
             padding_px: 20.0,
@@ -87,6 +90,7 @@ impl LabelStyle {
         Self {
             font_size_px: font_size_mm * px_per_mm,
             qr_size_px: qr_size_mm * px_per_mm,
+            qr_size_mm,
             barcode_height_px: barcode_height_mm * px_per_mm,
             barcode_module_width_px: barcode_module_width_mm * px_per_mm,
             padding_px: padding_mm * px_per_mm,
@@ -569,7 +573,8 @@ pub fn transpile(input: &str, opts: &TranspileOptions) -> String {
     let body = extract_body(input);
 
     let mut features = Features::default();
-    let body = rewrite_qr(&body, &mut features);
+    let px_per_mm = opts.style.qr_size_px / opts.style.qr_size_mm.max(f64::EPSILON);
+    let body = rewrite_qr(&body, &mut features, px_per_mm);
     let body = rewrite_barcode(&body, &mut features);
 
     assemble(&body, features, opts)
@@ -584,7 +589,7 @@ fn extract_body(input: &str) -> String {
     }
 }
 
-fn rewrite_qr(body: &str, features: &mut Features) -> String {
+fn rewrite_qr(body: &str, features: &mut Features, px_per_mm: f64) -> String {
     QR_RE
         .replace_all(body, |caps: &regex::Captures| {
             features.qr = true;
@@ -596,6 +601,12 @@ fn rewrite_qr(body: &str, features: &mut Features) -> String {
             }
             if let Some(m) = overrides.margin {
                 out.push_str(&format!(" data-margin=\"{m}\""));
+            }
+            if let Some(mm) = overrides.size_mm {
+                let px = (mm * px_per_mm).round().max(1.0) as u32;
+                out.push_str(&format!(
+                    " data-width=\"{px}\" style=\"width:{px}px;height:{px}px;flex:0 0 auto\""
+                ));
             }
             if let Some(d) = overrides.dark {
                 out.push_str(&format!(" data-dark=\"{}\"", attr(&d)));
@@ -650,8 +661,12 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     if opts.label_fit == LabelFit::Fill {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
+        head.push_str(assets::LABEL_FIT_ROW_TEXT_CSS);
         head.push_str(&lone_text_align_css(opts.label_align, opts.label_valign));
         if let Some(fit_css) = crate::text_fit::lone_text_fit_css(body, opts) {
+            head.push_str(&fit_css);
+        }
+        if let Some(fit_css) = crate::text_fit::row_text_qr_fit_css(body, opts) {
             head.push_str(&fit_css);
         }
         if opts.mode == OutputMode::Preview {
@@ -1157,6 +1172,16 @@ mod tests {
         );
         assert!(out.contains(r#"data-ec="H""#), "{out}");
         assert!(out.contains(r#"data-margin="2""#), "{out}");
+    }
+
+    #[test]
+    fn qr_size_mm_sets_container_and_data_width() {
+        let out = transpile(r#"<qr size_mm="10">x</qr>"#, &TranspileOptions::default());
+        assert!(out.contains(r#"data-width="107""#), "{out}");
+        assert!(
+            out.contains(r#"style="width:107px;height:107px;flex:0 0 auto""#),
+            "{out}"
+        );
     }
 
     #[test]

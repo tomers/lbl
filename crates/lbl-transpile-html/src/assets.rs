@@ -40,10 +40,12 @@ pub const BASE_CSS: &str = r#"
 html,body{margin:0;padding:0}
 .lbl-label{display:flex;flex-direction:column}
 .lbl-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center}
-.lbl-row>.lbl-text,.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>.lbl-col{flex:0 0 auto;min-width:0}
+.lbl-row>.lbl-text{flex:1 1 auto;min-width:0}
+.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>.lbl-col{flex:0 0 auto;min-width:0}
 .lbl-row>.lbl-col{flex:1 1 auto}
 .lbl-row .lbl-barcode{width:auto;height:auto}
 .lbl-row .lbl-barcode svg{display:block;width:auto;max-width:none;height:auto}
+.lbl-row .lbl-qr svg{display:block;width:100%;height:100%}
 .lbl-col{display:flex;flex-direction:column}
 .lbl-center{align-items:center;justify-content:center}
 .lbl-between{justify-content:space-between}
@@ -78,6 +80,17 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
   width:100%;
   line-height:1.1;
   font-size:min(calc(100cqh / 1.1),100cqw);
+  white-space:pre-wrap;
+  overflow:hidden;
+  word-break:break-word;
+}
+"#;
+
+/// When [`LabelFit::Fill`] is active, grow text beside a QR in a row to use
+/// the space left after the code (font size is computed at transpile time).
+pub const LABEL_FIT_ROW_TEXT_CSS: &str = r#"
+.lbl-row:has(.lbl-qr)>.lbl-text{
+  line-height:1.1;
   white-space:pre-wrap;
   overflow:hidden;
   word-break:break-word;
@@ -119,6 +132,8 @@ pub const QR_INIT_JS: &str = r#"
         if(ec){opts.errorCorrectionLevel=ec;}
         var margin=el.getAttribute('data-margin');
         if(margin!==null && margin!==''){opts.margin=parseInt(margin,10);}
+        var width=el.getAttribute('data-width');
+        if(width!==null && width!==''){opts.width=parseInt(width,10);}
         var dark=el.getAttribute('data-dark');
         var light=el.getAttribute('data-light');
         if(dark||light){
