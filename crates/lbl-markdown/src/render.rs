@@ -21,7 +21,8 @@ impl MarkdownDocument {
     /// inside headings or list items) and rendered as the corresponding
     /// authoring element; everything else is converted from Markdown to HTML.
     pub fn parse(input: &str) -> Self {
-        let (template, directives) = extract_directives(input);
+        let input = normalize_editor_artifacts(input);
+        let (template, directives) = extract_directives(&input);
         let template = expand_underline(&template);
         let mut body = markdown_to_html(&template);
         for (placeholder, block) in directives {
@@ -80,6 +81,59 @@ impl MarkdownDocument {
 /// substitution.
 fn placeholder(n: usize) -> String {
     format!("lblxdirectivexplaceholderx{n}xend")
+}
+
+/// Strip markdown link tails that rich-text editors append after lbl directives.
+///
+/// TipTap autolink can turn `{{qr:https://example.com}}` into
+/// `{{qr:https://example.com}}](https://example.com}}`, leaving stray link
+/// syntax outside the directive.
+fn normalize_editor_artifacts(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+
+    while i < input.len() {
+        if input[i..].starts_with("{{") {
+            if let Some((_, end)) = scan_directive_at(input, i) {
+                out.push_str(&input[i..end]);
+                i = skip_link_artifact_suffix(input, end);
+                continue;
+            }
+        }
+        let ch = input[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+
+    out
+}
+
+/// After a closing `}}`, skip a spurious `](url…)` tail from editor autolink.
+fn skip_link_artifact_suffix(input: &str, pos: usize) -> usize {
+    if input.as_bytes().get(pos) != Some(&b']') {
+        return pos;
+    }
+
+    let mut i = pos + 1;
+    if input.as_bytes().get(i) == Some(&b'(') {
+        i += 1;
+        while i < input.len() {
+            let b = input.as_bytes()[i];
+            if b == b')' || b == b'\n' {
+                if b == b')' {
+                    i += 1;
+                }
+                break;
+            }
+            i += 1;
+        }
+    }
+
+    while input.as_bytes().get(i) == Some(&b'}') {
+        i += 1;
+    }
+
+    i
 }
 
 /// Scan `input` for `{{type:...}}` directives, replacing each recognized one
@@ -192,6 +246,20 @@ mod tests {
             !html.contains("lblxdirective"),
             "placeholder leaked: {html}"
         );
+    }
+
+    #[test]
+    fn editor_link_artifact_after_qr_directive_is_stripped() {
+        let doc = MarkdownDocument::parse(
+            "# Order\n\nShip **fast**\n\n{{qr:https://example.com}}](https://example.com}}",
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains("<qr>https://example.com</qr>"), "{html}");
+        assert!(
+            !html.contains("example.com}}"),
+            "link artifact leaked: {html}"
+        );
+        assert!(!html.contains("]("), "link artifact leaked: {html}");
     }
 
     #[test]
