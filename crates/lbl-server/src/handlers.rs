@@ -315,7 +315,10 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let count = labels.len();
     let supersample = req.supersample;
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
-    let protocol = preview_protocol(&state.catalog, req.printer.as_deref());
+    // Preview targets the human reading frame, not the print head. The optional
+    // printer key only selects native DPI; layout/rotation still follow the
+    // chosen orientation without the head quarter-turn applied at encode time.
+    let protocol = Protocol::Virtual;
     let style_cfg = load_style_cfg(&state, &req.style);
     let style = resolve_style(&style_cfg, dpi, supersample);
     let media = resolve_media(
@@ -421,12 +424,6 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     });
 
     Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())
-}
-
-fn preview_protocol(catalog: &Catalog, printer_key: Option<&str>) -> Protocol {
-    printer_key
-        .and_then(|k| catalog.lookup_printer(k).map(|p| p.protocol))
-        .unwrap_or(Protocol::Virtual)
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
