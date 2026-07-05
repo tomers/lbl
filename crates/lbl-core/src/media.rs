@@ -133,4 +133,12 @@ impl Media {
             MediaLength::Continuous => None,
         }
     }
+
+    /// Fixed feed length in millimeters, if the media is die-cut.
+    pub fn fixed_length_mm(&self) -> Option<f64> {
+        match self.length {
+            MediaLength::Fixed(mm) => Some(mm),
+            MediaLength::Continuous => None,
+        }
+    }
 }

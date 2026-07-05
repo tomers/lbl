@@ -822,7 +822,12 @@ fn run_print(args: PrintArgs) -> Result<()> {
         .orientation
         .map(Orientation::from)
         .unwrap_or(render_cfg.orientation);
-    let rotation = Rotation::for_print(orientation, args.rotate_cw as u32, args.rotate_ccw as u32);
+    let rotation = Rotation::for_print_with_media(
+        orientation,
+        &media,
+        args.rotate_cw as u32,
+        args.rotate_ccw as u32,
+    );
 
     let style_cfg = args.style.resolve();
     let (style, media_inset) = if virtual_export_mode == VirtualExportMode::Vector {

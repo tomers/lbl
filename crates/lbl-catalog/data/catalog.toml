@@ -294,6 +294,9 @@ purchase_url = "https://www.niimbot.com/"
 media        = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 # --- NIIMBOT B1 die-cut thermal labels (48 mm print head @ 203 dpi) ---------
+#
+# SKU keys list the wider dimension first (e.g. 50x30 = 48 mm across the head,
+# 30 mm feed). Orientation::for_media inverts portrait/landscape for these.
 
 [[entries]]
 brand        = "NIIMBOT"

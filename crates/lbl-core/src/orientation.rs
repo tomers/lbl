@@ -16,11 +16,19 @@
 //!   square and people generally print along the long dimension, so landscape
 //!   is the default.
 //!
+//! Some die-cut SKUs (notably NIIMBOT B1 labels such as `50x30`) list the
+//! wider dimension first even though it spans the print head, so the head width
+//! exceeds the feed length. [`Orientation::for_media`] inverts portrait and
+//! landscape for those profiles so the UI icons still match the preview aspect
+//! ratio.
+//!
 //! Orientation, plus any extra [`Rotation`] quarter-turns, resolves to a single
 //! [`Rotation`] that the pipeline applies to the *rendered raster* after laying
 //! the content out in the chosen frame (see [`Rotation::for_print`]).
 
 use serde::{Deserialize, Serialize};
+
+use crate::media::Media;
 
 /// How label content is laid out relative to the media feed direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -35,6 +43,21 @@ pub enum Orientation {
     /// dimension.
     #[default]
     Landscape,
+}
+
+impl Orientation {
+    /// Map a user-facing portrait/landscape choice to the print orientation for
+    /// the given media. When the head width exceeds the feed length the natural
+    /// reading frame is wider than tall, which inverts the usual semantics.
+    pub fn for_media(self, media: &Media) -> Self {
+        match media.fixed_length_mm() {
+            Some(len) if media.width_mm > len => match self {
+                Orientation::Portrait => Orientation::Landscape,
+                Orientation::Landscape => Orientation::Portrait,
+            },
+            _ => self,
+        }
+    }
 }
 
 /// A rotation in 90° steps, expressed as clockwise quarter-turns and applied to
@@ -94,6 +117,16 @@ impl Rotation {
         let net = base + extra_cw as i32 - extra_ccw as i32;
         Rotation::from_quarter_turns_cw(net)
     }
+
+    /// Like [`Self::for_print`], but applies [`Orientation::for_media`] first.
+    pub fn for_print_with_media(
+        orientation: Orientation,
+        media: &Media,
+        extra_cw: u32,
+        extra_ccw: u32,
+    ) -> Self {
+        Self::for_print(orientation.for_media(media), extra_cw, extra_ccw)
+    }
 }
 
 #[cfg(test)]
@@ -151,5 +184,47 @@ mod tests {
         assert!(Rotation::Cw90.swaps_axes());
         assert!(!Rotation::Cw180.swaps_axes());
         assert!(Rotation::Cw270.swaps_axes());
+    }
+
+    #[test]
+    fn wide_first_media_inverts_orientation() {
+        use crate::media::Media;
+        use crate::units::Dpi;
+
+        let tape = Media::fixed(12.0, 40.0, Dpi(203.0));
+        assert_eq!(
+            Orientation::Portrait.for_media(&tape),
+            Orientation::Portrait
+        );
+        assert_eq!(
+            Orientation::Landscape.for_media(&tape),
+            Orientation::Landscape
+        );
+
+        let wide = Media::fixed(48.0, 30.0, Dpi(203.0));
+        assert_eq!(
+            Orientation::Portrait.for_media(&wide),
+            Orientation::Landscape
+        );
+        assert_eq!(
+            Orientation::Landscape.for_media(&wide),
+            Orientation::Portrait
+        );
+    }
+
+    #[test]
+    fn wide_first_media_maps_landscape_ui_to_wide_preview() {
+        use crate::media::Media;
+        use crate::units::Dpi;
+
+        let wide = Media::fixed(48.0, 30.0, Dpi(203.0));
+        assert_eq!(
+            Rotation::for_print_with_media(Orientation::Landscape, &wide, 0, 0),
+            Rotation::None
+        );
+        assert_eq!(
+            Rotation::for_print_with_media(Orientation::Portrait, &wide, 0, 0),
+            Rotation::Cw90
+        );
     }
 }
