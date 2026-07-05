@@ -1861,6 +1861,7 @@ dependencies = [
  "base64",
  "clap",
  "http-body-util",
+ "image",
  "lbl",
  "lbl-catalog",
  "lbl-cli",

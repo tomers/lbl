@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
+use image::RgbaImage;
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
@@ -687,6 +688,93 @@ pub fn page_size_mm(media: &Media, rotation: Rotation) -> PageSizeMm {
     }
 }
 
+/// Raster output from the print transpile + render path (before dither/encode).
+#[derive(Debug, Clone)]
+pub struct LabelRaster {
+    /// RGBA bitmap at print resolution, after any head rotation.
+    pub image: RgbaImage,
+    /// Browser-ready HTML used for rendering.
+    pub transpiled_html: String,
+}
+
+struct PrintRenderStage {
+    transpiled: String,
+    rendered: RgbaImage,
+    applied_rotation: Rotation,
+    req_width: Option<u32>,
+    req_height: Option<u32>,
+}
+
+/// Transpile for print, rasterize with Chromium, and apply the same rotation
+/// the encoder would use for the given protocol.
+fn render_label_print<B: RenderBackend>(
+    backend: &B,
+    authoring_html: &str,
+    opts: &PipelineOptions,
+) -> Result<PrintRenderStage> {
+    let viewport = render_viewport_px(&opts.media, opts.supersample, opts.rotation);
+    let transpiled = transpile(
+        authoring_html,
+        &TranspileOptions {
+            mode: OutputMode::Print,
+            assets_base: opts.assets_base.clone(),
+            index: None,
+            count: None,
+            style: opts.style.clone(),
+            label_fit: opts.label_fit,
+            viewport: Some(viewport),
+            label_align: opts.label_align,
+            label_valign: opts.label_valign,
+            label_fit_scale: opts.label_fit_scale,
+            font_fit_scale: opts.font_fit_scale,
+            media_inset: opts.media_inset,
+            ..Default::default()
+        },
+    );
+
+    let head_dots = opts.media.width_dots().0;
+    let feed_dots = opts.media.length_dots().map(|d| d.0);
+    let (req_width, req_height) = if opts.rotation.swaps_axes() {
+        (feed_dots, Some(head_dots))
+    } else {
+        (Some(head_dots), feed_dots)
+    };
+    let req = RenderRequest {
+        width_dots: req_width,
+        height_dots: req_height,
+        supersample: opts.supersample,
+    };
+    let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
+
+    let applied_rotation = if opts.protocol.targets_print_head() {
+        opts.rotation
+    } else {
+        Rotation::None
+    };
+    let rendered = apply_rotation(rendered, applied_rotation);
+
+    Ok(PrintRenderStage {
+        transpiled,
+        rendered,
+        applied_rotation,
+        req_width,
+        req_height,
+    })
+}
+
+/// Rasterize one label through the same print pipeline used before dither/encode.
+pub fn render_label_raster<B: RenderBackend>(
+    backend: &B,
+    authoring_html: &str,
+    opts: &PipelineOptions,
+) -> Result<LabelRaster> {
+    let stage = render_label_print(backend, authoring_html, opts)?;
+    Ok(LabelRaster {
+        image: stage.rendered,
+        transpiled_html: stage.transpiled,
+    })
+}
+
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
 /// producing printer-native bytes.
 pub fn encode_label<B: RenderBackend>(
@@ -713,54 +801,13 @@ pub fn encode_label_traced<B: RenderBackend>(
         return encode_label_vector_traced(backend, index, authoring_html, opts);
     }
 
-    let viewport = render_viewport_px(&opts.media, opts.supersample, opts.rotation);
-    let transpiled = transpile(
-        authoring_html,
-        &TranspileOptions {
-            mode: OutputMode::Print,
-            assets_base: opts.assets_base.clone(),
-            index: None,
-            count: None,
-            style: opts.style.clone(),
-            label_fit: opts.label_fit,
-            viewport: Some(viewport),
-            label_align: opts.label_align,
-            label_valign: opts.label_valign,
-            label_fit_scale: opts.label_fit_scale,
-            font_fit_scale: opts.font_fit_scale,
-            media_inset: opts.media_inset,
-            ..Default::default()
-        },
-    );
-
-    // The print head spans `head_dots` and the media advances along
-    // `feed_dots` (content-determined for continuous media). Lay content out in
-    // the chosen reading frame: a quarter-turn (landscape) transposes the
-    // render canvas so text runs along the feed, then we rotate the raster back
-    // onto the head.
-    let head_dots = opts.media.width_dots().0;
-    let feed_dots = opts.media.length_dots().map(|d| d.0);
-    let (req_width, req_height) = if opts.rotation.swaps_axes() {
-        (feed_dots, Some(head_dots))
-    } else {
-        (Some(head_dots), feed_dots)
-    };
-    let req = RenderRequest {
-        width_dots: req_width,
-        height_dots: req_height,
-        supersample: opts.supersample,
-    };
-    let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
-
-    // The quarter-turn maps the reading frame onto a physical print head. On
-    // screen sinks (image file, console preview) have no head, so they keep the
-    // reading orientation — a landscape label stays landscape in the file.
-    let applied_rotation = if opts.protocol.targets_print_head() {
-        opts.rotation
-    } else {
-        Rotation::None
-    };
-    let rendered = apply_rotation(rendered, applied_rotation);
+    let PrintRenderStage {
+        transpiled,
+        rendered,
+        applied_rotation,
+        req_width,
+        req_height,
+    } = render_label_print(backend, authoring_html, opts)?;
 
     let dithered = dither(&rendered, opts.dither);
 

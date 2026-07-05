@@ -1,5 +1,6 @@
 //! Request handlers.
 
+use anyhow::Context;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -8,7 +9,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, render_viewport_px, resolve_font_fit_scale,
+    authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
     resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
     resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, PipelineOptions,
     Source, TemplateFormat, VECTOR_CSS_DPI,
@@ -21,9 +22,7 @@ use lbl_dither::Algorithm;
 use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{
-    fitted_font_px, injected_fit_font_px, transpile, AssetsBase, LabelFitSetting, TranspileOptions,
-};
+use lbl_transpile_html::{injected_fit_font_px, AssetsBase, LabelFitSetting};
 
 use crate::AppState;
 
@@ -306,23 +305,25 @@ impl SourceReq {
 }
 
 pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
-    let labels = authoring_labels(
-        req.source.into_source()?,
-        &lbl_template::BatchSelection::default(),
-    )
-    .map_err(ApiError::from)?;
+    use base64::Engine as _;
+    use lbl_driver_file::VirtualExportMode;
+    use std::io::Cursor;
+
+    let source = req.source.into_source()?;
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
+        .map_err(ApiError::from)?;
     let count = labels.len();
-    const PREVIEW_SUPERSAMPLE: u32 = 2;
-    // Resolve the configured physical sizes against the standard preview DPI and
-    // supersample factor so the browser preview matches printed sizing.
+    let supersample = req.supersample;
+    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
+    let protocol = preview_protocol(&state.catalog, req.printer.as_deref());
     let style_cfg = load_style_cfg(&state, &req.style);
-    let style = resolve_style(&style_cfg, req.dpi, PREVIEW_SUPERSAMPLE);
+    let style = resolve_style(&style_cfg, dpi, supersample);
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
         req.width_mm.or(Some(50.0)),
         req.length_mm,
-        req.dpi,
+        dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
     let label_fit = resolve_label_fit(
@@ -333,7 +334,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, PREVIEW_SUPERSAMPLE);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, supersample);
     let rotation = resolve_rotation(
         &state,
         &media,
@@ -341,7 +342,71 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         req.rotate_cw,
         req.rotate_ccw,
     );
-    let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, rotation);
+    let corner_radius_px = match media.length {
+        lbl_core::media::MediaLength::Fixed(_) => style.corner_radius_px / supersample as f64,
+        lbl_core::media::MediaLength::Continuous => 0.0,
+    };
+    let opts = PipelineOptions {
+        protocol,
+        media: media.clone(),
+        supports_cut: false,
+        cut: false,
+        copies: 1,
+        dither: Algorithm::Auto,
+        rotation,
+        supersample,
+        assets_base: AssetsBase::Cdn,
+        style,
+        media_type: None,
+        virtual_export_mode: VirtualExportMode::Raster,
+        label_fit,
+        label_align,
+        label_valign,
+        label_fit_scale,
+        font_fit_scale,
+        media_inset,
+    };
+    let px_per_mm = dpi * supersample as f64 / 25.4;
+
+    let rendered =
+        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<serde_json::Value>> {
+            let backend = ChromiumBackend::launch()?;
+            let mut out = Vec::with_capacity(count);
+            for label in labels {
+                let raster = render_label_raster(&backend, &label.html, &opts)?;
+                let mut png = Vec::new();
+                raster
+                    .image
+                    .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+                    .context("encoding preview PNG")?;
+                let computed_font_size_mm =
+                    injected_fit_font_px(&raster.transpiled_html).map(|px| px / px_per_mm);
+                let mut label_json = json!({
+                    "index": label.index,
+                    "width_px": raster.image.width(),
+                    "height_px": raster.image.height(),
+                    "image_base64": base64::engine::general_purpose::STANDARD.encode(&png),
+                });
+                if let Some(mm) = computed_font_size_mm {
+                    label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
+                }
+                out.push(label_json);
+            }
+            Ok(out)
+        })
+        .await
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let (width_px, height_px) = rendered
+        .first()
+        .map(|l| {
+            (
+                l["width_px"].as_u64().unwrap_or(0) as f64,
+                l["height_px"].as_u64().unwrap_or(0) as f64,
+            )
+        })
+        .unwrap_or((0.0, 0.0));
     let media_info = json!({
         "width_mm": media.width_mm,
         "length_mm": match media.length {
@@ -350,44 +415,18 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         },
         "continuous": matches!(media.length, lbl_core::media::MediaLength::Continuous),
         "dpi": media.dpi.0,
-        "width_px": viewport.width,
-        "height_px": viewport.height,
-        "corner_radius_px": match media.length {
-            lbl_core::media::MediaLength::Fixed(_) => style.corner_radius_px,
-            lbl_core::media::MediaLength::Continuous => 0.0,
-        },
+        "width_px": width_px,
+        "height_px": height_px,
+        "corner_radius_px": corner_radius_px,
     });
-    let px_per_mm = req.dpi * PREVIEW_SUPERSAMPLE as f64 / 25.4;
-    let out: Vec<_> = labels
-        .into_iter()
-        .map(|l| {
-            let transpile_opts = TranspileOptions {
-                mode: lbl_core::job::OutputMode::Preview,
-                assets_base: AssetsBase::Cdn,
-                index: Some(l.index),
-                count: Some(count),
-                style: style.clone(),
-                label_fit,
-                viewport: Some(viewport.clone()),
-                label_align,
-                label_valign,
-                label_fit_scale,
-                font_fit_scale,
-                media_inset,
-                ..Default::default()
-            };
-            let html = transpile(&l.html, &transpile_opts);
-            let computed_font_size_mm = injected_fit_font_px(&html)
-                .or_else(|| fitted_font_px(&l.html, &transpile_opts))
-                .map(|px| px / px_per_mm);
-            let mut label_json = json!({ "index": l.index, "html": html });
-            if let Some(mm) = computed_font_size_mm {
-                label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
-            }
-            label_json
-        })
-        .collect();
-    Ok(Json(json!({ "count": count, "labels": out, "media": media_info })).into_response())
+
+    Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())
+}
+
+fn preview_protocol(catalog: &Catalog, printer_key: Option<&str>) -> Protocol {
+    printer_key
+        .and_then(|k| catalog.lookup_printer(k).map(|p| p.protocol))
+        .unwrap_or(Protocol::Virtual)
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -440,6 +479,9 @@ pub struct PreviewReq {
     length_mm: Option<f64>,
     #[serde(default = "default_dpi")]
     dpi: f64,
+    /// Catalog printer key (e.g. `B1`) used to pick native DPI.
+    #[serde(default)]
+    printer: Option<String>,
     /// Layout orientation (`portrait`|`landscape`). Falls back to the
     /// configured default (landscape) when omitted.
     #[serde(default)]
@@ -450,6 +492,9 @@ pub struct PreviewReq {
     /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
     #[serde(default)]
     rotate_ccw: u32,
+    /// Render supersample factor (same default as print).
+    #[serde(default = "default_supersample")]
+    supersample: u32,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
 }
@@ -547,6 +592,22 @@ fn resolve_rotation(
     Rotation::for_print_with_media(orientation, media, rotate_cw, rotate_ccw)
 }
 
+/// Pick the render DPI: explicit user overrides win; otherwise use the printer's
+/// native resolution from the catalog (same rule as the CLI).
+fn resolve_request_dpi(
+    catalog: &Catalog,
+    printer_key: Option<&str>,
+    protocol: Option<Protocol>,
+    req_dpi: f64,
+) -> f64 {
+    let protocol = protocol
+        .or_else(|| printer_key.and_then(|k| catalog.lookup_printer(k).map(|p| p.protocol)));
+    match protocol {
+        Some(p) => catalog.resolve_dpi(printer_key, p, req_dpi),
+        None => catalog.resolve_dpi(printer_key, Protocol::Virtual, req_dpi),
+    }
+}
+
 fn default_dpi() -> f64 {
     300.0
 }
@@ -582,17 +643,24 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
 
 pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> ApiResult {
     let source = req.source.clone().into_source()?;
+    let protocol = parse_protocol(&req.protocol)?;
+    let dpi = resolve_request_dpi(
+        &state.catalog,
+        req.printer.as_deref(),
+        Some(protocol),
+        req.dpi,
+    );
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
         req.width_mm,
         req.length_mm,
-        req.dpi,
+        dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let style_cfg = load_style_cfg(&state, &req.style);
-    let style = resolve_style(&style_cfg, req.dpi, req.supersample);
+    let style = resolve_style(&style_cfg, dpi, req.supersample);
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
@@ -601,9 +669,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, req.supersample);
 
-    let protocol = parse_protocol(&req.protocol)?;
     if req.dispatch_mode == DispatchMode::Client
         && matches!(
             protocol,
@@ -701,16 +768,22 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     use base64::Engine as _;
 
     let source = req.source.clone().into_source()?;
+    let protocol = parse_protocol(&req.protocol)?;
+    let dpi = resolve_request_dpi(
+        &state.catalog,
+        req.printer.as_deref(),
+        Some(protocol),
+        req.dpi,
+    );
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
         req.width_mm,
         req.length_mm,
-        req.dpi,
+        dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let protocol = parse_protocol(&req.protocol)?;
     let virtual_export_mode = if protocol == Protocol::Virtual {
         match &req.export_mode {
             Some(name) => lbl_driver_file::VirtualExportMode::parse(name)
@@ -744,8 +817,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         )
     } else {
         (
-            resolve_style(&style_cfg, req.dpi, req.supersample),
-            resolve_media_inset(&style_cfg).to_px(req.dpi, req.supersample),
+            resolve_style(&style_cfg, dpi, req.supersample),
+            resolve_media_inset(&style_cfg).to_px(dpi, req.supersample),
         )
     };
     let label_fit = resolve_label_fit(
