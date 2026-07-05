@@ -352,12 +352,11 @@ impl NiimbotDriver {
 
         Self::push_packet(&mut out, START_PAGE_PRINT, &[0x01]);
 
-        // 6-byte SetPageSize: rows, cols, 0x00, copies (single byte).
-        let copy_byte = copies.clamp(1, 255) as u8;
+        // 6-byte SetPageSize: rows, cols, copies (u16 big-endian).
         let mut page_size = [0u8; 6];
         page_size[0..2].copy_from_slice(&rows.to_be_bytes());
         page_size[2..4].copy_from_slice(&cols.to_be_bytes());
-        page_size[5] = copy_byte;
+        page_size[4..6].copy_from_slice(&copies.max(1).to_be_bytes());
         Self::push_packet(&mut out, SET_DIMENSION, &page_size);
 
         self.push_rows_b1(&mut out, bitmap, stride);
@@ -701,7 +700,7 @@ mod tests {
         assert!(find_packet(&bytes, SET_QUANTITY).is_none());
         let page_size = find_packet(&bytes, SET_DIMENSION).unwrap();
         assert_eq!(page_size.len(), 6);
-        assert_eq!(page_size[5], 3); // copies byte
+        assert_eq!(page_size[4..6], [0x00, 0x03]); // copies u16 BE
         assert!(find_packet(&bytes, PRINT_EMPTY_ROW).is_some());
     }
 

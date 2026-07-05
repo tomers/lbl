@@ -70,11 +70,15 @@ fn wait_for_niimbot_completion<T: Transport>(transport: &mut T) -> Result<(), De
     let query = lbl_driver_niimbot::status_query();
     let deadline = Instant::now() + HARD_CAP;
 
+    let mut saw_activity = false;
     loop {
         transport.send(&query)?;
         let resp = transport.receive(POLL_TIMEOUT)?;
         if let Some(status) = lbl_driver_niimbot::parse_status(&resp) {
-            if status.is_complete() || status.is_page_done() {
+            if status.progress1 < 100 || status.progress2 < 100 {
+                saw_activity = true;
+            }
+            if status.progress1 >= 100 && status.progress2 >= 100 && saw_activity {
                 return Ok(());
             }
         }
