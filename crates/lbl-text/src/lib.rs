@@ -15,6 +15,8 @@
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
 //! - `{{size:1.5:World}}` -> text at 1.5x the base font size (aliases:
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
+//! - `{{font:roboto:Hello}}` -> text in a named font (aliases: `font-family`,
+//!   `ff`; see [`fonts::FONTS`] for supported slugs)
 //!
 //! ```
 //! use lbl_text::Document;
@@ -29,9 +31,11 @@
 //! literally (so a label can contain the characters `{{...}}`). Flag-based
 //! directives still apply and are appended after the text.
 
+mod fonts;
 mod parse;
 mod qr;
 
+pub use fonts::{google_fonts_link, resolve_slug, FontDef, FONTS};
 pub use parse::{barcode_from_spec, parse_directive, scan_directive_at, Block, Document};
 pub use qr::{QrErrorCorrection, QrOptions};
 

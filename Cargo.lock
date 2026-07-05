@@ -1938,6 +1938,7 @@ dependencies = [
  "clap",
  "lbl-cli",
  "lbl-core",
+ "lbl-text",
  "once_cell",
  "regex",
  "serde",

@@ -1,6 +1,7 @@
 //! Core transpilation: rewrite custom elements and assemble the document.
 
 use lbl_core::job::OutputMode;
+use lbl_text::{google_fonts_link, resolve_slug};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -652,6 +653,34 @@ fn preview_corner_radius_css(style: &LabelStyle) -> String {
     )
 }
 
+static LBL_FONT_ATTR_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"data-lbl-font="([^"]+)""#).expect("lbl font attr regex"));
+
+/// CSS rules and optional Google Fonts link for `data-lbl-font` spans in `body`.
+fn font_assets_for_body(body: &str) -> (String, Option<String>) {
+    let mut slugs: Vec<String> = Vec::new();
+    for caps in LBL_FONT_ATTR_RE.captures_iter(body) {
+        let slug = caps[1].to_string();
+        if resolve_slug(&slug).is_some() && !slugs.iter().any(|s| s == &slug) {
+            slugs.push(slug);
+        }
+    }
+
+    let mut css = String::new();
+    for slug in &slugs {
+        if let Some(def) = resolve_slug(slug) {
+            css.push_str(&format!(
+                ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{css}}}\n",
+                slug = slug,
+                css = def.css
+            ));
+        }
+    }
+
+    let link = google_fonts_link(&slugs.iter().map(String::as_str).collect::<Vec<_>>());
+    (css, link)
+}
+
 fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     let mut head = String::new();
     head.push_str("<meta charset=\"utf-8\">\n");
@@ -661,6 +690,8 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
     }
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
+    let (font_css, font_link) = font_assets_for_body(body);
+    head.push_str(&font_css);
     if opts.label_fit == LabelFit::Fill {
         head.push_str(&format!(
             ".lbl-label{{--lbl-font-fit-scale:{:.4}}}\n",
@@ -703,6 +734,12 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
         }
     }
     head.push_str("</style>\n");
+    if let Some(url) = font_link {
+        head.push_str(&format!(
+            "<link rel=\"stylesheet\" href=\"{}\">\n",
+            attr(&url)
+        ));
+    }
 
     // Wrap body: preview mode adds an addressable, gallery-friendly container.
     let wrapped_body = if opts.mode == OutputMode::Preview {
@@ -752,6 +789,17 @@ fn attr(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn font_directive_injects_css_and_google_link() {
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"roboto\">Hi</span><span class=\"lbl-text\" data-lbl-font=\"bebas-neue\">Title</span></div>",
+            &TranspileOptions::default(),
+        );
+        assert!(out.contains("font-family:'Roboto',sans-serif"), "{out}");
+        assert!(out.contains("font-family:'Bebas Neue',sans-serif"), "{out}");
+        assert!(out.contains("fonts.googleapis.com"), "{out}");
+    }
 
     #[test]
     fn qr_is_rewritten_and_lib_injected() {

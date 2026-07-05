@@ -16,6 +16,13 @@ pub enum Block {
         /// The text to render at this size.
         text: String,
     },
+    /// A run of text rendered in a named font family (see [`crate::fonts`]).
+    Font {
+        /// Font slug, e.g. `roboto`, `mono`.
+        family: String,
+        /// The text to render in this font.
+        text: String,
+    },
     /// A QR code carrying the given payload and optional overrides.
     Qr {
         /// Encoded QR payload.
@@ -54,6 +61,11 @@ impl Block {
             Block::Sized { scale, text } => format!(
                 "<span class=\"lbl-text\" style=\"font-size:{}em\">{}</span>",
                 fmt_scale(*scale),
+                text_to_html(text)
+            ),
+            Block::Font { family, text } => format!(
+                "<span class=\"lbl-text\" data-lbl-font=\"{}\">{}</span>",
+                escape(family),
                 text_to_html(text)
             ),
             Block::Qr { payload, options } => {
@@ -256,7 +268,11 @@ fn flush_text(buf: &mut String, blocks: &mut Vec<Block>) {
 fn is_inline_flow_block(block: &Block) -> bool {
     match block {
         Block::Text(t) => !t.contains('\n'),
-        Block::Sized { .. } | Block::Qr { .. } | Block::Barcode { .. } | Block::Image(_) => true,
+        Block::Sized { .. }
+        | Block::Font { .. }
+        | Block::Qr { .. }
+        | Block::Barcode { .. }
+        | Block::Image(_) => true,
     }
 }
 
@@ -292,6 +308,7 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         "barcode" => Some(barcode_from_spec(rest)),
         "image" | "img" => Some(Block::Image(rest.to_string())),
         "size" | "font-size" | "fs" => sized_from_spec(rest),
+        "font" | "font-family" | "ff" => font_from_spec(rest),
         _ => None,
     }
 }
@@ -309,6 +326,20 @@ fn sized_from_spec(spec: &str) -> Option<Block> {
     }
     Some(Block::Sized {
         scale,
+        text: text.to_string(),
+    })
+}
+
+/// Parse a font spec `SLUG:TEXT` (e.g. `roboto:Hello`) into a [`Block::Font`].
+fn font_from_spec(spec: &str) -> Option<Block> {
+    let (family, text) = spec.split_once(':')?;
+    let family = family.trim();
+    let text = text.trim();
+    if family.is_empty() || text.is_empty() || crate::fonts::resolve_slug(family).is_none() {
+        return None;
+    }
+    Some(Block::Font {
+        family: family.to_ascii_lowercase(),
         text: text.to_string(),
     })
 }
@@ -452,6 +483,47 @@ mod tests {
             doc.blocks,
             vec![Block::Text("a {{unknown:y}} b".to_string())]
         );
+    }
+
+    #[test]
+    fn inline_font_directive_is_parsed() {
+        let doc = Document::parse("Hello, {{font:roboto:World}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Hello,".to_string()),
+                Block::Font {
+                    family: "roboto".to_string(),
+                    text: "World".to_string()
+                },
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains("data-lbl-font=\"roboto\""), "{html}");
+        assert!(html.contains(">World</span>"), "{html}");
+    }
+
+    #[test]
+    fn font_accepts_aliases() {
+        for spec in ["font:mono:code", "font-family:serif:Text", "ff:oswald:BIG"] {
+            let doc = Document::parse(&format!("{{{{{spec}}}}}"), false);
+            assert!(
+                matches!(doc.blocks.as_slice(), [Block::Font { .. }]),
+                "spec: {spec}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_font_is_kept_literal() {
+        for inner in ["font:roboto", "font:unknown:x", "font::x"] {
+            let doc = Document::parse(&format!("a {{{{{inner}}}}} b"), false);
+            assert_eq!(
+                doc.blocks,
+                vec![Block::Text(format!("a {{{{{inner}}}}} b"))],
+                "inner: {inner}"
+            );
+        }
     }
 
     #[test]

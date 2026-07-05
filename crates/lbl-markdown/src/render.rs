@@ -271,6 +271,16 @@ mod tests {
     }
 
     #[test]
+    fn font_directive_renders_inline() {
+        let doc = MarkdownDocument::parse("Hello, {{font:roboto:World}}!");
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains("Hello, <span class=\"lbl-text\" data-lbl-font=\"roboto\">World</span>!"),
+            "{html}"
+        );
+    }
+
+    #[test]
     fn size_directive_renders_inline() {
         let doc = MarkdownDocument::parse("Hello, {{size:1.5:World}}!");
         let html = doc.to_authoring_html();
