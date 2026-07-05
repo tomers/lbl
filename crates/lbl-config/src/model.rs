@@ -186,7 +186,7 @@ pub struct PrintConfig {
     pub usb: Option<String>,
     /// Default network target (`host:port`).
     pub network: Option<String>,
-    /// NIIMBOT task variant (`standard` or `v4`).
+    /// NIIMBOT task variant (`standard`, `v4`, or `b1`).
     pub niimbot_task: String,
     /// Virtual-printer output format (`png`, `bmp`, …).
     pub media_type: Option<String>,

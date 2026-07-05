@@ -74,7 +74,7 @@ fn wait_for_niimbot_completion<T: Transport>(transport: &mut T) -> Result<(), De
         transport.send(&query)?;
         let resp = transport.receive(POLL_TIMEOUT)?;
         if let Some(status) = lbl_driver_niimbot::parse_status(&resp) {
-            if status.is_complete() {
+            if status.is_complete() || status.is_page_done() {
                 return Ok(());
             }
         }

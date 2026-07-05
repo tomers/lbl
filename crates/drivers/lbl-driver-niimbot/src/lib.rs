@@ -50,6 +50,7 @@ const START_PAGE_PRINT: u8 = 0x03;
 const SET_DIMENSION: u8 = 0x13;
 const SET_QUANTITY: u8 = 0x15;
 const PRINT_BITMAP_ROW: u8 = 0x85;
+const PRINT_EMPTY_ROW: u8 = 0x84;
 const END_PAGE_PRINT: u8 = 0xE3;
 const END_PRINT: u8 = 0xF3;
 
@@ -67,8 +68,10 @@ const LABEL_TYPE_GAP: u8 = 0x01;
 ///
 /// Pocket D-series firmware (D110M V4, 2025+) uses [`NiimbotTask::V4`]: a
 /// 9-byte `PrintStart`, 13-byte `SetPageSize`, no `PageStart`, and a one-way
-/// `Heartbeat` after `PrintEnd`. B-series and older D110 units over USB serial
-/// use [`NiimbotTask::Standard`].
+/// `Heartbeat` after `PrintEnd`. B1 / B21 (protocol 3, 203 dpi) use
+/// [`NiimbotTask::B1`]: 7-byte PrintStart, 6-byte SetPageSize, total-mode row
+/// counts, and a post-connect handshake over BLE. Older B-series USB units use
+/// [`NiimbotTask::Standard`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NiimbotTask {
     /// Legacy D110 / B-series: 1-byte PrintStart, PageStart, 4-byte dimensions
@@ -78,6 +81,9 @@ pub enum NiimbotTask {
     /// D110M V4 (typical for BLE): 9-byte PrintStart, 13-byte SetPageSize, no
     /// PageStart, status + heartbeat extras.
     V4,
+    /// B1 / B21 (protocol 3): 7-byte PrintStart, PageStart, 6-byte SetPageSize,
+    /// total-mode rows, empty-row opcode, run-length grouping.
+    B1,
 }
 
 /// Driver for NIIMBOT thermal label printers (D11 / D110 family and
@@ -116,6 +122,14 @@ impl NiimbotDriver {
         }
     }
 
+    /// Create a driver configured for the B1 / B21 print task (protocol 3).
+    pub fn b1() -> Self {
+        Self {
+            task: NiimbotTask::B1,
+            ..Self::default()
+        }
+    }
+
     /// Create a driver with an explicit print density.
     pub fn with_density(density: u8) -> Self {
         Self {
@@ -129,6 +143,37 @@ impl NiimbotDriver {
         Self {
             task,
             ..Self::default()
+        }
+    }
+
+    /// Stable config/API name for a print task.
+    pub fn task_name(task: NiimbotTask) -> &'static str {
+        match task {
+            NiimbotTask::Standard => "standard",
+            NiimbotTask::V4 => "v4",
+            NiimbotTask::B1 => "b1",
+        }
+    }
+
+    /// Parse a print-task name from config or the API (`standard`, `v4`, `b1`).
+    pub fn parse_task_name(name: &str) -> Option<NiimbotTask> {
+        match name.to_ascii_lowercase().as_str() {
+            "standard" => Some(NiimbotTask::Standard),
+            "v4" => Some(NiimbotTask::V4),
+            "b1" => Some(NiimbotTask::B1),
+            _ => None,
+        }
+    }
+
+    /// Infer the NIIMBOT print task from a catalog printer key.
+    ///
+    /// Returns `None` when the model has no known task override (callers fall
+    /// back to config / `standard`).
+    pub fn task_for_printer_key(key: &str) -> Option<NiimbotTask> {
+        let k = key.to_ascii_lowercase();
+        match k.as_str() {
+            "b1" | "b1 pro" | "b1pro" | "m2-h" | "m2h" => Some(NiimbotTask::B1),
+            _ => None,
         }
     }
 
@@ -203,6 +248,7 @@ impl Driver for NiimbotDriver {
         match self.task {
             NiimbotTask::Standard => self.encode_standard(bitmap, rows, cols, copies, stride),
             NiimbotTask::V4 => self.encode_v4(bitmap, rows, cols, copies, stride),
+            NiimbotTask::B1 => self.encode_b1(bitmap, rows, cols, copies, stride),
         }
     }
 }
@@ -283,6 +329,43 @@ impl NiimbotDriver {
         Ok(out)
     }
 
+    /// B1 / B21 print task (protocol 3, 203 dpi, BLE or USB serial).
+    ///
+    /// Reference: niim.blue / niimbot-web-bluetooth `b1` task variant.
+    fn encode_b1(
+        &self,
+        bitmap: &MonoBitmap,
+        rows: u16,
+        cols: u16,
+        copies: u16,
+        stride: usize,
+    ) -> Result<Vec<u8>, DriverError> {
+        let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 96);
+
+        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
+
+        // 7-byte PrintStart: page count in first u16, remainder zeroed.
+        let mut start = [0u8; 7];
+        start[0..2].copy_from_slice(&copies.max(1).to_be_bytes());
+        Self::push_packet(&mut out, START_PRINT, &start);
+
+        Self::push_packet(&mut out, START_PAGE_PRINT, &[0x01]);
+
+        // 6-byte SetPageSize: rows, cols, 0x00, copies (single byte).
+        let copy_byte = copies.clamp(1, 255) as u8;
+        let mut page_size = [0u8; 6];
+        page_size[0..2].copy_from_slice(&rows.to_be_bytes());
+        page_size[2..4].copy_from_slice(&cols.to_be_bytes());
+        page_size[5] = copy_byte;
+        Self::push_packet(&mut out, SET_DIMENSION, &page_size);
+
+        self.push_rows_b1(&mut out, bitmap, stride);
+        Self::push_packet(&mut out, END_PAGE_PRINT, &[0x01]);
+        Self::push_packet(&mut out, END_PRINT, &[0x01]);
+        Ok(out)
+    }
+
     fn push_rows(&self, out: &mut Vec<u8>, bitmap: &MonoBitmap, stride: usize) {
         let mut row_data = Vec::with_capacity(6 + stride);
         for y in 0..bitmap.height {
@@ -294,7 +377,67 @@ impl NiimbotDriver {
             Self::push_packet(out, PRINT_BITMAP_ROW, &row_data);
         }
     }
+
+    /// Emit B1 rows with total-mode counts, empty-row opcode, and run-length.
+    fn push_rows_b1(&self, out: &mut Vec<u8>, bitmap: &MonoBitmap, stride: usize) {
+        const MAX_RUN: u8 = 200;
+
+        let mut y = 0u32;
+        while y < bitmap.height {
+            let row = bitmap.row(y);
+            let blank = row.iter().all(|&b| b == 0);
+            let mut run = 1u8;
+            while run < MAX_RUN
+                && y + (run as u32) < bitmap.height
+                && rows_equal(bitmap, y, y + run as u32, stride)
+            {
+                run += 1;
+            }
+
+            if blank {
+                let mut data = Vec::with_capacity(3);
+                data.extend_from_slice(&(y as u16).to_be_bytes());
+                data.push(run);
+                Self::push_packet(out, PRINT_EMPTY_ROW, &data);
+            } else {
+                let total = Self::row_ink_total(bitmap, y);
+                let mut data = Vec::with_capacity(6 + stride);
+                data.extend_from_slice(&(y as u16).to_be_bytes());
+                data.push(0x00);
+                data.extend_from_slice(&total.to_le_bytes());
+                data.push(run);
+                data.extend_from_slice(row);
+                Self::push_packet(out, PRINT_BITMAP_ROW, &data);
+            }
+            y += run as u32;
+        }
+    }
+
+    /// Total ink pixels in row `y` (B1 total-mode row header).
+    fn row_ink_total(bitmap: &MonoBitmap, y: u32) -> u16 {
+        let mut n = 0u32;
+        for x in 0..bitmap.width {
+            if bitmap.get(x, y) {
+                n += 1;
+            }
+        }
+        n.min(0xFFFF) as u16
+    }
 }
+
+fn rows_equal(bitmap: &MonoBitmap, a: u32, b: u32, stride: usize) -> bool {
+    bitmap.row(a)[..stride] == bitmap.row(b)[..stride]
+}
+
+// B1 post-connect handshake (required before the printer will feed paper).
+const PRINTER_STATUS_DATA: u8 = 0xA5;
+const PRINTER_INFO: u8 = 0x40;
+
+/// Sub-codes for [`PRINTER_INFO`] queries during the B1 connect handshake.
+pub const B1_INFO_SUBCODES: [u8; 8] = [0x08, 0x0b, 0x0d, 0x0a, 0x07, 0x03, 0x0c, 0x09];
+
+/// Initial BLE connect packet (raw, with leading `0x03` prefix).
+pub const B1_BLE_CONNECT: [u8; 9] = [0x03, 0x55, 0x55, 0xC1, 0x01, 0x01, 0xC1, 0xAA, 0xAA];
 
 /// Frame an arbitrary NIIMBOT command packet
 /// (`55 55 <cmd> <len> <data> <csum> AA AA`). Exposed for callers that drive
@@ -311,6 +454,16 @@ pub fn status_query() -> Vec<u8> {
     frame_packet(GET_PRINT_STATUS, &[0x01])
 }
 
+/// Packets for the B1 post-connect handshake (after [`B1_BLE_CONNECT`]).
+pub fn b1_handshake_packets() -> Vec<Vec<u8>> {
+    let mut out = vec![frame_packet(PRINTER_STATUS_DATA, &[0x01])];
+    for &sub in &B1_INFO_SUBCODES {
+        out.push(frame_packet(PRINTER_INFO, &[sub]));
+    }
+    out.push(frame_packet(HEARTBEAT, &[0x04]));
+    out
+}
+
 /// A decoded print-status reply from the printer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PrintStatus {
@@ -323,9 +476,14 @@ pub struct PrintStatus {
 }
 
 impl PrintStatus {
-    /// Whether the current page has finished printing.
+    /// Whether the current page has finished printing (Standard / V4 tasks).
     pub fn is_complete(&self) -> bool {
         self.progress1 >= 100 && self.progress2 >= 100
+    }
+
+    /// Whether the B1 task reports the page counter has advanced (page ≥ 1).
+    pub fn is_page_done(&self) -> bool {
+        self.page >= 1
     }
 }
 
@@ -526,5 +684,54 @@ mod tests {
         assert_eq!(find_packet(&bytes, SET_DIMENSION).unwrap().len(), 13);
         assert!(find_packet(&bytes, GET_PRINT_STATUS).is_some());
         assert!(find_packet(&bytes, HEARTBEAT).is_some());
+    }
+
+    #[test]
+    fn b1_uses_seven_byte_print_start_and_six_byte_page_size() {
+        let bmp = MonoBitmap::new(384, 4);
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(3);
+        let bytes = NiimbotDriver::b1()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+
+        assert!(checksum_ok(&bytes));
+        assert_eq!(find_packet(&bytes, START_PRINT).unwrap().len(), 7);
+        assert!(find_packet(&bytes, START_PAGE_PRINT).is_some());
+        assert!(find_packet(&bytes, SET_QUANTITY).is_none());
+        let page_size = find_packet(&bytes, SET_DIMENSION).unwrap();
+        assert_eq!(page_size.len(), 6);
+        assert_eq!(page_size[5], 3); // copies byte
+        assert!(find_packet(&bytes, PRINT_EMPTY_ROW).is_some());
+    }
+
+    #[test]
+    fn b1_row_uses_total_mode_pixel_count() {
+        let mut bmp = MonoBitmap::new(8, 1);
+        bmp.set(0, 0, true);
+        let caps = PrinterCapabilities::default();
+        let job = ctx_job(1);
+        let bytes = NiimbotDriver::b1()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+        let row = find_packet(&bytes, PRINT_BITMAP_ROW).unwrap();
+        assert_eq!(row[2], 0x00);
+        assert_eq!(row[3..5], [0x01, 0x00]); // total = 1, little-endian
+    }
+
+    #[test]
+    fn b1_status_page_done_when_page_at_least_one() {
+        let done = frame_packet(PRINT_STATUS_RESPONSE, &[0x00, 0x01, 50, 0]);
+        let s = parse_status(&done).unwrap();
+        assert!(s.is_page_done());
+    }
+
+    #[test]
+    fn task_for_printer_key_maps_b1_models() {
+        assert_eq!(
+            NiimbotDriver::task_for_printer_key("B1"),
+            Some(NiimbotTask::B1)
+        );
+        assert_eq!(NiimbotDriver::task_for_printer_key("d110"), None);
     }
 }

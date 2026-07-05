@@ -17,6 +17,7 @@ use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::printer::{PrinterProfile, Protocol};
 use lbl_core::Rotation;
 use lbl_dither::Algorithm;
+use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
 use lbl_transpile_html::{
@@ -552,7 +553,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "escpos" | "esc/pos" => Protocol::EscPos,
         "zpl" => Protocol::Zpl,
         "tspl" => Protocol::Tspl,
-        "niimbot" | "d110" | "d11" => Protocol::Niimbot,
+        "niimbot" | "d110" | "d11" | "b1" => Protocol::Niimbot,
         "virtual" | "file" => Protocol::Virtual,
         "console" | "term" => Protocol::Console,
         "html" => Protocol::Html,
@@ -637,7 +638,11 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
     let report = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
-        let registry = Registry::with_builtin_drivers();
+        let registry = if protocol == Protocol::Niimbot {
+            niimbot_registry(printer_key.as_deref())
+        } else {
+            Registry::with_builtin_drivers()
+        };
         let encoded: Vec<(String, Vec<u8>)> = if use_sidecar {
             encode_all(&SidecarBackend::node_default(), &registry, &labels, &opts)?
         } else {
@@ -770,8 +775,14 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         None => ("bin".to_string(), "application/octet-stream".to_string()),
     };
 
+    let printer_key = req.printer.clone();
+
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
-        let mut registry = Registry::with_builtin_drivers();
+        let mut registry = if protocol == Protocol::Niimbot {
+            niimbot_registry(printer_key.as_deref())
+        } else {
+            Registry::with_builtin_drivers()
+        };
         if let Some(mt) =
             media_type.filter(|_| virtual_export_mode == lbl_driver_file::VirtualExportMode::Raster)
         {
@@ -932,6 +943,24 @@ fn handshake_for_protocol(protocol: Protocol) -> &'static str {
     }
 }
 
+fn resolve_niimbot_task_name(printer_key: Option<&str>) -> Option<&'static str> {
+    printer_key
+        .and_then(NiimbotDriver::task_for_printer_key)
+        .map(NiimbotDriver::task_name)
+}
+
+fn niimbot_registry(printer_key: Option<&str>) -> Registry {
+    let mut registry = Registry::with_builtin_drivers();
+    if let Some(task) = printer_key.and_then(NiimbotDriver::task_for_printer_key) {
+        match task {
+            NiimbotTask::V4 => registry.register(Box::new(NiimbotDriver::v4())),
+            NiimbotTask::B1 => registry.register(Box::new(NiimbotDriver::b1())),
+            NiimbotTask::Standard => {}
+        }
+    }
+    registry
+}
+
 fn resolve_catalog_printer<'a>(
     catalog: &'a Catalog,
     printer_key: Option<&str>,
@@ -978,11 +1007,11 @@ pub fn browser_transport_hints(
     if !webusb_filters.is_empty() {
         return json!({ "api": "webusb", "filters": webusb_filters });
     }
-    if has_serial {
-        return json!({ "api": "web_serial" });
-    }
     if !ble_names.is_empty() {
         return json!({ "api": "web_bluetooth", "names": ble_names });
+    }
+    if has_serial {
+        return json!({ "api": "web_serial" });
     }
 
     json!({ "api": default_browser_api(protocol) })
@@ -1017,11 +1046,15 @@ fn build_client_print_response(
         })
         .collect();
 
+    let handshake = handshake_for_protocol(protocol);
+    let niimbot_task = resolve_niimbot_task_name(printer_key);
+
     Ok(json!({
         "dispatch_mode": "client",
         "protocol": opts_protocol_name(protocol),
-        "handshake": handshake_for_protocol(protocol),
+        "handshake": handshake,
         "transport": browser_transport_hints(catalog, protocol, printer_key),
+        "niimbot_task": niimbot_task,
         "labels": labels,
     }))
 }
@@ -1051,6 +1084,32 @@ mod browser_hints_tests {
             .unwrap()
             .iter()
             .any(|n| n.as_str() == Some("D110")));
+    }
+
+    #[test]
+    fn niimbot_b1_ble_hints() {
+        let catalog = Catalog::bundled().unwrap();
+        let hints = browser_transport_hints(&catalog, Protocol::Niimbot, Some("B1"));
+        assert_eq!(hints["api"], "web_bluetooth");
+        assert!(hints["names"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n.as_str() == Some("B1")));
+    }
+
+    #[test]
+    fn niimbot_b1_client_response_includes_task() {
+        let catalog = Catalog::bundled().unwrap();
+        let resp = build_client_print_response(
+            &catalog,
+            Protocol::Niimbot,
+            Some("B1"),
+            vec![("label-0000.bin".into(), vec![0x55, 0x55])],
+        )
+        .unwrap();
+        assert_eq!(resp["niimbot_task"], "b1");
+        assert_eq!(resp["transport"]["api"], "web_bluetooth");
     }
 
     #[test]

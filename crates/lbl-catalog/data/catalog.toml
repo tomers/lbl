@@ -293,6 +293,36 @@ name         = "NIIMBOT 15x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
 media        = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
+# --- NIIMBOT B1 die-cut thermal labels (48 mm print head @ 203 dpi) ---------
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["50x30", "niimbot-50x30"]
+name         = "NIIMBOT 50x30mm White Thermal Labels (B1)"
+purchase_url = "https://www.niimbot.com/"
+media        = { width_mm = 48.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["40x30", "niimbot-40x30"]
+name         = "NIIMBOT 40x30mm White Thermal Labels (B1)"
+purchase_url = "https://www.niimbot.com/"
+media        = { width_mm = 40.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["40x60", "niimbot-40x60"]
+name         = "NIIMBOT 40x60mm White Thermal Labels (B1)"
+purchase_url = "https://www.niimbot.com/"
+media        = { width_mm = 40.0, length = { kind = "fixed", mm = 60.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["30x20", "niimbot-30x20"]
+name         = "NIIMBOT 30x20mm White Thermal Labels (B1)"
+purchase_url = "https://www.niimbot.com/"
+media        = { width_mm = 30.0, length = { kind = "fixed", mm = 20.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
 # --- Known printers ----------------------------------------------------------
 #
 # `supported_media` lists canonical media keys from [[entries]] above.
@@ -483,11 +513,22 @@ connections     = [{ kind = "ble", name = "D110" }]
 
 [[printers]]
 brand           = "NIIMBOT"
-keys            = ["B1", "B21", "B18", "B203", "B3S"]
+keys            = ["B1"]
 name            = "NIIMBOT B1"
 protocol        = "niimbot"
 dpi             = 203.0
-max_width_mm    = 12.0
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+max_width_mm    = 48.0
+default_media   = "50x30"
+supported_media = ["50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["B21", "B18", "B203", "B3S"]
+name            = "NIIMBOT B21"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 48.0
+default_media   = "50x30"
+supported_media = ["50x30", "40x30", "40x60", "30x20"]
 connections     = [{ kind = "serial" }]

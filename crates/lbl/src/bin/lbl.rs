@@ -485,6 +485,8 @@ enum NiimbotTaskArg {
     Standard,
     /// D110M V4 (9-byte PrintStart, 13-byte SetPageSize, no PageStart).
     V4,
+    /// B1 / B21 (protocol 3: 7-byte PrintStart, 6-byte SetPageSize, total-mode rows).
+    B1,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -712,7 +714,25 @@ fn run_print(args: PrintArgs) -> Result<()> {
     };
     let niimbot_task = match args.niimbot_task {
         Some(t) => t,
-        None => config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?,
+        None => {
+            if let Some(key) = args
+                .printer
+                .as_deref()
+                .or_else(|| printer_entry.map(|p| p.canonical_key()))
+            {
+                if let Some(task) = lbl_driver_niimbot::NiimbotDriver::task_for_printer_key(key) {
+                    match task {
+                        lbl_driver_niimbot::NiimbotTask::Standard => NiimbotTaskArg::Standard,
+                        lbl_driver_niimbot::NiimbotTask::V4 => NiimbotTaskArg::V4,
+                        lbl_driver_niimbot::NiimbotTask::B1 => NiimbotTaskArg::B1,
+                    }
+                } else {
+                    config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?
+                }
+            } else {
+                config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?
+            }
+        }
     };
     let (network, usb, serial, bluetooth) = resolve_print_transport(
         printer_entry,
@@ -876,6 +896,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
     }
     if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::V4 {
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::v4()));
+    }
+    if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::B1 {
+        registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::b1()));
     }
 
     let extension = if protocol == Protocol::Console {
