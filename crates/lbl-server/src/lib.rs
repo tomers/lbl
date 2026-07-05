@@ -46,6 +46,7 @@ pub fn router(state: AppState) -> Router {
             get(handlers::profile_printer_status),
         )
         .route("/api/preview", post(handlers::preview))
+        .route("/api/preview/html", post(handlers::preview_html))
         .route("/api/print", post(handlers::print))
         .route("/api/print/file", post(handlers::print_file))
         .layer(CorsLayer::permissive())

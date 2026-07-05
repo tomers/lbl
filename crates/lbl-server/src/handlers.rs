@@ -11,8 +11,8 @@ use serde_json::json;
 use lbl::pipeline::{
     authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
     resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
-    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, PipelineOptions,
-    Source, TemplateFormat, VECTOR_CSS_DPI,
+    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
+    PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::media::Media;
@@ -421,6 +421,105 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         "width_px": width_px,
         "height_px": height_px,
         "corner_radius_px": corner_radius_px,
+    });
+
+    Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())
+}
+
+pub async fn preview_html(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
+    let source = req.source.into_source()?;
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
+        .map_err(ApiError::from)?;
+    let count = labels.len();
+    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
+    let style_cfg = load_style_cfg(&state, &req.style);
+    let style = resolve_style_vector(&style_cfg);
+    let media = resolve_media(
+        &state.catalog,
+        req.media.as_deref(),
+        req.width_mm.or(Some(50.0)),
+        req.length_mm,
+        dpi,
+    )
+    .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+    let label_fit = resolve_label_fit(
+        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        &media,
+    );
+    let label_align = resolve_label_align(&style_cfg.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(VECTOR_CSS_DPI, 1);
+    let rotation = resolve_rotation(
+        &state,
+        &media,
+        req.orientation,
+        req.rotate_cw,
+        req.rotate_ccw,
+    );
+    let opts = PipelineOptions {
+        protocol: Protocol::Virtual,
+        media: media.clone(),
+        supports_cut: false,
+        cut: false,
+        copies: 1,
+        dither: Algorithm::Auto,
+        rotation,
+        supersample: 1,
+        assets_base: AssetsBase::Cdn,
+        style,
+        media_type: None,
+        virtual_export_mode: lbl_driver_file::VirtualExportMode::Vector,
+        label_fit,
+        label_align,
+        label_valign,
+        label_fit_scale,
+        font_fit_scale,
+        media_inset,
+    };
+    let px_per_mm = VECTOR_CSS_DPI / 25.4;
+
+    let mut rendered = Vec::with_capacity(count);
+    for label in labels {
+        let transpiled = transpile_label_html(&label.html, &opts)
+            .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let computed_font_size_mm = injected_fit_font_px(&transpiled.html).map(|px| px / px_per_mm);
+        let mut label_json = json!({
+            "index": label.index,
+            "html": transpiled.html,
+            "width_px": transpiled.width_px,
+            "height_px": transpiled.height_px,
+        });
+        if let Some(mm) = computed_font_size_mm {
+            label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
+        }
+        rendered.push(label_json);
+    }
+
+    let (width_px, height_px) = rendered
+        .first()
+        .map(|l| {
+            (
+                l["width_px"].as_f64().unwrap_or(0.0),
+                l["height_px"].as_f64().unwrap_or(0.0),
+            )
+        })
+        .unwrap_or((0.0, 0.0));
+    let media_info = json!({
+        "width_mm": media.width_mm,
+        "length_mm": match media.length {
+            lbl_core::media::MediaLength::Fixed(mm) => serde_json::Value::from(mm),
+            lbl_core::media::MediaLength::Continuous => serde_json::Value::Null,
+        },
+        "continuous": matches!(media.length, lbl_core::media::MediaLength::Continuous),
+        "dpi": VECTOR_CSS_DPI,
+        "width_px": width_px,
+        "height_px": height_px,
+        "corner_radius_px": match media.length {
+            lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
+            lbl_core::media::MediaLength::Continuous => 0.0,
+        },
     });
 
     Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())

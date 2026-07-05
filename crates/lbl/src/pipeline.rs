@@ -688,6 +688,58 @@ pub fn page_size_mm(media: &Media, rotation: Rotation) -> PageSizeMm {
     }
 }
 
+/// Browser-ready HTML from the vector transpile path (no Chromium render).
+#[derive(Debug, Clone)]
+pub struct TranspiledLabelHtml {
+    pub html: String,
+    pub width_px: f64,
+    pub height_px: f64,
+    pub width_mm: f64,
+    pub height_mm: Option<f64>,
+    pub corner_radius_px: f64,
+}
+
+/// Transpile authoring HTML for browser preview or OS print (vector layout).
+pub fn transpile_label_html(
+    authoring_html: &str,
+    opts: &PipelineOptions,
+) -> Result<TranspiledLabelHtml> {
+    let viewport = render_viewport_vector(&opts.media, opts.rotation);
+    let page_size = page_size_mm(&opts.media, opts.rotation);
+    let transpiled = transpile(
+        authoring_html,
+        &TranspileOptions {
+            mode: OutputMode::Print,
+            assets_base: opts.assets_base.clone(),
+            index: None,
+            count: None,
+            style: opts.style.clone(),
+            label_fit: opts.label_fit,
+            viewport: Some(viewport.clone()),
+            label_align: opts.label_align,
+            label_valign: opts.label_valign,
+            label_fit_scale: opts.label_fit_scale,
+            font_fit_scale: opts.font_fit_scale,
+            media_inset: opts.media_inset,
+            page_size: Some(page_size),
+        },
+    );
+
+    let corner_radius_px = match opts.media.length {
+        lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
+        lbl_core::media::MediaLength::Continuous => 0.0,
+    };
+
+    Ok(TranspiledLabelHtml {
+        html: transpiled,
+        width_px: viewport.width.unwrap_or(0.0),
+        height_px: viewport.height.unwrap_or(0.0),
+        width_mm: page_size.width_mm,
+        height_mm: page_size.height_mm,
+        corner_radius_px,
+    })
+}
+
 /// Raster output from the print transpile + render path (before dither/encode).
 #[derive(Debug, Clone)]
 pub struct LabelRaster {

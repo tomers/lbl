@@ -18,9 +18,9 @@ pub use pipeline::{
     encode_sample_pattern_traced, page_size_mm, render_label_raster, render_viewport_px,
     render_viewport_vector, resolve_label_align, resolve_label_fit, resolve_label_fit_scale,
     resolve_label_valign, resolve_media, resolve_media_inset, resolve_print_transport,
-    resolve_style_vector, resolve_template_format, AuthoringLabel, BatchSelection,
-    EncodeLabelsOptions, EncodeLabelsResult, LabelRaster, PipelineOptions, Source, TemplateFormat,
-    VECTOR_CSS_DPI,
+    resolve_style_vector, resolve_template_format, transpile_label_html, AuthoringLabel,
+    BatchSelection, EncodeLabelsOptions, EncodeLabelsResult, LabelRaster, PipelineOptions, Source,
+    TemplateFormat, TranspiledLabelHtml, VECTOR_CSS_DPI,
 };
 pub use preprocess::{
     estimate_job, estimate_render_dimensions, hires_pixels_per_label, job_input,
