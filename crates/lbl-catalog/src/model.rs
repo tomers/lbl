@@ -80,6 +80,9 @@ pub struct CatalogEntry {
     /// Optional purchase URL (an affiliate tag may be appended at display time).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purchase_url: Option<String>,
+    /// Manufacturer-reported product identifiers (e.g. NIIMBOT RFID oneCodes).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub product_ids: Vec<String>,
 }
 
 impl CatalogEntry {
@@ -91,6 +94,11 @@ impl CatalogEntry {
     /// Whether any of this entry's keys matches `key` (case-insensitive).
     pub fn matches_key(&self, key: &str) -> bool {
         self.keys.iter().any(|k| k.eq_ignore_ascii_case(key))
+    }
+
+    /// Whether this entry matches a manufacturer product id (exact match).
+    pub fn matches_product_id(&self, id: &str) -> bool {
+        self.product_ids.iter().any(|p| p == id)
     }
 }
 

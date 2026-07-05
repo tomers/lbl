@@ -156,6 +156,11 @@ impl Catalog {
         self.entries.iter().find(|e| e.matches_key(key))
     }
 
+    /// Resolve a media entry by manufacturer product id (e.g. NIIMBOT RFID code).
+    pub fn lookup_by_product_id(&self, id: &str) -> Option<&CatalogEntry> {
+        self.entries.iter().find(|e| e.matches_product_id(id))
+    }
+
     /// Resolve a printer entry by any of its keys/aliases (case-insensitive).
     pub fn lookup_printer(&self, key: &str) -> Option<&PrinterEntry> {
         self.printers.iter().find(|p| p.matches_key(key))
@@ -544,6 +549,13 @@ mod tests {
             base_term.to_ascii_lowercase(),
             turbo_term.to_ascii_lowercase()
         );
+    }
+
+    #[test]
+    fn lookup_by_product_id_resolves_niimbot_roll() {
+        let catalog = Catalog::bundled().unwrap();
+        let entry = catalog.lookup_by_product_id("10262260").unwrap();
+        assert!(entry.matches_key("50x30"));
     }
 
     #[test]

@@ -300,6 +300,7 @@ brand        = "NIIMBOT"
 keys         = ["50x30", "niimbot-50x30"]
 name         = "NIIMBOT 50x30mm White Thermal Labels (B1)"
 purchase_url = "https://www.niimbot.com/"
+product_ids  = ["10262260"]
 media        = { width_mm = 48.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -521,6 +522,7 @@ max_width_mm    = 48.0
 default_media   = "50x30"
 supported_media = ["50x30", "40x30", "40x60", "30x20"]
 connections     = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
+reports_media   = true
 
 [[printers]]
 brand           = "NIIMBOT"
