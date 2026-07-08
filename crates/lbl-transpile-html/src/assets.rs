@@ -71,6 +71,9 @@ html,body{height:100%;width:100%;margin:0}
 /// When [`LabelFit::Fill`] is active, grow a lone `.lbl-text` block to use the
 /// printable area on fixed die-cut labels. Cross/main-axis alignment is injected
 /// at transpile time from [`LabelAlign`] / [`LabelValign`].
+///
+/// Inline styling (`color`, `font-size`, …) lives in `.lbl-text-inlines` so flex
+/// layout does not treat each styled span as its own column item.
 pub const LABEL_FIT_TEXT_CSS: &str = r#"
 .lbl-label{container-type:size}
 .lbl-label>.lbl-text:only-child{
@@ -80,9 +83,14 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
   width:100%;
   line-height:1.1;
   font-size:calc(min(calc(100cqh / 1.1), 100cqw) * var(--lbl-font-fit-scale, 1));
-  white-space:pre-wrap;
   overflow:hidden;
+}
+.lbl-label>.lbl-text:only-child .lbl-text-inlines{
+  display:block;
+  width:100%;
+  white-space:pre-wrap;
   word-break:break-word;
+  line-height:1.1;
 }
 "#;
 

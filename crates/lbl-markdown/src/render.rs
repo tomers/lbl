@@ -271,11 +271,23 @@ mod tests {
     }
 
     #[test]
+    fn color_directive_renders_inline() {
+        let doc = MarkdownDocument::parse("Hello, {{color:#ff0000:World}}!");
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "Hello, <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span style=\"color:#ff0000\">World</span></span></span>!"
+            ),
+            "{html}"
+        );
+    }
+
+    #[test]
     fn font_directive_renders_inline() {
         let doc = MarkdownDocument::parse("Hello, {{font:roboto:World}}!");
         let html = doc.to_authoring_html();
         assert!(
-            html.contains("Hello, <span class=\"lbl-text\" data-lbl-font=\"roboto\">World</span>!"),
+            html.contains("Hello, <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span data-lbl-font=\"roboto\">World</span></span></span>!"),
             "{html}"
         );
     }
@@ -287,7 +299,7 @@ mod tests {
         // The sized span stays inline within the paragraph alongside the text.
         assert!(
             html.contains(
-                "Hello, <span class=\"lbl-text\" style=\"font-size:1.5em\">World</span>!"
+                "Hello, <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span style=\"font-size:1.5em\">World</span></span></span>!"
             ),
             "{html}"
         );
@@ -298,7 +310,10 @@ mod tests {
         let doc = MarkdownDocument::parse("# Order {{size:2:#42}}");
         let html = doc.to_authoring_html();
         assert!(html.contains("<h1>Order <span"), "{html}");
-        assert!(html.contains("font-size:2em\">#42</span></h1>"), "{html}");
+        assert!(
+            html.contains("font-size:2em\">#42</span></span></span></h1>"),
+            "{html}"
+        );
     }
 
     #[test]

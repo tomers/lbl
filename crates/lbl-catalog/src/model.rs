@@ -200,6 +200,11 @@ pub struct PrinterEntry {
     /// Whether the printer can cut between jobs/items.
     #[serde(default)]
     pub supports_cut: bool,
+    /// Whether the printer outputs more than one ink color. Thermal 1-bit heads
+    /// (DYMO, NIIMBOT, ESC/POS, …) leave this false. Preview sinks
+    /// (`virtual`, `html`, `console`) are treated as color-capable in the UI.
+    #[serde(default)]
+    pub supports_color: bool,
     /// Whether the printer reports loaded media for auto-detection.
     #[serde(default)]
     pub reports_media: bool,

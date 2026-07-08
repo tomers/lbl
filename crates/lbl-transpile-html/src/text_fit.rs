@@ -6,14 +6,6 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::transpile::{TranspileOptions, ViewportPx};
 
-/// Matches `.lbl-label` containing a single `.lbl-text` child (`div` or `span`).
-static LONE_TEXT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r#"(?is)^\s*<div\s+class="lbl-label"[^>]*>\s*<(?:div|span)\s+class="lbl-text"[^>]*>([\s\S]*?)</(?:div|span)>\s*</div>\s*$"#,
-    )
-    .expect("lone text regex")
-});
-
 /// Matches `.lbl-label` > `.lbl-row` with plain text then a QR sibling.
 static ROW_TEXT_QR_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -29,8 +21,6 @@ static STYLE_WIDTH_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"style\s*=\s*"[^"]*width:\s*(\d+)px"#).expect("style width regex"));
 
 static ANY_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<[^>]+>").expect("any tag regex"));
-
-static BR_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<br\s*/?>").expect("br tag regex"));
 
 /// Line height for lone-text auto-fit (must match [`crate::assets::LABEL_FIT_TEXT_CSS`]).
 pub const LINE_HEIGHT: f64 = 1.1;
@@ -65,12 +55,11 @@ pub fn fitted_font_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
 
 fn lone_text_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
     let (width, height) = fit_box_px(opts)?;
-    let caps = LONE_TEXT_RE.captures(body)?;
-    let inner = caps.get(1)?.as_str();
-    if !is_plain_text_html(inner) {
+    let inner = lone_text_inner_html(body)?;
+    if !is_fit_measurable_html(&inner) {
         return None;
     }
-    let text = html_to_plain_text(inner);
+    let text = html_to_plain_text(&inner);
     Some(scaled_fit_px(max_fit_font_px(width, height, &text), opts))
 }
 
@@ -78,7 +67,7 @@ fn row_text_qr_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
     let (box_w, box_h) = fit_box_px(opts)?;
     let caps = ROW_TEXT_QR_RE.captures(body)?;
     let inner = caps.get(1)?.as_str();
-    if !is_plain_text_html(inner) {
+    if !is_fit_measurable_html(inner) {
         return None;
     }
     let text = html_to_plain_text(inner);
@@ -87,6 +76,60 @@ fn row_text_qr_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
     let gap = opts.style.element_gap_px.max(0.0);
     let text_w = (box_w - qr_w - gap).max(1.0);
     Some(scaled_fit_px(max_fit_font_px(text_w, box_h, &text), opts))
+}
+
+/// Inner HTML of a lone `.lbl-text` direct child of `.lbl-label`.
+fn lone_text_inner_html(body: &str) -> Option<String> {
+    let body = body.trim();
+    const LABEL_OPEN: &str = r#"<div class="lbl-label">"#;
+    const LABEL_CLOSE: &str = "</div>";
+    if !body.starts_with(LABEL_OPEN) || !body.ends_with(LABEL_CLOSE) {
+        return None;
+    }
+    let child = body[LABEL_OPEN.len()..body.len() - LABEL_CLOSE.len()].trim();
+    if child.contains("lbl-row") {
+        return None;
+    }
+    extract_lbl_text_inner(child)
+}
+
+fn extract_lbl_text_inner(html: &str) -> Option<String> {
+    for tag in ["span", "div"] {
+        let exact = format!(r#"<{tag} class="lbl-text">"#);
+        if let Some(rest) = html.strip_prefix(&exact) {
+            return balanced_element_inner(rest, tag);
+        }
+        let prefix = format!(r#"<{tag} class="lbl-text" "#);
+        if let Some(rest) = html.strip_prefix(&prefix) {
+            let gt = rest.find('>')?;
+            return balanced_element_inner(&rest[gt + 1..], tag);
+        }
+    }
+    None
+}
+
+fn balanced_element_inner(html: &str, tag: &str) -> Option<String> {
+    let open = format!("<{tag}");
+    let close = format!("</{tag}>");
+    let mut depth = 1i32;
+    let mut i = 0;
+    while i < html.len() {
+        if html[i..].starts_with(&close) {
+            depth -= 1;
+            if depth == 0 {
+                return Some(html[..i].to_string());
+            }
+            i += close.len();
+            continue;
+        }
+        if html[i..].starts_with(&open) {
+            depth += 1;
+            i += open.len();
+            continue;
+        }
+        i += html[i..].chars().next().map_or(1, |c| c.len_utf8());
+    }
+    None
 }
 
 /// CSS rule setting a transpile-time font size, when viewport geometry is known.
@@ -132,8 +175,17 @@ fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
     Some((box_w, box_h))
 }
 
-fn is_plain_text_html(inner: &str) -> bool {
-    !BR_TAG_RE.replace_all(inner, "").contains('<')
+/// Whether lone-text auto-fit can measure this inner HTML (plain text plus
+/// inline color/size/font spans, but not nested `.lbl-text` or widgets).
+fn is_fit_measurable_html(inner: &str) -> bool {
+    static NESTED_LBL_TEXT: Lazy<Regex> = Lazy::new(|| {
+        // Match `.lbl-text` but not `.lbl-text-inlines` (no lookahead in `regex` crate).
+        Regex::new(r#"class="lbl-text"([ >]|$)"#).expect("nested lbl-text regex")
+    });
+    !NESTED_LBL_TEXT.is_match(inner)
+        && !inner.contains("<qr")
+        && !inner.contains("<barcode")
+        && !inner.contains("<img")
 }
 
 fn html_to_plain_text(inner: &str) -> String {
@@ -292,6 +344,35 @@ mod tests {
     }
 
     #[test]
+    fn lone_text_inner_extracts_nested_color_spans() {
+        let body = r#"<div class="lbl-label"><span class="lbl-text"><span class="lbl-text-inlines">Hi <span style="color:#ff0000">there</span></span></span></div>"#;
+        let inner = super::lone_text_inner_html(body).expect("inner");
+        assert!(inner.contains("Hi"));
+        assert!(inner.contains("there"));
+        assert!(super::is_fit_measurable_html(&inner));
+    }
+
+    #[test]
+    fn inline_color_spans_remain_measurable() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            media_inset: MediaInsetPx::default(),
+            ..Default::default()
+        };
+        let body = r#"<div class="lbl-label"><span class="lbl-text"><span class="lbl-text-inlines">Hi <span style="color:#ff0000">there</span></span></span></div>"#;
+        let css = lone_text_fit_css(body, &opts).expect("css");
+        assert!(css.contains("font-size:"), "{css}");
+    }
+
+    #[test]
     fn skips_rich_inner_markup() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
@@ -344,7 +425,7 @@ mod tests {
             ..Default::default()
         };
         let css = lone_text_fit_css(
-            r#"<div class="lbl-label"><span class="lbl-text">30×20</span></div>"#,
+            r#"<div class="lbl-label"><span class="lbl-text"><span class="lbl-text-inlines">30×20</span></span></div>"#,
             &opts,
         )
         .expect("css");

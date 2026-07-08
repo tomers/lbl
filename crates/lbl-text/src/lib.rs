@@ -17,6 +17,8 @@
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
 //! - `{{font:roboto:Hello}}` -> text in a named font (aliases: `font-family`,
 //!   `ff`; see [`fonts::FONTS`] for supported slugs)
+//! - `{{color:#ff0000:Hello}}` -> colored text (aliases: `fg`, `foreground`,
+//!   `text-color`, `tc`; hex `#rgb` or `#rrggbb`)
 //!
 //! ```
 //! use lbl_text::Document;

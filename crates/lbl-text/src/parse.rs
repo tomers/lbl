@@ -23,6 +23,13 @@ pub enum Block {
         /// The text to render in this font.
         text: String,
     },
+    /// A run of text rendered in a foreground color (hex, e.g. `#ff0000`).
+    Color {
+        /// CSS color, normalized to `#rrggbb`.
+        color: String,
+        /// The text to render in this color.
+        text: String,
+    },
     /// A QR code carrying the given payload and optional overrides.
     Qr {
         /// Encoded QR payload.
@@ -55,19 +62,24 @@ impl Block {
                 if t.contains('\n') {
                     format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
                 } else {
-                    format!("<span class=\"lbl-text\">{}</span>", text_to_html(t))
+                    wrap_lbl_text_inlines(&text_to_html(t))
                 }
             }
-            Block::Sized { scale, text } => format!(
-                "<span class=\"lbl-text\" style=\"font-size:{}em\">{}</span>",
+            Block::Sized { scale, text } => wrap_lbl_text_inlines(&format!(
+                "<span style=\"font-size:{}em\">{}</span>",
                 fmt_scale(*scale),
                 text_to_html(text)
-            ),
-            Block::Font { family, text } => format!(
-                "<span class=\"lbl-text\" data-lbl-font=\"{}\">{}</span>",
+            )),
+            Block::Font { family, text } => wrap_lbl_text_inlines(&format!(
+                "<span data-lbl-font=\"{}\">{}</span>",
                 escape(family),
                 text_to_html(text)
-            ),
+            )),
+            Block::Color { color, text } => wrap_lbl_text_inlines(&format!(
+                "<span style=\"color:{}\">{}</span>",
+                escape(color),
+                text_to_html(text)
+            )),
             Block::Qr { payload, options } => {
                 format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
             }
@@ -77,6 +89,29 @@ impl Block {
                 escape(data)
             ),
             Block::Image(uri) => format!("<img src=\"{}\" />", escape(uri)),
+        }
+    }
+
+    /// Inline HTML for a text-run segment (no outer `.lbl-text` wrapper).
+    fn to_inline_html(&self) -> String {
+        match self {
+            Block::Text(t) => text_to_html(t),
+            Block::Sized { scale, text } => format!(
+                "<span style=\"font-size:{}em\">{}</span>",
+                fmt_scale(*scale),
+                text_to_html(text)
+            ),
+            Block::Font { family, text } => format!(
+                "<span data-lbl-font=\"{}\">{}</span>",
+                escape(family),
+                text_to_html(text)
+            ),
+            Block::Color { color, text } => format!(
+                "<span style=\"color:{}\">{}</span>",
+                escape(color),
+                text_to_html(text)
+            ),
+            _ => self.to_authoring_html(),
         }
     }
 }
@@ -137,6 +172,8 @@ impl Document {
                 let group = &self.blocks[start..i];
                 if group.len() == 1 {
                     out.push_str(&group[0].to_authoring_html());
+                } else if is_text_run_group(group) {
+                    out.push_str(&text_run_group_html(group));
                 } else {
                     out.push_str("<div class=\"lbl-row lbl-center\">");
                     for block in group {
@@ -255,12 +292,11 @@ fn try_parse_qr_block(input: &str, start: usize) -> Option<(Block, usize)> {
     ))
 }
 
-/// Push the accumulated text as a block, trimming surrounding whitespace (which
-/// is usually just separation around directives) and dropping it if empty.
+/// Push accumulated text as a block. Whitespace between directives is preserved
+/// so `aa {{color:#f00:bb}} cc` keeps its word spacing in the output.
 fn flush_text(buf: &mut String, blocks: &mut Vec<Block>) {
-    let trimmed = buf.trim();
-    if !trimmed.is_empty() {
-        blocks.push(Block::Text(trimmed.to_string()));
+    if !buf.is_empty() {
+        blocks.push(Block::Text(buf.clone()));
     }
     buf.clear();
 }
@@ -270,10 +306,33 @@ fn is_inline_flow_block(block: &Block) -> bool {
         Block::Text(t) => !t.contains('\n'),
         Block::Sized { .. }
         | Block::Font { .. }
+        | Block::Color { .. }
         | Block::Qr { .. }
         | Block::Barcode { .. }
         | Block::Image(_) => true,
     }
+}
+
+/// Consecutive inline text styling blocks (plain, color, size, font) without QR/barcode/image.
+fn is_text_run_group(blocks: &[Block]) -> bool {
+    blocks.iter().all(|b| {
+        matches!(
+            b,
+            Block::Text(_) | Block::Sized { .. } | Block::Font { .. } | Block::Color { .. }
+        )
+    })
+}
+
+fn text_run_group_html(blocks: &[Block]) -> String {
+    let mut inner = String::new();
+    for block in blocks {
+        inner.push_str(&block.to_inline_html());
+    }
+    wrap_lbl_text_inlines(&inner)
+}
+
+fn wrap_lbl_text_inlines(inner: &str) -> String {
+    format!("<span class=\"lbl-text\"><span class=\"lbl-text-inlines\">{inner}</span></span>")
 }
 
 /// Parse the inside of an inline `{{...}}` directive (e.g. `qr:https://x.y`,
@@ -309,6 +368,7 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         "image" | "img" => Some(Block::Image(rest.to_string())),
         "size" | "font-size" | "fs" => sized_from_spec(rest),
         "font" | "font-family" | "ff" => font_from_spec(rest),
+        "color" | "fg" | "foreground" | "text-color" | "tc" => color_from_spec(rest),
         _ => None,
     }
 }
@@ -328,6 +388,47 @@ fn sized_from_spec(spec: &str) -> Option<Block> {
         scale,
         text: text.to_string(),
     })
+}
+
+/// Parse a color spec `HEX:TEXT` (e.g. `#ff0000:Hello`) into a [`Block::Color`].
+fn color_from_spec(spec: &str) -> Option<Block> {
+    let (color_str, text) = spec.split_once(':')?;
+    let color = parse_hex_color(color_str.trim())?;
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    Some(Block::Color {
+        color,
+        text: text.to_string(),
+    })
+}
+
+/// Normalize a CSS hex color to lowercase `#rrggbb`. Accepts `#rgb` and `#rrggbb`.
+fn parse_hex_color(s: &str) -> Option<String> {
+    let s = s.trim();
+    let hex = s.strip_prefix('#')?;
+    let expanded = match hex.len() {
+        3 => {
+            let mut out = String::with_capacity(6);
+            for ch in hex.chars() {
+                if !ch.is_ascii_hexdigit() {
+                    return None;
+                }
+                out.push(ch);
+                out.push(ch);
+            }
+            out
+        }
+        6 => {
+            if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                return None;
+            }
+            hex.to_string()
+        }
+        _ => return None,
+    };
+    Some(format!("#{}", expanded.to_ascii_lowercase()))
 }
 
 /// Parse a font spec `SLUG:TEXT` (e.g. `roboto:Hello`) into a [`Block::Font`].
@@ -402,7 +503,7 @@ mod tests {
         assert_eq!(
             doc.blocks,
             vec![
-                Block::Text("ship to".to_string()),
+                Block::Text("ship to ".to_string()),
                 Block::Qr {
                     payload: "https://x.y".to_string(),
                     options: QrOptions::default(),
@@ -458,6 +559,7 @@ mod tests {
                     symbology: "EAN13".into(),
                     data: "123".into()
                 },
+                Block::Text(" ".to_string()),
                 Block::Barcode {
                     symbology: "CODE128".into(),
                     data: "456".into()
@@ -486,12 +588,67 @@ mod tests {
     }
 
     #[test]
+    fn inline_color_directive_is_parsed() {
+        let doc = Document::parse("Hello, {{color:#ff0000:World}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Hello, ".to_string()),
+                Block::Color {
+                    color: "#ff0000".to_string(),
+                    text: "World".to_string()
+                },
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"style="color:#ff0000""#), "{html}");
+        assert!(html.contains(">World</span>"), "{html}");
+    }
+
+    #[test]
+    fn color_accepts_aliases_and_short_hex() {
+        for spec in [
+            "color:#f00:Red",
+            "fg:#00ff00:Green",
+            "foreground:#0000ff:Blue",
+            "text-color:#abc:Short",
+            "tc:#aabbcc:Full",
+        ] {
+            let doc = Document::parse(&format!("{{{{{spec}}}}}"), false);
+            assert!(
+                matches!(doc.blocks.as_slice(), [Block::Color { .. }]),
+                "spec: {spec}"
+            );
+        }
+        let doc = Document::parse("{{color:#f00:Red}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Color {
+                color: "#ff0000".to_string(),
+                text: "Red".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn invalid_color_is_kept_literal() {
+        for inner in ["color:#ff0000", "color:bad:x", "color::x"] {
+            let doc = Document::parse(&format!("a {{{{{inner}}}}} b"), false);
+            assert_eq!(
+                doc.blocks,
+                vec![Block::Text(format!("a {{{{{inner}}}}} b"))],
+                "inner: {inner}"
+            );
+        }
+    }
+
+    #[test]
     fn inline_font_directive_is_parsed() {
         let doc = Document::parse("Hello, {{font:roboto:World}}", false);
         assert_eq!(
             doc.blocks,
             vec![
-                Block::Text("Hello,".to_string()),
+                Block::Text("Hello, ".to_string()),
                 Block::Font {
                     family: "roboto".to_string(),
                     text: "World".to_string()
@@ -532,7 +689,7 @@ mod tests {
         assert_eq!(
             doc.blocks,
             vec![
-                Block::Text("Hello,".to_string()),
+                Block::Text("Hello, ".to_string()),
                 Block::Sized {
                     scale: 1.5,
                     text: "World".to_string()
@@ -570,6 +727,32 @@ mod tests {
                 "inner: {inner}"
             );
         }
+    }
+
+    #[test]
+    fn mixed_color_text_runs_in_one_lbl_text() {
+        let doc = Document::parse("מורן {{color:#ff0000:לימון}} יפה", false);
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "<span class=\"lbl-text\"><span class=\"lbl-text-inlines\">מורן <span style=\"color:#ff0000\">לימון</span> יפה</span></span>"
+            ),
+            "{html}"
+        );
+        assert!(!html.contains("lbl-row"), "{html}");
+    }
+
+    #[test]
+    fn color_directive_preserves_surrounding_spaces() {
+        let doc = Document::parse("aa {{color:#e11515:bb}} cc", false);
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "<span class=\"lbl-text\"><span class=\"lbl-text-inlines\">aa <span style=\"color:#e11515\">bb</span> cc</span></span>"
+            ),
+            "{html}"
+        );
+        assert!(!html.contains("lbl-row"), "{html}");
     }
 
     #[test]
