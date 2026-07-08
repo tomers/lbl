@@ -13,22 +13,22 @@ pub enum Block {
     Sized {
         /// Font-size multiplier relative to the base text size.
         scale: f64,
-        /// The text to render at this size.
-        text: String,
+        /// Inline content rendered at this size (may include nested directives).
+        content: Vec<Block>,
     },
     /// A run of text rendered in a named font family (see [`crate::fonts`]).
     Font {
         /// Font slug, e.g. `roboto`, `mono`.
         family: String,
-        /// The text to render in this font.
-        text: String,
+        /// Inline content in this font (may include nested directives).
+        content: Vec<Block>,
     },
     /// A run of text rendered in a foreground color (hex, e.g. `#ff0000`).
     Color {
         /// CSS color, normalized to `#rrggbb`.
         color: String,
-        /// The text to render in this color.
-        text: String,
+        /// Inline content in this color (may include nested directives).
+        content: Vec<Block>,
     },
     /// A QR code carrying the given payload and optional overrides.
     Qr {
@@ -65,20 +65,20 @@ impl Block {
                     wrap_lbl_text_inlines(&text_to_html(t))
                 }
             }
-            Block::Sized { scale, text } => wrap_lbl_text_inlines(&format!(
+            Block::Sized { scale, content } => wrap_lbl_text_inlines(&format!(
                 "<span style=\"font-size:{}em\">{}</span>",
                 fmt_scale(*scale),
-                text_to_html(text)
+                inline_blocks_html(content)
             )),
-            Block::Font { family, text } => wrap_lbl_text_inlines(&format!(
+            Block::Font { family, content } => wrap_lbl_text_inlines(&format!(
                 "<span data-lbl-font=\"{}\">{}</span>",
                 escape(family),
-                text_to_html(text)
+                inline_blocks_html(content)
             )),
-            Block::Color { color, text } => wrap_lbl_text_inlines(&format!(
+            Block::Color { color, content } => wrap_lbl_text_inlines(&format!(
                 "<span style=\"color:{}\">{}</span>",
                 escape(color),
-                text_to_html(text)
+                inline_blocks_html(content)
             )),
             Block::Qr { payload, options } => {
                 format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
@@ -96,20 +96,20 @@ impl Block {
     fn to_inline_html(&self) -> String {
         match self {
             Block::Text(t) => text_to_html(t),
-            Block::Sized { scale, text } => format!(
+            Block::Sized { scale, content } => format!(
                 "<span style=\"font-size:{}em\">{}</span>",
                 fmt_scale(*scale),
-                text_to_html(text)
+                inline_blocks_html(content)
             ),
-            Block::Font { family, text } => format!(
+            Block::Font { family, content } => format!(
                 "<span data-lbl-font=\"{}\">{}</span>",
                 escape(family),
-                text_to_html(text)
+                inline_blocks_html(content)
             ),
-            Block::Color { color, text } => format!(
+            Block::Color { color, content } => format!(
                 "<span style=\"color:{}\">{}</span>",
                 escape(color),
-                text_to_html(text)
+                inline_blocks_html(content)
             ),
             _ => self.to_authoring_html(),
         }
@@ -228,10 +228,39 @@ pub fn scan_directive_at(input: &str, start: usize) -> Option<(Block, usize)> {
         return Some(result);
     }
 
-    let close = input[start + 2..].find("}}")?;
-    let inner = &input[start + 2..start + 2 + close];
+    let close = find_directive_close(input, start)?;
+    let inner = &input[start + 2..close];
     let block = directive_from_inner(inner)?;
-    Some((block, start + 2 + close + 2))
+    Some((block, close + 2))
+}
+
+/// Index of the first `}` in the closing `}}` of the directive opened at
+/// `open_start` (which must point at the first `{` of `{{`). Returns `None`
+/// when braces are unbalanced.
+fn find_directive_close(input: &str, open_start: usize) -> Option<usize> {
+    if !input[open_start..].starts_with("{{") {
+        return None;
+    }
+    let mut i = open_start + 2;
+    let mut depth = 1;
+    while i + 1 < input.len() {
+        if input[i..].starts_with("{{") {
+            depth += 1;
+            i += 2;
+            continue;
+        }
+        if input[i..].starts_with("}}") {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+            i += 2;
+            continue;
+        }
+        let ch = input[i..].chars().next().unwrap();
+        i += ch.len_utf8();
+    }
+    None
 }
 
 /// Scan `input` for `{{type:...}}` directives, returning interleaved text and
@@ -335,6 +364,22 @@ fn wrap_lbl_text_inlines(inner: &str) -> String {
     format!("<span class=\"lbl-text\"><span class=\"lbl-text-inlines\">{inner}</span></span>")
 }
 
+fn inline_blocks_html(blocks: &[Block]) -> String {
+    blocks.iter().map(|b| b.to_inline_html()).collect()
+}
+
+fn inline_content_from_spec(spec: &str) -> Option<Vec<Block>> {
+    let spec = spec.trim();
+    if spec.is_empty() {
+        return None;
+    }
+    let blocks = parse_inline(spec);
+    if blocks.is_empty() {
+        return None;
+    }
+    Some(blocks)
+}
+
 /// Parse the inside of an inline `{{...}}` directive (e.g. `qr:https://x.y`,
 /// `barcode:EAN13:123`, `image:./a.png`) into a [`Block`].
 ///
@@ -378,30 +423,18 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
 /// or a percentage (`150%`). Returns `None` if the scale is invalid or the text
 /// is empty, so the original `{{...}}` is left literal.
 fn sized_from_spec(spec: &str) -> Option<Block> {
-    let (scale_str, text) = spec.split_once(':')?;
+    let (scale_str, rest) = spec.split_once(':')?;
     let scale = parse_scale(scale_str.trim())?;
-    let text = text.trim();
-    if text.is_empty() {
-        return None;
-    }
-    Some(Block::Sized {
-        scale,
-        text: text.to_string(),
-    })
+    let content = inline_content_from_spec(rest)?;
+    Some(Block::Sized { scale, content })
 }
 
 /// Parse a color spec `HEX:TEXT` (e.g. `#ff0000:Hello`) into a [`Block::Color`].
 fn color_from_spec(spec: &str) -> Option<Block> {
-    let (color_str, text) = spec.split_once(':')?;
+    let (color_str, rest) = spec.split_once(':')?;
     let color = parse_hex_color(color_str.trim())?;
-    let text = text.trim();
-    if text.is_empty() {
-        return None;
-    }
-    Some(Block::Color {
-        color,
-        text: text.to_string(),
-    })
+    let content = inline_content_from_spec(rest)?;
+    Some(Block::Color { color, content })
 }
 
 /// Normalize a CSS hex color to lowercase `#rrggbb`. Accepts `#rgb` and `#rrggbb`.
@@ -433,15 +466,15 @@ fn parse_hex_color(s: &str) -> Option<String> {
 
 /// Parse a font spec `SLUG:TEXT` (e.g. `roboto:Hello`) into a [`Block::Font`].
 fn font_from_spec(spec: &str) -> Option<Block> {
-    let (family, text) = spec.split_once(':')?;
+    let (family, rest) = spec.split_once(':')?;
     let family = family.trim();
-    let text = text.trim();
-    if family.is_empty() || text.is_empty() || crate::fonts::resolve_slug(family).is_none() {
+    if family.is_empty() || crate::fonts::resolve_slug(family).is_none() {
         return None;
     }
+    let content = inline_content_from_spec(rest)?;
     Some(Block::Font {
         family: family.to_ascii_lowercase(),
-        text: text.to_string(),
+        content,
     })
 }
 
@@ -596,7 +629,7 @@ mod tests {
                 Block::Text("Hello, ".to_string()),
                 Block::Color {
                     color: "#ff0000".to_string(),
-                    text: "World".to_string()
+                    content: vec![Block::Text("World".to_string())]
                 },
             ]
         );
@@ -625,7 +658,7 @@ mod tests {
             doc.blocks,
             vec![Block::Color {
                 color: "#ff0000".to_string(),
-                text: "Red".to_string()
+                content: vec![Block::Text("Red".to_string())]
             }]
         );
     }
@@ -651,7 +684,7 @@ mod tests {
                 Block::Text("Hello, ".to_string()),
                 Block::Font {
                     family: "roboto".to_string(),
-                    text: "World".to_string()
+                    content: vec![Block::Text("World".to_string())]
                 },
             ]
         );
@@ -692,7 +725,7 @@ mod tests {
                 Block::Text("Hello, ".to_string()),
                 Block::Sized {
                     scale: 1.5,
-                    text: "World".to_string()
+                    content: vec![Block::Text("World".to_string())]
                 },
             ]
         );
@@ -709,7 +742,7 @@ mod tests {
                 doc.blocks,
                 vec![Block::Sized {
                     scale: 2.0,
-                    text: "Big".to_string()
+                    content: vec![Block::Text("Big".to_string())]
                 }],
                 "spec: {spec}"
             );
@@ -777,6 +810,52 @@ mod tests {
     fn html_is_escaped() {
         let doc = Document::parse("<script>", false);
         assert!(doc.to_authoring_html().contains("&lt;script&gt;"));
+    }
+
+    #[test]
+    fn nested_color_with_barcode() {
+        let doc = Document::parse("{{color:#e90b0b:aa {{barcode:12345}} cc}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Color {
+                color: "#e90b0b".to_string(),
+                content: vec![
+                    Block::Text("aa ".to_string()),
+                    Block::Barcode {
+                        symbology: "CODE128".into(),
+                        data: "12345".into()
+                    },
+                    Block::Text(" cc".to_string()),
+                ]
+            }]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"style="color:#e90b0b""#), "{html}");
+        assert!(html.contains(">aa "), "{html}");
+        assert!(
+            html.contains("<barcode type=\"CODE128\">12345</barcode>"),
+            "{html}"
+        );
+        assert!(html.contains("> cc</span>"), "{html}");
+    }
+
+    #[test]
+    fn nested_size_with_color() {
+        let doc = Document::parse("{{size:1.5:big {{color:#f00:red}} text}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Sized {
+                scale: 1.5,
+                content: vec![
+                    Block::Text("big ".to_string()),
+                    Block::Color {
+                        color: "#ff0000".to_string(),
+                        content: vec![Block::Text("red".to_string())]
+                    },
+                    Block::Text(" text".to_string()),
+                ]
+            }]
+        );
     }
 
     #[test]
