@@ -470,9 +470,11 @@ pub struct PipelineOptions {
     pub copies: u32,
     /// Dithering algorithm.
     pub dither: Algorithm,
-    /// Net rotation applied to the rendered raster (resolved from the requested
-    /// orientation plus any extra quarter-turns).
+    /// Net rotation for layout viewport sizing (reading frame).
     pub rotation: Rotation,
+    /// Quarter-turn applied to the raster before encode. Matches [`rotation`] for
+    /// row-oriented heads; feed-oriented DYMO drivers invert portrait/landscape.
+    pub head_rotation: Rotation,
     /// Supersample factor.
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
@@ -497,6 +499,8 @@ pub struct PipelineOptions {
     pub font_fit_scale: f64,
     /// Inset from the physical media edge (resolved from config/CLI).
     pub media_inset: MediaInsetPx,
+    /// Printer encode capabilities (feed padding, DPI, cut support).
+    pub encode_caps: PrinterCapabilities,
 }
 
 /// Options for [`encode_labels`].
@@ -749,6 +753,42 @@ pub struct LabelRaster {
     pub transpiled_html: String,
 }
 
+fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
+    mm.filter(|value| *value > f64::EPSILON)
+        .map(|value| ((value / 25.4) * dpi).round().max(0.0) as u32)
+        .unwrap_or(0)
+}
+
+/// Extend a preview raster with blank feed-axis margins that match what will be
+/// printed: lead before content, then one head-to-cutter gap after content.
+pub fn pad_preview_encode_feed(
+    image: RgbaImage,
+    caps: &PrinterCapabilities,
+    feed_along_width: bool,
+) -> RgbaImage {
+    use image::{imageops, Rgba};
+
+    let dpi = caps.dpi.0;
+    let lead = feed_margin_px(caps.feed_lead_mm, dpi);
+    let trail = feed_margin_px(caps.feed_trail_mm, dpi);
+    if lead == 0 && trail == 0 {
+        return image;
+    }
+
+    let white = Rgba([255, 255, 255, 255]);
+    if feed_along_width {
+        let (w, h) = image.dimensions();
+        let mut out = RgbaImage::from_pixel(w + lead + trail, h, white);
+        imageops::overlay(&mut out, &image, lead as i64, 0);
+        out
+    } else {
+        let (w, h) = image.dimensions();
+        let mut out = RgbaImage::from_pixel(w, h + lead + trail, white);
+        imageops::overlay(&mut out, &image, 0, lead as i64);
+        out
+    }
+}
+
 struct PrintRenderStage {
     transpiled: String,
     rendered: RgbaImage,
@@ -799,7 +839,7 @@ fn render_label_print<B: RenderBackend>(
     let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
 
     let applied_rotation = if opts.protocol.targets_print_head() {
-        opts.rotation
+        opts.head_rotation
     } else {
         Rotation::None
     };
@@ -869,13 +909,7 @@ pub fn encode_label_traced<B: RenderBackend>(
         let mut job = JobSpec::new(opts.media.clone());
         job.cut = opts.cut;
         job.copies = opts.copies;
-        let caps = PrinterCapabilities {
-            dpi: opts.media.dpi,
-            max_width_mm: opts.media.width_mm,
-            supports_cut: opts.supports_cut,
-            reports_media: false,
-            ..Default::default()
-        };
+        let caps = opts.encode_caps.clone();
         let driver = registry
             .get(opts.protocol)
             .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
@@ -997,13 +1031,7 @@ pub fn encode_sample_pattern_traced(
     let mut job = JobSpec::new(opts.media.clone());
     job.cut = opts.cut;
     job.copies = opts.copies;
-    let caps = PrinterCapabilities {
-        dpi: opts.media.dpi,
-        max_width_mm: opts.media.width_mm,
-        supports_cut: opts.supports_cut,
-        reports_media: false,
-        ..Default::default()
-    };
+    let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
         .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
@@ -1044,6 +1072,7 @@ fn mono_preview_rgba(bmp: &lbl_core::bitmap::MonoBitmap) -> image::RgbaImage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lbl_core::Orientation;
 
     /// A backend that returns a solid raster of exactly the requested size, so
     /// tests can exercise orientation/rotation without a browser.
@@ -1067,6 +1096,14 @@ mod tests {
 
     /// Landscape options for a 12×40 mm label (head 12 mm, feed 40 mm).
     fn landscape_opts(protocol: Protocol) -> PipelineOptions {
+        let rotation = Rotation::Cw90;
+        let head_rotation = Rotation::for_head_with_media(
+            Orientation::Landscape,
+            &Media::fixed(12.0, 40.0, Dpi(203.0)),
+            0,
+            0,
+            protocol,
+        );
         PipelineOptions {
             protocol,
             media: Media::fixed(12.0, 40.0, Dpi(203.0)),
@@ -1074,7 +1111,8 @@ mod tests {
             cut: false,
             copies: 1,
             dither: Algorithm::Threshold(128),
-            rotation: Rotation::Cw90,
+            rotation,
+            head_rotation,
             supersample: 1,
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
@@ -1086,6 +1124,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
+            encode_caps: PrinterCapabilities::default(),
         }
     }
 
@@ -1123,6 +1162,22 @@ mod tests {
         // taller than wide before encoding.
         assert!(h > w, "expected head-oriented raster, got {w}×{h}");
         assert_eq!(trace.rotation, Rotation::Cw90);
+    }
+
+    #[test]
+    fn dymo_landscape_keeps_feed_along_bitmap_width() {
+        let registry = Registry::with_builtin_drivers();
+        let trace = encode_label_traced(
+            &SolidBackend,
+            &registry,
+            0,
+            "<div>x</div>",
+            &landscape_opts(Protocol::Dymo),
+        )
+        .unwrap();
+        let (w, h) = trace.rendered.dimensions();
+        assert!(w > h, "expected feed-oriented DYMO raster, got {w}×{h}");
+        assert_eq!(trace.rotation, Rotation::None);
     }
 
     #[test]
@@ -1244,6 +1299,7 @@ mod tests {
             copies: 1,
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
+            head_rotation: Rotation::None,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
@@ -1255,6 +1311,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
+            encode_caps: PrinterCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 64, &opts).unwrap();
         assert_eq!(trace.dithered.height, 64);
@@ -1275,6 +1332,7 @@ mod tests {
             copies: 1,
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
+            head_rotation: Rotation::None,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
             style: LabelStyle::default(),
@@ -1286,6 +1344,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
+            encode_caps: PrinterCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 96, &opts).unwrap();
         assert_eq!(trace.dithered.width, 96);

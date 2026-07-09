@@ -14,9 +14,9 @@ use lbl::pipeline::{
     resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
     PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
-use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
+use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_core::media::Media;
-use lbl_core::printer::{PrinterProfile, Protocol};
+use lbl_core::printer::{PrinterCapabilities, PrinterProfile, Protocol};
 use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
@@ -349,6 +349,8 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         lbl_core::media::MediaLength::Fixed(_) => style.corner_radius_px / supersample as f64,
         lbl_core::media::MediaLength::Continuous => 0.0,
     };
+    let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
+    let feed_along_width = rotation.swaps_axes();
     let opts = PipelineOptions {
         protocol,
         media: media.clone(),
@@ -357,6 +359,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         copies: 1,
         dither: Algorithm::Auto,
         rotation,
+        head_rotation: rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -368,6 +371,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         label_fit_scale,
         font_fit_scale,
         media_inset,
+        encode_caps: encode_caps.clone(),
     };
     let px_per_mm = dpi * supersample as f64 / 25.4;
 
@@ -377,17 +381,21 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             let mut out = Vec::with_capacity(count);
             for label in labels {
                 let raster = render_label_raster(&backend, &label.html, &opts)?;
+                let image = lbl::pipeline::pad_preview_encode_feed(
+                    raster.image,
+                    &encode_caps,
+                    feed_along_width,
+                );
                 let mut png = Vec::new();
-                raster
-                    .image
+                image
                     .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
                     .context("encoding preview PNG")?;
                 let computed_font_size_mm =
                     injected_fit_font_px(&raster.transpiled_html).map(|px| px / px_per_mm);
                 let mut label_json = json!({
                     "index": label.index,
-                    "width_px": raster.image.width(),
-                    "height_px": raster.image.height(),
+                    "width_px": image.width(),
+                    "height_px": image.height(),
                     "image_base64": base64::engine::general_purpose::STANDARD.encode(&png),
                 });
                 if let Some(mm) = computed_font_size_mm {
@@ -466,6 +474,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         copies: 1,
         dither: Algorithm::Auto,
         rotation,
+        head_rotation: rotation,
         supersample: 1,
         assets_base: AssetsBase::Cdn,
         style,
@@ -477,6 +486,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         label_fit_scale,
         font_fit_scale,
         media_inset,
+        encode_caps: resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false),
     };
     let px_per_mm = VECTOR_CSS_DPI / 25.4;
 
@@ -671,6 +681,16 @@ impl PrintReq {
     }
 }
 
+fn resolve_encode_caps(
+    catalog: &Catalog,
+    printer_key: Option<&str>,
+    media: &Media,
+    supports_cut: bool,
+) -> PrinterCapabilities {
+    let printer = printer_key.and_then(|k| catalog.lookup_printer(k));
+    encode_capabilities_for(printer, media, supports_cut)
+}
+
 fn resolve_rotation(
     state: &AppState,
     media: &Media,
@@ -678,14 +698,33 @@ fn resolve_rotation(
     rotate_cw: u32,
     rotate_ccw: u32,
 ) -> Rotation {
-    let orientation = orientation.unwrap_or_else(|| {
+    let orientation = resolve_orientation(state, orientation);
+    Rotation::for_print_with_media(orientation, media, rotate_cw, rotate_ccw)
+}
+
+fn resolve_head_rotation(
+    state: &AppState,
+    media: &Media,
+    orientation: Option<lbl_core::Orientation>,
+    rotate_cw: u32,
+    rotate_ccw: u32,
+    protocol: Protocol,
+) -> Rotation {
+    let orientation = resolve_orientation(state, orientation);
+    Rotation::for_head_with_media(orientation, media, rotate_cw, rotate_ccw, protocol)
+}
+
+fn resolve_orientation(
+    state: &AppState,
+    orientation: Option<lbl_core::Orientation>,
+) -> lbl_core::Orientation {
+    orientation.unwrap_or_else(|| {
         state
             .loader
             .load()
             .map(|c| c.render.orientation)
             .unwrap_or_default()
-    });
-    Rotation::for_print_with_media(orientation, media, rotate_cw, rotate_ccw)
+    })
 }
 
 /// Pick the render DPI: explicit user overrides win; otherwise use the printer's
@@ -780,6 +819,20 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     }
 
     let rotation = req.rotation(&state, &media);
+    let head_rotation = resolve_head_rotation(
+        &state,
+        &media,
+        req.orientation,
+        req.rotate_cw,
+        req.rotate_ccw,
+        protocol,
+    );
+    let encode_caps = resolve_encode_caps(
+        &state.catalog,
+        req.printer.as_deref(),
+        &media,
+        req.supports_cut,
+    );
     let opts = PipelineOptions {
         protocol,
         media,
@@ -789,6 +842,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
+        head_rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -800,6 +854,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         label_fit_scale,
         font_fit_scale,
         media_inset,
+        encode_caps,
     };
 
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
@@ -927,6 +982,20 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
 
     let rotation = req.rotation(&state, &media);
+    let head_rotation = resolve_head_rotation(
+        &state,
+        &media,
+        req.orientation,
+        req.rotate_cw,
+        req.rotate_ccw,
+        protocol,
+    );
+    let encode_caps = resolve_encode_caps(
+        &state.catalog,
+        req.printer.as_deref(),
+        &media,
+        req.supports_cut,
+    );
     let opts = PipelineOptions {
         protocol,
         media,
@@ -936,6 +1005,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
+        head_rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -947,6 +1017,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         label_fit_scale,
         font_fit_scale,
         media_inset,
+        encode_caps,
     };
 
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())

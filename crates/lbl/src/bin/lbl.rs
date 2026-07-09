@@ -19,7 +19,7 @@ use lbl::pipeline::{
     EncodeLabelsResult, PipelineOptions, Source, VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
-use lbl_catalog::Catalog;
+use lbl_catalog::{encode_capabilities_for, Catalog};
 use lbl_config::StyleConfig;
 use lbl_core::job::OutputMode;
 use lbl_core::printer::Protocol;
@@ -828,6 +828,13 @@ fn run_print(args: PrintArgs) -> Result<()> {
         args.rotate_cw as u32,
         args.rotate_ccw as u32,
     );
+    let head_rotation = Rotation::for_head_with_media(
+        orientation,
+        &media,
+        args.rotate_cw as u32,
+        args.rotate_ccw as u32,
+        protocol,
+    );
 
     let style_cfg = args.style.resolve();
     let (style, media_inset) = if virtual_export_mode == VirtualExportMode::Vector {
@@ -860,6 +867,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     let efficiency_warn_below = render_cfg.efficiency_warn_below;
 
+    let encode_caps = encode_capabilities_for(printer_entry, &media, supports_cut);
+
     let opts = PipelineOptions {
         protocol,
         media,
@@ -868,6 +877,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         copies,
         dither: Algorithm::parse(&dither)?,
         rotation,
+        head_rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
         style,
@@ -879,6 +889,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         label_fit_scale,
         font_fit_scale,
         media_inset,
+        encode_caps,
     };
 
     if args.open_browser && protocol != Protocol::Html {
