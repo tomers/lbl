@@ -465,6 +465,24 @@ mod tests {
     }
 
     #[test]
+    fn labelmanager_d1_tape_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let tape = catalog.lookup("45013S").unwrap();
+        assert_eq!(tape.canonical_key(), "45013");
+        assert_eq!(tape.media.width_mm, 12.0);
+        assert!(matches!(
+            tape.media.length,
+            lbl_core::media::MediaLength::Continuous
+        ));
+        let lm280 = catalog.compatible_with("LabelManager 280");
+        assert!(lm280.iter().any(|e| e.matches_key("45013")));
+        assert!(lm280.iter().any(|e| e.matches_key("45013S")));
+        assert!(lm280.iter().any(|e| e.matches_key("S0720530S")));
+        let printer = catalog.lookup_printer("LM280").unwrap();
+        assert_eq!(printer.default_media.as_deref(), Some("45013"));
+    }
+
+    #[test]
     fn niimbot_d110_media_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
         let roll = catalog.lookup("12x40").unwrap();
