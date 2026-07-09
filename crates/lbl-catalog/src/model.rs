@@ -217,6 +217,15 @@ pub struct PrinterEntry {
     /// How to connect to this model (and, for USB, how to recognize it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionHint>,
+    /// Blank feed before raster content (DYMO tape: lead margin along feed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_lead_mm: Option<f64>,
+    /// Head-to-cutter gap along the feed (DYMO tape: ~8.1 mm on LabelManager).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_trail_mm: Option<f64>,
+    /// Mirror content along the feed axis when encoding (DYMO tape).
+    #[serde(default)]
+    pub feed_reverse: bool,
 }
 
 impl PrinterEntry {
@@ -265,12 +274,20 @@ impl PrinterEntry {
             brand: self.brand.clone(),
             model: self.canonical_key().to_string(),
             protocol: self.protocol,
-            capabilities: PrinterCapabilities {
-                dpi: Dpi(self.dpi),
-                max_width_mm: self.max_width_mm,
-                supports_cut: self.supports_cut,
-                reports_media: self.reports_media,
-            },
+            capabilities: self.encode_capabilities(),
+        }
+    }
+
+    /// Static capabilities for encode/dispatch (protocol padding, DPI, etc.).
+    pub fn encode_capabilities(&self) -> PrinterCapabilities {
+        PrinterCapabilities {
+            dpi: Dpi(self.dpi),
+            max_width_mm: self.max_width_mm,
+            supports_cut: self.supports_cut,
+            reports_media: self.reports_media,
+            feed_lead_mm: self.feed_lead_mm,
+            feed_trail_mm: self.feed_trail_mm,
+            feed_reverse: self.feed_reverse,
         }
     }
 
@@ -290,4 +307,25 @@ pub(crate) struct CatalogFile {
     pub entries: Vec<CatalogEntry>,
     #[serde(default)]
     pub printers: Vec<PrinterEntry>,
+}
+
+/// Resolve encode-time capabilities from an optional catalog printer and media.
+pub fn encode_capabilities_for(
+    printer: Option<&PrinterEntry>,
+    media: &Media,
+    supports_cut: bool,
+) -> PrinterCapabilities {
+    match printer {
+        Some(entry) => {
+            let mut caps = entry.encode_capabilities();
+            caps.supports_cut |= supports_cut;
+            caps
+        }
+        None => PrinterCapabilities {
+            dpi: media.dpi,
+            max_width_mm: media.width_mm,
+            supports_cut,
+            ..Default::default()
+        },
+    }
 }

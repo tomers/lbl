@@ -651,6 +651,8 @@ name = "DYMO LabelManager PnP"
 protocol = "dymo"
 dpi = 180.0
 max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
 default_media = "45013"
 supported_media = [
   "43613",
@@ -683,6 +685,8 @@ name = "DYMO LabelManager 280"
 protocol = "dymo"
 dpi = 180.0
 max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
 default_media = "45013"
 supported_media = [
   "43613",

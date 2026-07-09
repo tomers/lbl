@@ -104,6 +104,9 @@ mod tests {
                     max_width_mm: 56.0,
                     supports_cut: false,
                     reports_media: true,
+                    feed_lead_mm: None,
+                    feed_trail_mm: None,
+                    feed_reverse: false,
                 },
             },
             transport: Transport::Usb {

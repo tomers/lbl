@@ -19,7 +19,8 @@
 mod model;
 
 pub use model::{
-    CatalogEntry, ConnectionHint, ImageInfo, MediaSpec, PrinterEntry, ResolvedTransport,
+    encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, MediaSpec, PrinterEntry,
+    ResolvedTransport,
 };
 
 use lbl_core::printer::Protocol;
@@ -479,6 +480,8 @@ mod tests {
         assert!(lm280.iter().any(|e| e.matches_key("45013S")));
         assert!(lm280.iter().any(|e| e.matches_key("S0720530S")));
         let printer = catalog.lookup_printer("LM280").unwrap();
+        assert_eq!(printer.feed_trail_mm, Some(8.1));
+        assert!(printer.feed_reverse);
         assert_eq!(printer.default_media.as_deref(), Some("45013"));
     }
 

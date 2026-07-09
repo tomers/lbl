@@ -158,6 +158,17 @@ pub struct PrinterCapabilities {
     pub supports_cut: bool,
     /// Whether the printer reports loaded media for auto-detection.
     pub reports_media: bool,
+    /// Blank feed before raster content (DYMO tape: lead margin along feed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_lead_mm: Option<f64>,
+    /// Head-to-cutter gap along the feed (DYMO tape: ~8.1 mm on LabelManager).
+    /// Preview shows this once; the driver feeds 2× before `ESC E` so the cut
+    /// lands with symmetric margins (see labelle `MarginsRenderEngine`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_trail_mm: Option<f64>,
+    /// Mirror content along the feed axis when encoding (DYMO tape).
+    #[serde(default)]
+    pub feed_reverse: bool,
 }
 
 impl Default for PrinterCapabilities {
@@ -167,6 +178,9 @@ impl Default for PrinterCapabilities {
             max_width_mm: 56.0,
             supports_cut: false,
             reports_media: false,
+            feed_lead_mm: None,
+            feed_trail_mm: None,
+            feed_reverse: false,
         }
     }
 }

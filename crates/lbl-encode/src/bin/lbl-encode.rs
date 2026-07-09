@@ -137,6 +137,7 @@ fn main() -> Result<()> {
         max_width_mm: cli.width_mm,
         supports_cut: cli.supports_cut,
         reports_media: false,
+        ..Default::default()
     };
 
     let mut registry = Registry::with_builtin_drivers();

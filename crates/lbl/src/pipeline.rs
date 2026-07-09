@@ -874,6 +874,7 @@ pub fn encode_label_traced<B: RenderBackend>(
             max_width_mm: opts.media.width_mm,
             supports_cut: opts.supports_cut,
             reports_media: false,
+            ..Default::default()
         };
         let driver = registry
             .get(opts.protocol)
@@ -1001,6 +1002,7 @@ pub fn encode_sample_pattern_traced(
         max_width_mm: opts.media.width_mm,
         supports_cut: opts.supports_cut,
         reports_media: false,
+        ..Default::default()
     };
     let driver = registry
         .get(opts.protocol)

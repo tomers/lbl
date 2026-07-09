@@ -29,6 +29,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::media::Media;
+use crate::printer::Protocol;
 
 /// How label content is laid out relative to the media feed direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -127,6 +128,28 @@ impl Rotation {
     ) -> Self {
         Self::for_print(orientation.for_media(media), extra_cw, extra_ccw)
     }
+
+    /// Quarter-turn applied to the rendered raster before encode.
+    ///
+    /// Row-oriented drivers (ZPL, ESC/POS, …) use the same mapping as
+    /// [`Self::for_print_with_media`]. Feed-oriented drivers (DYMO tape and
+    /// LabelWriter raster) consume bitmaps with width = feed and height = head,
+    /// so portrait and landscape swap their base quarter-turns.
+    pub fn for_head_with_media(
+        orientation: Orientation,
+        media: &Media,
+        extra_cw: u32,
+        extra_ccw: u32,
+        protocol: Protocol,
+    ) -> Self {
+        let oriented = orientation.for_media(media);
+        let base = match (oriented, protocol.bitmap_width_is_feed()) {
+            (Orientation::Portrait, false) | (Orientation::Landscape, true) => 0,
+            (Orientation::Landscape, false) | (Orientation::Portrait, true) => 1,
+        };
+        let net = base + extra_cw as i32 - extra_ccw as i32;
+        Rotation::from_quarter_turns_cw(net)
+    }
 }
 
 #[cfg(test)]
@@ -224,6 +247,27 @@ mod tests {
         );
         assert_eq!(
             Rotation::for_print_with_media(Orientation::Portrait, &wide, 0, 0),
+            Rotation::Cw90
+        );
+    }
+
+    #[test]
+    fn dymo_head_rotation_inverts_landscape_and_portrait() {
+        use crate::media::Media;
+        use crate::printer::Protocol;
+        use crate::units::Dpi;
+
+        let tape = Media::continuous(12.0, Dpi(180.0));
+        assert_eq!(
+            Rotation::for_head_with_media(Orientation::Landscape, &tape, 0, 0, Protocol::Dymo),
+            Rotation::None
+        );
+        assert_eq!(
+            Rotation::for_head_with_media(Orientation::Portrait, &tape, 0, 0, Protocol::Dymo),
+            Rotation::Cw90
+        );
+        assert_eq!(
+            Rotation::for_head_with_media(Orientation::Landscape, &tape, 0, 0, Protocol::Zpl),
             Rotation::Cw90
         );
     }
