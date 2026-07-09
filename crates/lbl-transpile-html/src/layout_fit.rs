@@ -49,6 +49,23 @@ pub const LABEL_FIT_ROW_CSS: &str = r#"
 }
 "#;
 
+/// CSS for Fill-mode labels with multiple stacked rows (column layout).
+pub const LABEL_FIT_COLUMN_CSS: &str = r#"
+.lbl-label>:not(:only-child){
+  flex:1 1 0;
+  min-height:0;
+}
+.lbl-label>.lbl-text:not(:only-child){
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden;
+  line-height:1.1;
+  text-align:center;
+}
+"#;
+
 /// Result of Fill layout: patched body plus extra CSS rules.
 #[derive(Debug, Clone, Default)]
 pub struct LayoutFit {
@@ -93,7 +110,7 @@ pub fn apply_layout_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
         children: row_kids, ..
     }] = children.as_slice()
     {
-        fit_row(row_kids, body, box_w, box_h, gap, opts)
+        fit_row(row_kids, body, box_w, box_h, gap, opts, None)
     } else {
         fit_column(&children, body, box_w, box_h, gap, opts)
     };
@@ -162,6 +179,7 @@ fn fit_lone(
             box_h,
             opts.style.element_gap_px.max(0.0),
             opts,
+            None,
         ),
         Child::Img | Child::Other => LayoutFit {
             body: body.to_string(),
@@ -177,6 +195,7 @@ fn fit_row(
     box_h: f64,
     gap: f64,
     opts: &TranspileOptions,
+    forced_font: Option<f64>,
 ) -> LayoutFit {
     if row_kids.is_empty() {
         return LayoutFit {
@@ -186,61 +205,11 @@ fn fit_row(
     }
 
     let n_gaps = row_kids.len().saturating_sub(1) as f64;
-    let mut fixed_w = 0.0;
-    let mut grow: Vec<(usize, f64)> = Vec::new();
-
-    for (i, kid) in row_kids.iter().enumerate() {
-        match kid {
-            Child::Img | Child::Other => {
-                fixed_w += opts.style.qr_size_px.min(box_w * 0.2);
-            }
-            Child::Qr {
-                explicit_size: true,
-                attrs,
-                ..
-            } => {
-                fixed_w += qr_explicit_width(attrs, opts.style.qr_size_px);
-            }
-            Child::Text { .. } => grow.push((i, WEIGHT_TEXT)),
-            Child::Barcode { .. } => grow.push((i, WEIGHT_BARCODE)),
-            Child::Qr { .. } => grow.push((i, WEIGHT_QR)),
-            Child::Row { .. } => grow.push((i, WEIGHT_TEXT)),
-        }
-    }
-
-    let weight_sum: f64 = grow.iter().map(|(_, w)| *w).sum();
-    let avail = (box_w - gap * n_gaps - fixed_w).max(1.0);
-
-    let widths: Vec<Option<f64>> = row_kids
-        .iter()
-        .enumerate()
-        .map(|(i, kid)| match kid {
-            Child::Qr {
-                explicit_size: true,
-                attrs,
-                ..
-            } => Some(qr_explicit_width(attrs, opts.style.qr_size_px)),
-            Child::Img | Child::Other => Some(opts.style.qr_size_px.min(box_w * 0.2)),
-            _ => grow
-                .iter()
-                .find(|(gi, _)| *gi == i)
-                .map(|(_, w)| avail * (*w) / weight_sum.max(f64::EPSILON)),
-        })
-        .collect();
-
-    let combined_text: String = row_kids
-        .iter()
-        .filter_map(|kid| match kid {
-            Child::Text { inner } if is_fit_measurable_html(inner) => {
-                Some(html_to_plain_text(inner))
-            }
-            _ => None,
-        })
-        .collect();
+    let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
 
     let mut css = String::new();
-    let mut font_px: Option<f64> = None;
-    if !combined_text.trim().is_empty() {
+    let mut font_px = forced_font;
+    if font_px.is_none() {
         for (i, kid) in row_kids.iter().enumerate() {
             if let Child::Text { inner } = kid {
                 if !is_fit_measurable_html(inner) {
@@ -264,8 +233,10 @@ fn fit_row(
     }
 
     font_px = font_px.map(|fp| {
-        if row_has_barcode(row_kids) {
-            finalize_row_font_px(fp, box_h, row_kids, &widths, avail, grow.len(), opts)
+        if forced_font.is_some() {
+            fp
+        } else if row_has_barcode(row_kids) {
+            finalize_row_font_px(fp, box_h, row_kids, &widths, avail, grow_len, opts)
         } else {
             fp
         }
@@ -280,7 +251,7 @@ fn fit_row(
     let mut qr_n = 0usize;
 
     for (i, kid) in row_kids.iter().enumerate() {
-        let w = widths[i].unwrap_or(avail / grow.len().max(1) as f64);
+        let w = widths[i].unwrap_or(avail / grow_len.max(1) as f64);
         match kid {
             Child::Barcode { height_mode } => {
                 let (fw, bar_h, _total_h, caption_font) =
@@ -329,6 +300,128 @@ fn fit_row(
     }
 }
 
+fn column_visual_row_count(children: &[Child]) -> usize {
+    children
+        .iter()
+        .map(|child| match child {
+            Child::Text { inner } => {
+                let plain = html_to_plain_text(inner);
+                plain
+                    .split('\n')
+                    .filter(|line| !line.trim().is_empty())
+                    .count()
+                    .max(1)
+            }
+            _ => 1,
+        })
+        .sum()
+}
+
+fn row_width_layout(
+    row_kids: &[Child],
+    box_w: f64,
+    gap: f64,
+    n_gaps: f64,
+    opts: &TranspileOptions,
+) -> (Vec<Option<f64>>, f64, usize) {
+    let mut fixed_w = 0.0;
+    let mut grow: Vec<(usize, f64)> = Vec::new();
+
+    for (i, kid) in row_kids.iter().enumerate() {
+        match kid {
+            Child::Img | Child::Other => {
+                fixed_w += opts.style.qr_size_px.min(box_w * 0.2);
+            }
+            Child::Qr {
+                explicit_size: true,
+                attrs,
+                ..
+            } => {
+                fixed_w += qr_explicit_width(attrs, opts.style.qr_size_px);
+            }
+            Child::Text { .. } => grow.push((i, WEIGHT_TEXT)),
+            Child::Barcode { .. } => grow.push((i, WEIGHT_BARCODE)),
+            Child::Qr { .. } => grow.push((i, WEIGHT_QR)),
+            Child::Row { .. } => grow.push((i, WEIGHT_TEXT)),
+        }
+    }
+
+    let weight_sum: f64 = grow.iter().map(|(_, w)| *w).sum();
+    let avail = (box_w - gap * n_gaps - fixed_w).max(1.0);
+    let grow_len = grow.len();
+
+    let widths: Vec<Option<f64>> = row_kids
+        .iter()
+        .enumerate()
+        .map(|(i, kid)| match kid {
+            Child::Qr {
+                explicit_size: true,
+                attrs,
+                ..
+            } => Some(qr_explicit_width(attrs, opts.style.qr_size_px)),
+            Child::Img | Child::Other => Some(opts.style.qr_size_px.min(box_w * 0.2)),
+            _ => grow
+                .iter()
+                .find(|(gi, _)| *gi == i)
+                .map(|(_, w)| avail * (*w) / weight_sum.max(f64::EPSILON)),
+        })
+        .collect();
+
+    (widths, avail, grow_len)
+}
+
+fn row_max_font_px(
+    row_kids: &[Child],
+    box_w: f64,
+    box_h: f64,
+    gap: f64,
+    opts: &TranspileOptions,
+) -> f64 {
+    let n_gaps = row_kids.len().saturating_sub(1) as f64;
+    let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
+    let hi = (box_h / ROW_TEXT_LINE_HEIGHT).max(1.0);
+    finalize_row_font_px(hi, box_h, row_kids, &widths, avail, grow_len, opts)
+}
+
+fn text_sample_line(inner: &str) -> String {
+    let text = html_to_plain_text(inner);
+    text.split('\n')
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .max_by_key(|line| line.chars().count())
+        .map(str::to_string)
+        .unwrap_or(text)
+}
+
+fn column_unified_font(
+    children: &[Child],
+    box_w: f64,
+    slot_h: f64,
+    gap: f64,
+    opts: &TranspileOptions,
+) -> Option<f64> {
+    let mut font = f64::INFINITY;
+    for child in children {
+        match child {
+            Child::Text { inner } if is_fit_measurable_html(inner) => {
+                let sample = text_sample_line(inner);
+                font = font.min(max_fit_font_px(box_w, slot_h, &sample));
+            }
+            Child::Row {
+                children: row_kids, ..
+            } => {
+                font = font.min(row_max_font_px(row_kids, box_w, slot_h, gap, opts));
+            }
+            _ => {}
+        }
+    }
+    if font.is_finite() {
+        Some(scaled_fit_px(font.max(1.0), opts))
+    } else {
+        None
+    }
+}
+
 fn fit_column(
     children: &[Child],
     body: &str,
@@ -337,22 +430,27 @@ fn fit_column(
     gap: f64,
     opts: &TranspileOptions,
 ) -> LayoutFit {
-    let n = children.len();
-    let n_gaps = n.saturating_sub(1) as f64;
-    let slot_h = ((box_h - gap * n_gaps) / n as f64).max(1.0);
+    let visual_rows = column_visual_row_count(children).max(1);
+    let n_gaps = visual_rows.saturating_sub(1) as f64;
+    let slot_h = ((box_h - gap * n_gaps) / visual_rows as f64).max(1.0);
+    let unified_font = column_unified_font(children, box_w, slot_h, gap, opts);
 
-    let mut css = String::new();
+    let mut css = String::from(LABEL_FIT_COLUMN_CSS);
     let mut patched = body.to_string();
     let mut barcode_n = 0usize;
     let mut qr_n = 0usize;
-    let mut font_px = None;
+    let mut font_px = unified_font;
 
     for (i, child) in children.iter().enumerate() {
         match child {
             Child::Text { inner } => {
                 if is_fit_measurable_html(inner) {
-                    let text = html_to_plain_text(inner);
-                    let px = scaled_fit_px(max_fit_font_px(box_w, slot_h, &text), opts);
+                    let px = unified_font.unwrap_or_else(|| {
+                        scaled_fit_px(
+                            max_fit_font_px(box_w, slot_h, &text_sample_line(inner)),
+                            opts,
+                        )
+                    });
                     font_px = Some(px);
                     css.push_str(&format!(
                         ".lbl-label>.lbl-text:nth-child({}){{font-size:{px:.2}px}}\n",
@@ -393,7 +491,7 @@ fn fit_column(
             Child::Row {
                 children: row_kids, ..
             } => {
-                let nested = fit_row(row_kids, &patched, box_w, slot_h, gap, opts);
+                let nested = fit_row(row_kids, &patched, box_w, slot_h, gap, opts, unified_font);
                 patched = nested.body;
                 css.push_str(&nested.css);
                 if nested.font_px.is_some() {
@@ -988,6 +1086,36 @@ mod tests {
             .unwrap_or(0.0);
         assert!((t1 - t3).abs() < 1.0, "text slots equal: {t1} vs {t3}");
         assert!(bc > t1, "barcode slot wider than text: bc={bc} text={t1}");
+    }
+
+    #[test]
+    fn column_row_and_text_lines_share_equal_font() {
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><span class="lbl-text"><span class="lbl-text-inlines">OO</span></span><div class="lbl-barcode" data-symbology="CODE128" data-value="O360"></div></div><div class="lbl-text">OO</div><div class="lbl-text">OO</div><div class="lbl-text">OO</div></div>"#;
+        let fit = apply_layout_fit(body, &fill_opts());
+        assert!(
+            fit.css.contains("lbl-label>:not(:only-child)"),
+            "{}",
+            fit.css
+        );
+        let row_font: f64 = fit
+            .css
+            .split(".lbl-row>.lbl-text{font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let line_font: f64 = fit
+            .css
+            .split(".lbl-label>.lbl-text:nth-child(2){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        assert!(row_font > 0.0 && line_font > 0.0, "{}", fit.css);
+        assert!(
+            (row_font - line_font).abs() < row_font * 0.15,
+            "row text and stacked lines should match: row={row_font} line={line_font}"
+        );
     }
 
     #[test]
