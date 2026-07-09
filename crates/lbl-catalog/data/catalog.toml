@@ -507,6 +507,18 @@ max_width_mm = 24.0
 connections  = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1001 }]
 
 [[printers]]
+brand = "DYMO"
+keys = ["LabelManager 280", "LM280"]
+name = "DYMO LabelManager 280"
+protocol = "dymo"
+dpi = 180.0
+max_width_mm = 12.0
+connections = [
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1005 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1006 },
+]
+
+[[printers]]
 brand           = "NIIMBOT"
 keys            = ["D110", "D11"]
 name            = "NIIMBOT D110"

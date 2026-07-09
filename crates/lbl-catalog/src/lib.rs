@@ -486,6 +486,10 @@ mod tests {
         assert!(!lw550.matches_key("LabelWriter"));
         let turbo = catalog.match_usb(0x0922, 0x0029).unwrap();
         assert!(turbo.matches_key("LabelWriter 550 Turbo"));
+        let lm280 = catalog.match_usb(0x0922, 0x1005).unwrap();
+        assert!(lm280.matches_key("LabelManager 280"));
+        let lm280_printer = catalog.match_usb(0x0922, 0x1006).unwrap();
+        assert!(lm280_printer.matches_key("LabelManager 280"));
     }
 
     #[test]
