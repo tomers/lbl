@@ -645,13 +645,36 @@ supported_media = [
 connections = [{ kind = "usb", vendor_id = 0x0922 }]
 
 [[printers]]
-brand        = "DYMO"
-keys         = ["LabelManager PnP", "LabelManager"]
-name         = "DYMO LabelManager PnP"
-protocol     = "dymo"
-dpi          = 300.0
-max_width_mm = 24.0
-connections  = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1001 }]
+brand = "DYMO"
+keys = ["LabelManager PnP", "LabelManager"]
+name = "DYMO LabelManager PnP"
+protocol = "dymo"
+dpi = 180.0
+max_width_mm = 12.0
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1001 }]
 
 [[printers]]
 brand = "DYMO"
@@ -660,6 +683,29 @@ name = "DYMO LabelManager 280"
 protocol = "dymo"
 dpi = 180.0
 max_width_mm = 12.0
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+]
 connections = [
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1005 },
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1006 },
