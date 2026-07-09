@@ -94,7 +94,12 @@ impl Block {
         match self {
             Block::Text(t) => {
                 if t.contains('\n') {
-                    format!("<div class=\"lbl-text\">{}</div>", text_to_html(t))
+                    t.split('\n')
+                        .filter(|line| !line.is_empty())
+                        .map(|line| {
+                            format!(r#"<div class="lbl-text">{}</div>"#, text_to_html(line))
+                        })
+                        .collect()
                 } else {
                     wrap_lbl_text_inlines(&text_to_html(t))
                 }
@@ -896,6 +901,24 @@ mod tests {
         let doc = Document::parse("Line 1\nLine 2", false);
         let html = doc.to_authoring_html();
         assert!(!html.contains("lbl-row"), "{html}");
+        assert_eq!(
+            html.matches("<div class=\"lbl-text\">").count(),
+            2,
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn multiline_after_row_emits_one_div_per_line() {
+        let doc = Document::parse("OO{{barcode:O360}}\nOO\nOO\nOO", false);
+        let html = doc.to_authoring_html();
+        assert!(html.contains("lbl-row"), "{html}");
+        assert_eq!(
+            html.matches("<div class=\"lbl-text\">").count(),
+            3,
+            "{html}"
+        );
+        assert!(!html.contains("<br>"), "{html}");
     }
 
     #[test]
