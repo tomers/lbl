@@ -184,7 +184,23 @@ impl Catalog {
         match matches.len() {
             0 => PrinterLookup::NotFound,
             1 => PrinterLookup::Found(matches[0]),
-            _ => PrinterLookup::Ambiguous(matches),
+            _ => {
+                let max_score = matches
+                    .iter()
+                    .filter_map(|p| p.match_score(query))
+                    .max()
+                    .unwrap_or(0);
+                let best: Vec<_> = matches
+                    .iter()
+                    .filter(|p| p.match_score(query) == Some(max_score))
+                    .copied()
+                    .collect();
+                if best.len() == 1 {
+                    PrinterLookup::Found(best[0])
+                } else {
+                    PrinterLookup::Ambiguous(matches)
+                }
+            }
         }
     }
 
@@ -521,6 +537,14 @@ mod tests {
         assert!(catalog.lookup_printer("LW550").is_some());
         let printer = catalog.resolve_printer("LW550").unwrap();
         assert!(printer.matches_key("LabelWriter 550"));
+    }
+
+    #[test]
+    fn resolve_printer_prefers_specific_labelwriter_key() {
+        let catalog = Catalog::bundled().unwrap();
+        let printer = catalog.resolve_printer("DYMO LabelWriter 550").unwrap();
+        assert!(printer.matches_key("LabelWriter 550"));
+        assert!(!printer.matches_key("LabelWriter"));
     }
 
     #[test]

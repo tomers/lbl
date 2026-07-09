@@ -230,14 +230,33 @@ impl PrinterEntry {
         self.keys.iter().any(|k| k.eq_ignore_ascii_case(key))
     }
 
+    /// Match strength for a free-form model string. Higher is better; `None` if
+    /// no key matches. Exact key hits rank above substring matches; when the
+    /// query appears inside a key, the matched key length wins (so
+    /// "DYMO LabelWriter 550" prefers `LabelWriter 550` over `LabelWriter`).
+    pub fn match_score(&self, printer_model: &str) -> Option<usize> {
+        let needle = printer_model.to_ascii_lowercase();
+        let mut best = None;
+        for k in &self.keys {
+            let key = k.to_ascii_lowercase();
+            let score = if k.eq_ignore_ascii_case(printer_model) {
+                key.len() + 1000
+            } else if needle.contains(&key) {
+                key.len()
+            } else if key.contains(&needle) {
+                needle.len()
+            } else {
+                continue;
+            };
+            best = Some(best.map_or(score, |b: usize| b.max(score)));
+        }
+        best
+    }
+
     /// Whether this printer matches a free-form model string (case-insensitive
     /// substring match on keys, or exact key match).
     pub fn matches_model(&self, printer_model: &str) -> bool {
-        let needle = printer_model.to_ascii_lowercase();
-        self.keys.iter().any(|k| {
-            let key = k.to_ascii_lowercase();
-            needle.contains(&key) || key.contains(&needle) || k.eq_ignore_ascii_case(printer_model)
-        })
+        self.match_score(printer_model).is_some()
     }
 
     /// Convert to a [`PrinterModel`] for profiles and drivers.
