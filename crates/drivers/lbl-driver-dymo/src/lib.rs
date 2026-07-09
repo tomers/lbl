@@ -10,6 +10,8 @@
 //!   by [labelle](https://github.com/labelle-org/labelle) (derived from
 //!   dymoprint). Its command stream is `ESC C 0`, `ESC B 0`, `ESC D n`, a
 //!   `SYN`-prefixed line per column, then `ESC A` (status) and `ESC E` (feed/cut).
+//!   Column order matches [labelle](https://github.com/labelle-org/labelle)'s
+//!   `ROTATE_270` transpose when [`PrinterCapabilities::feed_reverse`] is set.
 //! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
 //!   (see [`lw550`]), per DYMO's LW 550 Technical Reference.
 //!
@@ -34,6 +36,13 @@ impl DymoDriver {
         Self
     }
 
+    fn mm_to_feed_dots(mm: f64, dpi: f64) -> u32 {
+        if mm <= f64::EPSILON {
+            return 0;
+        }
+        ((mm / 25.4) * dpi).round().max(0.0) as u32
+    }
+
     /// Extract column `x` of the bitmap as `bytes_per_line` packed bytes
     /// (MSB-first over the tape's vertical axis).
     fn column_bytes(bitmap: &MonoBitmap, x: u32, bytes_per_line: usize) -> Vec<u8> {
@@ -44,6 +53,51 @@ impl DymoDriver {
             }
         }
         col
+    }
+
+    fn append_job(
+        out: &mut Vec<u8>,
+        bitmap: &MonoBitmap,
+        lead_cols: u32,
+        trail_cols: u32,
+        feed_reverse: bool,
+    ) -> Result<(), DriverError> {
+        let bytes_per_line = bitmap.height.div_ceil(8) as usize;
+        if bytes_per_line > 0xFF {
+            return Err(DriverError::Unsupported(format!(
+                "tape too tall: {} dots (max 2040)",
+                bitmap.height
+            )));
+        }
+
+        // Tape color (0 = black on white).
+        out.extend_from_slice(&[ESC, b'C', 0x00]);
+        // Reset dot-tab bias; firmware can carry a non-zero margin across jobs.
+        out.extend_from_slice(&[ESC, b'B', 0x00]);
+        // Bytes per line.
+        out.extend_from_slice(&[ESC, b'D', bytes_per_line as u8]);
+
+        let total_cols = lead_cols + bitmap.width + trail_cols;
+        for i in 0..total_cols {
+            out.push(SYN);
+            if i < lead_cols || i >= lead_cols + bitmap.width {
+                out.extend_from_slice(&vec![0u8; bytes_per_line]);
+                continue;
+            }
+            let src_x = i - lead_cols;
+            let x = if feed_reverse {
+                bitmap.width - 1 - src_x
+            } else {
+                src_x
+            };
+            out.extend_from_slice(&Self::column_bytes(bitmap, x, bytes_per_line));
+        }
+
+        // Status query (conventional job terminator; host should read IN).
+        out.extend_from_slice(&[ESC, b'A']);
+        // Form feed (advances and cuts on cutter models).
+        out.extend_from_slice(&[ESC, b'E']);
+        Ok(())
     }
 }
 
@@ -60,31 +114,23 @@ impl Driver for DymoDriver {
         if bitmap.height == 0 || bitmap.width == 0 {
             return Err(DriverError::Unsupported("empty bitmap".into()));
         }
-        let bytes_per_line = bitmap.height.div_ceil(8) as usize;
-        if bytes_per_line > 0xFF {
-            return Err(DriverError::Unsupported(format!(
-                "tape too tall: {} dots (max 2040)",
-                bitmap.height
-            )));
-        }
+
+        let dpi = ctx.capabilities.dpi.0;
+        let lead_cols = ctx
+            .capabilities
+            .feed_lead_mm
+            .map(|mm| Self::mm_to_feed_dots(mm, dpi))
+            .unwrap_or(0);
+        let trail_cols = ctx
+            .capabilities
+            .feed_trail_mm
+            .map(|mm| Self::mm_to_feed_dots(mm * 2.0, dpi))
+            .unwrap_or(0);
+        let feed_reverse = ctx.capabilities.feed_reverse;
 
         let mut out = Vec::new();
         for _ in 0..ctx.copies() {
-            // Tape color (0 = black on white).
-            out.extend_from_slice(&[ESC, b'C', 0x00]);
-            // Reset dot-tab bias; firmware can carry a non-zero margin across jobs.
-            out.extend_from_slice(&[ESC, b'B', 0x00]);
-            // Bytes per line.
-            out.extend_from_slice(&[ESC, b'D', bytes_per_line as u8]);
-            // One SYN-prefixed line per column.
-            for x in 0..bitmap.width {
-                out.push(SYN);
-                out.extend_from_slice(&Self::column_bytes(bitmap, x, bytes_per_line));
-            }
-            // Status query (conventional job terminator; host should read IN).
-            out.extend_from_slice(&[ESC, b'A']);
-            // Form feed (advances and cuts on cutter models).
-            out.extend_from_slice(&[ESC, b'E']);
+            Self::append_job(&mut out, bitmap, lead_cols, trail_cols, feed_reverse)?;
         }
         Ok(out)
     }
@@ -132,5 +178,40 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(bytes.iter().filter(|&&b| b == b'E').count(), 3);
+    }
+
+    #[test]
+    fn feed_trail_adds_blank_columns() {
+        let mut bmp = MonoBitmap::new(1, 8);
+        bmp.set(0, 0, true);
+        let caps = PrinterCapabilities {
+            dpi: Dpi(180.0),
+            feed_trail_mm: Some(12.7), // gap; driver feeds 2× → 25.4 mm ≈ 180 dots
+            ..Default::default()
+        };
+        let job = ctx_job(1);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
+        let syn_count = bytes.iter().filter(|&&b| b == SYN).count();
+        assert_eq!(syn_count, 1 + 180);
+    }
+
+    #[test]
+    fn feed_reverse_swaps_column_order() {
+        let mut bmp = MonoBitmap::new(2, 8);
+        bmp.set(0, 0, true);
+        bmp.set(1, 7, true);
+        let caps = PrinterCapabilities {
+            feed_reverse: true,
+            ..Default::default()
+        };
+        let job = ctx_job(1);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
+        // First data column after headers should be right column (y=7).
+        assert_eq!(bytes[9], SYN);
+        assert_eq!(bytes[10], 0x01);
+        assert_eq!(bytes[11], SYN);
+        assert_eq!(bytes[12], 0x80);
     }
 }
