@@ -3,6 +3,38 @@
 use crate::qr::{parse_qr_attrs, QrOptions};
 use crate::DEFAULT_SYMBOLOGY;
 
+/// How a barcode grows in fill mode: configured bar height vs stretch to the label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BarcodeHeightMode {
+    /// Use configured bar height (similar to surrounding text).
+    #[default]
+    Normal,
+    /// Stretch bars to use available label height (caption still rendered below).
+    Stretch,
+}
+
+impl BarcodeHeightMode {
+    /// Parse `normal` / `stretch` (case-insensitive); unknown values map to [`Normal`].
+    pub fn parse(s: &str) -> Self {
+        if s.eq_ignore_ascii_case("stretch") {
+            Self::Stretch
+        } else {
+            Self::Normal
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::Stretch => "stretch",
+        }
+    }
+}
+
+fn is_barcode_height_mode(s: &str) -> bool {
+    s.eq_ignore_ascii_case("stretch") || s.eq_ignore_ascii_case("normal")
+}
+
 /// A content block in a label.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
@@ -43,6 +75,8 @@ pub enum Block {
         symbology: String,
         /// The encoded data.
         data: String,
+        /// Fill-mode bar height behaviour (`{{barcode:…:stretch}}` or `<barcode height="stretch">`).
+        height_mode: BarcodeHeightMode,
     },
     /// An image referenced by a local path or remote URL.
     Image(String),
@@ -83,11 +117,22 @@ impl Block {
             Block::Qr { payload, options } => {
                 format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
             }
-            Block::Barcode { symbology, data } => format!(
-                "<barcode type=\"{}\">{}</barcode>",
-                escape(symbology),
-                escape(data)
-            ),
+            Block::Barcode {
+                symbology,
+                data,
+                height_mode,
+            } => {
+                let height_attr = if *height_mode == BarcodeHeightMode::Stretch {
+                    r#" height="stretch""#
+                } else {
+                    ""
+                };
+                format!(
+                    "<barcode type=\"{}\"{height_attr}>{}</barcode>",
+                    escape(symbology),
+                    escape(data)
+                )
+            }
             Block::Image(uri) => format!("<img src=\"{}\" />", escape(uri)),
         }
     }
@@ -199,17 +244,35 @@ impl Document {
     }
 }
 
-/// Parse a barcode `spec` (`SYMBOLOGY:data` or just `data`) into a
-/// [`Block::Barcode`], defaulting the symbology when none is given.
+/// Parse a barcode `spec` (`SYMBOLOGY:data`, optional `:stretch` / `:normal` suffix)
+/// into a [`Block::Barcode`], defaulting the symbology when none is given.
 pub fn barcode_from_spec(spec: &str) -> Block {
-    match spec.split_once(':') {
+    let mut parts: Vec<&str> = spec.split(':').collect();
+    let mut height_mode = BarcodeHeightMode::Normal;
+    if parts.len() > 1 {
+        if let Some(last) = parts.last() {
+            if is_barcode_height_mode(last) {
+                height_mode = BarcodeHeightMode::parse(last);
+                parts.pop();
+            }
+        }
+    }
+    let rest = parts.join(":");
+    match rest.split_once(':') {
         Some((sym, data)) if !sym.is_empty() && !data.is_empty() => Block::Barcode {
             symbology: sym.to_string(),
             data: data.to_string(),
+            height_mode,
+        },
+        _ if !rest.is_empty() => Block::Barcode {
+            symbology: DEFAULT_SYMBOLOGY.to_string(),
+            data: rest,
+            height_mode,
         },
         _ => Block::Barcode {
             symbology: DEFAULT_SYMBOLOGY.to_string(),
             data: spec.to_string(),
+            height_mode,
         },
     }
 }
@@ -590,15 +653,32 @@ mod tests {
             vec![
                 Block::Barcode {
                     symbology: "EAN13".into(),
-                    data: "123".into()
+                    data: "123".into(),
+                    height_mode: BarcodeHeightMode::Normal,
                 },
                 Block::Text(" ".to_string()),
                 Block::Barcode {
                     symbology: "CODE128".into(),
-                    data: "456".into()
+                    data: "456".into(),
+                    height_mode: BarcodeHeightMode::Normal,
                 },
             ]
         );
+    }
+
+    #[test]
+    fn inline_barcode_height_mode_suffix() {
+        let doc = Document::parse("{{barcode:12346:stretch}}", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Barcode {
+                symbology: "CODE128".into(),
+                data: "12346".into(),
+                height_mode: BarcodeHeightMode::Stretch,
+            }]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"height="stretch""#), "{html}");
     }
 
     #[test]
@@ -789,6 +869,18 @@ mod tests {
     }
 
     #[test]
+    fn mixed_text_barcode_text_uses_flex_row_siblings() {
+        let doc = Document::parse("aa {{barcode:12346}} bb", false);
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "<div class=\"lbl-row lbl-center\"><span class=\"lbl-text\"><span class=\"lbl-text-inlines\">aa </span></span><barcode type=\"CODE128\">12346</barcode><span class=\"lbl-text\"><span class=\"lbl-text-inlines\"> bb</span></span></div>"
+            ),
+            "{html}"
+        );
+    }
+
+    #[test]
     fn inline_directives_flow_in_a_row() {
         let doc = Document::parse(
             "Ship {{size:1.2:Alice}}{{barcode:L42}}{{qr:https://track/42}}",
@@ -823,7 +915,8 @@ mod tests {
                     Block::Text("aa ".to_string()),
                     Block::Barcode {
                         symbology: "CODE128".into(),
-                        data: "12345".into()
+                        data: "12345".into(),
+                        height_mode: BarcodeHeightMode::Normal,
                     },
                     Block::Text(" cc".to_string()),
                 ]

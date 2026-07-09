@@ -38,7 +38,9 @@ mod parse;
 mod qr;
 
 pub use fonts::{google_fonts_link, resolve_slug, FontDef, FONTS};
-pub use parse::{barcode_from_spec, parse_directive, scan_directive_at, Block, Document};
+pub use parse::{
+    barcode_from_spec, parse_directive, scan_directive_at, BarcodeHeightMode, Block, Document,
+};
 pub use qr::{QrErrorCorrection, QrOptions};
 
 /// The default barcode symbology when one isn't specified.
