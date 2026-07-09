@@ -217,10 +217,12 @@ pub struct PrinterEntry {
     /// How to connect to this model (and, for USB, how to recognize it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionHint>,
-    /// Blank feed before raster content (DYMO tape: lead margin along feed).
+    /// Blank feed before raster content when encoding. Omitted for DYMO tape
+    /// because the head already sits past the last cut; preview still shows this
+    /// offset using [`feed_trail_mm`] when lead is unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_lead_mm: Option<f64>,
-    /// Head-to-cutter gap along the feed (DYMO tape: ~8.1 mm on LabelManager).
+    /// Head-to-cutter distance along the feed (DYMO tape: ~8.1 mm on LabelManager).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_trail_mm: Option<f64>,
     /// Mirror content along the feed axis when encoding (DYMO tape).
