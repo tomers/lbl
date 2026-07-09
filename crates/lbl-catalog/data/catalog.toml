@@ -236,6 +236,153 @@ name         = "DYMO 2191636 Continuous Thermal Paper 57mm (non-adhesive)"
 purchase_url = "https://dymo.eu/en/labels-tapes/labelwriter-labels.html"
 media        = { width_mm = 57.0, length = { kind = "continuous" }, material = "paper", adhesive = "none", color = "white" }
 
+# --- DYMO D1 continuous label tapes (LabelManager / LabelPoint) ---------------
+#
+# D1 cassettes are continuous thermal tape: `length` is always `continuous`.
+# Cartridge stock length (e.g. 3 m starter vs 7 m retail) is not modeled in the
+# catalog; starter SKUs such as 45013S alias the same entry as the retail tape.
+# Data sourced from https://dymo.eu/en/labels-tapes/d1-tapes.html
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["43613", "S0720780"]
+name         = "DYMO D1 43613 6mm x 7m Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["40910", "S0720670"]
+name         = "DYMO D1 40910 9mm x 7m Black on Clear"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["40913", "S0720680", "41913"]
+name         = "DYMO D1 40913 9mm x 7m Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["40914", "S0720690"]
+name         = "DYMO D1 40914 9mm x 7m Blue on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["40916", "S0720710"]
+name         = "DYMO D1 40916 9mm x 7m Black on Blue"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45010", "S0720500", "45110"]
+name         = "DYMO D1 45010 12mm x 7m Black on Clear"
+purchase_url = "https://dymo.eu/en/dymo-s0720500-d1-45010-tape-12mm-x-7m-black-on-clear.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45013", "S0720530", "45013S", "S0720530S", "43113", "45113"]
+name         = "DYMO D1 45013 12mm Black on White (7m retail; 3m starter as 45013S)"
+purchase_url = "https://dymo.eu/dymo-s0720530-d1-45013-tape-12mm-x-7m-black-on-white.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45014", "S0720540"]
+name         = "DYMO D1 45014 12mm x 7m Blue on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45015", "S0720550"]
+name         = "DYMO D1 45015 12mm x 7m Red on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45016", "S0720560"]
+name         = "DYMO D1 45016 12mm x 7m Black on Blue"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45017", "S0720570"]
+name         = "DYMO D1 45017 12mm x 7m Black on Red"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45018", "S0720580"]
+name         = "DYMO D1 45018 12mm x 7m Black on Yellow"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45019", "S0720590"]
+name         = "DYMO D1 45019 12mm x 7m Black on Green"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45020", "S0720600"]
+name         = "DYMO D1 45020 12mm x 7m White on Clear"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45021", "S0720610"]
+name         = "DYMO D1 45021 12mm x 7m White on Black"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["16957", "S0718040"]
+name         = "DYMO D1 16957 12mm x 3.5m Flexible Nylon Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["1978364"]
+name         = "DYMO D1 1978364 Durable 12mm x 5.5m Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["1978365"]
+name         = "DYMO D1 1978365 Durable 12mm x 3m White on Black"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["1978366"]
+name         = "DYMO D1 1978366 Durable 12mm x 3m White on Red"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "red" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["1978367"]
+name         = "DYMO D1 1978367 Durable 12mm x 3m Black on Orange"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "other" }
+
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
 #
 # D11/D110-family printers use a 12 mm (96-dot) thermal head at 203 dpi. Tape
