@@ -6,20 +6,6 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::transpile::{TranspileOptions, ViewportPx};
 
-/// Matches `.lbl-label` > `.lbl-row` with plain text then a QR sibling.
-static ROW_TEXT_QR_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r#"(?is)^\s*<div\s+class="lbl-label"[^>]*>\s*<div\s+class="lbl-row[^"]*"[^>]*>\s*<(?:div|span)\s+class="lbl-text"[^>]*>([\s\S]*?)</(?:div|span)>\s*<div\s+class="lbl-qr"([^>]*)>"#,
-    )
-    .expect("row text qr regex")
-});
-
-static DATA_WIDTH_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"\bdata-width\s*=\s*"(\d+)""#).expect("data-width regex"));
-
-static STYLE_WIDTH_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"style\s*=\s*"[^"]*width:\s*(\d+)px"#).expect("style width regex"));
-
 static ANY_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<[^>]+>").expect("any tag regex"));
 
 /// Line height for lone-text auto-fit (must match [`crate::assets::LABEL_FIT_TEXT_CSS`]).
@@ -31,17 +17,15 @@ const VISUAL_WIDTH_MARGIN: f64 = 1.35;
 /// Estimated em width of one terminal column at the transpiled font size.
 const EM_PER_COLUMN: f64 = 0.55;
 
-fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
+pub(crate) fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
     (px * opts.font_fit_scale.clamp(0.01, 5.0)).max(1.0)
 }
 
 /// Parse the auto-fit font size actually injected into transpiled HTML.
 pub fn injected_fit_font_px(html: &str) -> Option<f64> {
     static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(
-            r"(?:\.lbl-label>\.lbl-text:only-child|\.lbl-row:has\(\.lbl-qr\)>\.lbl-text)\{font-size:([\d.]+)px\}",
-        )
-        .expect("injected fit font regex")
+        Regex::new(r"\.lbl-(?:label>\.lbl-text:only-child|row>\.lbl-text)\{font-size:([\d.]+)px\}")
+            .expect("injected fit font regex")
     });
     RE.captures(html)
         .and_then(|caps| caps.get(1))
@@ -50,35 +34,11 @@ pub fn injected_fit_font_px(html: &str) -> Option<f64> {
 
 /// Largest auto-fit text size in pixels for this body, if computable.
 pub fn fitted_font_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
-    row_text_qr_fit_px(body, opts).or_else(|| lone_text_fit_px(body, opts))
-}
-
-fn lone_text_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
-    let (width, height) = fit_box_px(opts)?;
-    let inner = lone_text_inner_html(body)?;
-    if !is_fit_measurable_html(&inner) {
-        return None;
-    }
-    let text = html_to_plain_text(&inner);
-    Some(scaled_fit_px(max_fit_font_px(width, height, &text), opts))
-}
-
-fn row_text_qr_fit_px(body: &str, opts: &TranspileOptions) -> Option<f64> {
-    let (box_w, box_h) = fit_box_px(opts)?;
-    let caps = ROW_TEXT_QR_RE.captures(body)?;
-    let inner = caps.get(1)?.as_str();
-    if !is_fit_measurable_html(inner) {
-        return None;
-    }
-    let text = html_to_plain_text(inner);
-    let qr_attrs = caps.get(2)?.as_str();
-    let qr_w = qr_width_px(qr_attrs, opts.style.qr_size_px);
-    let gap = opts.style.element_gap_px.max(0.0);
-    let text_w = (box_w - qr_w - gap).max(1.0);
-    Some(scaled_fit_px(max_fit_font_px(text_w, box_h, &text), opts))
+    crate::layout_fit::apply_layout_fit(body, opts).font_px
 }
 
 /// Inner HTML of a lone `.lbl-text` direct child of `.lbl-label`.
+#[cfg(test)]
 fn lone_text_inner_html(body: &str) -> Option<String> {
     let body = body.trim();
     const LABEL_OPEN: &str = r#"<div class="lbl-label">"#;
@@ -93,6 +53,7 @@ fn lone_text_inner_html(body: &str) -> Option<String> {
     extract_lbl_text_inner(child)
 }
 
+#[cfg(test)]
 fn extract_lbl_text_inner(html: &str) -> Option<String> {
     for tag in ["span", "div"] {
         let exact = format!(r#"<{tag} class="lbl-text">"#);
@@ -108,6 +69,7 @@ fn extract_lbl_text_inner(html: &str) -> Option<String> {
     None
 }
 
+#[cfg(test)]
 fn balanced_element_inner(html: &str, tag: &str) -> Option<String> {
     let open = format!("<{tag}");
     let close = format!("</{tag}>");
@@ -133,42 +95,49 @@ fn balanced_element_inner(html: &str, tag: &str) -> Option<String> {
 }
 
 /// CSS rule setting a transpile-time font size, when viewport geometry is known.
+#[cfg(test)]
 pub fn lone_text_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
-    let font_px = lone_text_fit_px(body, opts)?;
-    Some(format!(
-        ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px}}\n"
-    ))
+    let fit = crate::layout_fit::apply_layout_fit(body, opts);
+    if fit
+        .css
+        .contains(".lbl-label>.lbl-text:only-child{font-size:")
+    {
+        Some(fit.css)
+    } else {
+        None
+    }
 }
 
-/// CSS rule setting a transpile-time font size for text beside a QR in a row.
+/// CSS rule setting a transpile-time font size for text in a Fill row.
+#[cfg(test)]
 pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String> {
-    let font_px = row_text_qr_fit_px(body, opts)?;
-    Some(format!(
-        ".lbl-row:has(.lbl-qr)>.lbl-text{{font-size:{font_px:.2}px}}\n"
-    ))
+    let fit = crate::layout_fit::apply_layout_fit(body, opts);
+    if fit.css.contains(".lbl-row>.lbl-text{font-size:") {
+        fit.css
+            .lines()
+            .find(|l| l.contains(".lbl-row>.lbl-text{font-size:"))
+            .map(|l| format!("{l}\n"))
+    } else {
+        None
+    }
 }
 
-fn qr_width_px(qr_attrs: &str, default_qr_px: f64) -> f64 {
-    if let Some(caps) = DATA_WIDTH_RE.captures(qr_attrs) {
-        return caps[1].parse().unwrap_or(default_qr_px);
-    }
-    if let Some(caps) = STYLE_WIDTH_RE.captures(qr_attrs) {
-        return caps[1].parse().unwrap_or(default_qr_px);
-    }
-    default_qr_px
+pub(crate) fn text_line_width_px(text: &str, font_px: f64) -> f64 {
+    line_em_width(text) * font_px * VISUAL_WIDTH_MARGIN
 }
 
-fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
+pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
     let ViewportPx { width, height } = opts.viewport.as_ref()?;
     let width = width.filter(|w| *w > f64::EPSILON)?;
     let height = height.filter(|h| *h > f64::EPSILON)?;
     let scale = opts.label_fit_scale.clamp(0.01, 1.0);
     let pad = opts.style.padding_px.max(0.0);
+    let border = opts.style.border_width_px.max(0.0);
     let inset = opts.media_inset;
     let inner_w = (width - inset.cross_start - inset.cross_end).max(0.0);
     let inner_h = (height - inset.start - inset.end).max(0.0);
-    let box_w = inner_w * scale - 2.0 * pad;
-    let box_h = inner_h * scale - 2.0 * pad;
+    let box_w = inner_w * scale - 2.0 * pad - 2.0 * border;
+    let box_h = inner_h * scale - 2.0 * pad - 2.0 * border;
     if box_w <= f64::EPSILON || box_h <= f64::EPSILON {
         return None;
     }
@@ -177,7 +146,7 @@ fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
 
 /// Whether lone-text auto-fit can measure this inner HTML (plain text plus
 /// inline color/size/font spans, but not nested `.lbl-text` or widgets).
-fn is_fit_measurable_html(inner: &str) -> bool {
+pub(crate) fn is_fit_measurable_html(inner: &str) -> bool {
     static NESTED_LBL_TEXT: Lazy<Regex> = Lazy::new(|| {
         // Match `.lbl-text` but not `.lbl-text-inlines` (no lookahead in `regex` crate).
         Regex::new(r#"class="lbl-text"([ >]|$)"#).expect("nested lbl-text regex")
@@ -185,10 +154,12 @@ fn is_fit_measurable_html(inner: &str) -> bool {
     !NESTED_LBL_TEXT.is_match(inner)
         && !inner.contains("<qr")
         && !inner.contains("<barcode")
+        && !inner.contains("lbl-barcode")
+        && !inner.contains("lbl-qr")
         && !inner.contains("<img")
 }
 
-fn html_to_plain_text(inner: &str) -> String {
+pub(crate) fn html_to_plain_text(inner: &str) -> String {
     let normalized = inner
         .replace("<br/>", "\n")
         .replace("<br />", "\n")
@@ -271,7 +242,7 @@ fn text_fits(font_px: f64, width_px: f64, height_px: f64, text: &str) -> bool {
     total_lines as f64 * font_px * LINE_HEIGHT <= height_px + 0.5
 }
 
-fn max_fit_font_px(width_px: f64, height_px: f64, text: &str) -> f64 {
+pub(crate) fn max_fit_font_px(width_px: f64, height_px: f64, text: &str) -> f64 {
     if text.is_empty() {
         return 1.0;
     }
@@ -461,7 +432,7 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
-        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x"></div></div></div>"#;
         let full_css = row_text_qr_fit_css(
             body,
             &TranspileOptions {
@@ -505,7 +476,7 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
-        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x"></div></div></div>"#;
         let full_css = row_text_qr_fit_css(
             body,
             &TranspileOptions {
@@ -529,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn smaller_qr_yields_larger_row_text() {
+    fn smaller_explicit_qr_yields_larger_row_text() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
             viewport: Some(ViewportPx {
@@ -545,8 +516,9 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
-        let small_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-width="50" style="width:50px;height:50px;flex:0 0 auto"></div></div></div>"#;
-        let large_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr"></div></div></div>"#;
+        // Explicit data-width keeps QR fixed; grown QR takes a weighted share.
+        let small_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x" data-width="50" style="width:50px;height:50px;flex:0 0 auto"></div></div></div>"#;
+        let large_qr_body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x"></div></div></div>"#;
         let small_css = row_text_qr_fit_css(small_qr_body, &opts).expect("small qr css");
         let large_css = row_text_qr_fit_css(large_qr_body, &opts).expect("large qr css");
         let parse_font = |css: &str| -> f64 {

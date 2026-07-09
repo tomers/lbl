@@ -94,14 +94,31 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
 }
 "#;
 
-/// When [`LabelFit::Fill`] is active, grow text beside a QR in a row to use
-/// the space left after the code (font size is computed at transpile time).
+/// Line height for row text beside codes in fill mode.
+pub const ROW_TEXT_LINE_HEIGHT: f64 = 1.25;
+
+/// When [`LabelFit::Fill`] is active, grow text beside codes in a row
+/// (font size is computed at transpile time).
 pub const LABEL_FIT_ROW_TEXT_CSS: &str = r#"
-.lbl-row:has(.lbl-qr)>.lbl-text{
-  line-height:1.1;
-  white-space:pre-wrap;
-  overflow:hidden;
-  word-break:break-word;
+.lbl-row>.lbl-text{
+  line-height:1.25;
+  white-space:nowrap;
+  overflow:visible;
+  text-align:center;
+}
+"#;
+
+/// Fill-mode helpers for barcodes/QRs sized via `data-fit-*` attributes.
+pub const LABEL_FIT_CODE_CSS: &str = r#"
+.lbl-row>.lbl-barcode[data-fit-width],.lbl-row>.lbl-qr[data-fit-width]{
+  overflow:visible;
+}
+.lbl-row>.lbl-barcode[data-fit-width] svg,.lbl-row>.lbl-qr[data-fit-width] svg{
+  display:block;
+  width:100%;
+  height:auto;
+  max-width:none;
+  max-height:none;
 }
 "#;
 
@@ -142,6 +159,8 @@ pub const QR_INIT_JS: &str = r#"
         if(margin!==null && margin!==''){opts.margin=parseInt(margin,10);}
         var width=el.getAttribute('data-width');
         if(width!==null && width!==''){opts.width=parseInt(width,10);}
+        var fitW=el.getAttribute('data-fit-width');
+        if((width===null || width==='') && fitW!==null && fitW!==''){opts.width=parseInt(fitW,10);}
         var dark=el.getAttribute('data-dark');
         var light=el.getAttribute('data-light');
         if(dark||light){
@@ -164,20 +183,65 @@ pub const QR_INIT_JS: &str = r#"
 ///
 /// Honors `window.__LBL_STYLE.barcode` (`width`/`height`/`fontSize`, all in
 /// pixels) when present, so the rendered barcode matches the configured size.
+/// Bar and caption colors inherit from the surrounding CSS `color` (e.g. when a
+/// barcode sits inside a `{{color:…:… {{barcode:…}} …}}` span).
 pub const BARCODE_INIT_JS: &str = r#"
 (function(){
   function render(){
     var st=(window.__LBL_STYLE&&window.__LBL_STYLE.barcode)||{};
     document.querySelectorAll('.lbl-barcode').forEach(function(el){
       if(el.dataset.rendered) return;
+      if(!window.JsBarcode) return;
       var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
       el.appendChild(svg);
-      if(window.JsBarcode){
-        var opts={format: el.getAttribute('data-symbology')||'CODE128', margin:0};
+      var opts={format: el.getAttribute('data-symbology')||'CODE128', margin:0, textMargin:0, displayValue:true};
         if(st.width){opts.width=st.width;}
         if(st.height){opts.height=st.height;}
         if(st.fontSize){opts.fontSize=st.fontSize;}
-        try{ JsBarcode(svg, el.getAttribute('data-value')||'', opts); }catch(e){}
+        var fitW=el.getAttribute('data-fit-width');
+        var fitH=el.getAttribute('data-fit-height');
+        var baseH=st.height||100;
+        var baseFont=st.fontSize||20;
+        if(fitH!==null && fitH!==''){
+          opts.height=parseInt(fitH,10);
+          var fitFont=el.getAttribute('data-fit-font-size');
+          if(fitFont!==null && fitFont!==''){
+            opts.fontSize=parseInt(fitFont,10);
+          }else{
+            opts.fontSize=Math.max(8, Math.round(baseFont*(opts.height/baseH)));
+          }
+        }
+        var color=window.getComputedStyle(el).color;
+        if(color){
+          opts.lineColor=color;
+          opts.textColor=color;
+        }
+        var value=el.getAttribute('data-value')||'';
+        try{
+          if(fitW!==null && fitW!==''){
+            var targetW=parseInt(fitW,10);
+            var moduleW=st.width||2;
+            opts.width=moduleW;
+            JsBarcode(svg, value, opts);
+            var bbox=svg.getBBox&&svg.getBBox();
+            var curW=(bbox&&bbox.width)||svg.width.baseVal.value||0;
+            if(targetW>0){
+              if(curW>0){
+                opts.width=Math.max(0.5, moduleW*(targetW/curW));
+              }else{
+                var estModules=Math.max(20, value.length*11+36);
+                opts.width=Math.max(0.5, targetW/estModules);
+              }
+              svg.innerHTML='';
+              JsBarcode(svg, value, opts);
+            }
+          }else{
+            JsBarcode(svg, value, opts);
+          }
+        }catch(e){}
+      if(!svg.childNodes.length){
+        svg.remove();
+        return;
       }
       el.dataset.rendered = '1';
     });

@@ -569,6 +569,8 @@ static BARCODE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)<barcode\b([^>]*)>(.*?)</barcode>").expect("barcode regex"));
 static TYPE_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)\btype\s*=\s*"([^"]*)""#).expect("type attr regex"));
+static BARCODE_HEIGHT_ATTR_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)\bheight\s*=\s*"([^"]*)""#).expect("barcode height attr regex"));
 static BODY_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?is)<body\b[^>]*>(.*)</body>").expect("body regex"));
 
@@ -581,7 +583,14 @@ pub fn transpile(input: &str, opts: &TranspileOptions) -> String {
     let body = rewrite_qr(&body, &mut features, px_per_mm);
     let body = rewrite_barcode(&body, &mut features);
 
-    assemble(&body, features, opts)
+    let (body, fill_css) = if opts.label_fit == LabelFit::Fill {
+        let fit = crate::layout_fit::apply_layout_fit(&body, opts);
+        (fit.body, fit.css)
+    } else {
+        (body, String::new())
+    };
+
+    assemble(&body, features, opts, &fill_css)
 }
 
 /// Extract the inner body if a full document was given; otherwise treat the
@@ -633,9 +642,18 @@ fn rewrite_barcode(body: &str, features: &mut Features) -> String {
                 .captures(attrs)
                 .map(|c| c[1].to_string())
                 .unwrap_or_else(|| "CODE128".to_string());
+            let height_attr = BARCODE_HEIGHT_ATTR_RE
+                .captures(attrs)
+                .map(|c| lbl_text::BarcodeHeightMode::parse(&c[1]))
+                .unwrap_or_default();
             let value = caps[2].trim();
+            let height_data = if height_attr == lbl_text::BarcodeHeightMode::Stretch {
+                r#" data-barcode-height="stretch""#
+            } else {
+                ""
+            };
             format!(
-                "<div class=\"lbl-barcode\" data-symbology=\"{}\" data-value=\"{}\"></div>",
+                "<div class=\"lbl-barcode\" data-symbology=\"{}\" data-value=\"{}\"{height_data}></div>",
                 attr(&symbology),
                 attr(value)
             )
@@ -681,7 +699,7 @@ fn font_assets_for_body(body: &str) -> (String, Option<String>) {
     (css, link)
 }
 
-fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
+fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &str) -> String {
     let mut head = String::new();
     head.push_str("<meta charset=\"utf-8\">\n");
     head.push_str("<style>");
@@ -700,13 +718,9 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions) -> String {
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
         head.push_str(assets::LABEL_FIT_ROW_TEXT_CSS);
+        head.push_str(assets::LABEL_FIT_CODE_CSS);
         head.push_str(&lone_text_align_css(opts.label_align, opts.label_valign));
-        if let Some(fit_css) = crate::text_fit::lone_text_fit_css(body, opts) {
-            head.push_str(&fit_css);
-        }
-        if let Some(fit_css) = crate::text_fit::row_text_qr_fit_css(body, opts) {
-            head.push_str(&fit_css);
-        }
+        head.push_str(fill_css);
         if opts.mode == OutputMode::Preview {
             head.push_str(assets::LABEL_FIT_FILL_PREVIEW_CSS);
         }
@@ -831,6 +845,185 @@ mod tests {
     }
 
     #[test]
+    fn colored_barcode_stays_inside_color_span() {
+        let body = r#"<div class="lbl-label"><span class="lbl-text"><span class="lbl-text-inlines"><span style="color:#e90b0b">aa <barcode type="CODE128">12345</barcode> cc</span></span></span></div>"#;
+        let out = transpile(body, &TranspileOptions::default());
+        assert!(
+            out.contains(
+                r#"<span style="color:#e90b0b">aa <div class="lbl-barcode" data-symbology="CODE128" data-value="12345"></div> cc</span>"#
+            ),
+            "{out}"
+        );
+        assert!(
+            out.contains("lineColor=color") || out.contains("opts.lineColor"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn fill_lone_barcode_gets_data_fit() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><barcode>12345</barcode></div>"#,
+            &opts,
+        );
+        assert!(out.contains("data-fit-width="), "{out}");
+        assert!(out.contains("data-fit-height="), "{out}");
+        assert!(
+            out.contains("baseFont*(opts.height/baseH)"),
+            "barcode caption should scale with fit height: {out}"
+        );
+        let w: f64 = out
+            .split("data-fit-width=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(w > 100.0, "lone barcode should grow, got {w}");
+    }
+
+    #[test]
+    fn fill_lone_qr_gets_data_fit() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 40.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(r#"<div class="lbl-label"><qr>x</qr></div>"#, &opts);
+        assert!(out.contains("data-fit-width="), "{out}");
+        let w: f64 = out
+            .split("data-fit-width=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(w > 40.0, "lone qr should grow beyond config, got {w}");
+    }
+
+    #[test]
+    fn fill_text_barcode_row_grows_both() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><div class="lbl-row lbl-center"><span class="lbl-text"><span class="lbl-text-inlines">aa </span></span><barcode>12346</barcode><span class="lbl-text"><span class="lbl-text-inlines"> bb</span></span></div></div>"#,
+            &opts,
+        );
+        assert!(out.contains(".lbl-row>.lbl-text{font-size:"), "{out}");
+        assert!(out.contains("data-fit-width="), "{out}");
+        assert!(out.contains("data-fit-height="), "{out}");
+    }
+
+    #[test]
+    fn fill_text_qr_row_grows_qr() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 40.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><qr>x</qr></div></div>"#,
+            &opts,
+        );
+        assert!(out.contains("data-fit-width="), "{out}");
+        assert!(out.contains(".lbl-row>.lbl-text{font-size:"), "{out}");
+        let w: f64 = out
+            .split("data-fit-width=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(w > 40.0, "row qr should grow, got {w}");
+    }
+
+    #[test]
+    fn fill_barcode_qr_row_shares_width() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(142.0),
+            }),
+            style: LabelStyle {
+                padding_px: 0.0,
+                qr_size_px: 40.0,
+                element_gap_px: 8.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-label"><div class="lbl-row lbl-center"><barcode>1</barcode><qr>x</qr></div></div>"#,
+            &opts,
+        );
+        let fits: Vec<&str> = out.split("data-fit-width=\"").skip(1).collect();
+        assert!(fits.len() >= 2, "expected both codes fitted: {out}");
+    }
+
+    #[test]
+    fn content_mode_skips_data_fit() {
+        let out = transpile(
+            r#"<div class="lbl-label"><barcode>12345</barcode></div>"#,
+            &TranspileOptions {
+                label_fit: LabelFit::Content,
+                viewport: Some(ViewportPx {
+                    width: Some(354.0),
+                    height: Some(142.0),
+                }),
+                ..Default::default()
+            },
+        );
+        assert!(!out.contains("data-fit-width="), "{out}");
+    }
+
+    #[test]
     fn preview_mode_wraps_with_addressable_container() {
         let opts = TranspileOptions {
             mode: OutputMode::Preview,
@@ -910,7 +1103,9 @@ mod tests {
             &TranspileOptions::default(),
         );
         assert!(
-            out.contains(".lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote){margin:0}"),
+            out.contains(
+                ".lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}"
+            ),
             "{out}"
         );
         assert!(out.contains(".lbl-label h1{font-size:1.35em"), "{out}");

@@ -21,6 +21,7 @@
 //! ```
 
 mod assets;
+mod layout_fit;
 mod qr;
 mod text_fit;
 mod transpile;
