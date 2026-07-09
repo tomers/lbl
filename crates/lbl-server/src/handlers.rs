@@ -381,11 +381,12 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             let mut out = Vec::with_capacity(count);
             for label in labels {
                 let raster = render_label_raster(&backend, &label.html, &opts)?;
-                let image = lbl::pipeline::pad_preview_encode_feed(
+                let padded = lbl::pipeline::pad_preview_encode_feed(
                     raster.image,
                     &encode_caps,
                     feed_along_width,
                 );
+                let image = padded.image;
                 let mut png = Vec::new();
                 image
                     .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
@@ -398,6 +399,18 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     "height_px": image.height(),
                     "image_base64": base64::engine::general_purpose::STANDARD.encode(&png),
                 });
+                if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 {
+                    label_json["content_feed_end_px"] =
+                        serde_json::Value::from(padded.content_feed_end_px);
+                    label_json["feed_trail_px"] = serde_json::Value::from(padded.trail_feed_px);
+                    if padded.feed_end_margin_px > 0 {
+                        label_json["feed_end_margin_px"] =
+                            serde_json::Value::from(padded.feed_end_margin_px);
+                    }
+                    if padded.lead_feed_px > 0 {
+                        label_json["feed_lead_px"] = serde_json::Value::from(padded.lead_feed_px);
+                    }
+                }
                 if let Some(mm) = computed_font_size_mm {
                     label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
                 }

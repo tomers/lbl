@@ -759,33 +759,86 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
         .unwrap_or(0)
 }
 
-/// Extend a preview raster with blank feed-axis margins that match what will be
-/// printed: lead before content, then one head-to-cutter gap after content.
+/// Feed-axis padding applied to a preview raster.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewFeedPad {
+    pub image: RgbaImage,
+    /// Feed-axis position where rendered content ends (start of right padding).
+    pub content_feed_end_px: u32,
+    /// Right padding on the sticker face before the cutter gap.
+    pub feed_end_margin_px: u32,
+    /// Cutter-gap width along the feed axis (metadata only; not drawn).
+    pub trail_feed_px: u32,
+    /// Blank tape before content (head offset from the previous cut).
+    pub lead_feed_px: u32,
+}
+
+/// Extend a preview raster with encode feed margins for tape printers.
+///
+/// When [`PrinterCapabilities::feed_trail_mm`] is set and [`PrinterCapabilities::feed_lead_mm`]
+/// is not, the head-to-cutter distance is also used as the implicit lead: the print
+/// head sits that far past the last cut when printing starts (labelle
+/// `MarginsRenderEngine`). Preview shows symmetric white margins on both sides of the
+/// content, with dashed markers between lead/content and content/right padding.
 pub fn pad_preview_encode_feed(
     image: RgbaImage,
     caps: &PrinterCapabilities,
     feed_along_width: bool,
-) -> RgbaImage {
+) -> PreviewFeedPad {
     use image::{imageops, Rgba};
 
     let dpi = caps.dpi.0;
-    let lead = feed_margin_px(caps.feed_lead_mm, dpi);
-    let trail = feed_margin_px(caps.feed_trail_mm, dpi);
-    if lead == 0 && trail == 0 {
-        return image;
+    let dx = feed_margin_px(caps.feed_trail_mm, dpi);
+    let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
+    let (preview_lead, end_margin, cutter_gap) = if explicit_lead > 0 {
+        (explicit_lead, 0, dx)
+    } else if dx > 0 {
+        (dx, dx, dx)
+    } else {
+        (0, 0, 0)
+    };
+
+    let content_feed = if feed_along_width {
+        image.width()
+    } else {
+        image.height()
+    };
+
+    if preview_lead == 0 && end_margin == 0 {
+        return PreviewFeedPad {
+            image,
+            content_feed_end_px: content_feed,
+            feed_end_margin_px: 0,
+            trail_feed_px: 0,
+            lead_feed_px: 0,
+        };
     }
 
-    let white = Rgba([255, 255, 255, 255]);
+    let label_white = Rgba([255, 255, 255, 255]);
+    let content_end = preview_lead + content_feed;
+
     if feed_along_width {
         let (w, h) = image.dimensions();
-        let mut out = RgbaImage::from_pixel(w + lead + trail, h, white);
-        imageops::overlay(&mut out, &image, lead as i64, 0);
-        out
+        let mut out = RgbaImage::from_pixel(w + preview_lead + end_margin, h, label_white);
+        imageops::overlay(&mut out, &image, preview_lead as i64, 0);
+        PreviewFeedPad {
+            image: out,
+            content_feed_end_px: content_end,
+            feed_end_margin_px: end_margin,
+            trail_feed_px: cutter_gap,
+            lead_feed_px: preview_lead,
+        }
     } else {
         let (w, h) = image.dimensions();
-        let mut out = RgbaImage::from_pixel(w, h + lead + trail, white);
-        imageops::overlay(&mut out, &image, 0, lead as i64);
-        out
+        let mut out = RgbaImage::from_pixel(w, h + preview_lead + end_margin, label_white);
+        imageops::overlay(&mut out, &image, 0, preview_lead as i64);
+        PreviewFeedPad {
+            image: out,
+            content_feed_end_px: content_end,
+            feed_end_margin_px: end_margin,
+            trail_feed_px: cutter_gap,
+            lead_feed_px: preview_lead,
+        }
     }
 }
 
@@ -1126,6 +1179,31 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             encode_caps: PrinterCapabilities::default(),
         }
+    }
+
+    #[test]
+    fn preview_shows_symmetric_head_offset_and_cutter_gap() {
+        use image::Rgba;
+
+        let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
+        let caps = PrinterCapabilities {
+            dpi: Dpi(180.0),
+            feed_trail_mm: Some(8.1),
+            ..Default::default()
+        };
+        let padded = pad_preview_encode_feed(image, &caps, true);
+        let dx = feed_margin_px(caps.feed_trail_mm, caps.dpi.0);
+        assert_eq!(padded.lead_feed_px, dx);
+        assert_eq!(padded.trail_feed_px, dx);
+        assert_eq!(padded.content_feed_end_px, dx + 10);
+        assert_eq!(padded.feed_end_margin_px, dx);
+        assert_eq!(padded.trail_feed_px, dx);
+        assert_eq!(padded.image.width(), 10 + dx * 2);
+        assert_eq!(
+            padded.image.get_pixel(dx + 10 + dx - 1, 0).0,
+            [255, 255, 255, 255],
+            "sticker face ends with white margin, not a drawn gap zone"
+        );
     }
 
     #[test]
