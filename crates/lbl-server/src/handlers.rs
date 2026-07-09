@@ -1120,6 +1120,7 @@ fn dispatch_bluetooth(
 
 fn handshake_for_protocol(protocol: Protocol) -> &'static str {
     match protocol {
+        Protocol::Dymo => "dymo_d1",
         Protocol::DymoLw => "dymo_lw",
         Protocol::Niimbot => "niimbot_poll",
         _ => "fire_and_forget",
@@ -1306,7 +1307,7 @@ mod browser_hints_tests {
         )
         .unwrap();
         assert_eq!(resp["dispatch_mode"], "client");
-        assert_eq!(resp["handshake"], "fire_and_forget");
+        assert_eq!(resp["handshake"], "dymo_d1");
         assert_eq!(resp["labels"].as_array().unwrap().len(), 1);
         assert!(resp["labels"][0]["data_base64"].is_string());
     }

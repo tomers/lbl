@@ -11,8 +11,10 @@ tape feeds horizontally. This driver transposes the `MonoBitmap` into columns
 and emits:
 
 - `ESC C 0` — tape color
+- `ESC B 0` — reset dot-tab bias (firmware can carry margin across jobs)
 - `ESC D n` — bytes per line (`ceil(height/8)`)
 - per column: `SYN` (0x16) + `n` column bytes (MSB-first across the tape)
+- `ESC A` — status query (host should read the IN endpoint)
 - `ESC E` — form feed / cut
 
 The command set is modeled on

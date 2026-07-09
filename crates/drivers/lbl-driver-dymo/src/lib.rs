@@ -8,8 +8,8 @@
 //!   **column** of dots across the tape, and the tape feeds horizontally, so the
 //!   encoder transposes the bitmap into columns. Modeled on the command set used
 //!   by [labelle](https://github.com/labelle-org/labelle) (derived from
-//!   dymoprint). Its command stream is `ESC C 0`, `ESC D n`, a `SYN`-prefixed
-//!   line per column, then `ESC E`.
+//!   dymoprint). Its command stream is `ESC C 0`, `ESC B 0`, `ESC D n`, a
+//!   `SYN`-prefixed line per column, then `ESC A` (status) and `ESC E` (feed/cut).
 //! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
 //!   (see [`lw550`]), per DYMO's LW 550 Technical Reference.
 //!
@@ -72,6 +72,8 @@ impl Driver for DymoDriver {
         for _ in 0..ctx.copies() {
             // Tape color (0 = black on white).
             out.extend_from_slice(&[ESC, b'C', 0x00]);
+            // Reset dot-tab bias; firmware can carry a non-zero margin across jobs.
+            out.extend_from_slice(&[ESC, b'B', 0x00]);
             // Bytes per line.
             out.extend_from_slice(&[ESC, b'D', bytes_per_line as u8]);
             // One SYN-prefixed line per column.
@@ -79,6 +81,8 @@ impl Driver for DymoDriver {
                 out.push(SYN);
                 out.extend_from_slice(&Self::column_bytes(bitmap, x, bytes_per_line));
             }
+            // Status query (conventional job terminator; host should read IN).
+            out.extend_from_slice(&[ESC, b'A']);
             // Form feed (advances and cuts on cutter models).
             out.extend_from_slice(&[ESC, b'E']);
         }
@@ -110,13 +114,14 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
 
-        // ESC C 0, ESC D 1, then 3 columns each: SYN + 1 byte.
+        // ESC C 0, ESC B 0, ESC D 1, then 3 columns each: SYN + 1 byte.
         assert_eq!(&bytes[0..3], &[ESC, b'C', 0x00]);
-        assert_eq!(&bytes[3..6], &[ESC, b'D', 0x01]);
-        assert_eq!(bytes[6], SYN);
-        assert_eq!(bytes[7], 0x80); // column 0, y=0 set
-                                    // ends with form feed
-        assert_eq!(&bytes[bytes.len() - 2..], &[ESC, b'E']);
+        assert_eq!(&bytes[3..6], &[ESC, b'B', 0x00]);
+        assert_eq!(&bytes[6..9], &[ESC, b'D', 0x01]);
+        assert_eq!(bytes[9], SYN);
+        assert_eq!(bytes[10], 0x80); // column 0, y=0 set
+                                     // ends with status + form feed
+        assert_eq!(&bytes[bytes.len() - 4..], &[ESC, b'A', ESC, b'E']);
     }
 
     #[test]
