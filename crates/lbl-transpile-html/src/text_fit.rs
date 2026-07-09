@@ -128,16 +128,28 @@ pub(crate) fn text_line_width_px(text: &str, font_px: f64) -> f64 {
 
 pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
     let ViewportPx { width, height } = opts.viewport.as_ref()?;
-    let width = width.filter(|w| *w > f64::EPSILON)?;
-    let height = height.filter(|h| *h > f64::EPSILON)?;
+    let width = width.filter(|w| *w > f64::EPSILON);
+    let height = height.filter(|h| *h > f64::EPSILON);
+    if width.is_none() && height.is_none() {
+        return None;
+    }
+    const UNBOUNDED_AXIS_PX: f64 = 1.0e6;
     let scale = opts.label_fit_scale.clamp(0.01, 1.0);
     let pad = opts.style.padding_px.max(0.0);
     let border = opts.style.border_width_px.max(0.0);
     let inset = opts.media_inset;
-    let inner_w = (width - inset.cross_start - inset.cross_end).max(0.0);
-    let inner_h = (height - inset.start - inset.end).max(0.0);
-    let box_w = inner_w * scale - 2.0 * pad - 2.0 * border;
-    let box_h = inner_h * scale - 2.0 * pad - 2.0 * border;
+    let box_w = if let Some(w) = width {
+        let inner_w = (w - inset.cross_start - inset.cross_end).max(0.0);
+        inner_w * scale - 2.0 * pad - 2.0 * border
+    } else {
+        UNBOUNDED_AXIS_PX
+    };
+    let box_h = if let Some(h) = height {
+        let inner_h = (h - inset.start - inset.end).max(0.0);
+        inner_h * scale - 2.0 * pad - 2.0 * border
+    } else {
+        UNBOUNDED_AXIS_PX
+    };
     if box_w <= f64::EPSILON || box_h <= f64::EPSILON {
         return None;
     }

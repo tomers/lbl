@@ -123,6 +123,55 @@ pub fn apply_layout_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
     }
 }
 
+/// Size lone text to the fixed head axis when continuous media leaves the feed
+/// axis unbounded (content fit).
+pub fn apply_content_head_text_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
+    let viewport = match opts.viewport.as_ref() {
+        Some(v) => v,
+        None => {
+            return LayoutFit {
+                body: body.to_string(),
+                ..Default::default()
+            };
+        }
+    };
+    let width_known = viewport.width.filter(|w| *w > f64::EPSILON).is_some();
+    let height_known = viewport.height.filter(|h| *h > f64::EPSILON).is_some();
+    if width_known == height_known {
+        return LayoutFit {
+            body: body.to_string(),
+            ..Default::default()
+        };
+    }
+
+    let (box_w, box_h) = match fit_box_px(opts) {
+        Some(b) => b,
+        None => {
+            return LayoutFit {
+                body: body.to_string(),
+                ..Default::default()
+            };
+        }
+    };
+
+    let Some(inner) = label_inner(body) else {
+        return LayoutFit {
+            body: body.to_string(),
+            ..Default::default()
+        };
+    };
+
+    let children = parse_top_children(inner);
+    if children.len() != 1 {
+        return LayoutFit {
+            body: body.to_string(),
+            ..Default::default()
+        };
+    }
+
+    fit_lone(&children[0], body, box_w, box_h, opts)
+}
+
 fn fit_lone(
     child: &Child,
     body: &str,
@@ -918,6 +967,30 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn content_head_fit_sizes_lone_text_on_landscape_continuous() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: None,
+                height: Some(170.0),
+            }),
+            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            ..Default::default()
+        };
+        let body =
+            r#"<div class="lbl-label"><div class="lbl-text">01234567890123456789</div></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        assert!(
+            fit.css.contains("font-size:"),
+            "css={} font={:?}",
+            fit.css,
+            fit.font_px
+        );
+        let font = fit.font_px.unwrap_or(0.0);
+        assert!(font > 60.0, "font={font}");
     }
 
     #[test]

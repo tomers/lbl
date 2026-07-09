@@ -7,6 +7,7 @@ use regex::Regex;
 
 use crate::assets;
 use crate::assets::AssetsBase;
+use crate::layout_fit::{apply_content_head_text_fit, apply_layout_fit};
 use crate::qr::{QrElementOverrides, QrErrorCorrection};
 
 /// Visual sizing for a label, in **CSS pixels** (which map 1:1 to render
@@ -583,11 +584,15 @@ pub fn transpile(input: &str, opts: &TranspileOptions) -> String {
     let body = rewrite_qr(&body, &mut features, px_per_mm);
     let body = rewrite_barcode(&body, &mut features);
 
-    let (body, fill_css) = if opts.label_fit == LabelFit::Fill {
-        let fit = crate::layout_fit::apply_layout_fit(&body, opts);
-        (fit.body, fit.css)
-    } else {
-        (body, String::new())
+    let (body, fill_css) = match opts.label_fit {
+        LabelFit::Fill => {
+            let fit = apply_layout_fit(&body, opts);
+            (fit.body, fit.css)
+        }
+        LabelFit::Content => {
+            let fit = apply_content_head_text_fit(&body, opts);
+            (fit.body, fit.css)
+        }
     };
 
     assemble(&body, features, opts, &fill_css)
@@ -720,11 +725,11 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
         head.push_str(assets::LABEL_FIT_ROW_TEXT_CSS);
         head.push_str(assets::LABEL_FIT_CODE_CSS);
         head.push_str(&lone_text_align_css(opts.label_align, opts.label_valign));
-        head.push_str(fill_css);
         if opts.mode == OutputMode::Preview {
             head.push_str(assets::LABEL_FIT_FILL_PREVIEW_CSS);
         }
     }
+    head.push_str(fill_css);
     head.push_str(&label_layout_css(
         opts.label_fit,
         opts.viewport.as_ref(),
@@ -1066,6 +1071,29 @@ mod tests {
         };
         let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
         assert!(!out.contains("border-radius"), "{out}");
+    }
+
+    #[test]
+    fn content_mode_sizes_lone_text_to_continuous_head_height() {
+        let opts = TranspileOptions {
+            mode: OutputMode::Preview,
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: None,
+                height: Some(170.0),
+            }),
+            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            ..Default::default()
+        };
+        let body =
+            r#"<div class="lbl-label"><div class="lbl-text">01234567890123456789</div></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        assert!(fit.font_px.unwrap_or(0.0) > 60.0, "{:?}", fit.font_px);
+        let out = transpile(body, &opts);
+        assert!(
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:"),
+            "{out}"
+        );
     }
 
     #[test]
