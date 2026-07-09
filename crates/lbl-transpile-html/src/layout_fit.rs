@@ -208,29 +208,7 @@ fn fit_row(
     let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
 
     let mut css = String::new();
-    let mut font_px = forced_font;
-    if font_px.is_none() {
-        for (i, kid) in row_kids.iter().enumerate() {
-            if let Child::Text { inner } = kid {
-                if !is_fit_measurable_html(inner) {
-                    continue;
-                }
-                let text = html_to_plain_text(inner);
-                let Some(w) = widths[i] else { continue };
-                if w <= f64::EPSILON || text.trim().is_empty() {
-                    continue;
-                }
-                let px = scaled_fit_px(
-                    max_fit_font_px(w, box_h * LINE_HEIGHT / ROW_TEXT_LINE_HEIGHT, &text),
-                    opts,
-                );
-                font_px = Some(match font_px {
-                    Some(cur) => cur.min(px),
-                    None => px,
-                });
-            }
-        }
-    }
+    let mut font_px = forced_font.or_else(|| row_text_fit_font_px(row_kids, &widths, box_h, opts));
 
     font_px = font_px.map(|fp| {
         if forced_font.is_some() {
@@ -379,8 +357,44 @@ fn row_max_font_px(
 ) -> f64 {
     let n_gaps = row_kids.len().saturating_sub(1) as f64;
     let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
-    let hi = (box_h / ROW_TEXT_LINE_HEIGHT).max(1.0);
-    finalize_row_font_px(hi, box_h, row_kids, &widths, avail, grow_len, opts)
+    if row_has_barcode(row_kids) {
+        let hi = (box_h / ROW_TEXT_LINE_HEIGHT).max(1.0);
+        finalize_row_font_px(hi, box_h, row_kids, &widths, avail, grow_len, opts)
+    } else {
+        row_text_fit_font_px(row_kids, &widths, box_h, opts)
+            .unwrap_or((box_h / ROW_TEXT_LINE_HEIGHT).max(1.0))
+    }
+}
+
+fn row_text_fit_font_px(
+    row_kids: &[Child],
+    widths: &[Option<f64>],
+    box_h: f64,
+    opts: &TranspileOptions,
+) -> Option<f64> {
+    let text_budget_h = box_h * LINE_HEIGHT / ROW_TEXT_LINE_HEIGHT;
+    let mut font_px: Option<f64> = None;
+    for (i, kid) in row_kids.iter().enumerate() {
+        let Child::Text { inner } = kid else {
+            continue;
+        };
+        if !is_fit_measurable_html(inner) {
+            continue;
+        }
+        let text = html_to_plain_text(inner);
+        let Some(w) = widths[i] else {
+            continue;
+        };
+        if w <= f64::EPSILON || text.trim().is_empty() {
+            continue;
+        }
+        let px = scaled_fit_px(max_fit_font_px(w, text_budget_h, &text), opts);
+        font_px = Some(match font_px {
+            Some(cur) => cur.min(px),
+            None => px,
+        });
+    }
+    font_px
 }
 
 fn text_sample_line(inner: &str) -> String {
@@ -1142,5 +1156,43 @@ mod tests {
         let fit = apply_layout_fit(body, &fill_opts());
         assert!(fit.body.contains("data-fit-width="), "{}", fit.body);
         assert!(fit.css.contains("font-size:"), "{}", fit.css);
+    }
+
+    #[test]
+    fn column_text_row_text_grows_each_line() {
+        let body = r#"<div class="lbl-label"><div class="lbl-text">a</div><div class="lbl-row lbl-center"><span class="lbl-text"><span class="lbl-text-inlines">b </span></span><div class="lbl-qr" data-qr="https://example.com"></div></div><div class="lbl-text">c</div></div>"#;
+        let fit = apply_layout_fit(body, &fill_opts());
+        let row_font: f64 = fit
+            .css
+            .split(".lbl-row>.lbl-text{font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let line1_font: f64 = fit
+            .css
+            .split(".lbl-label>.lbl-text:nth-child(1){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let line3_font: f64 = fit
+            .css
+            .split(".lbl-label>.lbl-text:nth-child(3){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        assert!(
+            row_font > 20.0,
+            "row font too small: {row_font}, css={}",
+            fit.css
+        );
+        assert!(line1_font > 20.0, "line1 font too small: {line1_font}");
+        assert!(line3_font > 20.0, "line3 font too small: {line3_font}");
+        assert!(
+            (row_font - line1_font).abs() < row_font * 0.05,
+            "stacked lines and row text should share font: row={row_font} line1={line1_font}"
+        );
     }
 }

@@ -211,28 +211,68 @@ impl Document {
     /// Render the authoring HTML fragment (the `<div class="lbl-label">` root
     /// and its children) consumed by `lbl-transpile-html`.
     pub fn to_authoring_html(&self) -> String {
+        let pieces = expand_layout_pieces(&self.blocks);
         let mut out = String::from("<div class=\"lbl-label\">");
         let mut i = 0;
-        while i < self.blocks.len() {
-            if is_inline_flow_block(&self.blocks[i]) {
+        while i < pieces.len() {
+            if let LayoutPiece::Line(line) = &pieces[i] {
+                if line_followed_by_inline_widget(&pieces, i) {
+                    out.push_str("<div class=\"lbl-row lbl-center\">");
+                    out.push_str(&wrap_lbl_text_inlines(&text_to_html(line)));
+                    i += 1;
+                    while i < pieces.len() {
+                        let LayoutPiece::Inline(block) = &pieces[i] else {
+                            break;
+                        };
+                        if !is_inline_flow_block(block) {
+                            break;
+                        }
+                        out.push_str(&block.to_authoring_html());
+                        i += 1;
+                    }
+                    out.push_str("</div>");
+                    continue;
+                }
+                out.push_str(&line_piece_html(line));
+                i += 1;
+                continue;
+            }
+
+            let LayoutPiece::Inline(block) = &pieces[i] else {
+                i += 1;
+                continue;
+            };
+            if is_inline_flow_block(block) {
                 let start = i;
-                while i < self.blocks.len() && is_inline_flow_block(&self.blocks[i]) {
+                while i < pieces.len() {
+                    let LayoutPiece::Inline(b) = &pieces[i] else {
+                        break;
+                    };
+                    if !is_inline_flow_block(b) {
+                        break;
+                    }
                     i += 1;
                 }
-                let group = &self.blocks[start..i];
+                let group = &pieces[start..i];
                 if group.len() == 1 {
-                    out.push_str(&group[0].to_authoring_html());
-                } else if is_text_run_group(group) {
-                    out.push_str(&text_run_group_html(group));
+                    let LayoutPiece::Inline(block) = &group[0] else {
+                        continue;
+                    };
+                    out.push_str(&block.to_authoring_html());
+                } else if is_text_run_piece_group(group) {
+                    out.push_str(&text_run_piece_group_html(group));
                 } else {
                     out.push_str("<div class=\"lbl-row lbl-center\">");
-                    for block in group {
+                    for piece in group {
+                        let LayoutPiece::Inline(block) = piece else {
+                            continue;
+                        };
                         out.push_str(&block.to_authoring_html());
                     }
                     out.push_str("</div>");
                 }
             } else {
-                out.push_str(&self.blocks[i].to_authoring_html());
+                out.push_str(&block.to_authoring_html());
                 i += 1;
             }
         }
@@ -398,6 +438,42 @@ fn flush_text(buf: &mut String, blocks: &mut Vec<Block>) {
     buf.clear();
 }
 
+/// Layout segment after splitting multiline text at newlines.
+enum LayoutPiece {
+    /// One source line (block-level when not paired with a widget).
+    Line(String),
+    /// Parsed block without embedded newlines.
+    Inline(Block),
+}
+
+fn expand_layout_pieces(blocks: &[Block]) -> Vec<LayoutPiece> {
+    let mut out = Vec::new();
+    for block in blocks {
+        match block {
+            Block::Text(t) if t.contains('\n') => {
+                for line in t.split('\n').filter(|line| !line.is_empty()) {
+                    out.push(LayoutPiece::Line(line.to_string()));
+                }
+            }
+            other => out.push(LayoutPiece::Inline(other.clone())),
+        }
+    }
+    out
+}
+
+fn line_followed_by_inline_widget(pieces: &[LayoutPiece], line_index: usize) -> bool {
+    matches!(
+        pieces.get(line_index + 1),
+        Some(LayoutPiece::Inline(
+            Block::Qr { .. } | Block::Barcode { .. } | Block::Image(_)
+        ))
+    )
+}
+
+fn line_piece_html(line: &str) -> String {
+    format!(r#"<div class="lbl-text">{}</div>"#, text_to_html(line))
+}
+
 fn is_inline_flow_block(block: &Block) -> bool {
     match block {
         Block::Text(t) => !t.contains('\n'),
@@ -410,20 +486,23 @@ fn is_inline_flow_block(block: &Block) -> bool {
     }
 }
 
-/// Consecutive inline text styling blocks (plain, color, size, font) without QR/barcode/image.
-fn is_text_run_group(blocks: &[Block]) -> bool {
-    blocks.iter().all(|b| {
+fn is_text_run_piece_group(pieces: &[LayoutPiece]) -> bool {
+    pieces.iter().all(|piece| {
         matches!(
-            b,
-            Block::Text(_) | Block::Sized { .. } | Block::Font { .. } | Block::Color { .. }
+            piece,
+            LayoutPiece::Inline(
+                Block::Text(_) | Block::Sized { .. } | Block::Font { .. } | Block::Color { .. }
+            )
         )
     })
 }
 
-fn text_run_group_html(blocks: &[Block]) -> String {
+fn text_run_piece_group_html(pieces: &[LayoutPiece]) -> String {
     let mut inner = String::new();
-    for block in blocks {
-        inner.push_str(&block.to_inline_html());
+    for piece in pieces {
+        if let LayoutPiece::Inline(block) = piece {
+            inner.push_str(&block.to_inline_html());
+        }
     }
     wrap_lbl_text_inlines(&inner)
 }
@@ -894,6 +973,26 @@ mod tests {
         let html = doc.to_authoring_html();
         assert!(html.contains("lbl-row"), "{html}");
         assert!(html.contains("<qr>https://track/42</qr>"), "{html}");
+    }
+
+    #[test]
+    fn multiline_text_with_qr_on_same_line_uses_row() {
+        let doc = Document::parse(
+            "a\nb {{qr light=\"#FFFFFF\"}}https://example.com{{/qr}}\nc",
+            false,
+        );
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "<div class=\"lbl-row lbl-center\"><span class=\"lbl-text\"><span class=\"lbl-text-inlines\">b </span></span><qr light=\"#FFFFFF\">https://example.com</qr></div>"
+            ),
+            "{html}"
+        );
+        assert_eq!(
+            html.matches("<div class=\"lbl-text\">").count(),
+            2,
+            "{html}"
+        );
     }
 
     #[test]
