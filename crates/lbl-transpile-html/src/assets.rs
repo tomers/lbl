@@ -45,14 +45,14 @@ html,body{margin:0;padding:0}
 .lbl-row>.lbl-col{flex:1 1 auto}
 .lbl-row .lbl-barcode{width:auto;height:auto}
 .lbl-row .lbl-barcode svg{display:block;width:auto;max-width:none;height:auto}
-.lbl-row .lbl-qr svg{display:block;width:100%;height:100%}
+.lbl-row .lbl-qr svg{display:block;width:100%;height:100%;object-fit:contain}
 .lbl-col{display:flex;flex-direction:column}
 .lbl-center{align-items:center;justify-content:center}
 .lbl-between{justify-content:space-between}
 .lbl-grow{flex:1 1 auto}
 .lbl-wrap{flex-wrap:wrap}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
-.lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;height:auto}
+.lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
 .lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}
 .lbl-label h1{font-size:1.35em;font-weight:700}
@@ -113,12 +113,20 @@ pub const LABEL_FIT_CODE_CSS: &str = r#"
 .lbl-row>.lbl-barcode[data-fit-width],.lbl-row>.lbl-qr[data-fit-width]{
   overflow:visible;
 }
-.lbl-row>.lbl-barcode[data-fit-width] svg,.lbl-row>.lbl-qr[data-fit-width] svg{
+.lbl-row>.lbl-barcode[data-fit-width] svg{
   display:block;
   width:100%;
   height:auto;
   max-width:none;
   max-height:none;
+}
+.lbl-row>.lbl-qr[data-fit-width] svg{
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:none;
+  max-height:none;
+  object-fit:contain;
 }
 "#;
 
