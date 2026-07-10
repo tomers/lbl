@@ -653,6 +653,7 @@ dpi = 180.0
 max_width_mm = 12.0
 feed_trail_mm = 8.1
 feed_reverse = true
+head_printable_height_mm = 8.2
 default_media = "45013"
 supported_media = [
   "43613",
@@ -687,6 +688,7 @@ dpi = 180.0
 max_width_mm = 12.0
 feed_trail_mm = 8.1
 feed_reverse = true
+head_printable_height_mm = 8.2
 default_media = "45013"
 supported_media = [
   "43613",

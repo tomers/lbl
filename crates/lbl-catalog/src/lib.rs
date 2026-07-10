@@ -481,6 +481,7 @@ mod tests {
         assert!(lm280.iter().any(|e| e.matches_key("S0720530S")));
         let printer = catalog.lookup_printer("LM280").unwrap();
         assert_eq!(printer.feed_trail_mm, Some(8.1));
+        assert_eq!(printer.head_printable_height_mm, Some(8.2));
         assert!(printer.feed_reverse);
         assert_eq!(printer.default_media.as_deref(), Some("45013"));
     }
