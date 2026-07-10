@@ -31,10 +31,10 @@ impl QrErrorCorrection {
     /// `quartile`, `high`), and approximate percentages (`7%`, `15%`, …).
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
-            "l" | "low" | "7" | "7%" => Some(Self::L),
-            "m" | "medium" | "15" | "15%" => Some(Self::M),
-            "q" | "quartile" | "25" | "25%" => Some(Self::Q),
-            "h" | "high" | "30" | "30%" => Some(Self::H),
+            "7" | "7%" | "l" | "low" => Some(Self::L),
+            "15" | "15%" | "m" | "medium" => Some(Self::M),
+            "25" | "25%" | "q" | "quartile" => Some(Self::Q),
+            "30" | "30%" | "h" | "high" => Some(Self::H),
             _ => None,
         }
     }
@@ -117,20 +117,20 @@ fn apply_option(options: &mut QrOptions, token: &str) {
     let key = key.trim().to_ascii_lowercase();
     let val = unquote(val.trim());
     match key.as_str() {
+        "dark" => {
+            options.dark = Some(val.to_string());
+        }
         "ec" | "error-correction" | "errorcorrectionlevel" => {
             options.error_correction = QrErrorCorrection::parse(val);
+        }
+        "light" => {
+            options.light = Some(val.to_string());
         }
         "margin" => {
             options.margin = val.parse().ok();
         }
-        "size_mm" | "size-mm" | "size" => {
+        "size" | "size-mm" | "size_mm" => {
             options.size_mm = val.parse().ok().filter(|v| *v > 0.0);
-        }
-        "dark" => {
-            options.dark = Some(val.to_string());
-        }
-        "light" => {
-            options.light = Some(val.to_string());
         }
         _ => {}
     }

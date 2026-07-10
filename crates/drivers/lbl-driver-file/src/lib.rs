@@ -28,8 +28,8 @@ impl VirtualExportMode {
     /// Parse a CLI/config value (case-insensitive).
     pub fn parse(name: &str) -> Result<Self, String> {
         Ok(match name.trim().to_ascii_lowercase().as_str() {
-            "raster" | "bitmap" | "image" => VirtualExportMode::Raster,
-            "vector" | "pdf" => VirtualExportMode::Vector,
+            "bitmap" | "image" | "raster" => VirtualExportMode::Raster,
+            "pdf" | "vector" => VirtualExportMode::Vector,
             other => return Err(format!("unknown export mode: {other}")),
         })
     }
@@ -83,12 +83,12 @@ impl MediaType {
     /// Parse a CLI-friendly media-type name (case-insensitive).
     pub fn parse(name: &str) -> Result<Self, String> {
         Ok(match name.trim().to_ascii_lowercase().as_str() {
-            "png" => MediaType::Png,
             "bmp" => MediaType::Bmp,
-            "tif" | "tiff" => MediaType::Tiff,
             "gif" => MediaType::Gif,
             "pbm" => MediaType::Pbm,
             "pdf" => MediaType::Pdf,
+            "png" => MediaType::Png,
+            "tif" | "tiff" => MediaType::Tiff,
             other => return Err(format!("unknown media type: {other}")),
         })
     }

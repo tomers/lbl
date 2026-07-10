@@ -775,16 +775,16 @@ fn default_dither() -> String {
 
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     Ok(match s.to_ascii_lowercase().as_str() {
-        "dymo" => Protocol::Dymo,
-        "dymolw" | "dymo-lw" | "lw550" => Protocol::DymoLw,
-        "escpos" | "esc/pos" => Protocol::EscPos,
-        "zpl" => Protocol::Zpl,
-        "tspl" => Protocol::Tspl,
-        "niimbot" | "d110" | "d11" | "b1" => Protocol::Niimbot,
-        "brotherql" | "brother-ql" | "brother_ql" | "ql820" => Protocol::BrotherQl,
-        "virtual" | "file" => Protocol::Virtual,
+        "b1" | "d11" | "d110" | "niimbot" => Protocol::Niimbot,
+        "brother-ql" | "brother_ql" | "brotherql" | "ql820" => Protocol::BrotherQl,
         "console" | "term" => Protocol::Console,
+        "dymo" => Protocol::Dymo,
+        "dymo-lw" | "dymolw" | "lw550" => Protocol::DymoLw,
+        "esc/pos" | "escpos" => Protocol::EscPos,
+        "file" | "virtual" => Protocol::Virtual,
         "html" => Protocol::Html,
+        "tspl" => Protocol::Tspl,
+        "zpl" => Protocol::Zpl,
         other => {
             return Err(ApiError(
                 StatusCode::BAD_REQUEST,

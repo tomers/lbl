@@ -546,6 +546,11 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         return None;
     }
     match kind.as_str() {
+        "barcode" => Some(barcode_from_spec(rest)),
+        "color" | "fg" | "foreground" | "tc" | "text-color" => color_from_spec(rest),
+        "ff" | "font" | "font-family" => font_from_spec(rest),
+        "font-size" | "fs" | "size" => sized_from_spec(rest),
+        "image" | "img" => Some(Block::Image(rest.to_string())),
         "qr" => {
             let payload = rest.trim();
             if payload.is_empty() {
@@ -556,11 +561,6 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
                 options: QrOptions::default(),
             })
         }
-        "barcode" => Some(barcode_from_spec(rest)),
-        "image" | "img" => Some(Block::Image(rest.to_string())),
-        "size" | "font-size" | "fs" => sized_from_spec(rest),
-        "font" | "font-family" | "ff" => font_from_spec(rest),
-        "color" | "fg" | "foreground" | "text-color" | "tc" => color_from_spec(rest),
         _ => None,
     }
 }

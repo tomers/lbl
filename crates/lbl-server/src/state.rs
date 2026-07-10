@@ -41,7 +41,7 @@ fn host_discovery_enabled_from_env() -> bool {
     match std::env::var("LBL_HOST_DISCOVERY") {
         Ok(v) => !matches!(
             v.trim().to_ascii_lowercase().as_str(),
-            "0" | "false" | "off" | "no" | "disabled"
+            "0" | "disabled" | "false" | "no" | "off"
         ),
         Err(_) => true,
     }
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn host_discovery_respects_disable_values() {
-        for v in ["0", "false", "off", "no", "disabled"] {
+        for v in ["0", "disabled", "false", "no", "off"] {
             std::env::set_var("LBL_HOST_DISCOVERY", v);
             assert!(
                 !host_discovery_enabled_from_env(),

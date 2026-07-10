@@ -68,9 +68,9 @@ pub fn infer_template_format_from_path(template: &str) -> Option<TemplateFormat>
     }
     let ext = std::path::Path::new(template).extension()?.to_str()?;
     match ext.to_ascii_lowercase().as_str() {
-        "html" | "htm" | "lbl" => Some(TemplateFormat::Html),
-        "md" | "markdown" => Some(TemplateFormat::Markdown),
-        "txt" | "text" => Some(TemplateFormat::Text),
+        "htm" | "html" | "lbl" => Some(TemplateFormat::Html),
+        "markdown" | "md" => Some(TemplateFormat::Markdown),
+        "text" | "txt" => Some(TemplateFormat::Text),
         _ => None,
     }
 }

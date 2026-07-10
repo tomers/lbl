@@ -56,8 +56,8 @@ impl Algorithm {
     pub fn parse(name: &str) -> Result<Self, DitherError> {
         Ok(match name.to_ascii_lowercase().as_str() {
             "auto" => Algorithm::Auto,
-            "floyd-steinberg" | "floyd" | "fs" => Algorithm::FloydSteinberg,
-            "ordered" | "bayer" => Algorithm::Ordered,
+            "bayer" | "ordered" => Algorithm::Ordered,
+            "floyd" | "floyd-steinberg" | "fs" => Algorithm::FloydSteinberg,
             "none" | "threshold" => Algorithm::Threshold(128),
             other => return Err(DitherError::UnknownAlgorithm(other.to_string())),
         })

@@ -335,9 +335,9 @@ macro_rules! impl_axis_align {
             /// `bottom` or `left` / `right` aliases where sensible).
             pub fn parse(s: &str) -> Option<Self> {
                 match s.trim().to_ascii_lowercase().as_str() {
-                    "start" | "left" | "top" => Some(Self::Start),
+                    "bottom" | "end" | "right" => Some(Self::End),
                     "center" | "centre" | "middle" => Some(Self::Center),
-                    "end" | "right" | "bottom" => Some(Self::End),
+                    "left" | "start" | "top" => Some(Self::Start),
                     _ => None,
                 }
             }
