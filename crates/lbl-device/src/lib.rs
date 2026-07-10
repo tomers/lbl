@@ -26,6 +26,8 @@ pub mod media;
 pub mod status;
 pub mod transport;
 pub mod troubleshoot;
+#[cfg(feature = "usb")]
+pub mod zpl;
 
 #[cfg(feature = "ble")]
 pub mod ble;
@@ -50,6 +52,10 @@ pub use dymo_lw::{
 pub use status::{query_loaded_media_sku, query_print_status, status_supported, PrintStatus};
 #[cfg(feature = "usb")]
 pub use transport::{open_usb_bulk_session, UsbBulkSession, UsbTransport};
+#[cfg(feature = "usb")]
+pub use zpl::{
+    parse_host_status as parse_zpl_host_status, query_status as query_zpl_status, ZplHostStatus,
+};
 
 #[cfg(feature = "serial")]
 pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};

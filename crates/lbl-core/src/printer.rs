@@ -13,8 +13,13 @@ pub enum Protocol {
     Dymo,
     /// DYMO LabelWriter 550-series raster protocol (structured print job).
     DymoLw,
+    /// DYMO LabelWriter 450-series classic raster (SYN rows; not LW550 job framing).
+    #[serde(rename = "dymolwclassic")]
+    DymoLwClassic,
     /// ESC/POS thermal protocol.
     EscPos,
+    /// Phomemo M02-class (ESC/POS raster with vendor `1F 11` framing).
+    Phomemo,
     /// Zebra Programming Language.
     Zpl,
     /// TSC Printer Language.
@@ -226,7 +231,9 @@ mod tests {
         for p in [
             Protocol::Dymo,
             Protocol::DymoLw,
+            Protocol::DymoLwClassic,
             Protocol::EscPos,
+            Protocol::Phomemo,
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,
@@ -237,5 +244,10 @@ mod tests {
         assert!(!Protocol::Virtual.targets_print_head());
         assert!(!Protocol::Console.targets_print_head());
         assert!(!Protocol::Html.targets_print_head());
+    }
+
+    #[test]
+    fn dymo_lw_classic_is_row_oriented() {
+        assert!(!Protocol::DymoLwClassic.bitmap_width_is_feed());
     }
 }

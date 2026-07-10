@@ -172,7 +172,11 @@ impl NiimbotDriver {
     pub fn task_for_printer_key(key: &str) -> Option<NiimbotTask> {
         let k = key.to_ascii_lowercase();
         match k.as_str() {
-            "b1" | "b1 pro" | "b1pro" | "m2-h" | "m2h" => Some(NiimbotTask::B1),
+            // Protocol 3 / 203 dpi B-series.
+            "b1" | "b2" | "b21" | "b21s" | "b203" | "b3s" | "b3s_p" => Some(NiimbotTask::B1),
+            // 300 dpi Pro / H variants use the V4 task.
+            "b1 pro" | "b1pro" | "b1_pro" | "b21 pro" | "b21pro" | "b21_pro" | "d11_h" | "d11h"
+            | "d11_pro" | "d11pro" | "d110_m" | "d110m" => Some(NiimbotTask::V4),
             _ => None,
         }
     }
@@ -726,11 +730,34 @@ mod tests {
     }
 
     #[test]
-    fn task_for_printer_key_maps_b1_models() {
-        assert_eq!(
-            NiimbotDriver::task_for_printer_key("B1"),
-            Some(NiimbotTask::B1)
-        );
-        assert_eq!(NiimbotDriver::task_for_printer_key("d110"), None);
+    fn task_for_printer_key_maps_b_series_to_b1() {
+        for key in ["B1", "B2", "B21", "B21S", "B203", "B3S", "B3S_P"] {
+            assert_eq!(
+                NiimbotDriver::task_for_printer_key(key),
+                Some(NiimbotTask::B1),
+                "{key} should map to B1"
+            );
+        }
+    }
+
+    #[test]
+    fn task_for_printer_key_maps_pro_h_to_v4() {
+        for key in [
+            "B1 Pro", "B1Pro", "B1_PRO", "B21 Pro", "B21Pro", "B21_PRO", "D11_H", "D11H",
+            "D11_PRO", "D11Pro", "D110_M", "D110M",
+        ] {
+            assert_eq!(
+                NiimbotDriver::task_for_printer_key(key),
+                Some(NiimbotTask::V4),
+                "{key} should map to V4"
+            );
+        }
+    }
+
+    #[test]
+    fn task_for_printer_key_no_match_for_plain_models() {
+        assert_eq!(NiimbotDriver::task_for_printer_key("D110"), None);
+        assert_eq!(NiimbotDriver::task_for_printer_key("D101"), None);
+        assert_eq!(NiimbotDriver::task_for_printer_key("unknown"), None);
     }
 }

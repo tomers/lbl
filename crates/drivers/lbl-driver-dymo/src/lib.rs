@@ -17,8 +17,10 @@
 //!
 //! `lbl` is not affiliated with DYMO; see the repository disclaimer.
 
+pub mod lw450;
 pub mod lw550;
 
+pub use lw450::LabelWriter450Driver;
 pub use lw550::LabelWriter550Driver;
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};

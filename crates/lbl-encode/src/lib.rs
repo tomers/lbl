@@ -52,7 +52,9 @@ impl Registry {
         let mut registry = Self::new();
         registry.register(Box::new(lbl_driver_dymo::DymoDriver::new()));
         registry.register(Box::new(lbl_driver_dymo::LabelWriter550Driver::new()));
+        registry.register(Box::new(lbl_driver_dymo::LabelWriter450Driver::new()));
         registry.register(Box::new(lbl_driver_escpos::EscPosDriver::new()));
+        registry.register(Box::new(lbl_driver_escpos::PhomemoDriver::new()));
         registry.register(Box::new(lbl_driver_zpl::ZplDriver::new()));
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::new()));
@@ -88,7 +90,9 @@ mod tests {
         for p in [
             Protocol::Dymo,
             Protocol::DymoLw,
+            Protocol::DymoLwClassic,
             Protocol::EscPos,
+            Protocol::Phomemo,
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,

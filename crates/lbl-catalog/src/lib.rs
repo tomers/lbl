@@ -518,9 +518,11 @@ mod tests {
             catalog.resolve_dpi(Some("D110"), Protocol::Niimbot, CLI_DEFAULT_DPI),
             203.0
         );
+        // Niimbot catalog includes both 203 dpi and 300 dpi models (Pro/H series),
+        // so protocol-only DPI lookup falls back to the CLI default.
         assert_eq!(
             catalog.resolve_dpi(None, Protocol::Niimbot, CLI_DEFAULT_DPI),
-            203.0
+            CLI_DEFAULT_DPI
         );
         assert_eq!(
             catalog.resolve_dpi(Some("LabelWriter 550"), Protocol::DymoLw, CLI_DEFAULT_DPI),
@@ -594,7 +596,11 @@ mod tests {
         assert!(err.contains("ambiguous printer '550'"));
         assert!(err.contains("DYMO LabelWriter 550"));
         assert!(err.contains("DYMO LabelWriter 550 Turbo"));
-        assert!(err.contains("--printer Turbo") || err.contains("--printer turbo"));
+        // "Turbo" alone also matches LabelWriter 450 Turbo.
+        assert!(
+            err.contains("--printer 550 Turbo") || err.contains("--printer 550 turbo"),
+            "expected '550 Turbo' suggestion, got:\n{err}"
+        );
     }
 
     #[test]

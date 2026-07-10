@@ -780,7 +780,9 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "console" | "term" => Protocol::Console,
         "dymo" => Protocol::Dymo,
         "dymo-lw" | "dymolw" | "lw550" => Protocol::DymoLw,
+        "dymo-lw-classic" | "dymolwclassic" | "lw450" => Protocol::DymoLwClassic,
         "esc/pos" | "escpos" => Protocol::EscPos,
+        "phomemo" | "m02" => Protocol::Phomemo,
         "file" | "virtual" => Protocol::Virtual,
         "html" => Protocol::Html,
         "tspl" => Protocol::Tspl,
@@ -1211,6 +1213,7 @@ fn handshake_for_protocol(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Dymo => "dymo_d1",
         Protocol::DymoLw => "dymo_lw",
+        Protocol::DymoLwClassic => "fire_and_forget",
         Protocol::Niimbot => "niimbot_poll",
         _ => "fire_and_forget",
     }
@@ -1293,7 +1296,8 @@ pub fn browser_transport_hints(
 fn default_browser_api(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Niimbot => "web_serial",
-        Protocol::Dymo | Protocol::DymoLw => "webusb",
+        Protocol::Phomemo => "web_bluetooth",
+        Protocol::Dymo | Protocol::DymoLw | Protocol::DymoLwClassic => "webusb",
         _ => "webusb",
     }
 }

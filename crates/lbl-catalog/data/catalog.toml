@@ -625,6 +625,27 @@ name         = "Brother DK-11241 62x29mm Multi-Purpose Labels"
 purchase_url = "https://www.brother.com/"
 media        = { width_mm = 62.0, length = { kind = "fixed", mm = 29.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
+[[entries]]
+brand        = "Brother"
+keys         = ["DK-22243", "DK22243"]
+name         = "Brother DK-22243 102mm Continuous White Paper"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 102.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["DK-11240", "DK11240"]
+name         = "Brother DK-11240 102x51mm Shipping Labels"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["DK-11247", "DK11247"]
+name         = "Brother DK-11247 103x164mm Shipping Labels"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 103.0, length = { kind = "fixed", mm = 164.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
 # --- Generic / industrial die-cut sizes (Zebra ZPL, TSC TSPL, clones) --------
 
 [[entries]]
@@ -808,6 +829,134 @@ supported_media = [
   "30339",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x002A }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 450"]
+name = "DYMO LabelWriter 450"
+protocol = "dymolwclassic"
+dpi = 300.0
+max_width_mm = 57.0
+default_media = "11352"
+supported_media = [
+  "99010",
+  "99012",
+  "99013",
+  "99014",
+  "99015",
+  "99017",
+  "99018",
+  "99019",
+  "11352",
+  "11353",
+  "11354",
+  "11355",
+  "2133399",
+  "2133400",
+  "30256",
+  "2112283",
+  "2112284",
+  "2112285",
+  "2112286",
+  "2112289",
+  "2112290",
+  "2191635",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0020 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 450 Turbo"]
+name = "DYMO LabelWriter 450 Turbo"
+protocol = "dymolwclassic"
+dpi = 300.0
+max_width_mm = 57.0
+default_media = "11352"
+supported_media = [
+  "99010",
+  "99012",
+  "99013",
+  "99014",
+  "99015",
+  "99017",
+  "99018",
+  "99019",
+  "11352",
+  "11353",
+  "11354",
+  "11355",
+  "2133399",
+  "2133400",
+  "30256",
+  "2112283",
+  "2112284",
+  "2112285",
+  "2112286",
+  "2112289",
+  "2112290",
+  "2191635",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0021 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelWriter 450 Twin Turbo"]
+name = "DYMO LabelWriter 450 Twin Turbo"
+protocol = "dymolwclassic"
+dpi = 300.0
+max_width_mm = 57.0
+default_media = "11352"
+supported_media = [
+  "99010",
+  "99012",
+  "99013",
+  "99014",
+  "99015",
+  "99017",
+  "99018",
+  "99019",
+  "11352",
+  "11353",
+  "11354",
+  "11355",
+  "2133399",
+  "2133400",
+  "30256",
+  "2112283",
+  "2112284",
+  "2112285",
+  "2112286",
+  "2112289",
+  "2112290",
+  "2191635",
+  "30326",
+  "30327",
+  "30332",
+  "30334",
+  "30339",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0022 }]
+
+[[printers]]
+brand           = "DYMO"
+keys            = ["LabelWriter 4XL"]
+name            = "DYMO LabelWriter 4XL"
+protocol        = "dymolwclassic"
+dpi             = 300.0
+max_width_mm    = 104.0
+default_media   = "1744907"
+supported_media = ["1744907", "2166659", "99010", "99012", "99014", "99015", "11352", "30256"]
+connections     = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001F }]
 
 [[printers]]
 brand = "DYMO"
@@ -999,6 +1148,39 @@ default_media   = "70x50"
 supported_media = ["70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
 connections     = [{ kind = "serial" }, { kind = "ble", name = "B3S" }]
 
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["B1 Pro", "B1Pro", "B1_PRO"]
+name            = "NIIMBOT B1 Pro"
+protocol        = "niimbot"
+dpi             = 300.0
+max_width_mm    = 48.0
+default_media   = "50x30"
+supported_media = ["50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["B21 Pro", "B21Pro", "B21_PRO"]
+name            = "NIIMBOT B21 Pro"
+protocol        = "niimbot"
+dpi             = 300.0
+max_width_mm    = 50.0
+default_media   = "50x30"
+supported_media = ["50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["D11_H", "D11H", "D11_PRO", "D11Pro"]
+name            = "NIIMBOT D11_H"
+protocol        = "niimbot"
+dpi             = 300.0
+max_width_mm    = 12.0
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "D11" }]
+
 # Brother QL-800 family shares the same 720-dot / 300 dpi raster dialect (≤ 62 mm DK).
 
 [[printers]]
@@ -1107,6 +1289,228 @@ supported_media = [
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209d }]
 
 [[printers]]
+brand = "Brother"
+keys = ["QL-700", "QL700"]
+name = "Brother QL-700"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2042 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-710W", "QL710W"]
+name = "Brother QL-710W"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2043 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-720NW", "QL720NW"]
+name = "Brother QL-720NW"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2044 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-1100", "QL1100"]
+name = "Brother QL-1100"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 103.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11240"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+  "DK-22243",
+  "DK-11240",
+  "DK-11247",
+  "102x152",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a7 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-1110NWB", "QL-1110NWBc", "QL1110NWB"]
+name = "Brother QL-1110NWB"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 103.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11240"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+  "DK-22243",
+  "DK-11240",
+  "DK-11247",
+  "102x152",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a8 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-1115NWB", "QL1115NWB"]
+name = "Brother QL-1115NWB"
+protocol = "brotherql"
+dpi = 300.0
+max_width_mm = 103.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11240"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11221",
+  "DK-11241",
+  "DK-22243",
+  "DK-11240",
+  "DK-11247",
+  "102x152",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20ab }]
+
+[[printers]]
 brand           = "Zebra"
 keys            = ["ZD220", "ZD220d"]
 name            = "Zebra ZD220"
@@ -1196,3 +1600,15 @@ max_width_mm    = 112.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
 connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+
+
+[[printers]]
+brand           = "Phomemo"
+keys            = ["M02", "M02S", "M02 Pro", "M02Pro"]
+name            = "Phomemo M02"
+protocol        = "phomemo"
+dpi             = 203.0
+max_width_mm    = 53.0
+default_media   = "cont-54"
+supported_media = ["cont-54", "50x25", "50x30", "40x30"]
+connections     = [{ kind = "ble", name = "M02" }]

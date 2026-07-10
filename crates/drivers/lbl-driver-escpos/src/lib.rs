@@ -4,6 +4,13 @@
 //! the [`MonoBitmap`] layout (rows packed MSB-first, `1` = printed dot). The
 //! stream is: `ESC @` (init), `GS v 0` raster, a short feed, then an optional
 //! `GS V` cut.
+//!
+//! Also hosts [`PhomemoDriver`] for Phomemo M02-class printers that wrap the
+//! same raster command in vendor `1F 11` framing.
+
+pub mod phomemo;
+
+pub use phomemo::PhomemoDriver;
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 

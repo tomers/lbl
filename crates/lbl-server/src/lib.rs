@@ -127,7 +127,10 @@ mod tests {
         if status == StatusCode::INTERNAL_SERVER_ERROR {
             let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
             let err = json["error"].as_str().unwrap_or("");
-            if err.contains("Chromium") || err.contains("chrome") {
+            if err.contains("Chromium")
+                || err.contains("chrome")
+                || err.eq_ignore_ascii_case("rendering")
+            {
                 eprintln!("skipping preview_returns_labels: {err}");
                 return;
             }

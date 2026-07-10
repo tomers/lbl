@@ -58,7 +58,9 @@ pub fn protocol_cli_name(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Dymo => "dymo",
         Protocol::DymoLw => "dymo-lw",
+        Protocol::DymoLwClassic => "dymo-lw-classic",
         Protocol::EscPos => "escpos",
+        Protocol::Phomemo => "phomemo",
         Protocol::Zpl => "zpl",
         Protocol::Tspl => "tspl",
         Protocol::Niimbot => "niimbot",

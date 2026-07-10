@@ -10,10 +10,15 @@ use crate::brother_ql::{self, BrotherQlStatus};
 use crate::dymo_lw::{self, Lw550PrintStatusView};
 #[cfg(feature = "usb")]
 use crate::transport::UsbTransport;
+#[cfg(feature = "usb")]
+use crate::zpl::{self, ZplHostStatus};
 
 /// Whether `protocol` supports print-engine status queries.
 pub fn status_supported(protocol: Protocol) -> bool {
-    matches!(protocol, Protocol::DymoLw | Protocol::BrotherQl)
+    matches!(
+        protocol,
+        Protocol::DymoLw | Protocol::BrotherQl | Protocol::Zpl
+    )
 }
 
 /// Print-engine status from a connected printer.
@@ -26,6 +31,9 @@ pub enum PrintStatus {
     /// Brother QL-series (`brother-ql`).
     #[serde(rename = "brother-ql")]
     BrotherQl(BrotherQlStatus),
+    /// Zebra ZPL (`zpl`).
+    #[serde(rename = "zpl")]
+    Zpl(ZplHostStatus),
 }
 
 /// Query print-engine status for `protocol` over USB.
@@ -42,6 +50,10 @@ pub fn query_print_status(
         Protocol::BrotherQl => {
             let status = brother_ql::query_status(usb)?;
             Ok(PrintStatus::BrotherQl(status))
+        }
+        Protocol::Zpl => {
+            let status = zpl::query_status(usb)?;
+            Ok(PrintStatus::Zpl(status))
         }
         other => Err(DeviceError::Transport(format!(
             "print-engine status not supported for protocol {other:?}"

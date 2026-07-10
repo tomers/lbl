@@ -448,7 +448,11 @@ enum ProtocolArg {
     Dymo,
     #[value(name = "dymo-lw", alias = "lw550")]
     DymoLw,
+    #[value(name = "dymo-lw-classic", aliases = ["dymolwclassic", "lw450"])]
+    DymoLwClassic,
     Escpos,
+    #[value(name = "phomemo", alias = "m02")]
+    Phomemo,
     Zpl,
     Tspl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
@@ -471,7 +475,9 @@ impl From<ProtocolArg> for Protocol {
         match p {
             ProtocolArg::Dymo => Protocol::Dymo,
             ProtocolArg::DymoLw => Protocol::DymoLw,
+            ProtocolArg::DymoLwClassic => Protocol::DymoLwClassic,
             ProtocolArg::Escpos => Protocol::EscPos,
+            ProtocolArg::Phomemo => Protocol::Phomemo,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
