@@ -6,7 +6,8 @@ PBM) into printer-native protocol bytes.
 `lbl-encode` owns the `Registry` of drivers. `Registry::with_builtin_drivers()`
 includes every bundled driver: DYMO LabelManager tape (`dymo`), DYMO
 LabelWriter 550 raster (`dymo-lw`), ESC/POS, ZPL, TSPL, NIIMBOT
-(`niimbot`; D11/D110 family), and the non-hardware preview drivers `virtual`
+(`niimbot`; D11/D110 family), Brother QL raster (`brother-ql`; QL-820NWB
+family), and the non-hardware preview drivers `virtual`
 (raster image file or vector PDF via the orchestrator) and `console` (terminal
 art). Additional drivers can be registered into a custom `Registry`.
 

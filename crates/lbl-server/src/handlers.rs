@@ -781,6 +781,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "zpl" => Protocol::Zpl,
         "tspl" => Protocol::Tspl,
         "niimbot" | "d110" | "d11" | "b1" => Protocol::Niimbot,
+        "brotherql" | "brother-ql" | "brother_ql" | "ql820" => Protocol::BrotherQl,
         "virtual" | "file" => Protocol::Virtual,
         "console" | "term" => Protocol::Console,
         "html" => Protocol::Html,

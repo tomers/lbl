@@ -23,6 +23,7 @@ members = [
   "crates/drivers/lbl-driver-zpl",
   "crates/drivers/lbl-driver-tspl",
   "crates/drivers/lbl-driver-niimbot",
+  "crates/drivers/lbl-driver-brother-ql",
   "crates/drivers/lbl-driver-file",
   "crates/drivers/lbl-driver-console",
 ]
@@ -37,28 +38,29 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 # Internal crates
-lbl-core           = { path = "crates/lbl-core" }
-lbl-cli            = { path = "crates/lbl-cli" }
-lbl-config         = { path = "crates/lbl-config" }
-lbl-catalog        = { path = "crates/lbl-catalog" }
-lbl-text           = { path = "crates/lbl-text" }
-lbl-markdown       = { path = "crates/lbl-markdown" }
-lbl-template       = { path = "crates/lbl-template" }
-lbl-transpile-html = { path = "crates/lbl-transpile-html" }
-lbl-render         = { path = "crates/lbl-render" }
-lbl-dither         = { path = "crates/lbl-dither" }
-lbl-pattern        = { path = "crates/lbl-pattern" }
-lbl-driver-api     = { path = "crates/drivers/lbl-driver-api" }
-lbl-driver-dymo    = { path = "crates/drivers/lbl-driver-dymo" }
-lbl-driver-escpos  = { path = "crates/drivers/lbl-driver-escpos" }
-lbl-driver-zpl     = { path = "crates/drivers/lbl-driver-zpl" }
-lbl-driver-tspl    = { path = "crates/drivers/lbl-driver-tspl" }
-lbl-driver-niimbot = { path = "crates/drivers/lbl-driver-niimbot" }
-lbl-driver-file    = { path = "crates/drivers/lbl-driver-file" }
-lbl-driver-console = { path = "crates/drivers/lbl-driver-console" }
-lbl-encode         = { path = "crates/lbl-encode" }
-lbl-device         = { path = "crates/lbl-device" }
-lbl-spool          = { path = "crates/lbl-spool" }
+lbl-core              = { path = "crates/lbl-core" }
+lbl-cli               = { path = "crates/lbl-cli" }
+lbl-config            = { path = "crates/lbl-config" }
+lbl-catalog           = { path = "crates/lbl-catalog" }
+lbl-text              = { path = "crates/lbl-text" }
+lbl-markdown          = { path = "crates/lbl-markdown" }
+lbl-template          = { path = "crates/lbl-template" }
+lbl-transpile-html    = { path = "crates/lbl-transpile-html" }
+lbl-render            = { path = "crates/lbl-render" }
+lbl-dither            = { path = "crates/lbl-dither" }
+lbl-pattern           = { path = "crates/lbl-pattern" }
+lbl-driver-api        = { path = "crates/drivers/lbl-driver-api" }
+lbl-driver-dymo       = { path = "crates/drivers/lbl-driver-dymo" }
+lbl-driver-escpos     = { path = "crates/drivers/lbl-driver-escpos" }
+lbl-driver-zpl        = { path = "crates/drivers/lbl-driver-zpl" }
+lbl-driver-tspl       = { path = "crates/drivers/lbl-driver-tspl" }
+lbl-driver-niimbot    = { path = "crates/drivers/lbl-driver-niimbot" }
+lbl-driver-brother-ql = { path = "crates/drivers/lbl-driver-brother-ql" }
+lbl-driver-file       = { path = "crates/drivers/lbl-driver-file" }
+lbl-driver-console    = { path = "crates/drivers/lbl-driver-console" }
+lbl-encode            = { path = "crates/lbl-encode" }
+lbl-device            = { path = "crates/lbl-device" }
+lbl-spool             = { path = "crates/lbl-spool" }
 
 # Shared third-party dependencies
 serde              = { version = "1", features = ["derive"] }

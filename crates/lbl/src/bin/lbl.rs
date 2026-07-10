@@ -453,6 +453,9 @@ enum ProtocolArg {
     Tspl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
     Niimbot,
+    /// Brother QL-series raster printers (QL-820NWB(c), …).
+    #[value(name = "brother-ql", alias = "brotherql")]
+    BrotherQl,
     /// Virtual printer: render to an image file instead of hardware.
     #[value(alias = "file")]
     Virtual,
@@ -472,6 +475,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
+            ProtocolArg::BrotherQl => Protocol::BrotherQl,
             ProtocolArg::Virtual => Protocol::Virtual,
             ProtocolArg::Console => Protocol::Console,
             ProtocolArg::Html => Protocol::Html,

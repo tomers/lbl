@@ -21,6 +21,8 @@ pub enum Protocol {
     Tspl,
     /// NIIMBOT thermal label protocol (packet-framed; D11/D110 family).
     Niimbot,
+    /// Brother QL-series raster protocol (QL-800 / QL-810W / QL-820NWB(c), …).
+    BrotherQl,
     /// A virtual printer that "prints" to an image file instead of hardware.
     ///
     /// The concrete output format (PNG, BMP, ...) is the printer's selected
@@ -228,6 +230,7 @@ mod tests {
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,
+            Protocol::BrotherQl,
         ] {
             assert!(p.targets_print_head(), "{p:?} should target a head");
         }

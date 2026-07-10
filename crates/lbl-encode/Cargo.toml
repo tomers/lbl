@@ -13,17 +13,18 @@ name = "lbl-encode"
 path = "src/bin/lbl-encode.rs"
 
 [dependencies]
-lbl-core           = { workspace = true }
-lbl-driver-api     = { workspace = true }
-lbl-driver-dymo    = { workspace = true }
-lbl-driver-escpos  = { workspace = true }
-lbl-driver-zpl     = { workspace = true }
-lbl-driver-tspl    = { workspace = true }
-lbl-driver-niimbot = { workspace = true }
-lbl-driver-file    = { workspace = true }
-lbl-driver-console = { workspace = true }
-thiserror          = { workspace = true }
-clap               = { workspace = true }
-lbl-cli            = { workspace = true }
-anyhow             = { workspace = true }
-lbl-pattern        = { workspace = true }
+lbl-core              = { workspace = true }
+lbl-driver-api        = { workspace = true }
+lbl-driver-dymo       = { workspace = true }
+lbl-driver-escpos     = { workspace = true }
+lbl-driver-zpl        = { workspace = true }
+lbl-driver-tspl       = { workspace = true }
+lbl-driver-niimbot    = { workspace = true }
+lbl-driver-brother-ql = { workspace = true }
+lbl-driver-file       = { workspace = true }
+lbl-driver-console    = { workspace = true }
+thiserror             = { workspace = true }
+clap                  = { workspace = true }
+lbl-cli               = { workspace = true }
+anyhow                = { workspace = true }
+lbl-pattern           = { workspace = true }

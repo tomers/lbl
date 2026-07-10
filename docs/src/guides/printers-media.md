@@ -182,3 +182,18 @@ On Linux you need a working Bluetooth adapter and the BlueZ daemon running.
 `lbl` talks to BlueZ over D-Bus; the `ble` feature vendors `libdbus` so you
 don't need to install `libdbus-1-dev`, but you may need permission to use
 Bluetooth (often membership in the `bluetooth` group).
+
+## Brother QL
+
+Brother QL printers (QL-820NWBc and the rest of the QL-800 family) use the
+`brother-ql` protocol: a 300 dpi, 720-dot raster stream with auto-cut. Connect
+over USB (`04f9:209d`) or raw TCP on port 9100:
+
+```bash
+lbl-catalog compatible --printer "QL-820NWBc"
+lbl print --media DK-11201 --protocol brother-ql --usb 04f9:209d --cut
+lbl print --media DK-22205 --protocol brother-ql --network 192.168.1.50:9100 --cut
+```
+
+DK die-cut and continuous sizes up to 62 mm ship in the bundled catalog under
+the `Brother` brand. Black/red two-color printing is not implemented yet.

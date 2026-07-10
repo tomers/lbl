@@ -449,6 +449,19 @@ mod tests {
     }
 
     #[test]
+    fn brother_ql820_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let printer = catalog.lookup_printer("QL-820NWBc").unwrap();
+        assert_eq!(printer.protocol, Protocol::BrotherQl);
+        assert_eq!(printer.dpi, 300.0);
+        assert!(printer.supports_cut);
+        assert!(catalog.supports_media("QL-820NWBc", "DK-11201"));
+        assert!(catalog.supports_media("QL820NWB", "DK-22205"));
+        let matched = catalog.match_usb(0x04f9, 0x209d).unwrap();
+        assert_eq!(matched.canonical_key(), "QL-820NWBc");
+    }
+
+    #[test]
     fn compatibility_filter_works() {
         let catalog = Catalog::bundled().unwrap();
         let lw = catalog.compatible_with("DYMO LabelWriter 550");
