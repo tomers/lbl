@@ -228,6 +228,9 @@ pub struct PrinterEntry {
     /// Mirror content along the feed axis when encoding (DYMO tape).
     #[serde(default)]
     pub feed_reverse: bool,
+    /// Printable head band height for DYMO LabelManager tape (8.2 mm).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_printable_height_mm: Option<f64>,
 }
 
 impl PrinterEntry {
@@ -290,6 +293,7 @@ impl PrinterEntry {
             feed_lead_mm: self.feed_lead_mm,
             feed_trail_mm: self.feed_trail_mm,
             feed_reverse: self.feed_reverse,
+            head_printable_height_mm: self.head_printable_height_mm,
         }
     }
 

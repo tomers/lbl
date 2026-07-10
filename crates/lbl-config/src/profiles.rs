@@ -107,6 +107,7 @@ mod tests {
                     feed_lead_mm: None,
                     feed_trail_mm: None,
                     feed_reverse: false,
+                    head_printable_height_mm: None,
                 },
             },
             transport: Transport::Usb {

@@ -172,6 +172,17 @@ pub struct PrinterCapabilities {
     /// Mirror content along the feed axis when encoding (DYMO tape).
     #[serde(default)]
     pub feed_reverse: bool,
+    /// When set, layout and encode use [`crate::dymo`] tape geometry: content
+    /// is fitted to the printable head band and padded to protocol column height.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_printable_height_mm: Option<f64>,
+}
+
+impl PrinterCapabilities {
+    /// Whether DYMO LabelManager tape dead-zone geometry applies.
+    pub fn uses_dymo_tape_geometry(&self) -> bool {
+        self.head_printable_height_mm.is_some()
+    }
 }
 
 impl Default for PrinterCapabilities {
@@ -184,6 +195,7 @@ impl Default for PrinterCapabilities {
             feed_lead_mm: None,
             feed_trail_mm: None,
             feed_reverse: false,
+            head_printable_height_mm: None,
         }
     }
 }
