@@ -21,6 +21,7 @@ pub mod lw550;
 
 pub use lw550::LabelWriter550Driver;
 
+use lbl_core::dymo;
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 const ESC: u8 = 0x1B;
@@ -53,6 +54,47 @@ impl DymoDriver {
             }
         }
         col
+    }
+
+    fn resample_height_nearest(src: &MonoBitmap, target_h: u32) -> MonoBitmap {
+        let mut out = MonoBitmap::new(src.width, target_h);
+        if src.height == 0 || target_h == 0 {
+            return out;
+        }
+        for y in 0..target_h {
+            let src_y = (y as u64 * src.height as u64 / target_h as u64) as u32;
+            let src_y = src_y.min(src.height.saturating_sub(1));
+            for x in 0..src.width {
+                if src.get(x, src_y) {
+                    out.set(x, y, true);
+                }
+            }
+        }
+        out
+    }
+
+    /// Fit a render-resolution bitmap into the protocol column for tape width.
+    fn fit_to_protocol_column(bitmap: &MonoBitmap, tape_mm: f64) -> MonoBitmap {
+        let protocol_h = dymo::protocol_head_dots(tape_mm);
+        if bitmap.height == protocol_h {
+            return bitmap.clone();
+        }
+        let v_margin = dymo::protocol_vertical_margin_dots(tape_mm);
+        let printable_h = dymo::protocol_printable_dots(tape_mm).max(1);
+        let scaled = if bitmap.height == printable_h {
+            bitmap.clone()
+        } else {
+            Self::resample_height_nearest(bitmap, printable_h)
+        };
+        let mut out = MonoBitmap::new(bitmap.width, protocol_h);
+        for y in 0..scaled.height.min(printable_h) {
+            for x in 0..scaled.width {
+                if scaled.get(x, y) {
+                    out.set(x, y + v_margin, true);
+                }
+            }
+        }
+        out
     }
 
     fn append_job(
@@ -127,10 +169,16 @@ impl Driver for DymoDriver {
             .map(|mm| Self::mm_to_feed_dots(mm * 2.0, dpi))
             .unwrap_or(0);
         let feed_reverse = ctx.capabilities.feed_reverse;
+        let tape_mm = ctx.job.media.width_mm;
+        let bitmap = if ctx.capabilities.uses_dymo_tape_geometry() {
+            Self::fit_to_protocol_column(bitmap, tape_mm)
+        } else {
+            bitmap.clone()
+        };
 
         let mut out = Vec::new();
         for _ in 0..ctx.copies() {
-            Self::append_job(&mut out, bitmap, lead_cols, trail_cols, feed_reverse)?;
+            Self::append_job(&mut out, &bitmap, lead_cols, trail_cols, feed_reverse)?;
         }
         Ok(out)
     }
@@ -213,5 +261,20 @@ mod tests {
         assert_eq!(bytes[10], 0x01);
         assert_eq!(bytes[11], SYN);
         assert_eq!(bytes[12], 0x80);
+    }
+
+    #[test]
+    fn twelve_mm_encode_uses_protocol_column_height() {
+        let mut bmp = MonoBitmap::new(1, 58);
+        bmp.set(0, 29, true);
+        let caps = PrinterCapabilities {
+            dpi: Dpi(180.0),
+            head_printable_height_mm: Some(8.2),
+            ..Default::default()
+        };
+        let job = ctx_job(1);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
+        assert_eq!(&bytes[6..9], &[ESC, b'D', 0x08]);
     }
 }
