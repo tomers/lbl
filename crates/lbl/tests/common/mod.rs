@@ -153,7 +153,8 @@ pub fn render_bitmap_with_layout(
     algorithm: Algorithm,
     layout: LayoutOptions,
 ) -> MonoBitmap {
-    let viewport = lbl::pipeline::render_viewport_px(media, supersample, lbl_core::Rotation::None);
+    let viewport =
+        lbl::pipeline::render_viewport_px(media, supersample, lbl_core::Rotation::None, None);
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {

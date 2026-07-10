@@ -5,10 +5,11 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use image::RgbaImage;
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
+use lbl_core::dymo;
 use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
-use lbl_core::units::{Dpi, CSS_LAYOUT_REFERENCE_DPI};
+use lbl_core::units::{Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
 use lbl_core::MonoBitmap;
 use lbl_core::Rotation;
 use lbl_dither::{dither, Algorithm};
@@ -639,10 +640,30 @@ pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     }
 }
 
+/// Head-axis dots used for layout and rasterize when tape has laminate margins.
+pub fn effective_render_head_dots(media: &Media, caps: &PrinterCapabilities) -> u32 {
+    if caps.uses_dymo_tape_geometry() {
+        Millimeters(dymo::printable_head_mm(media.width_mm))
+            .to_dots(media.dpi)
+            .0
+    } else if let Some(h) = caps.head_printable_height_mm {
+        Millimeters(h.min(media.width_mm)).to_dots(media.dpi).0
+    } else {
+        media.width_dots().0
+    }
+}
+
 /// CSS-pixel viewport matching the rasterizer's [`RenderRequest`] dimensions.
-pub fn render_viewport_px(media: &Media, supersample: u32, rotation: Rotation) -> ViewportPx {
+pub fn render_viewport_px(
+    media: &Media,
+    supersample: u32,
+    rotation: Rotation,
+    encode_caps: Option<&PrinterCapabilities>,
+) -> ViewportPx {
     let factor = supersample.max(1) as f64;
-    let head_dots = media.width_dots().0;
+    let head_dots = encode_caps
+        .map(|caps| effective_render_head_dots(media, caps))
+        .unwrap_or(media.width_dots().0);
     let feed_dots = media.length_dots().map(|d| d.0);
     let (width_dots, height_dots) = if rotation.swaps_axes() {
         (feed_dots, Some(head_dots))
@@ -652,6 +673,45 @@ pub fn render_viewport_px(media: &Media, supersample: u32, rotation: Rotation) -
     ViewportPx {
         width: width_dots.map(|w| w as f64 * factor),
         height: height_dots.map(|h| h as f64 * factor),
+    }
+}
+
+/// Pad a preview raster to the full tape width on the head axis (DYMO laminate).
+pub fn pad_preview_head_tape(
+    image: RgbaImage,
+    media: &Media,
+    caps: &PrinterCapabilities,
+    head_along_height: bool,
+) -> RgbaImage {
+    use image::{imageops, Rgba};
+
+    if !caps.uses_dymo_tape_geometry() {
+        return image;
+    }
+    let tape_dots = media.width_dots().0;
+    let printable_dots = effective_render_head_dots(media, caps);
+    if printable_dots >= tape_dots {
+        return image;
+    }
+    let pad_before = (tape_dots - printable_dots) / 2;
+    let label_white = Rgba([255, 255, 255, 255]);
+
+    if head_along_height {
+        let (w, h) = image.dimensions();
+        if h != printable_dots {
+            return image;
+        }
+        let mut out = RgbaImage::from_pixel(w, tape_dots, label_white);
+        imageops::overlay(&mut out, &image, 0, pad_before as i64);
+        out
+    } else {
+        let (w, h) = image.dimensions();
+        if w != printable_dots {
+            return image;
+        }
+        let mut out = RgbaImage::from_pixel(tape_dots, h, label_white);
+        imageops::overlay(&mut out, &image, pad_before as i64, 0);
+        out
     }
 }
 
@@ -857,7 +917,12 @@ fn render_label_print<B: RenderBackend>(
     authoring_html: &str,
     opts: &PipelineOptions,
 ) -> Result<PrintRenderStage> {
-    let viewport = render_viewport_px(&opts.media, opts.supersample, opts.rotation);
+    let viewport = render_viewport_px(
+        &opts.media,
+        opts.supersample,
+        opts.rotation,
+        Some(&opts.encode_caps),
+    );
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -877,7 +942,7 @@ fn render_label_print<B: RenderBackend>(
         },
     );
 
-    let head_dots = opts.media.width_dots().0;
+    let head_dots = effective_render_head_dots(&opts.media, &opts.encode_caps);
     let feed_dots = opts.media.length_dots().map(|d| d.0);
     let (req_width, req_height) = if opts.rotation.swaps_axes() {
         (feed_dots, Some(head_dots))
@@ -1020,7 +1085,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
         },
     );
 
-    let head_dots = opts.media.width_dots().0;
+    let head_dots = effective_render_head_dots(&opts.media, &opts.encode_caps);
     let feed_dots = opts.media.length_dots().map(|d| d.0);
     let (req_width, req_height) = if opts.rotation.swaps_axes() {
         (feed_dots, Some(head_dots))

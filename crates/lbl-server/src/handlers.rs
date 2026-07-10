@@ -381,18 +381,22 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             let mut out = Vec::with_capacity(count);
             for label in labels {
                 let raster = render_label_raster(&backend, &label.html, &opts)?;
-                let padded = lbl::pipeline::pad_preview_encode_feed(
+                let transpiled_html = raster.transpiled_html;
+                let image = lbl::pipeline::pad_preview_head_tape(
                     raster.image,
+                    &opts.media,
                     &encode_caps,
                     feed_along_width,
                 );
+                let padded =
+                    lbl::pipeline::pad_preview_encode_feed(image, &encode_caps, feed_along_width);
                 let image = padded.image;
                 let mut png = Vec::new();
                 image
                     .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
                     .context("encoding preview PNG")?;
                 let computed_font_size_mm =
-                    injected_fit_font_px(&raster.transpiled_html).map(|px| px / px_per_mm);
+                    injected_fit_font_px(&transpiled_html).map(|px| px / px_per_mm);
                 let mut label_json = json!({
                     "index": label.index,
                     "width_px": image.width(),
