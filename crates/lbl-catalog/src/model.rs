@@ -217,18 +217,19 @@ pub struct PrinterEntry {
     /// How to connect to this model (and, for USB, how to recognize it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionHint>,
-    /// Blank feed before raster content when encoding. Omitted for DYMO tape
-    /// because the head already sits past the last cut; preview still shows this
-    /// offset using [`feed_trail_mm`] when lead is unset.
+    /// Blank feed before raster content when encoding. Some tape printers omit
+    /// this because the head already sits past the last cut; preview may still
+    /// show that offset using [`feed_trail_mm`] when lead is unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_lead_mm: Option<f64>,
-    /// Head-to-cutter distance along the feed (DYMO tape: ~8.1 mm on LabelManager).
+    /// Head-to-cutter distance along the feed (e.g. ~8.1 mm on DYMO LabelManager).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_trail_mm: Option<f64>,
-    /// Mirror content along the feed axis when encoding (DYMO tape).
+    /// Mirror content along the feed axis when encoding (mechanical/orientation).
     #[serde(default)]
     pub feed_reverse: bool,
-    /// Printable head band height for DYMO LabelManager tape (8.2 mm).
+    /// Inkable height across the head when narrower than the loaded tape
+    /// (laminate / dead zones). Example: 8.2 mm on DYMO LabelManager.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_printable_height_mm: Option<f64>,
 }

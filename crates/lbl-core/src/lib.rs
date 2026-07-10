@@ -10,7 +10,6 @@
 //! types connect the stages together.
 
 pub mod bitmap;
-pub mod dymo;
 pub mod error;
 pub mod geometry;
 pub mod job;

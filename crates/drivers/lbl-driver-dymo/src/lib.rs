@@ -21,11 +21,33 @@ pub mod lw550;
 
 pub use lw550::LabelWriter550Driver;
 
-use lbl_core::dymo;
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 const ESC: u8 = 0x1B;
 const SYN: u8 = 0x16;
+
+/// LabelManager protocol column height in dots for a tape width (64 for 12 mm).
+fn protocol_head_dots(tape_width_mm: f64) -> u32 {
+    let bytes = (8.0 * tape_width_mm / 12.0).floor() as u32;
+    bytes.max(1) * 8
+}
+
+/// Dead-zone margin at each edge of the protocol column, in dots.
+fn protocol_vertical_margin_dots(tape_width_mm: f64, printable_height_mm: f64) -> u32 {
+    let margin_mm = ((tape_width_mm - printable_height_mm) / 2.0).max(0.0);
+    if margin_mm <= f64::EPSILON {
+        return 0;
+    }
+    let dots_per_mm = protocol_head_dots(tape_width_mm) as f64 / tape_width_mm;
+    (margin_mm * dots_per_mm).round() as u32
+}
+
+/// Inkable rows inside a protocol column.
+fn protocol_printable_dots(tape_width_mm: f64, printable_height_mm: f64) -> u32 {
+    let protocol_h = protocol_head_dots(tape_width_mm);
+    let margin = protocol_vertical_margin_dots(tape_width_mm, printable_height_mm);
+    protocol_h.saturating_sub(2 * margin)
+}
 
 /// The DYMO LabelManager driver.
 #[derive(Debug, Default, Clone, Copy)]
@@ -73,14 +95,19 @@ impl DymoDriver {
         out
     }
 
-    /// Fit a render-resolution bitmap into the protocol column for tape width.
-    fn fit_to_protocol_column(bitmap: &MonoBitmap, tape_mm: f64) -> MonoBitmap {
-        let protocol_h = dymo::protocol_head_dots(tape_mm);
+    /// Fit a render-resolution bitmap into the LabelManager protocol column.
+    fn fit_to_protocol_column(
+        bitmap: &MonoBitmap,
+        tape_mm: f64,
+        printable_height_mm: f64,
+    ) -> MonoBitmap {
+        let protocol_h = protocol_head_dots(tape_mm);
         if bitmap.height == protocol_h {
             return bitmap.clone();
         }
-        let v_margin = dymo::protocol_vertical_margin_dots(tape_mm);
-        let printable_h = dymo::protocol_printable_dots(tape_mm).max(1);
+        let printable_mm = printable_height_mm.min(tape_mm);
+        let v_margin = protocol_vertical_margin_dots(tape_mm, printable_mm);
+        let printable_h = protocol_printable_dots(tape_mm, printable_mm).max(1);
         let scaled = if bitmap.height == printable_h {
             bitmap.clone()
         } else {
@@ -170,8 +197,8 @@ impl Driver for DymoDriver {
             .unwrap_or(0);
         let feed_reverse = ctx.capabilities.feed_reverse;
         let tape_mm = ctx.job.media.width_mm;
-        let bitmap = if ctx.capabilities.uses_dymo_tape_geometry() {
-            Self::fit_to_protocol_column(bitmap, tape_mm)
+        let bitmap = if let Some(printable_mm) = ctx.capabilities.head_printable_height_mm {
+            Self::fit_to_protocol_column(bitmap, tape_mm, printable_mm)
         } else {
             bitmap.clone()
         };
@@ -276,5 +303,14 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[6..9], &[ESC, b'D', 0x08]);
+    }
+
+    #[test]
+    fn twelve_mm_protocol_geometry() {
+        assert_eq!(protocol_head_dots(12.0), 64);
+        assert_eq!(protocol_vertical_margin_dots(12.0, 8.2), 10);
+        assert_eq!(protocol_printable_dots(12.0, 8.2), 44);
+        assert_eq!(protocol_head_dots(6.0), 32);
+        assert_eq!(protocol_vertical_margin_dots(6.0, 8.2), 0);
     }
 }

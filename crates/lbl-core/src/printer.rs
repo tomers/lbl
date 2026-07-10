@@ -158,31 +158,24 @@ pub struct PrinterCapabilities {
     pub supports_cut: bool,
     /// Whether the printer reports loaded media for auto-detection.
     pub reports_media: bool,
-    /// Blank feed before raster content when encoding. Omitted for DYMO tape
-    /// because the head already sits past the last cut; preview still shows this
-    /// offset using [`feed_trail_mm`] when lead is unset.
+    /// Blank feed before raster content when encoding. Some tape printers omit
+    /// this because the head already sits past the last cut; preview may still
+    /// show that offset using [`feed_trail_mm`] when lead is unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_lead_mm: Option<f64>,
-    /// Head-to-cutter distance along the feed (DYMO tape: ~8.1 mm on LabelManager).
-    /// Preview shows symmetric head offset and content-boundary markers; the
-    /// driver feeds 2× before `ESC E` so the cut lands with symmetric margins
-    /// (see labelle `MarginsRenderEngine`).
+    /// Head-to-cutter distance along the feed (e.g. ~8.1 mm on DYMO LabelManager).
+    /// Preview can show symmetric head offset and content-boundary markers;
+    /// drivers may feed extra blank columns so the cut lands with matching margins.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_trail_mm: Option<f64>,
-    /// Mirror content along the feed axis when encoding (DYMO tape).
+    /// Mirror content along the feed axis when encoding (mechanical/orientation).
     #[serde(default)]
     pub feed_reverse: bool,
-    /// When set, layout and encode use [`crate::dymo`] tape geometry: content
-    /// is fitted to the printable head band and padded to protocol column height.
+    /// Inkable height across the head when narrower than the loaded tape
+    /// (laminate / dead zones on each edge). Layout fits content to this band;
+    /// drivers pad to the protocol column height as needed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_printable_height_mm: Option<f64>,
-}
-
-impl PrinterCapabilities {
-    /// Whether DYMO LabelManager tape dead-zone geometry applies.
-    pub fn uses_dymo_tape_geometry(&self) -> bool {
-        self.head_printable_height_mm.is_some()
-    }
 }
 
 impl Default for PrinterCapabilities {

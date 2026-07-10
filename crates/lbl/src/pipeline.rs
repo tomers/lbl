@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use image::RgbaImage;
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
-use lbl_core::dymo;
 use lbl_core::job::{JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
@@ -640,16 +639,12 @@ pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     }
 }
 
-/// Head-axis dots used for layout and rasterize when tape has laminate margins.
+/// Head-axis dots used for layout and rasterize when the head inkable band is
+/// narrower than the loaded tape (laminate / dead zones).
 pub fn effective_render_head_dots(media: &Media, caps: &PrinterCapabilities) -> u32 {
-    if caps.uses_dymo_tape_geometry() {
-        Millimeters(dymo::printable_head_mm(media.width_mm))
-            .to_dots(media.dpi)
-            .0
-    } else if let Some(h) = caps.head_printable_height_mm {
-        Millimeters(h.min(media.width_mm)).to_dots(media.dpi).0
-    } else {
-        media.width_dots().0
+    match caps.head_printable_height_mm {
+        Some(h) => Millimeters(h.min(media.width_mm)).to_dots(media.dpi).0,
+        None => media.width_dots().0,
     }
 }
 
@@ -676,7 +671,8 @@ pub fn render_viewport_px(
     }
 }
 
-/// Pad a preview raster to the full tape width on the head axis (DYMO laminate).
+/// Pad a preview raster to the full tape width on the head axis when content
+/// was rendered into a narrower printable band.
 pub fn pad_preview_head_tape(
     image: RgbaImage,
     media: &Media,
@@ -685,7 +681,7 @@ pub fn pad_preview_head_tape(
 ) -> RgbaImage {
     use image::{imageops, Rgba};
 
-    if !caps.uses_dymo_tape_geometry() {
+    if caps.head_printable_height_mm.is_none() {
         return image;
     }
     let tape_dots = media.width_dots().0;
@@ -837,9 +833,9 @@ pub struct PreviewFeedPad {
 ///
 /// When [`PrinterCapabilities::feed_trail_mm`] is set and [`PrinterCapabilities::feed_lead_mm`]
 /// is not, the head-to-cutter distance is also used as the implicit lead: the print
-/// head sits that far past the last cut when printing starts (labelle
-/// `MarginsRenderEngine`). Preview shows symmetric white margins on both sides of the
-/// content, with dashed markers between lead/content and content/right padding.
+/// head often already sits that far past the last cut when printing starts. Preview
+/// shows symmetric white margins on both sides of the content, with dashed markers
+/// between lead/content and content/right padding.
 pub fn pad_preview_encode_feed(
     image: RgbaImage,
     caps: &PrinterCapabilities,
