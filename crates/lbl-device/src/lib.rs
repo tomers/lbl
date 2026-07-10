@@ -17,6 +17,8 @@
 //! behind the opt-in `ble` feature (it pulls in `btleplug`, plus a vendored
 //! `libdbus` on Linux).
 
+#[cfg(feature = "usb")]
+pub mod brother_ql;
 pub mod discovery;
 #[cfg(feature = "usb")]
 pub mod dymo_lw;
@@ -32,6 +34,12 @@ pub use discovery::{discover, discover_ble, discover_serial, discover_usb, Disco
 pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 
+#[cfg(feature = "usb")]
+pub use brother_ql::{
+    media_key_hint as brother_ql_media_key_hint, parse_status as parse_brother_ql_status,
+    query_status as query_brother_ql_status, BrotherQlStatus,
+    STATUS_REPLY_LEN as BROTHER_QL_STATUS_REPLY_LEN, STATUS_REQUEST as BROTHER_QL_STATUS_REQUEST,
+};
 #[cfg(feature = "usb")]
 pub use dymo_lw::{
     parse_print_status, query_loaded_media, query_status, DymoLwUsbTransport, Lw550MainBayStatus,
