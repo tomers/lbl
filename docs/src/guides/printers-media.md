@@ -185,9 +185,9 @@ Bluetooth (often membership in the `bluetooth` group).
 
 ## Brother QL
 
-Brother QL printers (QL-820NWBc and the rest of the QL-800 family) use the
-`brother-ql` protocol: a 300 dpi, 720-dot raster stream with auto-cut. Connect
-over USB (`04f9:209d`) or raw TCP on port 9100:
+Brother QL-800 / QL-810W / QL-820NWB(c) use the `brother-ql` protocol: a 300 dpi,
+720-dot raster stream with auto-cut. Connect over USB (`04f9:209b` / `209c` /
+`209d`) or raw TCP on port 9100:
 
 ```bash
 lbl-catalog compatible --printer "QL-820NWBc"
@@ -197,3 +197,4 @@ lbl print --media DK-22205 --protocol brother-ql --network 192.168.1.50:9100 --c
 
 DK die-cut and continuous sizes up to 62 mm ship in the bundled catalog under
 the `Brother` brand. Black/red two-color printing is not implemented yet.
+Wider QL-1100-class printers need a driver head-width change before cataloguing.
