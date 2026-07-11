@@ -815,6 +815,8 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "tspl" => Protocol::Tspl,
         "slcs" | "bixolon" => Protocol::Slcs,
         "ezpl" | "godex" => Protocol::Ezpl,
+        "sbpl" | "sato" => Protocol::Sbpl,
+        "dpl" | "honeywell" | "datamax" => Protocol::Dpl,
         "zpl" => Protocol::Zpl,
         other => {
             return Err(ApiError(

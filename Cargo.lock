@@ -1758,6 +1758,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-dpl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-dymo"
 version = "0.1.0"
 dependencies = [
@@ -1807,6 +1815,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-sbpl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-slcs"
 version = "0.1.0"
 dependencies = [
@@ -1842,12 +1858,14 @@ dependencies = [
  "lbl-driver-brother-pt",
  "lbl-driver-brother-ql",
  "lbl-driver-console",
+ "lbl-driver-dpl",
  "lbl-driver-dymo",
  "lbl-driver-esclabel",
  "lbl-driver-escpos",
  "lbl-driver-ezpl",
  "lbl-driver-file",
  "lbl-driver-niimbot",
+ "lbl-driver-sbpl",
  "lbl-driver-slcs",
  "lbl-driver-tspl",
  "lbl-driver-zpl",

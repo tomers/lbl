@@ -868,6 +868,44 @@ mod tests {
     }
 
     #[test]
+    fn sato_sbpl_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let cl4 = catalog.lookup_printer("CL4NX").unwrap();
+        assert_eq!(cl4.protocol, Protocol::Sbpl);
+        assert_eq!(cl4.dpi, 203.0);
+        assert!(cl4.supports_cut);
+        assert_eq!(cl4.maturity, Maturity::Experimental);
+        assert!(catalog.supports_media("CL4NX", "102x152"));
+        assert!(cl4.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x0828,
+                product_id: None
+            }
+        )));
+    }
+
+    #[test]
+    fn honeywell_dpl_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let pc42 = catalog.lookup_printer("PC42d").unwrap();
+        assert_eq!(pc42.protocol, Protocol::Dpl);
+        assert_eq!(pc42.dpi, 203.0);
+        assert!(pc42.supports_cut);
+        assert!(catalog.supports_media("PC42d", "102x152"));
+        let px65 = catalog.lookup_printer("PX65").unwrap();
+        assert_eq!(px65.protocol, Protocol::Dpl);
+        assert_eq!(px65.dpi, 300.0);
+        assert!(px65.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x0b0b,
+                product_id: None
+            }
+        )));
+    }
+
+    #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
         let d110 = catalog.lookup_printer("D110").unwrap();
