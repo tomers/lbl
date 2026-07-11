@@ -619,7 +619,7 @@ mod tests {
             catalog.lookup_printer("D110").unwrap().maturity,
             Maturity::Verified
         );
-        // Closely related models are catalogued, not verified on hand.
+        // Same protocol as on-hand hardware → supported.
         assert_eq!(
             catalog
                 .lookup_printer("LabelWriter 550 Turbo")
@@ -632,12 +632,41 @@ mod tests {
             Maturity::Supported
         );
         assert_eq!(
-            catalog.lookup_printer("ZT231").unwrap().maturity,
-            Maturity::Preview
+            catalog.lookup_printer("LM500TS").unwrap().maturity,
+            Maturity::Supported
+        );
+        // Protocols never exercised on hand → experimental.
+        assert_eq!(
+            catalog.lookup_printer("LabelWriter 450").unwrap().maturity,
+            Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("LM500TS").unwrap().maturity,
-            Maturity::Preview
+            catalog.lookup_printer("QL-800").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("ZT231").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("M110").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("D30").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("Q30").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("X1038").unwrap().maturity,
+            Maturity::Experimental
+        );
+        assert_eq!(
+            catalog.lookup_printer("ITPP941").unwrap().maturity,
+            Maturity::Experimental
         );
         let verified: Vec<_> = catalog
             .printers()
@@ -649,6 +678,21 @@ mod tests {
             verified,
             vec!["LabelWriter 550", "LabelManager 280", "D110", "B1",]
         );
+        assert!(catalog
+            .printers()
+            .iter()
+            .filter(|p| p.maturity == Maturity::Supported)
+            .all(|p| matches!(
+                p.protocol,
+                Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot
+            )));
+        assert!(catalog.printers().iter().any(|p| {
+            p.maturity == Maturity::Experimental
+                && !matches!(
+                    p.protocol,
+                    Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot
+                )
+        }));
     }
 
     #[test]
@@ -707,6 +751,37 @@ mod tests {
         assert_eq!(t02.protocol, Protocol::Phomemo);
         let roll = catalog.lookup("phomemo-53-cont").unwrap();
         assert_eq!(roll.media.width_mm, 53.0);
+    }
+
+    #[test]
+    fn rollo_munbyn_and_phomemo_labelers_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let rollo = catalog.lookup_printer("X1038").unwrap();
+        assert_eq!(rollo.protocol, Protocol::Tspl);
+        assert_eq!(rollo.max_width_mm, 104.0);
+        assert!(catalog.supports_media("X1038", "102x152"));
+        let wireless = catalog.lookup_printer("X1040").unwrap();
+        assert_eq!(wireless.protocol, Protocol::Tspl);
+        let munbyn = catalog.lookup_printer("ITPP941").unwrap();
+        assert_eq!(munbyn.protocol, Protocol::Tspl);
+        assert!(munbyn
+            .connections
+            .iter()
+            .any(|c| c.is_exact_usb_match(0x09c6, 0x0426)));
+        let m110 = catalog.lookup_printer("M110").unwrap();
+        assert_eq!(m110.protocol, Protocol::PhomemoM110);
+        assert_eq!(m110.max_width_mm, 50.0);
+        assert!(catalog.supports_media("M110", "phomemo-50x30"));
+        assert!(catalog.supports_media("M110", "phomemo-40x30"));
+        let d30 = catalog.lookup_printer("D30").unwrap();
+        assert_eq!(d30.protocol, Protocol::PhomemoD30);
+        assert_eq!(d30.max_width_mm, 15.0);
+        assert!(catalog.supports_media("D30", "phomemo-12x40"));
+        let q30 = catalog.lookup_printer("Q30").unwrap();
+        assert_eq!(q30.protocol, Protocol::PhomemoD30);
+        assert!(catalog.supports_media("Q30", "phomemo-14x40"));
+        let tape12 = catalog.lookup("phomemo-12x40").unwrap();
+        assert_eq!(tape12.media.width_mm, 12.0);
     }
 
     #[test]

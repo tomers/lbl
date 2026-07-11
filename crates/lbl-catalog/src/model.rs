@@ -189,13 +189,14 @@ impl ConnectionHint {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Maturity {
-    /// Encode path and discovery exercised on real hardware.
+    /// Encode path and discovery exercised on real hardware we have on hand.
     Verified,
-    /// Protocol encode path exists; catalog geometry from public specs.
-    #[default]
+    /// Shares a protocol we have verified on hand; model itself not yet
+    /// hardware-exercised by us.
     Supported,
-    /// Catalogued with known gaps (e.g. missing USB PID); usable with care.
-    Preview,
+    /// Protocol has not been exercised on real hardware by us yet.
+    #[default]
+    Experimental,
 }
 
 impl Maturity {
@@ -204,7 +205,7 @@ impl Maturity {
         match self {
             Self::Verified => "verified",
             Self::Supported => "supported",
-            Self::Preview => "preview",
+            Self::Experimental => "experimental",
         }
     }
 }
