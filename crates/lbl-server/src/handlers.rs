@@ -7,6 +7,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
+use tracing::{error, warn};
 
 use lbl::pipeline::{
     authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
@@ -44,8 +45,20 @@ impl IntoResponse for ApiError {
 
 impl<E: std::fmt::Display> From<E> for ApiError {
     fn from(e: E) -> Self {
-        ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        // Catch-all for `?` conversions. Prefer explicit `error!`/`warn!` +
+        // `internal_server_error` / `bad_request` at call sites (openapp style).
+        let msg = e.to_string();
+        tracing::error!(error = %msg, "request failed");
+        ApiError(StatusCode::INTERNAL_SERVER_ERROR, msg)
     }
+}
+
+fn bad_request(message: impl Into<String>) -> ApiError {
+    ApiError(StatusCode::BAD_REQUEST, message.into())
+}
+
+fn internal_server_error(message: impl Into<String>) -> ApiError {
+    ApiError(StatusCode::INTERNAL_SERVER_ERROR, message.into())
 }
 
 type ApiResult = Result<axum::response::Response, ApiError>;
@@ -837,6 +850,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     })
 }
 
+#[tracing::instrument(skip(state, req), fields(protocol = %req.protocol, printer = ?req.printer))]
 pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> ApiResult {
     let source = req.source.clone().into_source()?;
     let protocol = parse_protocol(&req.protocol)?;
@@ -952,8 +966,20 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         }
     })
     .await
-    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .map_err(|e| {
+        error!(error = ?e, "print task join failed");
+        internal_server_error(e.to_string())
+    })?
+    .map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("no print target") {
+            warn!(error = %msg, "print rejected");
+            bad_request(msg)
+        } else {
+            error!(error = %msg, "print failed");
+            internal_server_error(msg)
+        }
+    })?;
 
     Ok(Json(report).into_response())
 }
@@ -1223,7 +1249,10 @@ fn dispatch(
     } else if let Some(target) = bluetooth {
         dispatch_bluetooth(encoded, protocol, target)?
     } else {
-        anyhow::bail!("no target; provide network, usb, serial, or bluetooth");
+        anyhow::bail!(
+            "no print target; provide network, usb, serial, or bluetooth \
+             (browser WebUSB/Serial/BLE profiles must use dispatch_mode=client)"
+        );
     };
 
     Ok(json!({

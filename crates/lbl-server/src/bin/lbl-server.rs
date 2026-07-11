@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use lbl_server::{router, AppState};
+use lbl_server::{init_tracing, router, AppState};
 
 #[derive(Parser)]
 #[command(name = "lbl-server", about = "HTTP API for the lbl pipeline", color = clap::ColorChoice::Auto, styles = lbl_cli::CLAP_STYLING)]
@@ -14,12 +14,7 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    init_tracing();
 
     let state = AppState::discover()?;
     let app = router(state);

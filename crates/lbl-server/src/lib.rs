@@ -9,9 +9,51 @@ mod state;
 
 pub use state::AppState;
 
+use axum::extract::Request;
+use axum::middleware::{from_fn, Next};
+use axum::response::Response;
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tower_http::cors::CorsLayer;
+use tracing::Instrument;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+/// Initialize tracing the same way as openapp's API server:
+/// `registry` + `RUST_LOG` EnvFilter (default `info`) + pretty `fmt` with optional ANSI.
+pub fn init_tracing() {
+    let enable_ansi = should_enable_ansi_colors();
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer().with_ansi(enable_ansi))
+        .init();
+}
+
+fn should_enable_ansi_colors() -> bool {
+    !env_bool("DISABLE_ANSI_COLORS", false)
+}
+
+fn env_bool(var_name: &str, default: bool) -> bool {
+    match std::env::var(var_name) {
+        Ok(value) => match value.to_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => true,
+            "false" | "0" | "no" | "off" => false,
+            _ => default,
+        },
+        Err(_) => default,
+    }
+}
+
+/// Parent span for each HTTP request (openapp: `http_request` + optional identity fields).
+async fn http_request_span(request: Request, next: Next) -> Response {
+    let span = tracing::info_span!(
+        "http_request",
+        method = %request.method(),
+        path = %request.uri().path(),
+    );
+    next.run(request).instrument(span).await
+}
 
 /// Build the application router with all routes mounted under `/api`.
 pub fn router(state: AppState) -> Router {
@@ -49,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/preview/html", post(handlers::preview_html))
         .route("/api/print", post(handlers::print))
         .route("/api/print/file", post(handlers::print_file))
+        .layer(from_fn(http_request_span))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
