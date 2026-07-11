@@ -602,12 +602,53 @@ mod tests {
     #[test]
     fn printer_maturity_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let lw550 = catalog.lookup_printer("LabelWriter 550").unwrap();
-        assert_eq!(lw550.maturity, Maturity::Verified);
-        let zt231 = catalog.lookup_printer("ZT231").unwrap();
-        assert_eq!(zt231.maturity, Maturity::Preview);
-        let lm500 = catalog.lookup_printer("LM500TS").unwrap();
-        assert_eq!(lm500.maturity, Maturity::Preview);
+        // Hardware-exercised on hand: LW 550, LM 280, B1, D110.
+        assert_eq!(
+            catalog.lookup_printer("LabelWriter 550").unwrap().maturity,
+            Maturity::Verified
+        );
+        assert_eq!(
+            catalog.lookup_printer("LabelManager 280").unwrap().maturity,
+            Maturity::Verified
+        );
+        assert_eq!(
+            catalog.lookup_printer("B1").unwrap().maturity,
+            Maturity::Verified
+        );
+        assert_eq!(
+            catalog.lookup_printer("D110").unwrap().maturity,
+            Maturity::Verified
+        );
+        // Closely related models are catalogued, not verified on hand.
+        assert_eq!(
+            catalog
+                .lookup_printer("LabelWriter 550 Turbo")
+                .unwrap()
+                .maturity,
+            Maturity::Supported
+        );
+        assert_eq!(
+            catalog.lookup_printer("B1 Pro").unwrap().maturity,
+            Maturity::Supported
+        );
+        assert_eq!(
+            catalog.lookup_printer("ZT231").unwrap().maturity,
+            Maturity::Preview
+        );
+        assert_eq!(
+            catalog.lookup_printer("LM500TS").unwrap().maturity,
+            Maturity::Preview
+        );
+        let verified: Vec<_> = catalog
+            .printers()
+            .iter()
+            .filter(|p| p.maturity == Maturity::Verified)
+            .map(|p| p.keys[0].as_str())
+            .collect();
+        assert_eq!(
+            verified,
+            vec!["LabelWriter 550", "LabelManager 280", "D110", "B1",]
+        );
     }
 
     #[test]
