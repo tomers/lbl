@@ -19,8 +19,8 @@
 mod model;
 
 pub use model::{
-    encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, MediaSpec, PrinterEntry,
-    ResolvedTransport,
+    encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, Maturity, MediaSpec,
+    PrinterEntry, ResolvedTransport,
 };
 
 use lbl_core::printer::Protocol;
@@ -597,6 +597,17 @@ mod tests {
         assert!(d110m.matches_key("D110M"));
         let d11s = catalog.lookup_printer("D11S").unwrap();
         assert!(d11s.matches_key("D110"));
+    }
+
+    #[test]
+    fn printer_maturity_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let lw550 = catalog.lookup_printer("LabelWriter 550").unwrap();
+        assert_eq!(lw550.maturity, Maturity::Verified);
+        let zt231 = catalog.lookup_printer("ZT231").unwrap();
+        assert_eq!(zt231.maturity, Maturity::Preview);
+        let lm500 = catalog.lookup_printer("LM500TS").unwrap();
+        assert_eq!(lm500.maturity, Maturity::Preview);
     }
 
     #[test]

@@ -11,7 +11,8 @@ Curated database of known label/tape media and printer models.
   material, adhesive, and color. Device resolution is applied from the target
   printer at resolve time.
 - **`[[printers]]`** — known printer models with native DPI, head width,
-  protocol, and a `supported_media` list naming the media keys each model can use.
+  protocol, maturity (`verified` / `supported` / `preview`), and a
+  `supported_media` list naming the media keys each model can use.
   `connections` declares how to reach the printer (and USB entries double as
   discovery hints).
 

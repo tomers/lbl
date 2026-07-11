@@ -185,6 +185,30 @@ impl ConnectionHint {
     }
 }
 
+/// How thoroughly a catalog printer model has been validated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Maturity {
+    /// Encode path and discovery exercised on real hardware.
+    Verified,
+    /// Protocol encode path exists; catalog geometry from public specs.
+    #[default]
+    Supported,
+    /// Catalogued with known gaps (e.g. missing USB PID); usable with care.
+    Preview,
+}
+
+impl Maturity {
+    /// Short label for UI / marketing tables.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Verified => "verified",
+            Self::Supported => "supported",
+            Self::Preview => "preview",
+        }
+    }
+}
+
 /// A known printer model in the catalog.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrinterEntry {
@@ -197,6 +221,9 @@ pub struct PrinterEntry {
     pub name: String,
     /// Protocol the model speaks.
     pub protocol: Protocol,
+    /// How thoroughly this model has been validated.
+    #[serde(default)]
+    pub maturity: Maturity,
     /// Native print resolution in dots per inch.
     pub dpi: f64,
     /// Maximum printable width across the head, in millimeters.
