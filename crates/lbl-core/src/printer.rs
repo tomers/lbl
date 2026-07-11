@@ -177,6 +177,12 @@ pub struct PrinterCapabilities {
     pub max_width_mm: f64,
     /// Whether the printer can cut between jobs/items.
     pub supports_cut: bool,
+    /// Whether the printer deposits more than one ink color (full-color inkjet
+    /// or dual-ink thermal). When set, the encode pipeline may supply a color
+    /// PNG alongside the mono bitmap for drivers that register full-color
+    /// graphics (e.g. ESC/Label `~DY`).
+    #[serde(default)]
+    pub supports_color: bool,
     /// Whether the printer reports loaded media for auto-detection.
     pub reports_media: bool,
     /// Blank feed before raster content when encoding. Some tape printers omit
@@ -205,6 +211,7 @@ impl Default for PrinterCapabilities {
             dpi: Dpi(300.0),
             max_width_mm: 56.0,
             supports_cut: false,
+            supports_color: false,
             reports_media: false,
             feed_lead_mm: None,
             feed_trail_mm: None,

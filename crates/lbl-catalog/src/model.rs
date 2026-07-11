@@ -329,6 +329,7 @@ impl PrinterEntry {
             dpi: Dpi(self.dpi),
             max_width_mm: self.max_width_mm,
             supports_cut: self.supports_cut,
+            supports_color: self.supports_color,
             reports_media: self.reports_media,
             feed_lead_mm: self.feed_lead_mm,
             feed_trail_mm: self.feed_trail_mm,

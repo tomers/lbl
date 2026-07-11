@@ -41,6 +41,12 @@ pub struct EncodeContext<'a> {
     /// is valid when artwork uses only the primary ink). Mono drivers ignore
     /// this field.
     pub secondary: Option<&'a MonoBitmap>,
+    /// Optional full-color PNG for inkjet / color graphic registration.
+    ///
+    /// When [`PrinterCapabilities::supports_color`] is set, the pipeline may
+    /// attach the rendered label as PNG bytes. Drivers that only speak 1-bit
+    /// rasters ignore this field and encode the mono `bitmap` instead.
+    pub color_png: Option<&'a [u8]>,
 }
 
 impl<'a> EncodeContext<'a> {
@@ -50,6 +56,7 @@ impl<'a> EncodeContext<'a> {
             job,
             capabilities,
             secondary: None,
+            color_png: None,
         }
     }
 
@@ -59,9 +66,20 @@ impl<'a> EncodeContext<'a> {
         self
     }
 
+    /// Attach a full-color PNG for color graphic registration.
+    pub fn with_color_png(mut self, png: &'a [u8]) -> Self {
+        self.color_png = Some(png);
+        self
+    }
+
     /// Whether this job targets dual-color media (`Media::two_color`).
     pub fn two_color(&self) -> bool {
         self.job.media.two_color
+    }
+
+    /// Whether a color PNG is available and the printer supports color output.
+    pub fn color(&self) -> bool {
+        self.capabilities.supports_color && self.color_png.is_some()
     }
 
     /// Effective cut mode: requested by the job *and* supported by the printer.

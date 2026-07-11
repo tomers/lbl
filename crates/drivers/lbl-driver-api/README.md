@@ -21,6 +21,8 @@ impl Driver for MyDriver {
 
 `EncodeContext` exposes the job and printer capabilities, plus helpers like
 `should_cut()` (job requested a cut AND the printer supports it) and `copies()`.
+Optional planes: `with_secondary` for dual-ink media, `with_color_png` for
+full-color graphic registration (e.g. ESC/Label `~DY`).
 
 Concrete drivers live alongside this crate under `crates/drivers/`:
 `lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`,

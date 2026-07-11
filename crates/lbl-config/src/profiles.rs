@@ -103,6 +103,7 @@ mod tests {
                     dpi: Dpi(300.0),
                     max_width_mm: 56.0,
                     supports_cut: false,
+                    supports_color: false,
                     reports_media: true,
                     feed_lead_mm: None,
                     feed_trail_mm: None,

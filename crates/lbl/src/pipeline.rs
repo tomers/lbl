@@ -1024,6 +1024,12 @@ pub fn encode_label_traced<B: RenderBackend>(
     } = render_label_print(backend, authoring_html, opts)?;
 
     let two_color = opts.media.two_color;
+    let color_png =
+        if !two_color && opts.encode_caps.supports_color && opts.protocol == Protocol::EscLabel {
+            Some(encode_rgba_png(&rendered).context("encoding color PNG")?)
+        } else {
+            None
+        };
     let (dithered, secondary_plane) = if two_color {
         let (primary, secondary) = split_black_red(&rendered, 80);
         (primary, Some(secondary))
@@ -1042,11 +1048,13 @@ pub fn encode_label_traced<B: RenderBackend>(
         let driver = registry
             .get(opts.protocol)
             .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
-        let ctx = EncodeContext::new(&job, &caps);
-        let ctx = match &secondary_plane {
-            Some(secondary) => ctx.with_secondary(secondary),
-            None => ctx,
-        };
+        let mut ctx = EncodeContext::new(&job, &caps);
+        if let Some(secondary) = &secondary_plane {
+            ctx = ctx.with_secondary(secondary);
+        }
+        if let Some(png) = &color_png {
+            ctx = ctx.with_color_png(png);
+        }
         (
             driver.encode(&dithered, &ctx).context("encoding")?,
             driver.name().to_string(),
@@ -1201,6 +1209,13 @@ fn mono_preview_rgba(bmp: &lbl_core::bitmap::MonoBitmap) -> image::RgbaImage {
         }
     }
     img
+}
+
+fn encode_rgba_png(img: &RgbaImage) -> Result<Vec<u8>> {
+    let mut buf = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png)
+        .context("PNG encode")?;
+    Ok(buf.into_inner())
 }
 
 #[cfg(test)]
