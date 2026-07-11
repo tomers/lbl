@@ -92,6 +92,11 @@ pub struct Media {
     /// Base color.
     #[serde(default)]
     pub color: MediaColor,
+    /// Whether this consumable needs Brother QL black/red two-color raster
+    /// (e.g. DK-22251). When set, the encode path splits RGBA into black and
+    /// red planes and the QL driver emits `w` two-color rows.
+    #[serde(default)]
+    pub two_color: bool,
 }
 
 impl Media {
@@ -105,6 +110,7 @@ impl Media {
             material: Material::default(),
             adhesive: Adhesive::default(),
             color: MediaColor::default(),
+            two_color: false,
         }
     }
 
@@ -118,6 +124,7 @@ impl Media {
             material: Material::default(),
             adhesive: Adhesive::default(),
             color: MediaColor::default(),
+            two_color: false,
         }
     }
 

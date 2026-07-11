@@ -195,8 +195,8 @@ lbl print --media DK-22205 --protocol brother-ql --network 192.168.1.50:9100 --c
 ```
 
 DK die-cut and continuous sizes (including wide-head DK for QL-1100) ship in the
-bundled catalog under the `Brother` brand. Black/red two-color printing is not
-implemented yet.
+bundled catalog under the `Brother` brand. Black/red two-color printing on
+DK-22251 is supported on QL-800 / QL-810W / QL-820NWB.
 
 Studio setup (WebUSB + TCP :9100): see [Brother QL setup](./brother-ql.md).
 

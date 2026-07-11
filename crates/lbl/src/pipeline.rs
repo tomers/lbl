@@ -11,7 +11,7 @@ use lbl_core::printer::{PrinterCapabilities, Protocol};
 use lbl_core::units::{Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
 use lbl_core::MonoBitmap;
 use lbl_core::Rotation;
-use lbl_dither::{dither, Algorithm};
+use lbl_dither::{dither, split_black_red, Algorithm};
 use lbl_driver_api::EncodeContext;
 use lbl_driver_file::{MediaType, VirtualExportMode};
 use lbl_encode::Registry;
@@ -1023,7 +1023,13 @@ pub fn encode_label_traced<B: RenderBackend>(
         req_height,
     } = render_label_print(backend, authoring_html, opts)?;
 
-    let dithered = dither(&rendered, opts.dither);
+    let two_color = opts.media.two_color && opts.protocol == Protocol::BrotherQl;
+    let (dithered, red_plane) = if two_color {
+        let (black, red) = split_black_red(&rendered, 80);
+        (black, Some(red))
+    } else {
+        (dither(&rendered, opts.dither), None)
+    };
 
     let (encoded, driver_name) = if opts.protocol == Protocol::Html {
         (Vec::new(), "html-preview".to_string())
@@ -1037,6 +1043,10 @@ pub fn encode_label_traced<B: RenderBackend>(
             .get(opts.protocol)
             .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
         let ctx = EncodeContext::new(&job, &caps);
+        let ctx = match &red_plane {
+            Some(red) => ctx.with_red(red),
+            None => ctx,
+        };
         (
             driver.encode(&dithered, &ctx).context("encoding")?,
             driver.name().to_string(),

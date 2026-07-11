@@ -33,12 +33,33 @@ pub struct EncodeContext<'a> {
     pub job: &'a JobSpec,
     /// Capabilities of the target printer.
     pub capabilities: &'a PrinterCapabilities,
+    /// Optional red (low-energy) plane for Brother QL two-color media.
+    ///
+    /// When [`JobSpec::media`] has `two_color` set, callers should supply a
+    /// same-sized plane (empty is valid for black-only artwork on red/black
+    /// tape). Ignored by mono drivers.
+    pub red: Option<&'a MonoBitmap>,
 }
 
 impl<'a> EncodeContext<'a> {
-    /// Create a new context.
+    /// Create a new mono encode context.
     pub fn new(job: &'a JobSpec, capabilities: &'a PrinterCapabilities) -> Self {
-        Self { job, capabilities }
+        Self {
+            job,
+            capabilities,
+            red: None,
+        }
+    }
+
+    /// Attach a red plane for two-color Brother QL encoding.
+    pub fn with_red(mut self, red: &'a MonoBitmap) -> Self {
+        self.red = Some(red);
+        self
+    }
+
+    /// Whether this job should use Brother QL two-color raster (`w` rows).
+    pub fn two_color(&self) -> bool {
+        self.job.media.two_color
     }
 
     /// Effective cut mode: requested by the job *and* supported by the printer.

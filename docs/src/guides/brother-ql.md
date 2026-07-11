@@ -74,8 +74,10 @@ When the printer reports media geometry, Studio maps it to a DK SKU and badges
 the media picker as **Paper type**. If the selected media differs, Studio warns
 before print so you can switch to the loaded roll.
 
-Black/red two-color DK (DK-2251 / DK-22251) is catalogued but still encoded as
-mono today.
+Black/red two-color DK (**DK-22251** / DK-2251) uses Brother’s dual-plane
+raster (`w` rows): Studio color directives map red-ish pixels to the low-energy
+plane and dark pixels to black. You must select that media SKU when the
+black/red roll is loaded (same requirement as Brother’s `--red` flag).
 
 ## Related
 

@@ -554,10 +554,10 @@ media        = { width_mm = 62.0, length = { kind = "continuous" }, material = "
 
 [[entries]]
 brand        = "Brother"
-keys         = ["DK-22251", "DK22251"]
+keys         = ["DK-22251", "DK22251", "DK-2251", "DK2251"]
 name         = "Brother DK-22251 62mm Continuous Black/Red Paper"
 purchase_url = "https://www.brother.com/"
-media        = { width_mm = 62.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+media        = { width_mm = 62.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white", two_color = true }
 
 [[entries]]
 brand        = "Brother"
@@ -769,8 +769,10 @@ media        = { width_mm = 24.0, length = { kind = "fixed", mm = 40.0 }, materi
 # --- Known printers ----------------------------------------------------------
 #
 # `supported_media` lists canonical media keys from [[entries]] above.
-# Set `supports_color = true` only for printers that output more than one ink
-# color (not thermal 1-bit heads). None of the bundled models qualify today.
+# Set `supports_color = true` for printers that can deposit more than one ink
+# color (Brother QL-800-series black/red on DK-22251). Thermal 1-bit heads leave
+# this false. Preview sinks (`virtual`, `html`, `console`) are treated as
+# color-capable in the UI regardless.
 
 [[printers]]
 brand = "DYMO"
@@ -1258,6 +1260,7 @@ protocol = "brotherql"
 dpi = 300.0
 max_width_mm = 62.0
 supports_cut = true
+supports_color = true
 reports_media = true
 default_media = "DK-11201"
 supported_media = [
@@ -1293,6 +1296,7 @@ protocol = "brotherql"
 dpi = 300.0
 max_width_mm = 62.0
 supports_cut = true
+supports_color = true
 reports_media = true
 default_media = "DK-11201"
 supported_media = [
@@ -1328,6 +1332,7 @@ protocol = "brotherql"
 dpi = 300.0
 max_width_mm = 62.0
 supports_cut = true
+supports_color = true
 reports_media = true
 default_media = "DK-11201"
 supported_media = [

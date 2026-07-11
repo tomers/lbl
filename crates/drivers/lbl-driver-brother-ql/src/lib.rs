@@ -19,13 +19,20 @@
 //!   ESC i z …             print information (media + raster line count)
 //!   ESC i M …             various mode (auto-cut)
 //!   ESC i A …             cut every N labels
-//!   ESC i K …             expanded mode (cut-at-end)
+//!   ESC i K …             expanded mode (cut-at-end [| two-color])
 //!   ESC i d …             margin / feed amount
 //!   M 0x00                compression off
-//!   per row:
+//!   per row (mono):
 //!     g 0x00 n <n bytes>  raster graphics transfer (row mirrored)
+//!   per row (two-color / DK-22251):
+//!     w 0x01 n <black>    high-energy (black) plane
+//!     w 0x02 n <red>      low-energy (red) plane
 //!   0x1A / 0x0C           print with feed (last) / print (more pages follow)
 //! ```
+//!
+//! Two-color mode is selected when [`EncodeContext::two_color`] is true (media
+//! flagged `two_color`, e.g. DK-22251). Quality-priority is omitted in that
+//! mode per Brother's raster reference.
 //!
 //! Bit polarity matches [`MonoBitmap`]: `1` = ink. Each row is mirrored
 //! left-to-right before packing, matching the head wiring used by
@@ -429,7 +436,8 @@ impl BrotherQlDriver {
 
     fn push_page(
         out: &mut Vec<u8>,
-        bitmap: &MonoBitmap,
+        black: &MonoBitmap,
+        red: &MonoBitmap,
         geom: MediaGeometry,
         head: HeadProfile,
         opts: PageEncodeOpts,
@@ -438,38 +446,53 @@ impl BrotherQlDriver {
             auto_cut,
             cut_at_end,
             quality,
+            two_color,
             first_page,
             last_page,
         } = opts;
         out.extend_from_slice(&[ESC, b'i', b'S']);
 
+        // PI_QUALITY (bit 6) is invalid for two-color printing.
         let mut flags: u8 = 0x80 | (1 << 1) | (1 << 2) | (1 << 3);
-        if quality {
+        if quality && !two_color {
             flags |= 1 << 6;
         }
         out.extend_from_slice(&[ESC, b'i', b'z', flags]);
         out.push(geom.media_type);
         out.push(geom.tape_width_mm);
         out.push(geom.tape_length_mm);
-        out.extend_from_slice(&bitmap.height.to_le_bytes());
+        out.extend_from_slice(&black.height.to_le_bytes());
         out.push(if first_page { 0 } else { 1 });
         out.push(0x00);
 
         // ESC i M: bit 6 = auto cut. ESC i A: cut every N labels (required with auto cut).
-        // ESC i K: bit 3 = cut at end.
+        // ESC i K: bit 0 = two-color, bit 3 = cut at end.
         out.extend_from_slice(&[ESC, b'i', b'M', if auto_cut { 1 << 6 } else { 0 }]);
         if auto_cut {
             out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
         }
-        out.extend_from_slice(&[ESC, b'i', b'K', if cut_at_end { 1 << 3 } else { 0 }]);
+        let mut expanded: u8 = if cut_at_end { 1 << 3 } else { 0 };
+        if two_color {
+            expanded |= 1 << 0;
+        }
+        out.extend_from_slice(&[ESC, b'i', b'K', expanded]);
         out.extend_from_slice(&[ESC, b'i', b'd']);
         out.extend_from_slice(&geom.feed_margin.to_le_bytes());
         out.extend_from_slice(&[b'M', 0x00]);
 
-        for y in 0..bitmap.height {
-            let row = Self::pack_mirrored_row(bitmap, y, head);
-            out.extend_from_slice(&[b'g', 0x00, head.bytes_per_row as u8]);
-            out.extend_from_slice(&row);
+        for y in 0..black.height {
+            if two_color {
+                let black_row = Self::pack_mirrored_row(black, y, head);
+                let red_row = Self::pack_mirrored_row(red, y, head);
+                out.extend_from_slice(&[b'w', 0x01, head.bytes_per_row as u8]);
+                out.extend_from_slice(&black_row);
+                out.extend_from_slice(&[b'w', 0x02, head.bytes_per_row as u8]);
+                out.extend_from_slice(&red_row);
+            } else {
+                let row = Self::pack_mirrored_row(black, y, head);
+                out.extend_from_slice(&[b'g', 0x00, head.bytes_per_row as u8]);
+                out.extend_from_slice(&row);
+            }
         }
 
         out.push(if last_page { 0x1A } else { 0x0C });
@@ -481,6 +504,7 @@ struct PageEncodeOpts {
     auto_cut: bool,
     cut_at_end: bool,
     quality: bool,
+    two_color: bool,
     first_page: bool,
     last_page: bool,
 }
@@ -497,7 +521,22 @@ impl Driver for BrotherQlDriver {
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let head = head_profile(ctx);
         let geom = Self::resolve_media(ctx, head);
-        let bitmap = Self::pad_to_head(bitmap, geom, head)?;
+        let two_color = ctx.two_color();
+        let black = Self::pad_to_head(bitmap, geom, head)?;
+        let red = if two_color {
+            let red_src = match ctx.red {
+                Some(r) if r.width == bitmap.width && r.height == bitmap.height => r.clone(),
+                Some(_) => {
+                    return Err(DriverError::Unsupported(
+                        "red plane dimensions must match black plane".into(),
+                    ));
+                }
+                None => MonoBitmap::new(bitmap.width, bitmap.height),
+            };
+            Self::pad_to_head(&red_src, geom, head)?
+        } else {
+            MonoBitmap::new(0, 0)
+        };
         let copies = ctx.copies();
         let (auto_cut, cut_at_end) = match ctx.cut_mode() {
             CutMode::None => (false, false),
@@ -505,11 +544,15 @@ impl Driver for BrotherQlDriver {
             CutMode::End => (false, true),
         };
 
+        let row_overhead = if two_color {
+            2 * (3 + head.bytes_per_row)
+        } else {
+            3 + head.bytes_per_row
+        };
         let mut out = Vec::with_capacity(
             head.invalidate_bytes
                 + 64
-                + copies as usize
-                    * (bitmap.data.len() + bitmap.height as usize * (3 + head.bytes_per_row) + 48),
+                + copies as usize * (black.data.len() + black.height as usize * row_overhead + 48),
         );
         out.extend(std::iter::repeat_n(0u8, head.invalidate_bytes));
         out.extend_from_slice(&[ESC, b'@']);
@@ -518,13 +561,15 @@ impl Driver for BrotherQlDriver {
         for index in 0..copies {
             Self::push_page(
                 &mut out,
-                &bitmap,
+                &black,
+                &red,
                 geom,
                 head,
                 PageEncodeOpts {
                     auto_cut,
                     cut_at_end,
                     quality: self.quality_priority,
+                    two_color,
                     first_page: index == 0,
                     last_page: index + 1 == copies,
                 },
@@ -706,5 +751,32 @@ mod tests {
         assert_eq!(bytes[pos + 4], MEDIA_DIE_CUT);
         assert_eq!(bytes[pos + 5], 102);
         assert_eq!(bytes[pos + 6], 152);
+    }
+
+    #[test]
+    fn two_color_emits_w_rows_and_expanded_bit() {
+        let mut black = MonoBitmap::new(8, 1);
+        black.set(0, 0, true);
+        let mut red = MonoBitmap::new(8, 1);
+        red.set(1, 0, true);
+        let mut media = Media::continuous(62.0, Dpi(300.0));
+        media.two_color = true;
+        let (job, caps) = ctx_job(media, 1, CutMode::End, 62.0);
+        let ctx = EncodeContext::new(&job, &caps).with_red(&red);
+        let bytes = BrotherQlDriver::new().encode(&black, &ctx).unwrap();
+
+        assert!(bytes.windows(3).any(|w| w == [b'w', 0x01, 90]));
+        assert!(bytes.windows(3).any(|w| w == [b'w', 0x02, 90]));
+        assert!(!bytes.windows(3).any(|w| w == [b'g', 0x00, 90]));
+        // ESC i K: two-color bit 0 + cut-at-end bit 3
+        assert!(bytes
+            .windows(4)
+            .any(|w| w == [ESC, b'i', b'K', (1 << 0) | (1 << 3)]));
+        // Quality flag must not be set in ESC i z for two-color.
+        let z = bytes
+            .windows(3)
+            .position(|w| w == [ESC, b'i', b'z'])
+            .unwrap();
+        assert_eq!(bytes[z + 3] & (1 << 6), 0);
     }
 }

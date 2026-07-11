@@ -74,3 +74,57 @@ pub fn dither(img: &RgbaImage, algorithm: Algorithm) -> MonoBitmap {
         Algorithm::Threshold(level) => algorithms::threshold(&gray, level),
     }
 }
+
+/// Split an RGBA label into black (high-energy) and red (low-energy) planes for
+/// Brother QL DK-22251 two-color tape.
+///
+/// Heuristic mirrors `brother_ql`'s HSV filters: saturated red-ish pixels go to
+/// the red plane; dark non-red pixels go to black. Red is subtracted from black
+/// so overlapping ink prefers red.
+pub fn split_black_red(img: &RgbaImage, black_luma_max: u8) -> (MonoBitmap, MonoBitmap) {
+    let w = img.width();
+    let h = img.height();
+    let mut black = MonoBitmap::new(w, h);
+    let mut red = MonoBitmap::new(w, h);
+
+    for y in 0..h {
+        for x in 0..w {
+            let p = img.get_pixel(x, y).0;
+            let (r, g, b, a) = (p[0], p[1], p[2], p[3]);
+            if a < 128 {
+                continue;
+            }
+            let luma = ((u16::from(r) * 77 + u16::from(g) * 150 + u16::from(b) * 29) / 256) as u8;
+            let max = r.max(g).max(b);
+            let min = r.min(g).min(b);
+            let chroma = max.saturating_sub(min);
+            // Hue near red/magenta with enough saturation and brightness.
+            let is_red =
+                chroma > 40 && r >= g.saturating_add(30) && r >= b.saturating_add(30) && luma > 40;
+            if is_red {
+                red.set(x, y, true);
+            } else if luma <= black_luma_max {
+                black.set(x, y, true);
+            }
+        }
+    }
+    (black, red)
+}
+
+#[cfg(test)]
+mod two_color_tests {
+    use super::*;
+    use image::{Rgba, RgbaImage};
+
+    #[test]
+    fn splits_red_and_black_pixels() {
+        let mut img = RgbaImage::from_pixel(2, 1, Rgba([255, 255, 255, 255]));
+        img.put_pixel(0, 0, Rgba([0, 0, 0, 255]));
+        img.put_pixel(1, 0, Rgba([220, 30, 30, 255]));
+        let (black, red) = split_black_red(&img, 80);
+        assert!(black.get(0, 0));
+        assert!(!black.get(1, 0));
+        assert!(!red.get(0, 0));
+        assert!(red.get(1, 0));
+    }
+}
