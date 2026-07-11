@@ -455,6 +455,10 @@ enum ProtocolArg {
     Phomemo,
     #[value(name = "phomemo-m02x", aliases = ["phomemom02x", "m02x"])]
     PhomemoM02x,
+    #[value(name = "phomemo-m110", aliases = ["phomemom110", "m110"])]
+    PhomemoM110,
+    #[value(name = "phomemo-d30", aliases = ["phomemod30", "d30", "q30"])]
+    PhomemoD30,
     Zpl,
     Tspl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
@@ -484,6 +488,8 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Escpos => Protocol::EscPos,
             ProtocolArg::Phomemo => Protocol::Phomemo,
             ProtocolArg::PhomemoM02x => Protocol::PhomemoM02x,
+            ProtocolArg::PhomemoM110 => Protocol::PhomemoM110,
+            ProtocolArg::PhomemoD30 => Protocol::PhomemoD30,
             ProtocolArg::Zpl => Protocol::Zpl,
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,

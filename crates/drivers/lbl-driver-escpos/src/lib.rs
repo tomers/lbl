@@ -5,14 +5,19 @@
 //! stream is: `ESC @` (init), `GS v 0` raster, a short feed, then an optional
 //! `GS V` cut.
 //!
-//! Also hosts [`PhomemoDriver`] (M02-class) and [`PhomemoM02xDriver`] (M02X
-//! proprietary framing) for Phomemo pocket printers.
+//! Also hosts Phomemo drivers: [`PhomemoDriver`] (M02-class),
+//! [`PhomemoM02xDriver`] (M02X), [`PhomemoM110Driver`] (M110/M120/M220), and
+//! [`PhomemoD30Driver`] (D30/Q30).
 
 pub mod phomemo;
+pub mod phomemo_d30;
 pub mod phomemo_m02x;
+pub mod phomemo_m110;
 
 pub use phomemo::PhomemoDriver;
+pub use phomemo_d30::PhomemoD30Driver;
 pub use phomemo_m02x::PhomemoM02xDriver;
+pub use phomemo_m110::PhomemoM110Driver;
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 

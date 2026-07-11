@@ -23,6 +23,12 @@ pub enum Protocol {
     /// Phomemo M02X proprietary framing (not M02 ESC/POS).
     #[serde(rename = "phomemom02x")]
     PhomemoM02x,
+    /// Phomemo M110/M120/M220 business labelers (speed/density/`1F 11` media + `GS v 0`).
+    #[serde(rename = "phomemom110")]
+    PhomemoM110,
+    /// Phomemo D30/Q30 mini label makers (vendor bring-up + `GS v 0`).
+    #[serde(rename = "phomemod30")]
+    PhomemoD30,
     /// Zebra Programming Language.
     Zpl,
     /// TSC Printer Language.
@@ -240,6 +246,8 @@ mod tests {
             Protocol::EscPos,
             Protocol::Phomemo,
             Protocol::PhomemoM02x,
+            Protocol::PhomemoM110,
+            Protocol::PhomemoD30,
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,

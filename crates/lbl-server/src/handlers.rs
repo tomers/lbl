@@ -807,6 +807,8 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "esc/pos" | "escpos" => Protocol::EscPos,
         "phomemo" | "m02" => Protocol::Phomemo,
         "phomemo-m02x" | "phomemom02x" | "m02x" => Protocol::PhomemoM02x,
+        "phomemo-m110" | "phomemom110" | "m110" => Protocol::PhomemoM110,
+        "phomemo-d30" | "phomemod30" | "d30" | "q30" => Protocol::PhomemoD30,
         "file" | "virtual" => Protocol::Virtual,
         "html" => Protocol::Html,
         "tspl" => Protocol::Tspl,
@@ -1322,7 +1324,10 @@ pub fn browser_transport_hints(
 fn default_browser_api(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Niimbot => "web_serial",
-        Protocol::Phomemo | Protocol::PhomemoM02x => "web_bluetooth",
+        Protocol::Phomemo
+        | Protocol::PhomemoM02x
+        | Protocol::PhomemoM110
+        | Protocol::PhomemoD30 => "web_bluetooth",
         Protocol::Dymo | Protocol::DymoLw | Protocol::DymoLwClassic => "webusb",
         Protocol::BrotherQl | Protocol::BrotherPt => "webusb",
         _ => "webusb",

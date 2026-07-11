@@ -56,6 +56,8 @@ impl Registry {
         registry.register(Box::new(lbl_driver_escpos::EscPosDriver::new()));
         registry.register(Box::new(lbl_driver_escpos::PhomemoDriver::new()));
         registry.register(Box::new(lbl_driver_escpos::PhomemoM02xDriver::new()));
+        registry.register(Box::new(lbl_driver_escpos::PhomemoM110Driver::new()));
+        registry.register(Box::new(lbl_driver_escpos::PhomemoD30Driver::new()));
         registry.register(Box::new(lbl_driver_zpl::ZplDriver::new()));
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::new()));
@@ -96,6 +98,8 @@ mod tests {
             Protocol::EscPos,
             Protocol::Phomemo,
             Protocol::PhomemoM02x,
+            Protocol::PhomemoM110,
+            Protocol::PhomemoD30,
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,
