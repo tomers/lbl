@@ -785,6 +785,26 @@ mod tests {
     }
 
     #[test]
+    fn epson_colorworks_esclabel_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let c4000 = catalog.lookup_printer("CW-C4000").unwrap();
+        assert_eq!(c4000.protocol, Protocol::EscLabel);
+        assert_eq!(c4000.dpi, 600.0);
+        assert_eq!(c4000.max_width_mm, 108.0);
+        assert!(c4000.supports_cut);
+        assert!(c4000.supports_color);
+        assert_eq!(c4000.maturity, Maturity::Experimental);
+        assert!(catalog.supports_media("CW-C4000", "epson-matte-4x6"));
+        assert!(catalog.supports_media("CW-C4000", "epson-cont-108"));
+        let c6500 = catalog.lookup_printer("CW-C6500A").unwrap();
+        assert_eq!(c6500.max_width_mm, 215.9);
+        assert!(catalog.supports_media("CW-C6500A", "epson-cont-215"));
+        let matte = catalog.lookup("epson-matte-4x6").unwrap();
+        assert_eq!(matte.media.width_mm, 102.0);
+        assert_eq!(matte.brand, "Epson");
+    }
+
+    #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
         let d110 = catalog.lookup_printer("D110").unwrap();

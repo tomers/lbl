@@ -18,6 +18,9 @@ pub enum Protocol {
     DymoLwClassic,
     /// ESC/POS thermal protocol.
     EscPos,
+    /// Epson ESC/Label (ColorWorks; ZPL II–compatible with Epson media layout).
+    #[serde(rename = "esclabel")]
+    EscLabel,
     /// Phomemo M02-class (ESC/POS raster with vendor `1F 11` framing).
     Phomemo,
     /// Phomemo M02X proprietary framing (not M02 ESC/POS).
@@ -244,6 +247,7 @@ mod tests {
             Protocol::DymoLw,
             Protocol::DymoLwClassic,
             Protocol::EscPos,
+            Protocol::EscLabel,
             Protocol::Phomemo,
             Protocol::PhomemoM02x,
             Protocol::PhomemoM110,

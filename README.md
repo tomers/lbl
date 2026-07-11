@@ -33,7 +33,7 @@ text/data/HTML
 | `lbl-transpile-html` | Custom elements + flex -> browser-ready HTML |
 | `lbl-render` | HTML -> raster (headless Chromium, two-pass); PrintToPdf for vector PDF export |
 | `lbl-dither` | Raster -> printer bit depth (photo-aware dithering) |
-| `crates/drivers/*` | Printer drivers: api, dymo, escpos, zpl, tspl, niimbot, file (virtual raster/PDF), console (terminal) |
+| `crates/drivers/*` | Printer drivers: api, dymo, escpos, esclabel, zpl, tspl, niimbot, file (virtual raster/PDF), console (terminal) |
 | `lbl-encode` | Bitmap -> protocol bytes (driver selection) |
 | `lbl-device` | Device discovery + USB/network transport |
 | `lbl-spool` | Internal print spooler |
@@ -178,7 +178,7 @@ $ lbl print --template sopranos.lbl --orientation portrait
 
 Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one string.
 
-<img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" width="100%" />
+<img src="docs/src/generated/images/inline-syntax.png" alt="Inline mini-syntax" />
 
 *80×20 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
@@ -194,9 +194,9 @@ Inline elements in a row are separated by `element_gap_mm` (default 4 mm).
 Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 (see [configuration precedence](docs/src/guides/configuration.md#configuration)).
 
-<img src="docs/src/generated/images/element-gap.png" alt="Element spacing" width="100%" />
+<img src="docs/src/generated/images/element-gap.png" alt="Element spacing" />
 
-<img src="docs/src/generated/images/element-gap-01.png" alt="Element spacing" width="100%" />
+<img src="docs/src/generated/images/element-gap-01.png" alt="Element spacing" />
 
 *200×30 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
@@ -228,7 +228,7 @@ $ lbl print --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n{{qr:htt
 
 Position content on the label with `--label-align` and `--label-valign`.
 
-<img src="docs/src/generated/images/label-align.png" alt="Label alignment" width="100%" />
+<img src="docs/src/generated/images/label-align.png" alt="Label alignment" />
 
 *90×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#style-fonts-qr-barcodes)
 
@@ -258,7 +258,7 @@ $ lbl print --label-align end --label-valign end --text bottom-right
 
 Inner padding (`--padding-mm`, default 2 mm) gutters content from the label edge.
 
-<img src="docs/src/generated/images/zero-padding.png" alt="Inner padding" width="100%" />
+<img src="docs/src/generated/images/zero-padding.png" alt="Inner padding" />
 
 *54×15 mm @ 300 dpi* · [Configuration →](docs/src/guides/configuration.md#padding-and-insets)
 

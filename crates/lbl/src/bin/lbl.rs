@@ -460,6 +460,9 @@ enum ProtocolArg {
     #[value(name = "phomemo-d30", aliases = ["phomemod30", "d30", "q30"])]
     PhomemoD30,
     Zpl,
+    /// Epson ESC/Label (ColorWorks).
+    #[value(name = "esc-label", aliases = ["esclabel", "colorworks"])]
+    EscLabel,
     Tspl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
     Niimbot,
@@ -491,6 +494,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::PhomemoM110 => Protocol::PhomemoM110,
             ProtocolArg::PhomemoD30 => Protocol::PhomemoD30,
             ProtocolArg::Zpl => Protocol::Zpl,
+            ProtocolArg::EscLabel => Protocol::EscLabel,
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::BrotherQl => Protocol::BrotherQl,

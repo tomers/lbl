@@ -17,6 +17,7 @@ makes sense.
 | `lbl-driver-api` | `crates/drivers/lbl-driver-api` | — | The `Driver` plugin contract |
 | `lbl-driver-dymo` | `crates/drivers/lbl-driver-dymo` | — | DYMO drivers: LabelManager tape (`dymo`) + LabelWriter 550 raster (`dymo-lw`) |
 | `lbl-driver-escpos` | `crates/drivers/lbl-driver-escpos` | — | ESC/POS driver |
+| `lbl-driver-esclabel` | `crates/drivers/lbl-driver-esclabel` | — | Epson ESC/Label (ColorWorks) |
 | `lbl-driver-zpl` | `crates/drivers/lbl-driver-zpl` | — | ZPL driver |
 | `lbl-driver-tspl` | `crates/drivers/lbl-driver-tspl` | — | TSPL driver |
 | `lbl-driver-niimbot` | `crates/drivers/lbl-driver-niimbot` | — | NIIMBOT packet driver (`niimbot`; D11/D110 family) |

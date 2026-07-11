@@ -811,6 +811,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "phomemo-d30" | "phomemod30" | "d30" | "q30" => Protocol::PhomemoD30,
         "file" | "virtual" => Protocol::Virtual,
         "html" => Protocol::Html,
+        "esc-label" | "esc/label" | "esclabel" | "colorworks" => Protocol::EscLabel,
         "tspl" => Protocol::Tspl,
         "zpl" => Protocol::Zpl,
         other => {

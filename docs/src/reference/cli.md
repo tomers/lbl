@@ -32,7 +32,7 @@ lbl device    Discover printers (list|status). Status uses the same printer
 --font-size-mm <MM>  --padding-mm <MM>  --border-mm <MM>
                     Inner padding and border on .lbl-label (defaults from
                     [style] padding_mm / border_width_mm, currently 2.0 / 0)
---protocol <dymo|dymo-lw|escpos|zpl|tspl|niimbot|virtual|console|html>
+--protocol <dymo|dymo-lw|escpos|esc-label|zpl|tspl|niimbot|virtual|console|html>
                     (dymo-lw = LabelWriter 550 series; niimbot = D11/D110;
                      virtual = file output (raster image or vector PDF);
                      console = terminal art;

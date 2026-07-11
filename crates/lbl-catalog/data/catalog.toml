@@ -1270,6 +1270,71 @@ name         = "Zebra Z-Perform 1000D 102x152mm Black-Mark"
 purchase_url = "https://www.zebra.com/"
 media        = { width_mm = 102.0, length = { kind = "fixed", mm = 152.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "black_mark", mark_mm = 4.0, offset_mm = 0.0 } }
 
+# --- Epson ColorWorks inkjet stock (ESC/Label) --------------------------------
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-matte-4x6", "EP-Matte-4x6", "CW-Matte-102x152"]
+name         = "Epson PE Matte 102x152mm (4x6) Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 152.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-matte-4x2", "EP-Matte-4x2", "CW-Matte-102x51"]
+name         = "Epson PE Matte 102x51mm (4x2) Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-matte-3x2", "EP-Matte-3x2", "CW-Matte-76x51"]
+name         = "Epson PE Matte 76x51mm (3x2) Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 76.0, length = { kind = "fixed", mm = 51.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-matte-2x1", "EP-Matte-2x1", "CW-Matte-50x25"]
+name         = "Epson PE Matte 50x25mm Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 50.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-glossy-4x6", "EP-Glossy-4x6", "CW-Glossy-102x152"]
+name         = "Epson Glossy 102x152mm (4x6) Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 152.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-synthetic-4x6", "EP-Synthetic-4x6", "CW-Synthetic-102x152"]
+name         = "Epson Synthetic 102x152mm (4x6) Inkjet Labels"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 152.0 }, material = "polypropylene", adhesive = "permanent", color = "white", sense = { kind = "gap", gap_mm = 3.0, offset_mm = 0.0 } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-cont-108", "CW-cont-108", "continuous-inkjet-4in"]
+name         = "Epson 108mm Continuous Inkjet Label Stock"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 108.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "continuous" } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-cont-215", "CW-cont-215", "continuous-inkjet-8in"]
+name         = "Epson 215mm Continuous Inkjet Label Stock"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 215.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "continuous" } }
+
+[[entries]]
+brand        = "Epson"
+keys         = ["epson-4x6-blackmark", "CW-4x6-BM"]
+name         = "Epson 102x152mm (4x6) Inkjet Labels Black-Mark"
+purchase_url = "https://epson.com/"
+media        = { width_mm = 102.0, length = { kind = "fixed", mm = 152.0 }, material = "paper", adhesive = "permanent", color = "white", sense = { kind = "black_mark", mark_mm = 4.0, offset_mm = 0.0 } }
+
 [[entries]]
 brand        = "TSC"
 keys         = ["tsc-4x6", "TSC-102x152"]
@@ -4271,3 +4336,170 @@ supported_media = [
 ]
 # USB bulk preferred; Bluetooth Classic SPP via OS serial (9600 baud).
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c7 }, { kind = "serial" }]
+
+# Epson ColorWorks inkjet (ESC/Label). USB product IDs vary by region/SKU;
+# vendor 0x04b8 (Seiko Epson) is used as a discovery wildcard until PIDs are
+# confirmed on hardware. Raw TCP :9100 is the common network path.
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C4000", "CWC4000", "ColorWorks C4000", "CW-C4000u", "CW-C4000e"]
+name = "Epson ColorWorks CW-C4000"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 600.0
+max_width_mm = 108.0
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C6000A", "CWC6000A", "ColorWorks C6000A", "CW-C6000Au", "CW-C6000Ae"]
+name = "Epson ColorWorks CW-C6000A"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 600.0
+max_width_mm = 112.0
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C6000P", "CWC6000P", "ColorWorks C6000P", "CW-C6000Pu", "CW-C6000Pe"]
+name = "Epson ColorWorks CW-C6000P"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 600.0
+max_width_mm = 112.0
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C6500A", "CWC6500A", "ColorWorks C6500A", "CW-C6500Au", "CW-C6500Ae"]
+name = "Epson ColorWorks CW-C6500A"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 600.0
+max_width_mm = 215.9
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-cont-215",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C6500P", "CWC6500P", "ColorWorks C6500P", "CW-C6500Pu", "CW-C6500Pe"]
+name = "Epson ColorWorks CW-C6500P"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 600.0
+max_width_mm = 215.9
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-cont-215",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+
+[[printers]]
+brand = "Epson"
+keys = ["CW-C3500", "CWC3500", "ColorWorks C3500", "TM-C3500"]
+name = "Epson ColorWorks CW-C3500"
+protocol = "esclabel"
+maturity = "experimental"
+dpi = 720.0
+max_width_mm = 108.0
+supports_cut = true
+supports_color = true
+default_media = "epson-matte-4x6"
+supported_media = [
+  "epson-matte-4x6",
+  "epson-matte-4x2",
+  "epson-matte-3x2",
+  "epson-matte-2x1",
+  "epson-glossy-4x6",
+  "epson-synthetic-4x6",
+  "epson-cont-108",
+  "epson-4x6-blackmark",
+  "102x152",
+  "100x150",
+  "50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x04b8 }]
