@@ -5,12 +5,14 @@
 //! stream is: `ESC @` (init), `GS v 0` raster, a short feed, then an optional
 //! `GS V` cut.
 //!
-//! Also hosts [`PhomemoDriver`] for Phomemo M02-class printers that wrap the
-//! same raster command in vendor `1F 11` framing.
+//! Also hosts [`PhomemoDriver`] (M02-class) and [`PhomemoM02xDriver`] (M02X
+//! proprietary framing) for Phomemo pocket printers.
 
 pub mod phomemo;
+pub mod phomemo_m02x;
 
 pub use phomemo::PhomemoDriver;
+pub use phomemo_m02x::PhomemoM02xDriver;
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 

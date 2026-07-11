@@ -5,8 +5,7 @@
 //! payload itself is standard `GS v 0`. Reverse-engineered from community
 //! captures ([vivier/phomemo-tools](https://github.com/vivier/phomemo-tools)).
 //!
-//! M02X and some newer SKUs use a different proprietary framing and are not
-//! covered here.
+//! M02X uses different proprietary framing — see [`crate::PhomemoM02xDriver`].
 //!
 //! `lbl` is not affiliated with Phomemo.
 

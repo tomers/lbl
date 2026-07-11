@@ -20,6 +20,9 @@ pub enum Protocol {
     EscPos,
     /// Phomemo M02-class (ESC/POS raster with vendor `1F 11` framing).
     Phomemo,
+    /// Phomemo M02X proprietary framing (not M02 ESC/POS).
+    #[serde(rename = "phomemom02x")]
+    PhomemoM02x,
     /// Zebra Programming Language.
     Zpl,
     /// TSC Printer Language.
@@ -236,6 +239,7 @@ mod tests {
             Protocol::DymoLwClassic,
             Protocol::EscPos,
             Protocol::Phomemo,
+            Protocol::PhomemoM02x,
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Niimbot,

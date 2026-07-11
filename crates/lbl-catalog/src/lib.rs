@@ -598,6 +598,25 @@ mod tests {
     }
 
     #[test]
+    fn phomemo_m02x_and_branded_media_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let m02x = catalog.lookup_printer("M02X").unwrap();
+        assert_eq!(m02x.protocol, Protocol::PhomemoM02x);
+        assert_eq!(m02x.dpi, 203.0);
+        assert_eq!(m02x.max_width_mm, 53.0);
+        assert!(catalog.supports_media("M02X", "phomemo-53-cont"));
+        assert!(catalog.supports_media("M02X", "phomemo-53-sticker"));
+        let m02s = catalog.lookup_printer("M02S").unwrap();
+        assert_eq!(m02s.protocol, Protocol::Phomemo);
+        assert_eq!(m02s.dpi, 300.0);
+        assert!(catalog.supports_media("M02S", "phomemo-15-cont"));
+        let t02 = catalog.lookup_printer("T02").unwrap();
+        assert_eq!(t02.protocol, Protocol::Phomemo);
+        let roll = catalog.lookup("phomemo-53-cont").unwrap();
+        assert_eq!(roll.media.width_mm, 53.0);
+    }
+
+    #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
         let d110 = catalog.lookup_printer("D110").unwrap();

@@ -766,6 +766,43 @@ keys  = ["cont-54", "continuous-2in"]
 name  = "54mm Continuous Thermal"
 media = { width_mm = 54.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
 
+# --- Phomemo pocket thermal rolls (M02 / M02X / T02 family, 53 mm class) -----
+
+[[entries]]
+brand        = "Phomemo"
+keys         = ["phomemo-53-cont", "PM-53-CONT"]
+name         = "Phomemo 53mm Continuous White Thermal"
+purchase_url = "https://phomemo.com/"
+media        = { width_mm = 53.0, length = { kind = "continuous" }, material = "paper", adhesive = "none", color = "white" }
+
+[[entries]]
+brand        = "Phomemo"
+keys         = ["phomemo-53-sticker", "PM-53-STICKER"]
+name         = "Phomemo 53mm Continuous White Sticker"
+purchase_url = "https://phomemo.com/"
+media        = { width_mm = 53.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Phomemo"
+keys         = ["phomemo-15-cont", "PM-15-CONT"]
+name         = "Phomemo 15mm Continuous White Thermal"
+purchase_url = "https://phomemo.com/"
+media        = { width_mm = 15.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Phomemo"
+keys         = ["phomemo-25-cont", "PM-25-CONT"]
+name         = "Phomemo 25mm Continuous White Thermal"
+purchase_url = "https://phomemo.com/"
+media        = { width_mm = 25.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Phomemo"
+keys         = ["phomemo-50x30", "PM-50x30"]
+name         = "Phomemo 50x30mm White Thermal Labels"
+purchase_url = "https://phomemo.com/"
+media        = { width_mm = 50.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
 [[entries]]
 brand        = "NIIMBOT"
 keys         = ["70x50", "niimbot-70x50"]
@@ -1895,14 +1932,78 @@ connections     = [{ kind = "usb", vendor_id = 0x1203 }]
 
 [[printers]]
 brand           = "Phomemo"
-keys            = ["M02", "M02S", "M02 Pro", "M02Pro"]
+keys            = ["M02"]
 name            = "Phomemo M02"
 protocol        = "phomemo"
 dpi             = 203.0
 max_width_mm    = 53.0
-default_media   = "cont-54"
-supported_media = ["cont-54", "50x25", "50x30", "40x30"]
+default_media   = "phomemo-53-cont"
+supported_media = ["phomemo-53-cont", "phomemo-53-sticker", "cont-54", "phomemo-50x30", "50x25", "50x30", "40x30"]
 connections     = [{ kind = "ble", name = "M02" }]
+
+[[printers]]
+brand = "Phomemo"
+keys = ["M02S"]
+name = "Phomemo M02S"
+protocol = "phomemo"
+dpi = 300.0
+max_width_mm = 53.0
+default_media = "phomemo-53-cont"
+supported_media = [
+  "phomemo-53-cont",
+  "phomemo-53-sticker",
+  "phomemo-15-cont",
+  "phomemo-25-cont",
+  "cont-54",
+  "phomemo-50x30",
+  "50x25",
+  "50x30",
+  "40x30",
+]
+connections = [{ kind = "ble", name = "M02S" }]
+
+[[printers]]
+brand = "Phomemo"
+keys = ["M02 Pro", "M02Pro"]
+name = "Phomemo M02 Pro"
+protocol = "phomemo"
+dpi = 300.0
+max_width_mm = 53.0
+default_media = "phomemo-53-cont"
+supported_media = [
+  "phomemo-53-cont",
+  "phomemo-53-sticker",
+  "phomemo-15-cont",
+  "phomemo-25-cont",
+  "cont-54",
+  "phomemo-50x30",
+  "50x25",
+  "50x30",
+  "40x30",
+]
+connections = [{ kind = "ble", name = "M02 Pro" }]
+
+[[printers]]
+brand           = "Phomemo"
+keys            = ["T02"]
+name            = "Phomemo T02"
+protocol        = "phomemo"
+dpi             = 203.0
+max_width_mm    = 53.0
+default_media   = "phomemo-53-cont"
+supported_media = ["phomemo-53-cont", "phomemo-53-sticker", "cont-54", "phomemo-50x30", "50x25", "50x30", "40x30"]
+connections     = [{ kind = "ble", name = "T02" }]
+
+[[printers]]
+brand           = "Phomemo"
+keys            = ["M02X"]
+name            = "Phomemo M02X"
+protocol        = "phomemom02x"
+dpi             = 203.0
+max_width_mm    = 53.0
+default_media   = "phomemo-53-cont"
+supported_media = ["phomemo-53-cont", "phomemo-53-sticker", "cont-54", "phomemo-50x30", "50x25", "50x30", "40x30"]
+connections     = [{ kind = "ble", name = "M02X" }]
 
 # Brother P-touch PT family — 128-dot / 180 dpi TZe raster (≤ 24 mm).
 
