@@ -202,13 +202,17 @@ Studio setup (WebUSB + TCP :9100): see [Brother QL setup](./brother-ql.md).
 
 ## Brother P-touch / TZe
 
-Brother PT-P700 / H500 / E500 / D600-class printers use the `brother-pt`
-protocol: a 180 dpi, 128-dot raster stream for laminated TZe tape (≤ 24 mm).
-Connect over USB or, on Wi‑Fi models such as PT-P750W, raw TCP port 9100:
+Brother PT-P700 / H500 / E500 / D600 / P710BT-class printers use the
+`brother-pt` protocol: a 180 dpi, 128-dot raster stream for laminated TZe tape
+(≤ 24 mm). PT-P900 / P900W / P950NW / P910BT use the same protocol with a
+560-dot / 360 dpi head (≤ 36 mm). Connect over USB, TCP port 9100 on Wi‑Fi
+models, or Bluetooth Classic SPP as a serial port (Cube — not Web Bluetooth):
 
 ```bash
 lbl-catalog compatible --printer "PT-P700"
 lbl print --media TZe-231 --protocol brother-pt --usb 04f9:2061 --cut
+lbl print --media TZe-261 --protocol brother-pt --usb 04f9:2083 --cut
+lbl print --media TZe-231 --protocol brother-pt --serial /dev/rfcomm0:9600 --cut
 ```
 
 See [Brother P-touch / TZe setup](./brother-pt.md).

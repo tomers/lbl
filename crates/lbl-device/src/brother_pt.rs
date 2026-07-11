@@ -79,7 +79,15 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, DeviceError> {
         (0x17, "Heat-shrink tube 3:1"),
         (0xFF, "Incompatible tape"),
     ];
-    const MODEL_CODES: &[(u8, &str)] = &[(b'd', "PT-H500"), (b'e', "PT-E500"), (b'g', "PT-P700")];
+    const MODEL_CODES: &[(u8, &str)] = &[
+        (b'd', "PT-H500"),
+        (b'e', "PT-E500"),
+        (b'g', "PT-P700"),
+        (b'q', "PT-P900"),
+        (b'o', "PT-P900W"),
+        (b'p', "PT-P950NW"),
+        (b'x', "PT-P910BT"),
+    ];
     // Raster Command Reference — Error information 1 / 2 (PT-H500 / P700 / E500).
     const ERROR1: &[(u8, &str)] = &[
         (0, "No media"),
