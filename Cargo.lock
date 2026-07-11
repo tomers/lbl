@@ -1782,6 +1782,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-ezpl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-file"
 version = "0.1.0"
 dependencies = [
@@ -1837,6 +1845,7 @@ dependencies = [
  "lbl-driver-dymo",
  "lbl-driver-esclabel",
  "lbl-driver-escpos",
+ "lbl-driver-ezpl",
  "lbl-driver-file",
  "lbl-driver-niimbot",
  "lbl-driver-slcs",

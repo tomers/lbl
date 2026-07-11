@@ -467,6 +467,9 @@ enum ProtocolArg {
     /// Bixolon SLCS label printers.
     #[value(name = "slcs", aliases = ["bixolon"])]
     Slcs,
+    /// Godex EZPL label printers.
+    #[value(name = "ezpl", aliases = ["godex"])]
+    Ezpl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
     Niimbot,
     /// Brother QL-series raster printers (QL-820NWB(c), …).
@@ -500,6 +503,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::EscLabel => Protocol::EscLabel,
             ProtocolArg::Tspl => Protocol::Tspl,
             ProtocolArg::Slcs => Protocol::Slcs,
+            ProtocolArg::Ezpl => Protocol::Ezpl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::BrotherQl => Protocol::BrotherQl,
             ProtocolArg::BrotherPt => Protocol::BrotherPt,

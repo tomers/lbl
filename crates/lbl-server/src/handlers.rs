@@ -814,6 +814,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
         "esc-label" | "esc/label" | "esclabel" | "colorworks" => Protocol::EscLabel,
         "tspl" => Protocol::Tspl,
         "slcs" | "bixolon" => Protocol::Slcs,
+        "ezpl" | "godex" => Protocol::Ezpl,
         "zpl" => Protocol::Zpl,
         other => {
             return Err(ApiError(

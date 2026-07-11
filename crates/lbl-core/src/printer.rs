@@ -38,6 +38,8 @@ pub enum Protocol {
     Tspl,
     /// Bixolon SLCS (Samsung Label Command Set) label language.
     Slcs,
+    /// Godex EZPL (EZ Printer Language).
+    Ezpl,
     /// NIIMBOT thermal label protocol (packet-framed; D11/D110 family).
     Niimbot,
     /// Brother QL-series raster protocol (QL-800 / QL-810W / QL-820NWB(c), …).
@@ -264,6 +266,7 @@ mod tests {
             Protocol::Zpl,
             Protocol::Tspl,
             Protocol::Slcs,
+            Protocol::Ezpl,
             Protocol::Niimbot,
             Protocol::BrotherQl,
             Protocol::BrotherPt,

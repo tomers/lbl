@@ -21,6 +21,7 @@ lbl-driver-zpl        = { workspace = true }
 lbl-driver-esclabel   = { workspace = true }
 lbl-driver-tspl       = { workspace = true }
 lbl-driver-slcs       = { workspace = true }
+lbl-driver-ezpl       = { workspace = true }
 lbl-driver-niimbot    = { workspace = true }
 lbl-driver-brother-ql = { workspace = true }
 lbl-driver-brother-pt = { workspace = true }
