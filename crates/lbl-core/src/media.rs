@@ -70,6 +70,63 @@ pub enum MediaColor {
     Other,
 }
 
+/// How the printer senses label boundaries along the feed.
+///
+/// Industrial dialects (TSPL / ZPL) emit different setup commands based on this
+/// metadata. When unset on a catalog row, drivers infer a sensible default from
+/// [`MediaLength`] (gap for die-cut, none for continuous).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum MediaSense {
+    /// Inter-label gap sensing (TSPL `GAP`, ZPL `^MNY`).
+    Gap {
+        /// Gap height along the feed, in millimeters.
+        #[serde(default = "default_gap_mm")]
+        gap_mm: f64,
+        /// Offset from the gap edge to the print start, in millimeters.
+        #[serde(default)]
+        offset_mm: f64,
+    },
+    /// Black-mark sensing on the liner or label back (TSPL `BLINE`, ZPL `^MNM`).
+    BlackMark {
+        /// Mark height along the feed, in millimeters.
+        #[serde(default = "default_mark_mm")]
+        mark_mm: f64,
+        /// Offset from the mark to the print start, in millimeters.
+        #[serde(default)]
+        offset_mm: f64,
+    },
+    /// Continuous stock with no inter-label sensor mark (TSPL `GAP 0`, ZPL `^MNN`).
+    Continuous,
+}
+
+fn default_gap_mm() -> f64 {
+    3.0
+}
+
+fn default_mark_mm() -> f64 {
+    3.0
+}
+
+impl Default for MediaSense {
+    fn default() -> Self {
+        Self::Gap {
+            gap_mm: default_gap_mm(),
+            offset_mm: 0.0,
+        }
+    }
+}
+
+impl MediaSense {
+    /// Infer sensing from length when a catalog row omits an explicit sense.
+    pub fn inferred_from_length(length: MediaLength) -> Self {
+        match length {
+            MediaLength::Fixed(_) => Self::default(),
+            MediaLength::Continuous => Self::Continuous,
+        }
+    }
+}
+
 /// A fully-resolved media profile, sufficient to size a render and drive a
 /// printer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -98,6 +155,9 @@ pub struct Media {
     /// primary bitmap; drivers that support dual-color media consume both.
     #[serde(default)]
     pub two_color: bool,
+    /// Label-boundary sensing for industrial dialects (TSPL / ZPL).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sense: Option<MediaSense>,
 }
 
 impl Media {
@@ -112,6 +172,7 @@ impl Media {
             adhesive: Adhesive::default(),
             color: MediaColor::default(),
             two_color: false,
+            sense: Some(MediaSense::Continuous),
         }
     }
 
@@ -126,7 +187,14 @@ impl Media {
             adhesive: Adhesive::default(),
             color: MediaColor::default(),
             two_color: false,
+            sense: Some(MediaSense::default()),
         }
+    }
+
+    /// Effective boundary sensing, falling back from [`MediaLength`] when unset.
+    pub fn sense_or_inferred(&self) -> MediaSense {
+        self.sense
+            .unwrap_or_else(|| MediaSense::inferred_from_length(self.length))
     }
 
     /// Printable width in device dots.

@@ -217,6 +217,25 @@ const MEDIA_TABLE: &[MediaGeometry] = &[
         media_type: MEDIA_DIE_CUT,
         wide_head: false,
     },
+    // Round die-cuts (DK-11219 / DK-11218); geometry from brother_ql labels.py.
+    MediaGeometry {
+        tape_width_mm: 12,
+        tape_length_mm: 12,
+        printable_dots: 94,
+        offset_r: 113,
+        feed_margin: 35,
+        media_type: MEDIA_DIE_CUT,
+        wide_head: false,
+    },
+    MediaGeometry {
+        tape_width_mm: 24,
+        tape_length_mm: 24,
+        printable_dots: 236,
+        offset_r: 42,
+        feed_margin: 0,
+        media_type: MEDIA_DIE_CUT,
+        wide_head: false,
+    },
     MediaGeometry {
         tape_width_mm: 29,
         tape_length_mm: 42,

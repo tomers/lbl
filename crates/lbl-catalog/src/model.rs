@@ -1,6 +1,6 @@
 //! Data model for catalog entries.
 
-use lbl_core::media::{Adhesive, Material, Media, MediaColor, MediaLength};
+use lbl_core::media::{Adhesive, Material, Media, MediaColor, MediaLength, MediaSense};
 use lbl_core::printer::{PrinterCapabilities, PrinterModel, Protocol};
 use lbl_core::units::Dpi;
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,9 @@ pub struct MediaSpec {
     /// Dual-ink / two-color consumable (primary + secondary plane at encode).
     #[serde(default)]
     pub two_color: bool,
+    /// Explicit gap / black-mark / continuous sensing for industrial dialects.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sense: Option<MediaSense>,
 }
 
 impl MediaSpec {
@@ -39,6 +42,10 @@ impl MediaSpec {
             adhesive: self.adhesive,
             color: self.color,
             two_color: self.two_color,
+            sense: Some(
+                self.sense
+                    .unwrap_or_else(|| MediaSense::inferred_from_length(self.length)),
+            ),
         }
     }
 }

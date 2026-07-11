@@ -850,6 +850,49 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let entry = catalog.lookup_by_product_id("10262260").unwrap();
         assert!(entry.matches_key("50x30"));
+        assert!(catalog
+            .lookup_by_product_id("6972842748577")
+            .unwrap()
+            .matches_key("50x30"));
+        assert!(catalog
+            .lookup_by_product_id("T40X30-230")
+            .unwrap()
+            .matches_key("40x30"));
+    }
+
+    #[test]
+    fn remaining_media_gaps_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        assert!(catalog.lookup("DK-11218").unwrap().name.contains("Round"));
+        assert!(catalog.lookup("DK-11219").unwrap().name.contains("Round"));
+        assert!(catalog
+            .lookup("TZe-FX231")
+            .unwrap()
+            .name
+            .contains("Flexible"));
+        assert!(catalog.lookup("TZe-SE4").unwrap().name.contains("Security"));
+        assert!(catalog.lookup("18051").unwrap().name.contains("Rhino"));
+        assert!(catalog.lookup("30346").unwrap().name.contains("US"));
+        assert_eq!(
+            catalog.lookup("z-perform-1000d-4x6").unwrap().brand,
+            "Zebra"
+        );
+        assert!(matches!(
+            catalog.lookup("zebra-4x6-blackmark").unwrap().media.sense,
+            Some(lbl_core::media::MediaSense::BlackMark { .. })
+        ));
+        assert!(catalog
+            .lookup("50x30-pro")
+            .unwrap()
+            .matches_key("50x30-pro"));
+        assert_eq!(catalog.lookup("phomemo-60x40").unwrap().brand, "Phomemo");
+        let duo = catalog.lookup_printer("LabelWriter Duo").unwrap();
+        assert_eq!(duo.protocol, Protocol::DymoLwClassic);
+        assert!(catalog.supports_media("LabelWriter Duo", "99014-duo"));
+        let m220 = catalog.lookup_printer("M220").unwrap();
+        assert_eq!(m220.protocol, Protocol::PhomemoM110);
+        assert!(catalog.supports_media("M220", "phomemo-80x60"));
+        assert!(catalog.supports_media("QL-820NWB", "DK-11218"));
     }
 
     #[test]

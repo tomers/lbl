@@ -5,7 +5,7 @@
 //! means *not printed* (white). This driver therefore inverts the bytes.
 
 use lbl_core::job::CutMode;
-use lbl_core::media::MediaLength;
+use lbl_core::media::{MediaLength, MediaSense};
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 use std::fmt::Write;
 
@@ -56,7 +56,15 @@ impl Driver for TsplDriver {
 
         let mut header = String::new();
         let _ = write!(header, "SIZE {width_mm:.0} mm, {height_mm:.0} mm\r\n");
-        header.push_str("GAP 0 mm, 0 mm\r\n");
+        match media.sense_or_inferred() {
+            MediaSense::Gap { gap_mm, offset_mm } => {
+                let _ = write!(header, "GAP {gap_mm:.0} mm, {offset_mm:.0} mm\r\n");
+            }
+            MediaSense::BlackMark { mark_mm, offset_mm } => {
+                let _ = write!(header, "BLINE {mark_mm:.0} mm, {offset_mm:.0} mm\r\n");
+            }
+            MediaSense::Continuous => header.push_str("GAP 0 mm, 0 mm\r\n"),
+        }
         header.push_str("DIRECTION 1\r\n");
         if let Some(n) = cutter_n {
             let _ = write!(header, "SET CUTTER {n}\r\n");
@@ -105,8 +113,38 @@ mod tests {
         let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();
         let text = String::from_utf8_lossy(&out);
         assert!(text.contains("SIZE 25 mm, 54 mm"));
+        assert!(text.contains("GAP 3 mm, 0 mm"));
         assert!(text.contains("BITMAP 0,0,1,1,0,"));
         assert!(text.contains("PRINT 1,1"));
+    }
+
+    #[test]
+    fn continuous_emits_zero_gap() {
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities::default();
+        let job = JobSpec::new(Media::continuous(104.0, Dpi(203.0)));
+        let ctx = EncodeContext::new(&job, &caps);
+        let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();
+        let text = String::from_utf8_lossy(&out);
+        assert!(text.contains("GAP 0 mm, 0 mm"));
+    }
+
+    #[test]
+    fn black_mark_emits_bline() {
+        use lbl_core::media::MediaSense;
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities::default();
+        let mut media = Media::fixed(102.0, 152.0, Dpi(203.0));
+        media.sense = Some(MediaSense::BlackMark {
+            mark_mm: 4.0,
+            offset_mm: 0.0,
+        });
+        let job = JobSpec::new(media);
+        let ctx = EncodeContext::new(&job, &caps);
+        let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();
+        let text = String::from_utf8_lossy(&out);
+        assert!(text.contains("BLINE 4 mm, 0 mm"));
+        assert!(!text.contains("GAP "));
     }
 
     #[test]
