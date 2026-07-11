@@ -178,6 +178,10 @@ pub struct PrinterModel {
     pub capabilities: PrinterCapabilities,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 /// What a printer can do; used by drivers and the spooler.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrinterCapabilities {
@@ -213,6 +217,22 @@ pub struct PrinterCapabilities {
     /// drivers pad to the protocol column height as needed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_printable_height_mm: Option<f64>,
+    /// Brother QL: emit `ESC i K` expanded mode (cut-at-end / two-color / hi-res).
+    /// Older chassis (QL-500 / QL-550) omit this opcode per Brother's raster ref.
+    #[serde(default = "default_true")]
+    pub supports_expanded_mode: bool,
+    /// Brother QL: emit `ESC i A` (cut every N) when auto-cut is on.
+    /// QL-500/550/650TD lack this command; QL-560+ support it.
+    #[serde(default = "default_true")]
+    pub supports_cut_every: bool,
+    /// Brother QL: emit `ESC i a 01` raster-mode switch.
+    /// Required only on QL-580N / 650TD / 1050 / 1060N (and later dual-mode bodies).
+    #[serde(default = "default_true")]
+    pub emit_raster_mode_switch: bool,
+    /// Brother QL: override leading invalidate (`0x00`) length.
+    /// When unset, the driver picks 400 (narrow) or 350 (wide) from head geometry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalidate_bytes: Option<u32>,
 }
 
 impl Default for PrinterCapabilities {
@@ -227,6 +247,10 @@ impl Default for PrinterCapabilities {
             feed_trail_mm: None,
             feed_reverse: false,
             head_printable_height_mm: None,
+            supports_expanded_mode: true,
+            supports_cut_every: true,
+            emit_raster_mode_switch: true,
+            invalidate_bytes: None,
         }
     }
 }

@@ -462,6 +462,48 @@ mod tests {
     }
 
     #[test]
+    fn brother_ql500_family_dialect_caps() {
+        let catalog = Catalog::bundled().unwrap();
+
+        let ql500 = catalog.lookup_printer("QL-500").unwrap();
+        assert_eq!(ql500.protocol, Protocol::BrotherQl);
+        assert_eq!(ql500.maturity, Maturity::Experimental);
+        assert!(!ql500.supports_cut);
+        assert!(!ql500.supports_expanded_mode);
+        assert!(!ql500.supports_cut_every);
+        assert!(!ql500.emit_raster_mode_switch);
+        assert_eq!(ql500.invalidate_bytes, Some(200));
+        assert_eq!(
+            catalog.match_usb(0x04f9, 0x2015).unwrap().canonical_key(),
+            "QL-500"
+        );
+
+        let ql550 = catalog.lookup_printer("QL-550").unwrap();
+        assert!(ql550.supports_cut);
+        assert!(!ql550.supports_expanded_mode);
+        assert!(!ql550.supports_cut_every);
+        assert!(!ql550.emit_raster_mode_switch);
+
+        let ql560 = catalog.lookup_printer("QL-560").unwrap();
+        assert!(ql560.supports_cut_every);
+        assert!(ql560.supports_expanded_mode);
+        assert!(!ql560.emit_raster_mode_switch);
+
+        let ql580 = catalog.lookup_printer("QL-580N").unwrap();
+        assert!(ql580.emit_raster_mode_switch);
+        assert!(ql580.supports_cut_every);
+
+        let ql650 = catalog.lookup_printer("QL-650TD").unwrap();
+        assert!(ql650.supports_expanded_mode);
+        assert!(!ql650.supports_cut_every);
+        assert!(ql650.emit_raster_mode_switch);
+        assert_eq!(
+            catalog.match_usb(0x04f9, 0x201b).unwrap().canonical_key(),
+            "QL-650TD"
+        );
+    }
+
+    #[test]
     fn compatibility_filter_works() {
         let catalog = Catalog::bundled().unwrap();
         let lw = catalog.compatible_with("DYMO LabelWriter 550");

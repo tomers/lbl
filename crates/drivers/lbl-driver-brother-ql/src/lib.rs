@@ -2,7 +2,8 @@
 //!
 //! Implements the raster command language from Brother's *Raster Command
 //! Reference* for the QL-800 / QL-810W / QL-820NWB family (720-dot head) and the
-//! QL-1050 / QL-1060N / QL-1100 / QL-1110NWB / QL-1115NWB family (1296-dot head).
+//! QL-1050 / QL-1060N / QL-1100 / QL-1110NWB / QL-1115NWB family (1296-dot head),
+//! plus capability-gated dialects for QL-500…580N / 650TD.
 //! The print head is horizontal and consumes one raster line per row of a
 //! row-major [`MonoBitmap`].
 //!
@@ -10,18 +11,25 @@
 //! wider than 70 mm use the QL-11xx / QL-1050-class 1296-dot / 162-byte row
 //! layout (350-byte invalidate per Brother's QL-500-series command reference).
 //!
+//! Cut / expanded / mode-switch opcodes are gated by
+//! [`PrinterCapabilities::supports_cut`],
+//! [`PrinterCapabilities::supports_cut_every`],
+//! [`PrinterCapabilities::supports_expanded_mode`], and
+//! [`PrinterCapabilities::emit_raster_mode_switch`] so QL-500-class bodies do
+//! not receive unsupported commands (Brother Raster Command Reference v6.0).
+//!
 //! ## Print job structure
 //!
 //! ```text
-//! N × 0x00                invalidate (400 on QL-8xx, 350 on QL-11xx)
+//! N × 0x00                invalidate (400 narrow / 350 wide; override via caps)
 //! ESC @                   initialize
-//! ESC i a 0x01            switch to raster mode
+//! ESC i a 0x01            switch to raster mode (when emit_raster_mode_switch)
 //! per page / copy:
 //!   ESC i S               status information request
 //!   ESC i z …             print information (media + raster line count)
-//!   ESC i M …             various mode (auto-cut)
-//!   ESC i A …             cut every N labels
-//!   ESC i K …             expanded mode (cut-at-end [| two-color])
+//!   ESC i M …             various mode / auto-cut (when supports_cut + auto-cut)
+//!   ESC i A …             cut every N labels (when supports_cut_every)
+//!   ESC i K …             expanded mode (when supports_expanded_mode)
 //!   ESC i d …             margin / feed amount
 //!   M 0x00                compression off
 //!   per row (mono):
@@ -470,6 +478,9 @@ impl BrotherQlDriver {
             two_color,
             first_page,
             last_page,
+            supports_cut,
+            supports_cut_every,
+            supports_expanded_mode,
         } = opts;
         out.extend_from_slice(&[ESC, b'i', b'S']);
 
@@ -486,17 +497,20 @@ impl BrotherQlDriver {
         out.push(if first_page { 0 } else { 1 });
         out.push(0x00);
 
-        // ESC i M: bit 6 = auto cut. ESC i A: cut every N labels (required with auto cut).
-        // ESC i K: bit 0 = two-color, bit 3 = cut at end.
-        out.extend_from_slice(&[ESC, b'i', b'M', if auto_cut { 1 << 6 } else { 0 }]);
-        if auto_cut {
-            out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
+        // ESC i M / A / K are model-specific (Brother QL Series Raster Ref v6.0).
+        if supports_cut && auto_cut {
+            out.extend_from_slice(&[ESC, b'i', b'M', 1 << 6]);
+            if supports_cut_every {
+                out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
+            }
         }
-        let mut expanded: u8 = if cut_at_end { 1 << 3 } else { 0 };
-        if two_color {
-            expanded |= 1 << 0;
+        if supports_expanded_mode {
+            let mut expanded: u8 = if cut_at_end { 1 << 3 } else { 0 };
+            if two_color {
+                expanded |= 1 << 0;
+            }
+            out.extend_from_slice(&[ESC, b'i', b'K', expanded]);
         }
-        out.extend_from_slice(&[ESC, b'i', b'K', expanded]);
         out.extend_from_slice(&[ESC, b'i', b'd']);
         out.extend_from_slice(&geom.feed_margin.to_le_bytes());
         out.extend_from_slice(&[b'M', 0x00]);
@@ -528,6 +542,9 @@ struct PageEncodeOpts {
     two_color: bool,
     first_page: bool,
     last_page: bool,
+    supports_cut: bool,
+    supports_cut_every: bool,
+    supports_expanded_mode: bool,
 }
 
 impl Driver for BrotherQlDriver {
@@ -541,6 +558,11 @@ impl Driver for BrotherQlDriver {
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let head = head_profile(ctx);
+        let invalidate_bytes = ctx
+            .capabilities
+            .invalidate_bytes
+            .map(|n| n as usize)
+            .unwrap_or(head.invalidate_bytes);
         let geom = Self::resolve_media(ctx, head);
         let two_color = ctx.two_color();
         let black = Self::pad_to_head(bitmap, geom, head)?;
@@ -559,10 +581,17 @@ impl Driver for BrotherQlDriver {
             MonoBitmap::new(0, 0)
         };
         let copies = ctx.copies();
+        let caps = ctx.capabilities;
         let (auto_cut, cut_at_end) = match ctx.cut_mode() {
             CutMode::None => (false, false),
             CutMode::Every => (true, false),
-            CutMode::End => (false, true),
+            CutMode::End => {
+                if caps.supports_expanded_mode {
+                    (false, true)
+                } else {
+                    (caps.supports_cut, false)
+                }
+            }
         };
 
         let row_overhead = if two_color {
@@ -571,13 +600,15 @@ impl Driver for BrotherQlDriver {
             3 + head.bytes_per_row
         };
         let mut out = Vec::with_capacity(
-            head.invalidate_bytes
+            invalidate_bytes
                 + 64
                 + copies as usize * (black.data.len() + black.height as usize * row_overhead + 48),
         );
-        out.extend(std::iter::repeat_n(0u8, head.invalidate_bytes));
+        out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
         out.extend_from_slice(&[ESC, b'@']);
-        out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+        if caps.emit_raster_mode_switch {
+            out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+        }
 
         for index in 0..copies {
             Self::push_page(
@@ -593,6 +624,9 @@ impl Driver for BrotherQlDriver {
                     two_color,
                     first_page: index == 0,
                     last_page: index + 1 == copies,
+                    supports_cut: caps.supports_cut,
+                    supports_cut_every: caps.supports_cut_every,
+                    supports_expanded_mode: caps.supports_expanded_mode,
                 },
             );
         }
@@ -692,7 +726,7 @@ mod tests {
         let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 2, CutMode::End, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
-        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
+        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
         assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
     }
@@ -703,8 +737,85 @@ mod tests {
         let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::None, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
-        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'M']));
         assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 0]));
+    }
+
+    #[test]
+    fn ql500_omits_cut_expanded_and_mode_switch() {
+        let bmp = MonoBitmap::new(8, 1);
+        let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
+        job.cut_mode = CutMode::Every;
+        let caps = PrinterCapabilities {
+            supports_cut: false,
+            supports_expanded_mode: false,
+            supports_cut_every: false,
+            emit_raster_mode_switch: false,
+            invalidate_bytes: Some(200),
+            dpi: Dpi(300.0),
+            max_width_mm: 62.0,
+            ..Default::default()
+        };
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
+
+        assert!(bytes[..200].iter().all(|&b| b == 0));
+        assert_eq!(&bytes[200..202], &[ESC, b'@']);
+        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'a', 0x01]));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'M']));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'A']));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'K']));
+        assert!(bytes.windows(3).any(|w| w == [ESC, b'i', b'z']));
+        assert_eq!(*bytes.last().unwrap(), 0x1A);
+    }
+
+    #[test]
+    fn ql550_auto_cut_without_cut_every_or_expanded() {
+        let bmp = MonoBitmap::new(8, 1);
+        let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
+        job.cut_mode = CutMode::Every;
+        let caps = PrinterCapabilities {
+            supports_cut: true,
+            supports_expanded_mode: false,
+            supports_cut_every: false,
+            emit_raster_mode_switch: false,
+            invalidate_bytes: Some(200),
+            dpi: Dpi(300.0),
+            max_width_mm: 62.0,
+            ..Default::default()
+        };
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
+
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'A']));
+        assert!(!bytes.windows(3).any(|w| w == [ESC, b'i', b'K']));
+        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'a', 0x01]));
+    }
+
+    #[test]
+    fn ql560_auto_cut_emits_cut_every_and_expanded() {
+        let bmp = MonoBitmap::new(8, 1);
+        let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
+        job.cut_mode = CutMode::Every;
+        let caps = PrinterCapabilities {
+            supports_cut: true,
+            supports_expanded_mode: true,
+            supports_cut_every: true,
+            emit_raster_mode_switch: false,
+            invalidate_bytes: Some(200),
+            dpi: Dpi(300.0),
+            max_width_mm: 62.0,
+            ..Default::default()
+        };
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
+
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 0]));
+        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'a', 0x01]));
     }
 
     #[test]

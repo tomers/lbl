@@ -2760,6 +2760,260 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "K4" }, { kind = "serial" }]
 
+# Brother QL-500-family: 720-dot / 300 dpi narrow head. Dialect gates (Raster
+# Command Reference v6.0 / cv_qlseries_eng_raster_600.pdf):
+#   QL-500  — no auto-cut / cut-every / expanded / mode-switch; invalidate 200
+#   QL-550  — auto-cut only (manual-cut sibling has lever; 550 has cutter)
+#   QL-560/570 — auto-cut + cut-every + expanded; no mode-switch
+#   QL-580N/650TD — + ESC i a mode-switch; 650TD has no cut-every
+# USB PIDs from §7 of the same ref. Maturity experimental until hardware smoke.
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-500", "QL500"]
+name = "Brother QL-500"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = false
+supports_expanded_mode = false
+supports_cut_every = false
+emit_raster_mode_switch = false
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2015 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-550", "QL550"]
+name = "Brother QL-550"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+supports_expanded_mode = false
+supports_cut_every = false
+emit_raster_mode_switch = false
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2016 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-560", "QL560"]
+name = "Brother QL-560"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+supports_expanded_mode = true
+supports_cut_every = true
+emit_raster_mode_switch = false
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2027 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-570", "QL570"]
+name = "Brother QL-570"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+supports_expanded_mode = true
+supports_cut_every = true
+emit_raster_mode_switch = false
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2028 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-580N", "QL580N"]
+name = "Brother QL-580N"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+supports_expanded_mode = true
+supports_cut_every = true
+emit_raster_mode_switch = true
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2029 }]
+
+[[printers]]
+brand = "Brother"
+keys = ["QL-650TD", "QL650TD"]
+name = "Brother QL-650TD"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+supports_expanded_mode = true
+supports_cut_every = false
+emit_raster_mode_switch = true
+invalidate_bytes = 200
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x201b }]
+
 # Brother QL-800 family shares the same 720-dot / 300 dpi raster dialect (≤ 62 mm DK).
 
 [[printers]]

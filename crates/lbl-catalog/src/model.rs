@@ -5,6 +5,10 @@ use lbl_core::printer::{PrinterCapabilities, PrinterModel, Protocol};
 use lbl_core::units::Dpi;
 use serde::{Deserialize, Serialize};
 
+fn default_true() -> bool {
+    true
+}
+
 /// The physical specification of a media SKU, independent of any printer's
 /// resolution. Combine with a [`Dpi`] to produce a device-ready [`Media`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -244,6 +248,18 @@ pub struct PrinterEntry {
     /// (`virtual`, `html`, `console`) are treated as color-capable in the UI.
     #[serde(default)]
     pub supports_color: bool,
+    /// Brother QL: emit `ESC i K` expanded mode. Defaults on for modern QL.
+    #[serde(default = "default_true")]
+    pub supports_expanded_mode: bool,
+    /// Brother QL: emit `ESC i A` cut-every-N with auto-cut. Defaults on.
+    #[serde(default = "default_true")]
+    pub supports_cut_every: bool,
+    /// Brother QL: emit `ESC i a` raster-mode switch. Defaults on.
+    #[serde(default = "default_true")]
+    pub emit_raster_mode_switch: bool,
+    /// Brother QL: optional invalidate (`0x00`) byte count override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalidate_bytes: Option<u32>,
     /// Whether the printer reports loaded media for auto-detection.
     #[serde(default)]
     pub reports_media: bool,
@@ -335,6 +351,10 @@ impl PrinterEntry {
             feed_trail_mm: self.feed_trail_mm,
             feed_reverse: self.feed_reverse,
             head_printable_height_mm: self.head_printable_height_mm,
+            supports_expanded_mode: self.supports_expanded_mode,
+            supports_cut_every: self.supports_cut_every,
+            emit_raster_mode_switch: self.emit_raster_mode_switch,
+            invalidate_bytes: self.invalidate_bytes,
         }
     }
 

@@ -105,10 +105,7 @@ mod tests {
                     supports_cut: false,
                     supports_color: false,
                     reports_media: true,
-                    feed_lead_mm: None,
-                    feed_trail_mm: None,
-                    feed_reverse: false,
-                    head_printable_height_mm: None,
+                    ..Default::default()
                 },
             },
             transport: Transport::Usb {
