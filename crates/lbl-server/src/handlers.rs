@@ -27,6 +27,12 @@ use lbl_transpile_html::{injected_fit_font_px, AssetsBase, LabelFitSetting};
 
 use crate::AppState;
 
+fn lock_chromium(lock: &std::sync::Mutex<()>) -> std::sync::MutexGuard<'_, ()> {
+    // A poisoned lock still means the previous Chromium work finished (or
+    // panicked); recover so one bad render does not brick the server.
+    lock.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// A handler error that renders as a JSON `{ "error": ... }` with a status.
 pub struct ApiError(StatusCode, String);
 
@@ -376,9 +382,11 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         encode_caps: encode_caps.clone(),
     };
     let px_per_mm = dpi * supersample as f64 / 25.4;
+    let chromium_lock = state.chromium_lock.clone();
 
     let rendered =
         tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<serde_json::Value>> {
+            let _chromium = lock_chromium(&chromium_lock);
             let backend = ChromiumBackend::launch()?;
             let mut out = Vec::with_capacity(count);
             for label in labels {
@@ -921,6 +929,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let bluetooth = req.bluetooth.clone();
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
+    let chromium_lock = state.chromium_lock.clone();
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
     let report = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
@@ -932,6 +941,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         let encoded: Vec<(String, Vec<u8>)> = if use_sidecar {
             encode_all(&SidecarBackend::node_default(), &registry, &labels, &opts)?
         } else {
+            let _chromium = lock_chromium(&chromium_lock);
             let backend = ChromiumBackend::launch()?;
             encode_all(&backend, &registry, &labels, &opts)?
         };
@@ -1085,6 +1095,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     };
 
     let printer_key = req.printer.clone();
+    let chromium_lock = state.chromium_lock.clone();
 
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let mut registry = if protocol == Protocol::Niimbot {
@@ -1135,6 +1146,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         if use_sidecar {
             encode(&SidecarBackend::node_default())
         } else {
+            let _chromium = lock_chromium(&chromium_lock);
             encode(&ChromiumBackend::launch()?)
         }
     })

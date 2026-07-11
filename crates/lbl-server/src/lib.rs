@@ -72,6 +72,7 @@ mod tests {
             )),
             loader: Arc::new(Loader::new()),
             host_discovery_enabled: true,
+            chromium_lock: Arc::new(std::sync::Mutex::new(())),
         }
     }
 

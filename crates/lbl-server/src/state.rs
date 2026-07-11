@@ -1,6 +1,6 @@
 //! Shared application state.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use lbl_catalog::Catalog;
 use lbl_config::{Loader, ProfileStore};
@@ -16,6 +16,13 @@ pub struct AppState {
     pub loader: Arc<Loader>,
     /// When false, local device enumeration is skipped (`GET /api/printers`, etc.).
     pub host_discovery_enabled: bool,
+    /// Serializes in-process Chromium launches.
+    ///
+    /// Each `ChromiumBackend::launch` starts a browser plus a nested Tokio
+    /// runtime. Overlapping launches (common when Studio fires several
+    /// `/api/preview` requests on refresh) reset the upstream connection and
+    /// surface as gateway `500 Internal Server Error`.
+    pub chromium_lock: Arc<Mutex<()>>,
 }
 
 impl AppState {
@@ -30,6 +37,7 @@ impl AppState {
             profiles: Arc::new(profiles),
             loader: Arc::new(loader),
             host_discovery_enabled: host_discovery_enabled_from_env(),
+            chromium_lock: Arc::new(Mutex::new(())),
         })
     }
 }
