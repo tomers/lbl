@@ -173,7 +173,9 @@ impl NiimbotDriver {
         let k = key.to_ascii_lowercase();
         match k.as_str() {
             // Protocol 3 / 203 dpi B-series.
-            "b1" | "b2" | "b21" | "b21s" | "b203" | "b3s" | "b3s_p" => Some(NiimbotTask::B1),
+            "b1" | "b2" | "b21" | "b21s" | "b203" | "b3s" | "b3s_p" | "b31" | "b4" => {
+                Some(NiimbotTask::B1)
+            }
             // 300 dpi Pro / H variants use the V4 task.
             "b1 pro" | "b1pro" | "b1_pro" | "b21 pro" | "b21pro" | "b21_pro" | "d11_h" | "d11h"
             | "d11_pro" | "d11pro" | "d110_m" | "d110m" => Some(NiimbotTask::V4),
@@ -737,7 +739,9 @@ mod tests {
 
     #[test]
     fn task_for_printer_key_maps_b_series_to_b1() {
-        for key in ["B1", "B2", "B21", "B21S", "B203", "B3S", "B3S_P"] {
+        for key in [
+            "B1", "B2", "B21", "B21S", "B203", "B3S", "B3S_P", "B31", "B4",
+        ] {
             assert_eq!(
                 NiimbotDriver::task_for_printer_key(key),
                 Some(NiimbotTask::B1),

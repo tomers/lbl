@@ -383,6 +383,27 @@ name         = "DYMO D1 1978367 Durable 12mm x 3m Black on Orange"
 purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
 media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "other" }
 
+[[entries]]
+brand        = "DYMO"
+keys         = ["45803", "S0720830"]
+name         = "DYMO D1 45803 19mm x 7m Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45800", "S0720820"]
+name         = "DYMO D1 45800 19mm x 7m Black on Clear"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45804"]
+name         = "DYMO D1 45804 19mm x 7m Black on Yellow"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
 #
 # D11/D110-family printers use a 12 mm (96-dot) thermal head at 203 dpi. Tape
@@ -761,6 +782,13 @@ media        = { width_mm = 70.0, length = { kind = "fixed", mm = 80.0 }, materi
 
 [[entries]]
 brand        = "NIIMBOT"
+keys         = ["70x40", "niimbot-70x40"]
+name         = "NIIMBOT 70x40mm White Thermal Labels (B31)"
+purchase_url = "https://www.niimbot.com/"
+media        = { width_mm = 70.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
 keys         = ["24x40", "niimbot-24x40"]
 name         = "NIIMBOT 24x40mm White Thermal Labels (D101)"
 purchase_url = "https://www.niimbot.com/"
@@ -1099,7 +1127,11 @@ supported_media = [
   "1978366",
   "1978367",
 ]
-connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1001 }]
+connections = [
+  # Mass-storage / modeswitch default, then printer interface.
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1001 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1002 },
+]
 
 [[printers]]
 brand = "DYMO"
@@ -1140,6 +1172,83 @@ connections = [
 ]
 
 [[printers]]
+brand = "DYMO"
+keys = ["LabelManager 420P", "LM420P"]
+name = "DYMO LabelManager 420P"
+protocol = "dymo"
+dpi = 180.0
+max_width_mm = 19.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 13.0
+default_media = "45803"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "45803",
+  "45800",
+  "45804",
+]
+connections = [
+  # Mass-storage / modeswitch default, then printer interface.
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1003 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1004 },
+]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelManager Wireless PnP", "LM Wireless PnP", "LMWirelessPnP"]
+name = "DYMO LabelManager Wireless PnP"
+protocol = "dymo"
+dpi = 180.0
+max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 8.2
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1008 }]
+
+[[printers]]
 brand           = "NIIMBOT"
 keys            = ["D110", "D11", "D11S"]
 name            = "NIIMBOT D110"
@@ -1148,7 +1257,7 @@ dpi             = 203.0
 max_width_mm    = 12.0
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D110" }]
+connections     = [{ kind = "ble", name = "D110" }, { kind = "ble", name = "D11S" }, { kind = "ble", name = "D11" }]
 
 [[printers]]
 brand           = "NIIMBOT"
@@ -1249,6 +1358,39 @@ max_width_mm    = 12.0
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D11" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["D110_M", "D110M"]
+name            = "NIIMBOT D110_M"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 12.0
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "D110" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["B31"]
+name            = "NIIMBOT B31"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 75.0
+default_media   = "70x40"
+supported_media = ["70x40", "70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "B31" }, { kind = "serial" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["B4"]
+name            = "NIIMBOT B4"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "B4" }, { kind = "serial" }]
 
 # Brother QL-800 family shares the same 720-dot / 300 dpi raster dialect (≤ 62 mm DK).
 
@@ -1630,6 +1772,39 @@ supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
 connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0141 }]
 
 [[printers]]
+brand           = "Zebra"
+keys            = ["ZD420", "ZD420d"]
+name            = "Zebra ZD420"
+protocol        = "zpl"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0120 }]
+
+[[printers]]
+brand           = "Zebra"
+keys            = ["ZD421", "ZD421d"]
+name            = "Zebra ZD421"
+protocol        = "zpl"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0185 }]
+
+[[printers]]
+brand           = "Zebra"
+keys            = ["GC420d", "GC420"]
+name            = "Zebra GC420d"
+protocol        = "zpl"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x00d1 }]
+
+[[printers]]
 brand           = "TSC"
 keys            = ["TE200"]
 name            = "TSC TE200"
@@ -1669,6 +1844,50 @@ name            = "TSC TE310"
 protocol        = "tspl"
 dpi             = 300.0
 max_width_mm    = 112.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+
+[[printers]]
+brand           = "TSC"
+keys            = ["DA210"]
+name            = "TSC DA210"
+protocol        = "tspl"
+dpi             = 203.0
+max_width_mm    = 108.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+
+[[printers]]
+brand           = "TSC"
+keys            = ["DA220"]
+name            = "TSC DA220"
+protocol        = "tspl"
+dpi             = 203.0
+max_width_mm    = 108.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+
+[[printers]]
+brand           = "TSC"
+keys            = ["DA310"]
+name            = "TSC DA310"
+protocol        = "tspl"
+dpi             = 300.0
+max_width_mm    = 106.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+
+[[printers]]
+brand           = "TSC"
+keys            = ["DA320"]
+name            = "TSC DA320"
+protocol        = "tspl"
+dpi             = 300.0
+max_width_mm    = 106.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
 connections     = [{ kind = "usb", vendor_id = 0x1203 }]

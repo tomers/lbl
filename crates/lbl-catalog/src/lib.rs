@@ -543,6 +543,15 @@ mod tests {
         assert!(lm280.matches_key("LabelManager 280"));
         let lm280_printer = catalog.match_usb(0x0922, 0x1006).unwrap();
         assert!(lm280_printer.matches_key("LabelManager 280"));
+        let lm420p = catalog.match_usb(0x0922, 0x1004).unwrap();
+        assert!(lm420p.matches_key("LabelManager 420P"));
+        assert_eq!(lm420p.max_width_mm, 19.0);
+        let lm_wireless = catalog.match_usb(0x0922, 0x1008).unwrap();
+        assert!(lm_wireless.matches_key("LabelManager Wireless PnP"));
+        let zd421 = catalog.match_usb(0x0a5f, 0x0185).unwrap();
+        assert!(zd421.matches_key("ZD421"));
+        let zd420 = catalog.match_usb(0x0a5f, 0x0120).unwrap();
+        assert!(zd420.matches_key("ZD420"));
     }
 
     #[test]
@@ -557,6 +566,35 @@ mod tests {
         let legacy = catalog.match_usb(0x0922, 0x0042).unwrap();
         assert!(legacy.matches_key("LabelWriter"));
         assert!(!legacy.matches_key("LabelWriter 550"));
+    }
+
+    #[test]
+    fn niimbot_wide_heads_and_d110m_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let b31 = catalog.lookup_printer("B31").unwrap();
+        assert_eq!(b31.max_width_mm, 75.0);
+        assert_eq!(b31.dpi, 203.0);
+        assert!(catalog.supports_media("B31", "70x40"));
+        let b4 = catalog.lookup_printer("B4").unwrap();
+        assert_eq!(b4.max_width_mm, 104.0);
+        assert!(catalog.supports_media("B4", "102x152"));
+        let d110m = catalog.lookup_printer("D110_M").unwrap();
+        assert_eq!(d110m.max_width_mm, 12.0);
+        assert!(d110m.matches_key("D110M"));
+        let d11s = catalog.lookup_printer("D11S").unwrap();
+        assert!(d11s.matches_key("D110"));
+    }
+
+    #[test]
+    fn tsc_da_series_and_d1_19mm_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let da210 = catalog.lookup_printer("DA210").unwrap();
+        assert_eq!(da210.protocol, Protocol::Tspl);
+        assert_eq!(da210.max_width_mm, 108.0);
+        let tape19 = catalog.lookup("45803").unwrap();
+        assert_eq!(tape19.media.width_mm, 19.0);
+        let lm420p = catalog.compatible_with("LabelManager 420P");
+        assert!(lm420p.iter().any(|e| e.matches_key("45803")));
     }
 
     #[test]
