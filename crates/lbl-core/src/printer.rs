@@ -42,8 +42,10 @@ pub enum Protocol {
     Ezpl,
     /// SATO Barcode Printer Language (SBPL).
     Sbpl,
-    /// Honeywell / Datamax-O'Neil DPL (Datamax Programming Language).
+    /// Honeywell / Datamax-O'Neil / Citizen DPL (Datamax Programming Language).
     Dpl,
+    /// Toshiba TEC TPCL (TEC Printer Command Language).
+    Tpcl,
     /// NIIMBOT thermal label protocol (packet-framed; D11/D110 family).
     Niimbot,
     /// Brother QL-series raster protocol (QL-800 / QL-810W / QL-820NWB(c), …).
@@ -273,6 +275,7 @@ mod tests {
             Protocol::Ezpl,
             Protocol::Sbpl,
             Protocol::Dpl,
+            Protocol::Tpcl,
             Protocol::Niimbot,
             Protocol::BrotherQl,
             Protocol::BrotherPt,

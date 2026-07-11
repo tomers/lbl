@@ -24,6 +24,7 @@ lbl-driver-slcs       = { workspace = true }
 lbl-driver-ezpl       = { workspace = true }
 lbl-driver-sbpl       = { workspace = true }
 lbl-driver-dpl        = { workspace = true }
+lbl-driver-tpcl       = { workspace = true }
 lbl-driver-niimbot    = { workspace = true }
 lbl-driver-brother-ql = { workspace = true }
 lbl-driver-brother-pt = { workspace = true }

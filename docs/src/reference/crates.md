@@ -20,6 +20,11 @@ makes sense.
 | `lbl-driver-esclabel` | `crates/drivers/lbl-driver-esclabel` | — | Epson ESC/Label (ColorWorks) |
 | `lbl-driver-zpl` | `crates/drivers/lbl-driver-zpl` | — | ZPL driver |
 | `lbl-driver-tspl` | `crates/drivers/lbl-driver-tspl` | — | TSPL driver |
+| `lbl-driver-slcs` | `crates/drivers/lbl-driver-slcs` | — | Bixolon SLCS driver |
+| `lbl-driver-ezpl` | `crates/drivers/lbl-driver-ezpl` | — | Godex EZPL driver |
+| `lbl-driver-sbpl` | `crates/drivers/lbl-driver-sbpl` | — | SATO SBPL driver |
+| `lbl-driver-dpl` | `crates/drivers/lbl-driver-dpl` | — | Honeywell / Citizen DPL driver |
+| `lbl-driver-tpcl` | `crates/drivers/lbl-driver-tpcl` | — | Toshiba TEC TPCL driver |
 | `lbl-driver-niimbot` | `crates/drivers/lbl-driver-niimbot` | — | NIIMBOT packet driver (`niimbot`; D11/D110 family) |
 | `lbl-driver-file` | `crates/drivers/lbl-driver-file` | — | Virtual printer → file (raster: png/bmp/tiff/gif/pbm; vector: pdf via orchestrator) |
 | `lbl-driver-console` | `crates/drivers/lbl-driver-console` | — | Console preview → terminal art (`console`) |

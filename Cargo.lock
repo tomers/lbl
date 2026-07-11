@@ -1831,6 +1831,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-tpcl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-tspl"
 version = "0.1.0"
 dependencies = [
@@ -1867,6 +1875,7 @@ dependencies = [
  "lbl-driver-niimbot",
  "lbl-driver-sbpl",
  "lbl-driver-slcs",
+ "lbl-driver-tpcl",
  "lbl-driver-tspl",
  "lbl-driver-zpl",
  "lbl-pattern",

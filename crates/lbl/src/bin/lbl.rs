@@ -473,9 +473,12 @@ enum ProtocolArg {
     /// SATO SBPL label printers.
     #[value(name = "sbpl", aliases = ["sato"])]
     Sbpl,
-    /// Honeywell / Datamax-O'Neil DPL label printers.
-    #[value(name = "dpl", aliases = ["honeywell", "datamax"])]
+    /// Honeywell / Datamax-O'Neil / Citizen DPL label printers.
+    #[value(name = "dpl", aliases = ["honeywell", "datamax", "citizen"])]
     Dpl,
+    /// Toshiba TEC TPCL label printers.
+    #[value(name = "tpcl", aliases = ["toshiba", "tec"])]
+    Tpcl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
     Niimbot,
     /// Brother QL-series raster printers (QL-820NWB(c), …).
@@ -512,6 +515,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Ezpl => Protocol::Ezpl,
             ProtocolArg::Sbpl => Protocol::Sbpl,
             ProtocolArg::Dpl => Protocol::Dpl,
+            ProtocolArg::Tpcl => Protocol::Tpcl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
             ProtocolArg::BrotherQl => Protocol::BrotherQl,
             ProtocolArg::BrotherPt => Protocol::BrotherPt,
