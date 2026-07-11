@@ -199,3 +199,16 @@ bundled catalog under the `Brother` brand. Black/red two-color printing is not
 implemented yet.
 
 Studio setup (WebUSB + TCP :9100): see [Brother QL setup](./brother-ql.md).
+
+## Brother P-touch / TZe
+
+Brother PT-P700 / H500 / E500 / D600-class printers use the `brother-pt`
+protocol: a 180 dpi, 128-dot raster stream for laminated TZe tape (≤ 24 mm).
+Connect over USB or, on Wi‑Fi models such as PT-P750W, raw TCP port 9100:
+
+```bash
+lbl-catalog compatible --printer "PT-P700"
+lbl print --media TZe-231 --protocol brother-pt --usb 04f9:2061 --cut
+```
+
+See [Brother P-touch / TZe setup](./brother-pt.md).

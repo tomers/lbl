@@ -474,6 +474,65 @@ name         = "NIIMBOT 30x20mm White Thermal Labels (B1)"
 purchase_url = "https://www.niimbot.com/"
 media        = { width_mm = 30.0, length = { kind = "fixed", mm = 20.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
+# --- Brother TZe laminated tapes (P-touch PT family, ≤ 24 mm) -----------------
+# Cassette widths map to printable bands on the 128-dot (180 dpi) PT head.
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N201", "TZe-N211", "TZEN201", "tze-3.5"]
+name         = "Brother TZe 3.5mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 3.5, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-211", "TZe211", "tze-6"]
+name         = "Brother TZe-211 6mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-221", "TZe221", "tze-9"]
+name         = "Brother TZe-221 9mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-231", "TZe231", "tze-12"]
+name         = "Brother TZe-231 12mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-131", "TZe131"]
+name         = "Brother TZe-131 12mm Black on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-241", "TZe241", "tze-18"]
+name         = "Brother TZe-241 18mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-251", "TZe251", "tze-24"]
+name         = "Brother TZe-251 24mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-334", "TZe334"]
+name         = "Brother TZe-334 12mm Gold on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
 # --- Brother DK labels (QL-820 family, ≤ 62 mm) -------------------------------
 # Dimensions are marketed tape/label sizes. The brother-ql driver maps them to
 # printable bands on the 720-dot (300 dpi) head.
@@ -1612,3 +1671,83 @@ max_width_mm    = 53.0
 default_media   = "cont-54"
 supported_media = ["cont-54", "50x25", "50x30", "40x30"]
 connections     = [{ kind = "ble", name = "M02" }]
+
+# Brother P-touch PT family — 128-dot / 180 dpi TZe raster (≤ 24 mm).
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-P700", "PTP700", "P700"]
+name            = "Brother PT-P700"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 24.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-251", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2061 }]
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-P750W", "PTP750W", "P750W"]
+name            = "Brother PT-P750W"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 24.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-251", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2062 }]
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-H500", "PTH500", "H500"]
+name            = "Brother PT-H500"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 24.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-251", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205e }]
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-E500", "PTE500", "E500"]
+name            = "Brother PT-E500"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 24.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-251", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205f }]
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-D600", "PTD600", "D600"]
+name            = "Brother PT-D600"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 24.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-251", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2074 }]
+
+[[printers]]
+brand           = "Brother"
+keys            = ["PT-D450", "PTD450", "D450"]
+name            = "Brother PT-D450"
+protocol        = "brotherpt"
+reports_media   = true
+dpi             = 180.0
+max_width_mm    = 18.0
+supports_cut    = true
+default_media   = "TZe-231"
+supported_media = ["TZe-N201", "TZe-211", "TZe-221", "TZe-231", "TZe-131", "TZe-241", "TZe-334"]
+connections     = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2073 }]

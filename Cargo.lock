@@ -1734,6 +1734,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-brother-pt"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-brother-ql"
 version = "0.1.0"
 dependencies = [
@@ -1807,6 +1815,7 @@ dependencies = [
  "lbl-cli",
  "lbl-core",
  "lbl-driver-api",
+ "lbl-driver-brother-pt",
  "lbl-driver-brother-ql",
  "lbl-driver-console",
  "lbl-driver-dymo",

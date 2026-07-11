@@ -59,6 +59,7 @@ impl Registry {
         registry.register(Box::new(lbl_driver_tspl::TsplDriver::new()));
         registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::new()));
         registry.register(Box::new(lbl_driver_brother_ql::BrotherQlDriver::new()));
+        registry.register(Box::new(lbl_driver_brother_pt::BrotherPtDriver::new()));
         registry.register(Box::new(lbl_driver_file::FileDriver::default()));
         registry.register(Box::new(lbl_driver_console::ConsoleDriver::new()));
         registry
@@ -97,6 +98,7 @@ mod tests {
             Protocol::Tspl,
             Protocol::Niimbot,
             Protocol::BrotherQl,
+            Protocol::BrotherPt,
             Protocol::Virtual,
             Protocol::Console,
         ] {

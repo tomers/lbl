@@ -799,6 +799,7 @@ fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     Ok(match s.to_ascii_lowercase().as_str() {
         "b1" | "d11" | "d110" | "niimbot" => Protocol::Niimbot,
         "brother-ql" | "brother_ql" | "brotherql" | "ql820" => Protocol::BrotherQl,
+        "brother-pt" | "brother_pt" | "brotherpt" | "pt" | "tze" => Protocol::BrotherPt,
         "console" | "term" => Protocol::Console,
         "dymo" => Protocol::Dymo,
         "dymo-lw" | "dymolw" | "lw550" => Protocol::DymoLw,
@@ -1322,6 +1323,7 @@ fn default_browser_api(protocol: Protocol) -> &'static str {
         Protocol::Niimbot => "web_serial",
         Protocol::Phomemo => "web_bluetooth",
         Protocol::Dymo | Protocol::DymoLw | Protocol::DymoLwClassic => "webusb",
+        Protocol::BrotherQl | Protocol::BrotherPt => "webusb",
         _ => "webusb",
     }
 }

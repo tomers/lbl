@@ -28,6 +28,8 @@ pub enum Protocol {
     Niimbot,
     /// Brother QL-series raster protocol (QL-800 / QL-810W / QL-820NWB(c), …).
     BrotherQl,
+    /// Brother P-touch / TZe tape raster protocol (PT-P700 / H500 / E500 family).
+    BrotherPt,
     /// A virtual printer that "prints" to an image file instead of hardware.
     ///
     /// The concrete output format (PNG, BMP, ...) is the printer's selected
@@ -238,6 +240,7 @@ mod tests {
             Protocol::Tspl,
             Protocol::Niimbot,
             Protocol::BrotherQl,
+            Protocol::BrotherPt,
         ] {
             assert!(p.targets_print_head(), "{p:?} should target a head");
         }

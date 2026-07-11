@@ -18,6 +18,8 @@
 //! `libdbus` on Linux).
 
 #[cfg(feature = "usb")]
+pub mod brother_pt;
+#[cfg(feature = "usb")]
 pub mod brother_ql;
 pub mod discovery;
 #[cfg(feature = "usb")]
@@ -36,6 +38,12 @@ pub use discovery::{discover, discover_ble, discover_serial, discover_usb, Disco
 pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 
+#[cfg(feature = "usb")]
+pub use brother_pt::{
+    media_key_hint as brother_pt_media_key_hint, parse_status as parse_brother_pt_status,
+    query_status as query_brother_pt_status, BrotherPtStatus,
+    STATUS_REPLY_LEN as BROTHER_PT_STATUS_REPLY_LEN, STATUS_REQUEST as BROTHER_PT_STATUS_REQUEST,
+};
 #[cfg(feature = "usb")]
 pub use brother_ql::{
     media_key_hint as brother_ql_media_key_hint, parse_status as parse_brother_ql_status,
