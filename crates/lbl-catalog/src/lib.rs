@@ -865,6 +865,8 @@ mod tests {
         assert!(c4000.connections.is_empty());
         assert!(catalog.match_usb(0x04b8, 0x0001).is_none());
         assert!(catalog.supports_media("CW-C4000", "epson-matte-4x6"));
+        assert!(catalog.supports_media("CW-C4000", "epson-matte-4x3"));
+        assert!(catalog.supports_media("CW-C4000", "epson-premium-matte-4x6"));
         assert!(catalog.supports_media("CW-C4000", "epson-cont-108"));
         let c6500 = catalog.lookup_printer("CW-C6500A").unwrap();
         assert_eq!(c6500.max_width_mm, 215.9);
@@ -873,6 +875,10 @@ mod tests {
         let matte = catalog.lookup("epson-matte-4x6").unwrap();
         assert_eq!(matte.media.width_mm, 102.0);
         assert_eq!(matte.brand, "Epson");
+        assert!(matte.matches_product_id("C33S045714"));
+        let pe43 = catalog.lookup("C33S045713").unwrap();
+        assert_eq!(pe43.media.width_mm, 102.0);
+        assert_eq!(pe43.media.length, lbl_core::media::MediaLength::Fixed(76.0));
     }
 
     #[test]
@@ -983,6 +989,20 @@ mod tests {
                 product_id: Some(0x0fff)
             }
         )));
+        let s621 = catalog.lookup_printer("CL-S621").unwrap();
+        assert_eq!(s621.protocol, Protocol::Dpl);
+        assert!(s621.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x2730,
+                product_id: Some(0x0fff)
+            }
+        )));
+        let e720 = catalog.lookup_printer("CL-E720").unwrap();
+        assert_eq!(e720.protocol, Protocol::Zpl);
+        assert!(e720.connections.is_empty());
+        let s700dt = catalog.lookup_printer("CL-S700DT").unwrap();
+        assert_eq!(s700dt.protocol, Protocol::Dpl);
     }
 
     #[test]
@@ -1001,6 +1021,14 @@ mod tests {
         let bv = catalog.lookup_printer("BV420D").unwrap();
         assert_eq!(bv.protocol, Protocol::Tpcl);
         assert!(bv.connections.is_empty());
+        let sv4 = catalog.lookup_printer("B-SV4").unwrap();
+        assert!(sv4.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x08a6,
+                product_id: Some(0x0051)
+            }
+        )));
         // Shared encode: desktop + industrial families on `tpcl`.
         for key in ["B-FV4D", "B-SV4", "B-SX4", "B-SA4TM", "B-EV4T"] {
             assert_eq!(
@@ -1009,6 +1037,53 @@ mod tests {
                 "{key}"
             );
         }
+    }
+
+    #[test]
+    fn catalog_depth_clones_and_usb_are_present() {
+        let catalog = Catalog::bundled().unwrap();
+        let d35 = catalog.lookup_printer("D35").unwrap();
+        assert_eq!(d35.protocol, Protocol::PhomemoD30);
+        assert_eq!(d35.max_width_mm, 15.0);
+        let q30s = catalog.lookup_printer("Q30S").unwrap();
+        assert_eq!(q30s.protocol, Protocol::PhomemoD30);
+        let ttp = catalog.lookup_printer("TTP-244 Pro").unwrap();
+        assert_eq!(ttp.protocol, Protocol::Tspl);
+        assert_eq!(ttp.max_width_mm, 108.0);
+        assert!(ttp.connections.is_empty());
+        let xp = catalog.lookup_printer("XP-420B").unwrap();
+        assert_eq!(xp.protocol, Protocol::Tspl);
+        assert_eq!(xp.brand, "Xprinter");
+        let e550 = catalog.lookup_printer("PT-E550W").unwrap();
+        assert_eq!(e550.protocol, Protocol::BrotherPt);
+        assert!(e550.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x04f9,
+                product_id: Some(0x2060)
+            }
+        )));
+        // Documented unknowns — still empty (no guessed PIDs).
+        assert!(catalog
+            .lookup_printer("ZT231")
+            .unwrap()
+            .connections
+            .is_empty());
+        assert!(catalog
+            .lookup_printer("LM500TS")
+            .unwrap()
+            .connections
+            .is_empty());
+        assert!(catalog
+            .lookup_printer("X1038")
+            .unwrap()
+            .connections
+            .is_empty());
+        assert!(catalog
+            .lookup_printer("CW-C4000")
+            .unwrap()
+            .connections
+            .is_empty());
     }
 
     #[test]
