@@ -4504,3 +4504,306 @@ supported_media = [
   "50x25",
 ]
 connections = []
+
+# Bixolon SLCS desktops. USB vendor 0x1504; SLP-T400 PID 0x0008 is confirmed in
+# public ID databases. Other PIDs vary by SKU — pair by model / network :9100
+# until field-captured. Shared industrial media with Zebra/TSC.
+
+[[printers]]
+brand           = "Bixolon"
+keys            = ["SLP-DX220", "SLPDX220", "DX220"]
+name            = "Bixolon SLP-DX220"
+protocol        = "slcs"
+maturity        = "experimental"
+dpi             = 203.0
+max_width_mm    = 60.0
+supports_cut    = true
+default_media   = "50x25"
+supported_media = ["50x25", "tsc-50x25", "z-perform-1000d-2x1", "cont-54", "102x152", "100x150"]
+connections     = [{ kind = "usb", vendor_id = 0x1504 }]
+
+[[printers]]
+brand = "Bixolon"
+keys = ["SLP-DX420", "SLPDX420", "DX420"]
+name = "Bixolon SLP-DX420"
+protocol = "slcs"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1504 }]
+
+[[printers]]
+brand = "Bixolon"
+keys = ["SLP-TX400", "SLPTX400", "TX400"]
+name = "Bixolon SLP-TX400"
+protocol = "slcs"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1504 }]
+
+[[printers]]
+brand = "Bixolon"
+keys = ["SLP-TX420", "SLPTX420", "TX420"]
+name = "Bixolon SLP-TX420"
+protocol = "slcs"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1504 }]
+
+[[printers]]
+brand = "Bixolon"
+keys = ["SLP-T400", "SLPT400", "T400"]
+name = "Bixolon SLP-T400"
+protocol = "slcs"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1504, product_id = 0x0008 }]
+
+[[printers]]
+brand = "Bixolon"
+keys = ["XD3-40d", "XD340d", "XD3-40D"]
+name = "Bixolon XD3-40d"
+protocol = "slcs"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1504 }]
+
+# Godex EZPL desktops. USB vendor 0x6495 (GoDEX International); product IDs
+# unconfirmed in public DBs — pair by model / network :9100 until field-captured.
+
+[[printers]]
+brand = "Godex"
+keys = ["DT4x", "DT4X", "DT4"]
+name = "Godex DT4x"
+protocol = "ezpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x6495 }]
+
+[[printers]]
+brand           = "Godex"
+keys            = ["DT2x", "DT2X", "DT2"]
+name            = "Godex DT2x"
+protocol        = "ezpl"
+maturity        = "experimental"
+dpi             = 203.0
+max_width_mm    = 54.0
+supports_cut    = true
+default_media   = "50x25"
+supported_media = ["50x25", "tsc-50x25", "z-perform-1000d-2x1", "cont-54"]
+connections     = [{ kind = "usb", vendor_id = 0x6495 }]
+
+[[printers]]
+brand = "Godex"
+keys = ["G500", "G-500"]
+name = "Godex G500"
+protocol = "ezpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x6495 }]
+
+[[printers]]
+brand = "Godex"
+keys = ["G530", "G-530"]
+name = "Godex G530"
+protocol = "ezpl"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 105.7
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x6495 }]
+
+[[printers]]
+brand = "Godex"
+keys = ["RT700", "RT-700"]
+name = "Godex RT700"
+protocol = "ezpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x6495 }]
+
+[[printers]]
+brand = "Godex"
+keys = ["RT730", "RT-730"]
+name = "Godex RT730"
+protocol = "ezpl"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 105.7
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x6495 }]

@@ -809,6 +809,40 @@ mod tests {
     }
 
     #[test]
+    fn bixolon_slcs_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let dx420 = catalog.lookup_printer("SLP-DX420").unwrap();
+        assert_eq!(dx420.protocol, Protocol::Slcs);
+        assert_eq!(dx420.dpi, 203.0);
+        assert!(dx420.supports_cut);
+        assert_eq!(dx420.maturity, Maturity::Experimental);
+        assert!(catalog.supports_media("SLP-DX420", "102x152"));
+        let t400 = catalog.lookup_printer("SLP-T400").unwrap();
+        assert_eq!(t400.protocol, Protocol::Slcs);
+        assert!(t400.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x1504,
+                product_id: Some(0x0008)
+            }
+        )));
+    }
+
+    #[test]
+    fn godex_ezpl_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let dt4x = catalog.lookup_printer("DT4x").unwrap();
+        assert_eq!(dt4x.protocol, Protocol::Ezpl);
+        assert_eq!(dt4x.dpi, 203.0);
+        assert_eq!(dt4x.max_width_mm, 108.0);
+        assert!(dt4x.supports_cut);
+        assert!(catalog.supports_media("DT4x", "102x152"));
+        let g530 = catalog.lookup_printer("G530").unwrap();
+        assert_eq!(g530.protocol, Protocol::Ezpl);
+        assert_eq!(g530.dpi, 300.0);
+    }
+
+    #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
         let d110 = catalog.lookup_printer("D110").unwrap();
