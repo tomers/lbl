@@ -2,11 +2,13 @@
 //!
 //! Implements the raster command language from Brother's *Raster Command
 //! Reference* for the QL-800 / QL-810W / QL-820NWB family (720-dot head) and the
-//! QL-1100 / QL-1110NWB / QL-1115NWB family (1296-dot head). The print head is
-//! horizontal and consumes one raster line per row of a row-major [`MonoBitmap`].
+//! QL-1050 / QL-1060N / QL-1100 / QL-1110NWB / QL-1115NWB family (1296-dot head).
+//! The print head is horizontal and consumes one raster line per row of a
+//! row-major [`MonoBitmap`].
 //!
 //! Head geometry is selected from [`PrinterCapabilities::max_width_mm`]: printers
-//! wider than 70 mm use the QL-11xx 1296-dot / 162-byte row layout.
+//! wider than 70 mm use the QL-11xx / QL-1050-class 1296-dot / 162-byte row
+//! layout (350-byte invalidate per Brother's QL-500-series command reference).
 //!
 //! ## Print job structure
 //!

@@ -2086,6 +2086,8 @@ connections = [
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1004 },
 ]
 
+# USB PID for 500TS is still unconfirmed in public ID DBs (Windows HWID is
+# USBPRINT\DYMOLABELMANAGER_5002B5B only). Pair by model until hardware capture.
 [[printers]]
 brand = "DYMO"
 keys = ["LabelManager 500TS", "LM500TS"]
@@ -2153,6 +2155,192 @@ supported_media = [
 ]
 connections = []
 
+# Older 64-dot @ 180 dpi D1 tape heads (labelle / dymoprint / thermal-label).
+# LM 160 / 210D / 360D are keyboard-only (no host USB) — not catalogued.
+
+[[printers]]
+
+brand = "DYMO"
+keys = ["LabelManager PC", "LM PC", "LMPC"]
+name = "DYMO LabelManager PC"
+protocol = "dymo"
+maturity = "experimental"
+dpi = 180.0
+max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 9.0
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "18443",
+  "18444",
+  "18488",
+  "1805414",
+  "18053",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0011 }]
+
+[[printers]]
+
+brand = "DYMO"
+keys = ["LabelManager PC II", "LM PC II", "LMPCII"]
+name = "DYMO LabelManager PC II"
+protocol = "dymo"
+maturity = "experimental"
+dpi = 180.0
+max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 9.0
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "18443",
+  "18444",
+  "18488",
+  "1805414",
+  "18053",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001c }]
+
+[[printers]]
+
+brand = "DYMO"
+keys = ["LabelManager 400", "LM400"]
+name = "DYMO LabelManager 400"
+protocol = "dymo"
+maturity = "experimental"
+dpi = 180.0
+max_width_mm = 12.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 9.0
+default_media = "45013"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "18443",
+  "18444",
+  "18488",
+  "1805414",
+  "18053",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0013 }]
+
+[[printers]]
+
+brand = "DYMO"
+keys = ["LabelPoint 350", "LP350"]
+name = "DYMO LabelPoint 350"
+protocol = "dymo"
+maturity = "experimental"
+dpi = 180.0
+max_width_mm = 19.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 9.0
+default_media = "45803"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "45803",
+  "45800",
+  "45804",
+  "45805",
+  "45806",
+  "45807",
+  "45808",
+  "45809",
+  "45811",
+  "16958",
+  "16960",
+  "18443",
+  "18444",
+  "18488",
+  "1805414",
+  "18053",
+  "18051",
+  "18055",
+  "18489",
+  "1805416",
+]
+connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0015 }]
+
 [[printers]]
 brand = "DYMO"
 keys = ["LabelManager Wireless PnP", "LM Wireless PnP", "LMWirelessPnP"]
@@ -2205,6 +2393,59 @@ max_width_mm    = 12.0
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D110" }, { kind = "ble", name = "D11S" }, { kind = "ble", name = "D11" }]
+
+# Thermal-transfer pocket / mid-size: ribbon + label required. Encode uses `b1`
+# task (niimbluelib modelPrintTasks: N1 + M2_H; B18/B18S geometric siblings of N1).
+
+[[printers]]
+
+brand           = "NIIMBOT"
+keys            = ["B18", "B18S"]
+name            = "NIIMBOT B18"
+protocol        = "niimbot"
+maturity        = "experimental"
+dpi             = 203.0
+max_width_mm    = 12.0
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
+
+[[printers]]
+
+brand           = "NIIMBOT"
+keys            = ["N1"]
+name            = "NIIMBOT N1"
+protocol        = "niimbot"
+maturity        = "experimental"
+dpi             = 203.0
+max_width_mm    = 12.0
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "N1" }]
+
+[[printers]]
+
+brand = "NIIMBOT"
+keys = ["M2_H", "M2H"]
+name = "NIIMBOT M2_H"
+protocol = "niimbot"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 48.0
+default_media = "50x30-pro"
+supported_media = [
+  "50x30",
+  "40x30",
+  "40x60",
+  "30x20",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+]
+connections = [{ kind = "ble", name = "M2_H" }, { kind = "ble", name = "M2H" }, { kind = "serial" }]
+reports_media = true
 
 [[printers]]
 brand           = "NIIMBOT"
@@ -2752,6 +2993,48 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2044 }]
 
+# QL-600: 720-dot / 300 dpi narrow head (linux-usb.org + lsusb `04f9:20c0`).
+# `04f9:2100` is a Brother card reader — do not alias.
+
+[[printers]]
+
+brand = "Brother"
+keys = ["QL-600", "QL600"]
+name = "Brother QL-600"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 62.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11201"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c0 }]
+
 [[printers]]
 brand = "Brother"
 keys = ["QL-1100", "QL1100"]
@@ -2904,6 +3187,114 @@ supported_media = [
   "tsc-50x25",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20ab }]
+
+# QL-1050 / 1060N: same 1296-dot / 162-byte / 350-invalidate wide-head path as
+# QL-11xx (`max_width_mm > 70`). Brother Raster Command Reference (QL-500 series
+# v6.0) lists PIDs `2020` / `202a` and n=162; not an alias of QL-1100 SKUs.
+
+[[printers]]
+
+brand = "Brother"
+keys = ["QL-1050", "QL1050"]
+name = "Brother QL-1050"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 103.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11240"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+  "DK-22243",
+  "DK-11240",
+  "DK-11247",
+  "102x152",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2020 }]
+
+[[printers]]
+
+brand = "Brother"
+keys = ["QL-1060N", "QL1060N"]
+name = "Brother QL-1060N"
+protocol = "brotherql"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 103.0
+supports_cut = true
+reports_media = true
+default_media = "DK-11240"
+supported_media = [
+  "DK-22205",
+  "DK-22251",
+  "DK-22214",
+  "DK-2210",
+  "DK-2211",
+  "DK-22225",
+  "DK-22223",
+  "DK-44205",
+  "DK-44605",
+  "DK-22212",
+  "DK-22606",
+  "DK-22113",
+  "DK-11201",
+  "DK-11202",
+  "DK-11203",
+  "DK-11204",
+  "DK-11208",
+  "DK-11209",
+  "DK-11215",
+  "DK-11218",
+  "DK-11219",
+  "DK-11221",
+  "DK-11241",
+  "DK-22243",
+  "DK-11240",
+  "DK-11247",
+  "102x152",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x202a }]
 
 [[printers]]
 brand = "Zebra"
