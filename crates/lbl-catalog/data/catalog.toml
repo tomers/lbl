@@ -399,10 +399,136 @@ media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "
 
 [[entries]]
 brand        = "DYMO"
-keys         = ["45804"]
-name         = "DYMO D1 45804 19mm x 7m Black on Yellow"
+keys         = ["45804", "S0720840"]
+name         = "DYMO D1 45804 19mm x 7m Blue on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45805", "S0720850"]
+name         = "DYMO D1 45805 19mm x 7m Red on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45806", "S0720860"]
+name         = "DYMO D1 45806 19mm x 7m Black on Blue"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45807", "S0720870"]
+name         = "DYMO D1 45807 19mm x 7m Black on Red"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45808", "S0720880"]
+name         = "DYMO D1 45808 19mm x 7m Black on Yellow"
 purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
 media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45809", "S0720890"]
+name         = "DYMO D1 45809 19mm x 7m Black on Green"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["45811", "S0720910"]
+name         = "DYMO D1 45811 19mm x 7m White on Black"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["16958", "S0718050"]
+name         = "DYMO D1 16958 19mm x 3.5m Flexible Nylon Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["16960", "S0718070"]
+name         = "DYMO D1 16960 19mm x 5.5m Permanent Polyester Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53710", "S0720920"]
+name         = "DYMO D1 53710 24mm x 7m Black on Clear"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53713", "S0720930"]
+name         = "DYMO D1 53713 24mm x 7m Black on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53714", "S0720940"]
+name         = "DYMO D1 53714 24mm x 7m Blue on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53715", "S0720950"]
+name         = "DYMO D1 53715 24mm x 7m Red on White"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53716", "S0720960"]
+name         = "DYMO D1 53716 24mm x 7m Black on Blue"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53717", "S0720970"]
+name         = "DYMO D1 53717 24mm x 7m Black on Red"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53718", "S0720980"]
+name         = "DYMO D1 53718 24mm x 7m Black on Yellow"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53719", "S0720990"]
+name         = "DYMO D1 53719 24mm x 7m Black on Green"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53720", "S0721000"]
+name         = "DYMO D1 53720 24mm x 7m White on Clear"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["53721", "S0721010"]
+name         = "DYMO D1 53721 24mm x 7m White on Black"
+purchase_url = "https://dymo.eu/en/labels-tapes/d1-tapes.html"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
 
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
 #
@@ -1243,12 +1369,76 @@ supported_media = [
   "45803",
   "45800",
   "45804",
+  "45805",
+  "45806",
+  "45807",
+  "45808",
+  "45809",
+  "45811",
+  "16958",
+  "16960",
 ]
 connections = [
   # Mass-storage / modeswitch default, then printer interface.
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1003 },
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1004 },
 ]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LabelManager 500TS", "LM500TS"]
+name = "DYMO LabelManager 500TS"
+protocol = "dymo"
+dpi = 300.0
+max_width_mm = 24.0
+feed_trail_mm = 8.1
+feed_reverse = true
+head_printable_height_mm = 18.0
+default_media = "53713"
+supported_media = [
+  "43613",
+  "40910",
+  "40913",
+  "40914",
+  "40916",
+  "45010",
+  "45013",
+  "45014",
+  "45015",
+  "45016",
+  "45017",
+  "45018",
+  "45019",
+  "45020",
+  "45021",
+  "16957",
+  "1978364",
+  "1978365",
+  "1978366",
+  "1978367",
+  "45803",
+  "45800",
+  "45804",
+  "45805",
+  "45806",
+  "45807",
+  "45808",
+  "45809",
+  "45811",
+  "16958",
+  "16960",
+  "53710",
+  "53713",
+  "53714",
+  "53715",
+  "53716",
+  "53717",
+  "53718",
+  "53719",
+  "53720",
+  "53721",
+]
+connections = []
 
 [[printers]]
 brand = "DYMO"
@@ -1309,7 +1499,7 @@ connections     = [{ kind = "ble", name = "D101" }]
 
 [[printers]]
 brand           = "NIIMBOT"
-keys            = ["B1"]
+keys            = ["B1", "B1_SE", "B1SE"]
 name            = "NIIMBOT B1"
 protocol        = "niimbot"
 dpi             = 203.0
@@ -1332,7 +1522,7 @@ connections     = [{ kind = "ble", name = "B2" }, { kind = "serial" }]
 
 [[printers]]
 brand           = "NIIMBOT"
-keys            = ["B21", "B21S"]
+keys            = ["B21", "B21S", "B21_C2B", "B21C2B", "B21_L2B", "B21L2B"]
 name            = "NIIMBOT B21"
 protocol        = "niimbot"
 dpi             = 203.0
@@ -1428,6 +1618,28 @@ max_width_mm    = 104.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
 connections     = [{ kind = "ble", name = "B4" }, { kind = "serial" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["K3", "K3_W", "K3W"]
+name            = "NIIMBOT K3"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 80.0
+default_media   = "70x50"
+supported_media = ["70x40", "70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "K3" }, { kind = "serial" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["K4"]
+name            = "NIIMBOT K4"
+protocol        = "niimbot"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "70x50", "70x80", "50x30", "40x30", "40x60", "30x20"]
+connections     = [{ kind = "ble", name = "K4" }, { kind = "serial" }]
 
 # Brother QL-800 family shares the same 720-dot / 300 dpi raster dialect (≤ 62 mm DK).
 
@@ -1842,6 +2054,28 @@ supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
 connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x00d1 }]
 
 [[printers]]
+brand           = "Zebra"
+keys            = ["ZP450", "ZP 450", "ZP-450"]
+name            = "Zebra ZP450"
+protocol        = "zpl"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x008c }]
+
+[[printers]]
+brand           = "Zebra"
+keys            = ["ZT231", "ZT231d"]
+name            = "Zebra ZT231"
+protocol        = "zpl"
+dpi             = 203.0
+max_width_mm    = 104.0
+default_media   = "102x152"
+supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
+connections     = []
+
+[[printers]]
 brand           = "TSC"
 keys            = ["TE200"]
 name            = "TSC TE200"
@@ -1850,7 +2084,7 @@ dpi             = 203.0
 max_width_mm    = 112.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1861,7 +2095,7 @@ dpi             = 203.0
 max_width_mm    = 112.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1872,7 +2106,7 @@ dpi             = 300.0
 max_width_mm    = 112.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1883,7 +2117,7 @@ dpi             = 300.0
 max_width_mm    = 112.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1894,7 +2128,7 @@ dpi             = 203.0
 max_width_mm    = 108.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1905,7 +2139,7 @@ dpi             = 203.0
 max_width_mm    = 108.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1916,7 +2150,7 @@ dpi             = 300.0
 max_width_mm    = 106.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 [[printers]]
 brand           = "TSC"
@@ -1927,7 +2161,7 @@ dpi             = 300.0
 max_width_mm    = 106.0
 default_media   = "102x152"
 supported_media = ["102x152", "100x150", "50x25", "cont-104", "50x30", "40x30"]
-connections     = [{ kind = "usb", vendor_id = 0x1203 }]
+connections     = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 
 [[printers]]

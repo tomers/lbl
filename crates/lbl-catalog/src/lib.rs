@@ -552,6 +552,11 @@ mod tests {
         assert!(zd421.matches_key("ZD421"));
         let zd420 = catalog.match_usb(0x0a5f, 0x0120).unwrap();
         assert!(zd420.matches_key("ZD420"));
+        let zp450 = catalog.match_usb(0x0a5f, 0x008c).unwrap();
+        assert!(zp450.matches_key("ZP450"));
+        let tsc = catalog.match_usb(0x1203, 0x0160).unwrap();
+        assert_eq!(tsc.protocol, Protocol::Tspl);
+        assert!(tsc.matches_key("TE200"));
     }
 
     #[test]
@@ -578,6 +583,15 @@ mod tests {
         let b4 = catalog.lookup_printer("B4").unwrap();
         assert_eq!(b4.max_width_mm, 104.0);
         assert!(catalog.supports_media("B4", "102x152"));
+        let k3 = catalog.lookup_printer("K3").unwrap();
+        assert_eq!(k3.max_width_mm, 80.0);
+        assert!(k3.matches_key("K3_W"));
+        let k4 = catalog.lookup_printer("K4").unwrap();
+        assert_eq!(k4.max_width_mm, 104.0);
+        let b1 = catalog.lookup_printer("B1_SE").unwrap();
+        assert!(b1.matches_key("B1"));
+        let b21 = catalog.lookup_printer("B21_C2B").unwrap();
+        assert!(b21.matches_key("B21"));
         let d110m = catalog.lookup_printer("D110_M").unwrap();
         assert_eq!(d110m.max_width_mm, 12.0);
         assert!(d110m.matches_key("D110M"));
@@ -591,10 +605,37 @@ mod tests {
         let da210 = catalog.lookup_printer("DA210").unwrap();
         assert_eq!(da210.protocol, Protocol::Tspl);
         assert_eq!(da210.max_width_mm, 108.0);
+        assert!(da210
+            .connections
+            .iter()
+            .any(|c| c.is_exact_usb_match(0x1203, 0x0160)));
+        assert!(!da210.connections.iter().any(|c| {
+            matches!(
+                c,
+                ConnectionHint::Usb {
+                    vendor_id: 0x1203,
+                    product_id: None,
+                }
+            )
+        }));
         let tape19 = catalog.lookup("45803").unwrap();
         assert_eq!(tape19.media.width_mm, 19.0);
+        let tape19_yellow = catalog.lookup("45808").unwrap();
+        assert_eq!(
+            tape19_yellow.media.color,
+            lbl_core::media::MediaColor::Yellow
+        );
+        let tape24 = catalog.lookup("53713").unwrap();
+        assert_eq!(tape24.media.width_mm, 24.0);
         let lm420p = catalog.compatible_with("LabelManager 420P");
         assert!(lm420p.iter().any(|e| e.matches_key("45803")));
+        assert!(lm420p.iter().any(|e| e.matches_key("45808")));
+        let lm500ts = catalog.lookup_printer("LM500TS").unwrap();
+        assert_eq!(lm500ts.max_width_mm, 24.0);
+        assert!(catalog.supports_media("LM500TS", "53713"));
+        let zt231 = catalog.lookup_printer("ZT231").unwrap();
+        assert_eq!(zt231.protocol, Protocol::Zpl);
+        assert_eq!(zt231.max_width_mm, 104.0);
     }
 
     #[test]
