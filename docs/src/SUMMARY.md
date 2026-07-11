@@ -17,6 +17,7 @@
 - [Rendering Quality & Supersampling](./guides/rendering-quality.md)
 - [Configuration](./guides/configuration.md)
 - [Managing Printers & Media](./guides/printers-media.md)
+- [Brother QL setup](./guides/brother-ql.md)
 - [Fixed-size Label Examples](./generated/label-examples.md)
 
 # Reference
