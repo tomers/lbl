@@ -568,7 +568,7 @@ pub fn encode_labels<B: RenderBackend>(
     let batch = labels.len() > 1;
     let mut preprocess_elapsed = Duration::ZERO;
     let mut next_batch_warn = BATCH_WARN_INTERVAL;
-    let last_index = labels.len().saturating_sub(1);
+    let last_index = labels.len() - 1;
 
     for (position, label) in labels.iter().enumerate() {
         let mut label_opts = opts.clone();

@@ -55,7 +55,7 @@ const DEFAULT_DENSITY: u8 = 100;
 /// Map a 1–5 UI density level onto DYMO's percent scale (≈60–140%).
 fn density_percent(job_density: Option<u8>) -> u8 {
     match job_density {
-        Some(level) if (1..=5).contains(&level) => 40u8.saturating_add(level.saturating_mul(20)),
+        Some(level) if (1..=5).contains(&level) => 40 + level * 20,
         Some(pct) if pct > 0 => pct.min(200),
         _ => DEFAULT_DENSITY,
     }

@@ -288,7 +288,7 @@ fn term_cols() -> usize {
 pub fn raster_options(color: bool) -> TerminalOptions {
     TerminalOptions {
         // Leave room for the frame's two border columns.
-        max_width: term_cols().saturating_sub(2).max(16),
+        max_width: term_cols() - 2,
         frame: true,
         color,
     }

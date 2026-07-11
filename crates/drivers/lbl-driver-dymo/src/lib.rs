@@ -87,7 +87,7 @@ impl DymoDriver {
         }
         for y in 0..target_h {
             let src_y = (y as u64 * src.height as u64 / target_h as u64) as u32;
-            let src_y = src_y.min(src.height.saturating_sub(1));
+            let src_y = src_y.min(src.height - 1);
             for x in 0..src.width {
                 if src.get(x, src_y) {
                     out.set(x, y, true);

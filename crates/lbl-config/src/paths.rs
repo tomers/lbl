@@ -66,7 +66,7 @@ pub fn format_paths_report(paths: &ConfigPaths, catalog_extra: &[String], color:
     let mut out = String::new();
     for line in lines {
         let path_plain = line.path.display().to_string();
-        let pad = path_w.saturating_sub(path_plain.len());
+        let pad = path_w - path_plain.len();
         let path_col = if color && !line.exists {
             format!("{DIM}{path_plain}{RESET}{}", " ".repeat(pad))
         } else {

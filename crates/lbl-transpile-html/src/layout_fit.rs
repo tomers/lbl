@@ -253,7 +253,7 @@ fn fit_row(
         };
     }
 
-    let n_gaps = row_kids.len().saturating_sub(1) as f64;
+    let n_gaps = (row_kids.len() - 1) as f64;
     let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
 
     let mut css = String::new();
@@ -494,7 +494,7 @@ fn fit_column(
     opts: &TranspileOptions,
 ) -> LayoutFit {
     let visual_rows = column_visual_row_count(children).max(1);
-    let n_gaps = visual_rows.saturating_sub(1) as f64;
+    let n_gaps = (visual_rows - 1) as f64;
     let slot_h = ((box_h - gap * n_gaps) / visual_rows as f64).max(1.0);
     let unified_font = column_unified_font(children, box_w, slot_h, gap, opts);
 

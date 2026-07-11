@@ -356,7 +356,7 @@ impl BrotherQlDriver {
                 .unwrap_or(MediaGeometry {
                     tape_width_mm: width_mm,
                     tape_length_mm: 0,
-                    printable_dots: head.head_dots.saturating_sub(24),
+                    printable_dots: head.head_dots - 24,
                     offset_r: 12,
                     feed_margin: 35,
                     media_type: MEDIA_CONTINUOUS,
@@ -374,7 +374,7 @@ impl BrotherQlDriver {
                     .unwrap_or(MediaGeometry {
                         tape_width_mm: width_mm,
                         tape_length_mm: length_mm,
-                        printable_dots: head.head_dots.saturating_sub(24),
+                        printable_dots: head.head_dots - 24,
                         offset_r: 12,
                         feed_margin: 0,
                         media_type: MEDIA_DIE_CUT,
@@ -397,9 +397,10 @@ impl BrotherQlDriver {
 
         let offset_r = geom.offset_r + head.additional_offset_r;
         let use_w = bitmap.width.min(geom.printable_dots).min(head.head_dots);
-        let src_x0 = bitmap.width.saturating_sub(use_w) / 2;
-        let max_start = head.head_dots.saturating_sub(use_w);
-        let start_x = max_start.saturating_sub(offset_r).min(max_start);
+        let src_x0 = (bitmap.width - use_w) / 2;
+        let max_start = head.head_dots - use_w;
+        // offset_r can exceed max_start when the bitmap already fills the head.
+        let start_x = max_start.saturating_sub(offset_r);
 
         let mut out = MonoBitmap::new(head.head_dots, bitmap.height);
         for y in 0..bitmap.height {
