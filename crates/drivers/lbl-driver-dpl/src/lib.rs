@@ -1,9 +1,9 @@
-//! Honeywell / Datamax-O'Neil DPL (Datamax Programming Language) driver.
+//! Honeywell / Datamax-O'Neil / Citizen DPL (Datamax Programming Language) driver.
 //!
 //! Disables immediate commands with `SOH D`, selects media sense, downloads a
 //! 1-bit BMP via `STX I`, places it with an image record inside `STX L`…`E`,
 //! then deletes the temporary graphic. Optional cut uses label-format `:`.
-
+//! Citizen CL-S / CL-E native Datamax mode uses the same command set.
 use lbl_core::job::CutMode;
 use lbl_core::media::{MediaLength, MediaSense};
 use lbl_core::units::Millimeters;

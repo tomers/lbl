@@ -906,6 +906,70 @@ mod tests {
     }
 
     #[test]
+    fn citizen_zpl_and_dpl_are_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let e321 = catalog.lookup_printer("CL-E321").unwrap();
+        assert_eq!(e321.protocol, Protocol::Zpl);
+        assert_eq!(e321.maturity, Maturity::Experimental);
+        assert!(e321.connections.is_empty());
+        assert!(catalog.supports_media("CL-E321", "102x152"));
+
+        let s521 = catalog.lookup_printer("CL-S521").unwrap();
+        assert_eq!(s521.protocol, Protocol::Dpl);
+        assert!(s521.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x08bd,
+                product_id: Some(0x0208)
+            }
+        )));
+        let s631 = catalog.lookup_printer("CL-S631").unwrap();
+        assert_eq!(s631.protocol, Protocol::Dpl);
+        assert_eq!(s631.dpi, 300.0);
+        assert!(s631.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x1d90,
+                product_id: Some(0x2037)
+            }
+        )));
+        let s700 = catalog.lookup_printer("CL-S700").unwrap();
+        assert!(s700.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Usb {
+                vendor_id: 0x2730,
+                product_id: Some(0x0fff)
+            }
+        )));
+    }
+
+    #[test]
+    fn toshiba_tpcl_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let ev4 = catalog.lookup_printer("B-EV4D").unwrap();
+        assert_eq!(ev4.protocol, Protocol::Tpcl);
+        assert_eq!(ev4.dpi, 203.0);
+        assert!(ev4.supports_cut);
+        assert_eq!(ev4.maturity, Maturity::Experimental);
+        assert!(catalog.supports_media("B-EV4D", "102x152"));
+        assert!(ev4.connections.is_empty());
+        let sx5 = catalog.lookup_printer("B-SX5").unwrap();
+        assert_eq!(sx5.protocol, Protocol::Tpcl);
+        assert_eq!(sx5.max_width_mm, 128.0);
+        let bv = catalog.lookup_printer("BV420D").unwrap();
+        assert_eq!(bv.protocol, Protocol::Tpcl);
+        assert!(bv.connections.is_empty());
+        // Shared encode: desktop + industrial families on `tpcl`.
+        for key in ["B-FV4D", "B-SV4", "B-SX4", "B-SA4TM", "B-EV4T"] {
+            assert_eq!(
+                catalog.lookup_printer(key).unwrap().protocol,
+                Protocol::Tpcl,
+                "{key}"
+            );
+        }
+    }
+
+    #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
         let d110 = catalog.lookup_printer("D110").unwrap();

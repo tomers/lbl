@@ -1,6 +1,6 @@
 [package]
 name                   = "lbl-driver-dpl"
-description            = "Honeywell / Datamax-O'Neil DPL driver for lbl."
+description            = "Honeywell / Datamax-O'Neil / Citizen DPL driver for lbl."
 version.workspace      = true
 edition.workspace      = true
 license.workspace      = true

@@ -1,7 +1,8 @@
 # lbl-driver-dpl
 
-Honeywell / Datamax-O'Neil **DPL** (Datamax Programming Language) driver for
-PC42 / PM / PX-class industrial label printers.
+Honeywell / Datamax-O'Neil / Citizen **DPL** (Datamax Programming Language)
+driver for PC42 / PM / PX-class industrials and Citizen CL-S / CL-E warehouse
+printers (native Datamax mode; ZPL-mode SKUs can stay on `zpl`).
 
 Emits:
 
@@ -12,4 +13,6 @@ Emits:
 - `:` — cut-by amount when requested
 - `STX x` — delete the temporary graphic
 
-Typical transport: USB (`0b0b:*`) or raw TCP `:9100`.
+Typical transport: USB (`0b0b:*` Honeywell/Datamax, `1d90:*` / `2730:*` /
+`08bd:*` Citizen) or raw TCP `:9100`. CLI/API aliases: `dpl`, `honeywell`,
+`datamax`, `citizen`.

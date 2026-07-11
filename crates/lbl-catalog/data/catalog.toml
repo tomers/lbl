@@ -5434,3 +5434,367 @@ supported_media = [
   "tsc-50x25",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0b0b }]
+
+# Citizen CL-S / CL-E warehouse printers.
+# Prefer existing protocols: ZPL II emulation (`zpl`) or Datamax/DMX (`dpl`).
+# Set the printer emulation to match the catalog protocol (Cross-Emulation).
+# USB: exact VID:PID only (no VID wildcards). Pair by model / :9100 otherwise.
+# See docs/research-tpcl-citizen.md.
+
+[[printers]]
+brand = "Citizen"
+keys = ["CL-E321", "CLE321"]
+name = "Citizen CL-E321"
+protocol = "zpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Citizen"
+keys = ["CL-S521", "CLS521", "CLP-521", "CLP521"]
+name = "Citizen CL-S521"
+protocol = "dpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+# usb.ids: Citizen Watch CLP-521 = 08bd:0208 (CL-S521 family alias).
+connections = [{ kind = "usb", vendor_id = 0x08bd, product_id = 0x0208 }]
+
+[[printers]]
+brand = "Citizen"
+keys = ["CL-S631", "CLS631", "CLP-631", "CLP631"]
+name = "Citizen CL-S631"
+protocol = "dpl"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x1d90, product_id = 0x2037 }]
+
+[[printers]]
+brand = "Citizen"
+keys = ["CL-S700", "CLS700"]
+name = "Citizen CL-S700"
+protocol = "dpl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
+
+# Toshiba TEC TPCL industrials (shared `tpcl` hex-SG encode).
+# Catalog breadth: common B-series desktops from public PPD/manual sets.
+# USB vendor 0x08a6 known; per-model PIDs not field-captured — connections = []
+# (pair by model / :9100). No VID-only wildcards.
+# See docs/research-tpcl-citizen.md.
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-EV4D", "BEV4D", "B-EV4"]
+name = "Toshiba TEC B-EV4D"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-EV4T", "BEV4T"]
+name = "Toshiba TEC B-EV4T"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-FV4D", "BFV4D", "B-FV4"]
+name = "Toshiba TEC B-FV4D"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-FV4T", "BFV4T"]
+name = "Toshiba TEC B-FV4T"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-SV4", "BSV4", "B-SV4D", "B-SV4T"]
+name = "Toshiba TEC B-SV4"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-SX4", "BSX4", "B-SX4T"]
+name = "Toshiba TEC B-SX4"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-SX5", "BSX5", "B-SX5T"]
+name = "Toshiba TEC B-SX5"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 128.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["B-SA4TM", "BSA4TM", "B-SA4", "BSA4"]
+name = "Toshiba TEC B-SA4TM"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Toshiba TEC"
+keys = ["BV420D", "BV420", "BX410", "BX420"]
+name = "Toshiba TEC BV420D"
+protocol = "tpcl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 104.0
+supports_cut = true
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
