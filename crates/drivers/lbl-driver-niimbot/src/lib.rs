@@ -248,11 +248,14 @@ impl Driver for NiimbotDriver {
         let rows = bitmap.height as u16;
         let cols = bitmap.width as u16;
         let copies = ctx.copies().min(0xFFFF) as u16;
+        let density = ctx.job.density.unwrap_or(self.density).clamp(1, 5);
 
         match self.task {
-            NiimbotTask::Standard => self.encode_standard(bitmap, rows, cols, copies, stride),
-            NiimbotTask::V4 => self.encode_v4(bitmap, rows, cols, copies, stride),
-            NiimbotTask::B1 => self.encode_b1(bitmap, rows, cols, copies, stride),
+            NiimbotTask::Standard => {
+                self.encode_standard(bitmap, rows, cols, copies, stride, density)
+            }
+            NiimbotTask::V4 => self.encode_v4(bitmap, rows, cols, copies, stride, density),
+            NiimbotTask::B1 => self.encode_b1(bitmap, rows, cols, copies, stride, density),
         }
     }
 }
@@ -265,10 +268,11 @@ impl NiimbotDriver {
         cols: u16,
         copies: u16,
         stride: usize,
+        density: u8,
     ) -> Result<Vec<u8>, DriverError> {
         let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 64);
 
-        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_DENSITY, &[density]);
         Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
         Self::push_packet(&mut out, START_PRINT, &[0x01]);
         Self::push_packet(&mut out, START_PAGE_PRINT, &[0x01]);
@@ -295,10 +299,11 @@ impl NiimbotDriver {
         cols: u16,
         copies: u16,
         stride: usize,
+        density: u8,
     ) -> Result<Vec<u8>, DriverError> {
         let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 96);
 
-        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_DENSITY, &[density]);
         Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
 
         // 9-byte PrintStart: pages(u16), 0×4, pageColor, speed, flag.
@@ -343,10 +348,11 @@ impl NiimbotDriver {
         cols: u16,
         copies: u16,
         stride: usize,
+        density: u8,
     ) -> Result<Vec<u8>, DriverError> {
         let mut out = Vec::with_capacity(bitmap.data.len() + bitmap.height as usize * 12 + 96);
 
-        Self::push_packet(&mut out, SET_DENSITY, &[self.density]);
+        Self::push_packet(&mut out, SET_DENSITY, &[density]);
         Self::push_packet(&mut out, SET_LABEL_TYPE, &[LABEL_TYPE_GAP]);
 
         // 7-byte PrintStart: page count in first u16, remainder zeroed.

@@ -10,7 +10,7 @@
 //! self-contained so adding a new one is an isolated drop-in.
 
 pub use lbl_core::bitmap::MonoBitmap;
-pub use lbl_core::job::JobSpec;
+pub use lbl_core::job::{CutMode, JobSpec};
 pub use lbl_core::printer::{PrinterCapabilities, Protocol};
 
 /// Errors a driver can produce while encoding.
@@ -41,10 +41,23 @@ impl<'a> EncodeContext<'a> {
         Self { job, capabilities }
     }
 
-    /// Whether a cut should be emitted: requested by the job *and* supported by
-    /// the printer.
+    /// Effective cut mode: requested by the job *and* supported by the printer.
+    pub fn cut_mode(&self) -> CutMode {
+        if self.capabilities.supports_cut {
+            self.job.cut_mode
+        } else {
+            CutMode::None
+        }
+    }
+
+    /// Whether any cut is requested and supported.
     pub fn should_cut(&self) -> bool {
-        self.job.cut && self.capabilities.supports_cut
+        self.cut_mode().requests_cut()
+    }
+
+    /// Whether a cut should fire after copy `index` (0-based) of `copies`.
+    pub fn should_cut_after_copy(&self, index: u32, copies: u32) -> bool {
+        self.cut_mode().should_cut_after_copy(index, copies)
     }
 
     /// Number of copies (at least 1).

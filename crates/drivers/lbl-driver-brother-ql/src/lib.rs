@@ -33,6 +33,7 @@
 //!
 //! `lbl` is not affiliated with Brother; see the repository disclaimer.
 
+use lbl_core::job::CutMode;
 use lbl_core::media::MediaLength;
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
@@ -433,7 +434,8 @@ impl BrotherQlDriver {
         opts: PageEncodeOpts,
     ) {
         let PageEncodeOpts {
-            cut,
+            auto_cut,
+            cut_at_end,
             quality,
             first_page,
             last_page,
@@ -452,11 +454,13 @@ impl BrotherQlDriver {
         out.push(if first_page { 0 } else { 1 });
         out.push(0x00);
 
-        out.extend_from_slice(&[ESC, b'i', b'M', if cut { 1 << 6 } else { 0 }]);
-        if cut {
+        // ESC i M: bit 6 = auto cut. ESC i A: cut every N labels (required with auto cut).
+        // ESC i K: bit 3 = cut at end.
+        out.extend_from_slice(&[ESC, b'i', b'M', if auto_cut { 1 << 6 } else { 0 }]);
+        if auto_cut {
             out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
         }
-        out.extend_from_slice(&[ESC, b'i', b'K', if cut { 1 << 3 } else { 0 }]);
+        out.extend_from_slice(&[ESC, b'i', b'K', if cut_at_end { 1 << 3 } else { 0 }]);
         out.extend_from_slice(&[ESC, b'i', b'd']);
         out.extend_from_slice(&geom.feed_margin.to_le_bytes());
         out.extend_from_slice(&[b'M', 0x00]);
@@ -473,7 +477,8 @@ impl BrotherQlDriver {
 
 #[derive(Debug, Clone, Copy)]
 struct PageEncodeOpts {
-    cut: bool,
+    auto_cut: bool,
+    cut_at_end: bool,
     quality: bool,
     first_page: bool,
     last_page: bool,
@@ -493,7 +498,11 @@ impl Driver for BrotherQlDriver {
         let geom = Self::resolve_media(ctx, head);
         let bitmap = Self::pad_to_head(bitmap, geom, head)?;
         let copies = ctx.copies();
-        let cut = ctx.should_cut();
+        let (auto_cut, cut_at_end) = match ctx.cut_mode() {
+            CutMode::None => (false, false),
+            CutMode::Every => (true, false),
+            CutMode::End => (false, true),
+        };
 
         let mut out = Vec::with_capacity(
             head.invalidate_bytes
@@ -512,7 +521,8 @@ impl Driver for BrotherQlDriver {
                 geom,
                 head,
                 PageEncodeOpts {
-                    cut,
+                    auto_cut,
+                    cut_at_end,
                     quality: self.quality_priority,
                     first_page: index == 0,
                     last_page: index + 1 == copies,
@@ -526,7 +536,7 @@ impl Driver for BrotherQlDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::job::JobSpec;
+    use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
     use lbl_core::printer::PrinterCapabilities;
     use lbl_core::units::Dpi;
@@ -534,12 +544,12 @@ mod tests {
     fn ctx_job(
         media: Media,
         copies: u32,
-        cut: bool,
+        cut_mode: CutMode,
         max_width_mm: f64,
     ) -> (JobSpec, PrinterCapabilities) {
         let mut job = JobSpec::new(media);
         job.copies = copies;
-        job.cut = cut;
+        job.cut_mode = cut_mode;
         let caps = PrinterCapabilities {
             supports_cut: true,
             dpi: Dpi(300.0),
@@ -552,7 +562,7 @@ mod tests {
     #[test]
     fn emits_invalidate_init_and_raster_mode() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, true, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::Every, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
 
@@ -567,7 +577,7 @@ mod tests {
     #[test]
     fn continuous_62mm_sets_media_type_and_width() {
         let bmp = MonoBitmap::new(8, 2);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, true, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::Every, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
 
@@ -582,7 +592,12 @@ mod tests {
     #[test]
     fn die_cut_29x90_sets_length() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::fixed(29.0, 90.0, Dpi(300.0)), 1, true, 62.0);
+        let (job, caps) = ctx_job(
+            Media::fixed(29.0, 90.0, Dpi(300.0)),
+            1,
+            CutMode::Every,
+            62.0,
+        );
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
 
@@ -594,20 +609,31 @@ mod tests {
     }
 
     #[test]
-    fn cut_commands_when_supported() {
+    fn cut_every_enables_auto_cut() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, true, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::Every, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 0]));
+    }
+
+    #[test]
+    fn cut_at_end_enables_expanded_cut_flag() {
+        let bmp = MonoBitmap::new(8, 1);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 2, CutMode::End, 62.0);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
+        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
     }
 
     #[test]
     fn no_cut_when_not_requested() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, false, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::None, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
@@ -617,7 +643,7 @@ mod tests {
     #[test]
     fn copies_use_form_feed_between_and_eof_at_end() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 3, true, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 3, CutMode::Every, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(bytes.iter().filter(|&&b| b == 0x0C).count(), 2);
@@ -628,7 +654,7 @@ mod tests {
     fn raster_row_is_mirrored_and_full_head_width() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, false, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::None, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
 
@@ -645,7 +671,7 @@ mod tests {
     fn wide_62mm_bitmap_is_center_cropped() {
         let mut bmp = MonoBitmap::new(732, 1);
         bmp.set(18, 0, true);
-        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, false, 62.0);
+        let (job, caps) = ctx_job(Media::continuous(62.0, Dpi(300.0)), 1, CutMode::None, 62.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
         assert!(!bytes.is_empty());
@@ -660,7 +686,12 @@ mod tests {
     #[test]
     fn ql1100_uses_162_byte_rows_and_wide_media() {
         let bmp = MonoBitmap::new(8, 1);
-        let (job, caps) = ctx_job(Media::fixed(102.0, 152.0, Dpi(300.0)), 1, true, 103.0);
+        let (job, caps) = ctx_job(
+            Media::fixed(102.0, 152.0, Dpi(300.0)),
+            1,
+            CutMode::Every,
+            103.0,
+        );
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = BrotherQlDriver::new().encode(&bmp, &ctx).unwrap();
 

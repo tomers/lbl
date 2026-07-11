@@ -49,7 +49,8 @@ impl Driver for EscPosDriver {
         let mut out = Vec::new();
         out.extend_from_slice(&[ESC, b'@']); // initialize
 
-        for _ in 0..ctx.copies() {
+        let copies = ctx.copies();
+        for index in 0..copies {
             // GS v 0 m xL xH yL yH [data]
             out.extend_from_slice(&[GS, b'v', b'0', 0x00]);
             out.push((stride & 0xFF) as u8);
@@ -61,7 +62,7 @@ impl Driver for EscPosDriver {
             // Feed a few dots so the content clears the head/cutter.
             out.extend_from_slice(&[ESC, b'd', 0x03]);
 
-            if ctx.should_cut() {
+            if ctx.should_cut_after_copy(index, copies) {
                 out.extend_from_slice(&[GS, b'V', 0x00]); // full cut
             }
         }
@@ -72,7 +73,7 @@ impl Driver for EscPosDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::job::JobSpec;
+    use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
     use lbl_core::printer::PrinterCapabilities;
     use lbl_core::units::Dpi;
@@ -95,7 +96,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let mut caps = PrinterCapabilities::default();
         let mut job = JobSpec::new(Media::continuous(58.0, Dpi(203.0)));
-        job.cut = true;
+        job.cut_mode = CutMode::Every;
 
         // Requested but printer can't cut.
         let ctx = EncodeContext::new(&job, &caps);

@@ -21,7 +21,7 @@ use lbl::pipeline::{
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::{encode_capabilities_for, Catalog};
 use lbl_config::StyleConfig;
-use lbl_core::job::OutputMode;
+use lbl_core::job::{CutMode, OutputMode};
 use lbl_core::printer::Protocol;
 use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
@@ -587,10 +587,15 @@ struct PrintArgs {
     #[arg(long, action = clap::ArgAction::Count)]
     rotate_ccw: u8,
 
-    /// Request a cut after each label. Overrides config `[print] cut` /
-    /// `LBL_PRINT__CUT`.
-    #[arg(long, action = clap::ArgAction::SetTrue)]
-    cut: Option<bool>,
+    /// When to cut: `none`, `every` (after each label), or `end` (after last).
+    /// Overrides config `[print] cut_mode` / `LBL_PRINT__CUT_MODE`. The legacy
+    /// `--cut` flag is an alias for `--cut-mode every`.
+    #[arg(long, value_name = "MODE")]
+    cut_mode: Option<String>,
+
+    /// Request a cut after each label (alias for `--cut-mode every`).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "cut_mode")]
+    cut: bool,
 
     /// Mark target printer as cut-capable. Overrides config `[print]
     /// supports_cut` / `LBL_PRINT__SUPPORTS_CUT`.
@@ -601,6 +606,11 @@ struct PrintArgs {
     /// `LBL_PRINT__COPIES`.
     #[arg(long)]
     copies: Option<u32>,
+
+    /// Print density / heat level (driver-specific; typically 1–5).
+    /// Overrides config `[print] density` / `LBL_PRINT__DENSITY`.
+    #[arg(long)]
+    density: Option<u8>,
 
     /// Rendering backend. Overrides config `[print] backend` /
     /// `LBL_PRINT__BACKEND`.
@@ -714,9 +724,17 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     let confirm = args.confirm.unwrap_or(print_cfg.confirm);
     let debug = args.debug.unwrap_or(print_cfg.debug);
-    let cut = args.cut.unwrap_or(print_cfg.cut);
+    let cut_mode = if args.cut {
+        CutMode::Every
+    } else if let Some(mode) = args.cut_mode.as_deref() {
+        CutMode::parse(mode)
+            .ok_or_else(|| anyhow!("unknown cut mode '{mode}' (expected none|every|end)"))?
+    } else {
+        CutMode::parse(&print_cfg.cut_mode).unwrap_or(CutMode::None)
+    };
     let supports_cut = args.supports_cut.unwrap_or(print_cfg.supports_cut);
     let copies = args.copies.unwrap_or(print_cfg.copies);
+    let density = args.density.or(print_cfg.density);
     let dither = args.dither.unwrap_or_else(|| print_cfg.dither.clone());
     let backend = match args.backend {
         Some(b) => b,
@@ -883,8 +901,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
         protocol,
         media,
         supports_cut,
-        cut,
+        cut_mode,
         copies,
+        density,
         dither: Algorithm::parse(&dither)?,
         rotation,
         head_rotation,

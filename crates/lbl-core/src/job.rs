@@ -15,6 +15,49 @@ pub enum OutputMode {
     Preview,
 }
 
+/// When (if at all) the printer should cut during a job.
+///
+/// Matches the Brother P-touch cut matrix and maps sensibly onto other cutters:
+/// cut after every label, only after the last label/copy, or not at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CutMode {
+    /// Do not cut.
+    #[default]
+    None,
+    /// Cut after every label / copy.
+    Every,
+    /// Cut only after the last label / copy in the job.
+    End,
+}
+
+impl CutMode {
+    /// Parse a CLI/API-friendly name (`none`, `every`, `end`).
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "none" | "off" | "false" | "0" => Some(Self::None),
+            "every" | "each" | "auto" | "true" | "1" => Some(Self::Every),
+            "end" | "last" | "at-end" | "at_end" => Some(Self::End),
+            _ => None,
+        }
+    }
+
+    /// Whether any cut is requested.
+    pub fn requests_cut(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    /// Whether a cut should fire after copy `index` (0-based) of `copies`.
+    pub fn should_cut_after_copy(self, index: u32, copies: u32) -> bool {
+        let copies = copies.max(1);
+        match self {
+            Self::None => false,
+            Self::Every => true,
+            Self::End => index + 1 == copies,
+        }
+    }
+}
+
 /// A single print job: the media to print on and whether to cut afterward.
 ///
 /// The HTML/raster content is carried alongside this spec by each stage; this
@@ -26,12 +69,18 @@ pub struct JobSpec {
     /// Output mode for rendering/transpilation.
     #[serde(default)]
     pub mode: OutputMode,
-    /// Request a cut after this job (honored only if the printer supports it).
+    /// When to cut (honored only if the printer supports cutting).
     #[serde(default)]
-    pub cut: bool,
+    pub cut_mode: CutMode,
     /// Number of copies.
     #[serde(default = "one")]
     pub copies: u32,
+    /// Optional print density / heat level (driver-specific).
+    ///
+    /// Typical ranges: NIIMBOT 1–5, DYMO LabelWriter percent 1–200. When
+    /// omitted, each driver uses its own default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub density: Option<u8>,
 }
 
 fn one() -> u32 {
@@ -44,8 +93,33 @@ impl JobSpec {
         Self {
             media,
             mode: OutputMode::Print,
-            cut: false,
+            cut_mode: CutMode::None,
             copies: 1,
+            density: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cut_mode_parse_aliases() {
+        assert_eq!(CutMode::parse("none"), Some(CutMode::None));
+        assert_eq!(CutMode::parse("every"), Some(CutMode::Every));
+        assert_eq!(CutMode::parse("end"), Some(CutMode::End));
+        assert_eq!(CutMode::parse("at-end"), Some(CutMode::End));
+        assert_eq!(CutMode::parse("true"), Some(CutMode::Every));
+        assert_eq!(CutMode::parse("bogus"), None);
+    }
+
+    #[test]
+    fn cut_mode_after_copy() {
+        assert!(!CutMode::None.should_cut_after_copy(0, 3));
+        assert!(CutMode::Every.should_cut_after_copy(0, 3));
+        assert!(CutMode::Every.should_cut_after_copy(2, 3));
+        assert!(!CutMode::End.should_cut_after_copy(0, 3));
+        assert!(CutMode::End.should_cut_after_copy(2, 3));
     }
 }

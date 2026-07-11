@@ -4,6 +4,7 @@
 //! `BITMAP` uses the **opposite** ink convention to [`MonoBitmap`]: a `1` bit
 //! means *not printed* (white). This driver therefore inverts the bytes.
 
+use lbl_core::job::CutMode;
 use lbl_core::media::MediaLength;
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 use std::fmt::Write;
@@ -45,13 +46,20 @@ impl Driver for TsplDriver {
         let width_bytes = bitmap.stride();
         // TSPL: 1 = white, 0 = black -> invert our (1 = ink) bytes.
         let inverted: Vec<u8> = bitmap.data.iter().map(|b| !b).collect();
+        let copies = ctx.copies();
+        // SET CUTTER n cuts every n labels; End mode cuts once after the batch.
+        let cutter_n = match ctx.cut_mode() {
+            CutMode::None => None,
+            CutMode::Every => Some(1u32),
+            CutMode::End => Some(copies),
+        };
 
         let mut header = String::new();
         let _ = write!(header, "SIZE {width_mm:.0} mm, {height_mm:.0} mm\r\n");
         header.push_str("GAP 0 mm, 0 mm\r\n");
         header.push_str("DIRECTION 1\r\n");
-        if ctx.should_cut() {
-            header.push_str("SET CUTTER 1\r\n");
+        if let Some(n) = cutter_n {
+            let _ = write!(header, "SET CUTTER {n}\r\n");
         }
         header.push_str("CLS\r\n");
         let _ = write!(header, "BITMAP 0,0,{width_bytes},{},0,", bitmap.height);

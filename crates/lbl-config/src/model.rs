@@ -165,12 +165,14 @@ pub struct PrintConfig {
     pub confirm: bool,
     /// Dump every pipeline stage to stderr.
     pub debug: bool,
-    /// Request a cut after each label.
-    pub cut: bool,
+    /// When to cut (`none`, `every`, `end`).
+    pub cut_mode: String,
     /// Mark the target printer as cut-capable.
     pub supports_cut: bool,
     /// Copies per label.
     pub copies: u32,
+    /// Optional print density / heat (driver-specific).
+    pub density: Option<u8>,
     /// Dithering algorithm (`auto`, `floyd-steinberg`, `ordered`, `none`).
     pub dither: String,
     /// Default protocol (`dymo`, `niimbot`, `virtual`, …) when `--protocol` is
@@ -199,9 +201,10 @@ impl Default for PrintConfig {
         Self {
             confirm: false,
             debug: false,
-            cut: false,
+            cut_mode: "none".into(),
             supports_cut: false,
             copies: 1,
+            density: None,
             dither: "auto".into(),
             protocol: None,
             backend: "chromium".into(),

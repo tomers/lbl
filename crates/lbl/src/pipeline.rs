@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use image::RgbaImage;
 use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
-use lbl_core::job::{JobSpec, OutputMode};
+use lbl_core::job::{CutMode, JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
 use lbl_core::units::{Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
@@ -464,10 +464,12 @@ pub struct PipelineOptions {
     pub media: Media,
     /// Whether the printer can cut.
     pub supports_cut: bool,
-    /// Whether to request a cut.
-    pub cut: bool,
+    /// When to cut during the job.
+    pub cut_mode: CutMode,
     /// Copies.
     pub copies: u32,
+    /// Optional print density / heat (driver-specific).
+    pub density: Option<u8>,
     /// Dithering algorithm.
     pub dither: Algorithm,
     /// Net rotation for layout viewport sizing (reading frame).
@@ -566,10 +568,16 @@ pub fn encode_labels<B: RenderBackend>(
     let batch = labels.len() > 1;
     let mut preprocess_elapsed = Duration::ZERO;
     let mut next_batch_warn = BATCH_WARN_INTERVAL;
+    let last_index = labels.len().saturating_sub(1);
 
-    for label in labels {
+    for (position, label) in labels.iter().enumerate() {
+        let mut label_opts = opts.clone();
+        // Across a multi-label batch, "cut at end" applies only to the last label.
+        if opts.cut_mode == CutMode::End && position != last_index {
+            label_opts.cut_mode = CutMode::None;
+        }
         let started = Instant::now();
-        let trace = encode_label_traced(backend, registry, label.index, &label.html, opts)
+        let trace = encode_label_traced(backend, registry, label.index, &label.html, &label_opts)
             .with_context(|| format!("encoding label {}", label.index))?;
         preprocess_elapsed += started.elapsed();
 
@@ -1021,8 +1029,9 @@ pub fn encode_label_traced<B: RenderBackend>(
         (Vec::new(), "html-preview".to_string())
     } else {
         let mut job = JobSpec::new(opts.media.clone());
-        job.cut = opts.cut;
+        job.cut_mode = opts.cut_mode;
         job.copies = opts.copies;
+        job.density = opts.density;
         let caps = opts.encode_caps.clone();
         let driver = registry
             .get(opts.protocol)
@@ -1143,8 +1152,9 @@ pub fn encode_sample_pattern_traced(
     let bitmap = sample_pattern_for_media(head_dots, &opts.media, opts.protocol);
 
     let mut job = JobSpec::new(opts.media.clone());
-    job.cut = opts.cut;
+    job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;
+    job.density = opts.density;
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
@@ -1222,8 +1232,9 @@ mod tests {
             protocol,
             media: Media::fixed(12.0, 40.0, Dpi(203.0)),
             supports_cut: false,
-            cut: false,
+            cut_mode: CutMode::None,
             copies: 1,
+            density: None,
             dither: Algorithm::Threshold(128),
             rotation,
             head_rotation,
@@ -1434,8 +1445,9 @@ mod tests {
             protocol: Protocol::Dymo,
             media: Media::continuous(12.0, Dpi(180.0)),
             supports_cut: false,
-            cut: false,
+            cut_mode: CutMode::None,
             copies: 1,
+            density: None,
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
@@ -1467,8 +1479,9 @@ mod tests {
             protocol: Protocol::Niimbot,
             media: Media::fixed(12.0, 30.0, Dpi(203.0)),
             supports_cut: false,
-            cut: false,
+            cut_mode: CutMode::None,
             copies: 1,
+            density: None,
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,

@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, ValueEnum};
 use lbl_core::bitmap::MonoBitmap;
-use lbl_core::job::JobSpec;
+use lbl_core::job::{CutMode, JobSpec};
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, Protocol};
 use lbl_core::units::Dpi;
@@ -97,13 +97,21 @@ struct Cli {
     #[arg(long, default_value_t = 1)]
     copies: u32,
 
-    /// Request a cut after the label.
-    #[arg(long)]
+    /// When to cut: `none`, `every`, or `end`.
+    #[arg(long, value_name = "MODE")]
+    cut_mode: Option<String>,
+
+    /// Request a cut after each label (alias for `--cut-mode every`).
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "cut_mode")]
     cut: bool,
 
-    /// Mark the target printer as cut-capable (so --cut is honored).
+    /// Mark the target printer as cut-capable (so cut mode is honored).
     #[arg(long)]
     supports_cut: bool,
+
+    /// Print density / heat level (driver-specific; typically 1–5).
+    #[arg(long)]
+    density: Option<u8>,
 
     /// Output file. If omitted, bytes are written to stdout.
     #[arg(long)]
@@ -139,8 +147,16 @@ fn main() -> Result<()> {
     };
 
     let mut job = JobSpec::new(media.clone());
-    job.cut = cli.cut;
+    job.cut_mode = if cli.cut {
+        CutMode::Every
+    } else if let Some(mode) = cli.cut_mode.as_deref() {
+        CutMode::parse(mode)
+            .ok_or_else(|| anyhow::anyhow!("unknown cut mode '{mode}' (expected none|every|end)"))?
+    } else {
+        CutMode::None
+    };
     job.copies = cli.copies;
+    job.density = cli.density;
 
     let caps = PrinterCapabilities {
         dpi,

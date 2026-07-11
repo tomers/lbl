@@ -15,6 +15,7 @@ use lbl::pipeline::{
     PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
+use lbl_core::job::CutMode;
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, PrinterProfile, Protocol};
 use lbl_core::Rotation;
@@ -355,8 +356,9 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         protocol,
         media: media.clone(),
         supports_cut: false,
-        cut: false,
+        cut_mode: CutMode::None,
         copies: 1,
+        density: None,
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
@@ -487,8 +489,9 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         protocol: Protocol::Virtual,
         media: media.clone(),
         supports_cut: false,
-        cut: false,
+        cut_mode: CutMode::None,
         copies: 1,
+        density: None,
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
@@ -645,12 +648,19 @@ pub struct PrintReq {
     printer: Option<String>,
     #[serde(default)]
     dispatch_mode: DispatchMode,
+    /// Legacy boolean cut flag; prefer `cut_mode`.
     #[serde(default)]
     cut: bool,
+    /// When to cut: `none`, `every`, or `end`. Wins over `cut` when set.
+    #[serde(default)]
+    cut_mode: Option<String>,
     #[serde(default)]
     supports_cut: bool,
     #[serde(default = "default_copies")]
     copies: u32,
+    /// Optional print density / heat (driver-specific; typically 1–5).
+    #[serde(default)]
+    density: Option<u8>,
     #[serde(default = "default_supersample")]
     supersample: u32,
     #[serde(default = "default_dither")]
@@ -773,6 +783,18 @@ fn default_dither() -> String {
     "auto".to_string()
 }
 
+fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiError> {
+    if let Some(mode) = cut_mode {
+        return CutMode::parse(mode).ok_or_else(|| {
+            ApiError(
+                StatusCode::BAD_REQUEST,
+                format!("unknown cut_mode '{mode}' (expected none|every|end)"),
+            )
+        });
+    }
+    Ok(if cut { CutMode::Every } else { CutMode::None })
+}
+
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     Ok(match s.to_ascii_lowercase().as_str() {
         "b1" | "d11" | "d110" | "niimbot" => Protocol::Niimbot,
@@ -857,8 +879,9 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         protocol,
         media,
         supports_cut: req.supports_cut,
-        cut: req.cut,
+        cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
+        density: req.density,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
@@ -1020,8 +1043,9 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         protocol,
         media,
         supports_cut: req.supports_cut,
-        cut: req.cut,
+        cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
+        density: req.density,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,

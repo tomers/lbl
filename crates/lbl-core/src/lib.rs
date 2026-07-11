@@ -21,7 +21,7 @@ pub mod units;
 pub use bitmap::MonoBitmap;
 pub use error::{CoreError, Result};
 pub use geometry::{Margins, Size};
-pub use job::{JobSpec, OutputMode};
+pub use job::{CutMode, JobSpec, OutputMode};
 pub use media::{Adhesive, Material, Media, MediaColor, MediaLength};
 pub use orientation::{Orientation, Rotation};
 pub use printer::{

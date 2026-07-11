@@ -54,10 +54,11 @@ impl Driver for ZplDriver {
         if bitmap.data.is_empty() {
             return Err(DriverError::Unsupported("empty bitmap".into()));
         }
-        let label = Self::label(bitmap, ctx.should_cut());
+        let copies = ctx.copies();
         let mut out = String::new();
-        for _ in 0..ctx.copies() {
-            out.push_str(&label);
+        for index in 0..copies {
+            let cut = ctx.should_cut_after_copy(index, copies);
+            out.push_str(&Self::label(bitmap, cut));
         }
         Ok(out.into_bytes())
     }
@@ -66,7 +67,7 @@ impl Driver for ZplDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::job::JobSpec;
+    use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
     use lbl_core::printer::PrinterCapabilities;
     use lbl_core::units::Dpi;
@@ -97,7 +98,7 @@ mod tests {
             ..Default::default()
         };
         let mut job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
-        job.cut = true;
+        job.cut_mode = CutMode::Every;
         let ctx = EncodeContext::new(&job, &caps);
         let out = String::from_utf8(ZplDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();
         assert!(out.contains("^MMC"));
