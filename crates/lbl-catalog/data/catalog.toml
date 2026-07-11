@@ -4337,9 +4337,10 @@ supported_media = [
 # USB bulk preferred; Bluetooth Classic SPP via OS serial (9600 baud).
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c7 }, { kind = "serial" }]
 
-# Epson ColorWorks inkjet (ESC/Label). USB product IDs vary by region/SKU;
-# vendor 0x04b8 (Seiko Epson) is used as a discovery wildcard until PIDs are
-# confirmed on hardware. Raw TCP :9100 is the common network path.
+# Epson ColorWorks inkjet (ESC/Label). Exact USB product IDs are not in public
+# ID databases (region/SKU variance); VID-only 0x04b8 wildcards were removed
+# because they match any Seiko Epson USB device. Pair by model or use :9100
+# until PIDs are captured on hardware.
 
 [[printers]]
 brand = "Epson"
@@ -4366,7 +4367,7 @@ supported_media = [
   "50x25",
   "cont-104",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []
 
 [[printers]]
 brand = "Epson"
@@ -4393,7 +4394,7 @@ supported_media = [
   "50x25",
   "cont-104",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []
 
 [[printers]]
 brand = "Epson"
@@ -4420,7 +4421,7 @@ supported_media = [
   "50x25",
   "cont-104",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []
 
 [[printers]]
 brand = "Epson"
@@ -4448,7 +4449,7 @@ supported_media = [
   "50x25",
   "cont-104",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []
 
 [[printers]]
 brand = "Epson"
@@ -4476,7 +4477,7 @@ supported_media = [
   "50x25",
   "cont-104",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []
 
 [[printers]]
 brand = "Epson"
@@ -4502,4 +4503,4 @@ supported_media = [
   "100x150",
   "50x25",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04b8 }]
+connections = []

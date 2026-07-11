@@ -794,10 +794,14 @@ mod tests {
         assert!(c4000.supports_cut);
         assert!(c4000.supports_color);
         assert_eq!(c4000.maturity, Maturity::Experimental);
+        // No VID-only Epson wildcard — would match any Seiko Epson USB device.
+        assert!(c4000.connections.is_empty());
+        assert!(catalog.match_usb(0x04b8, 0x0001).is_none());
         assert!(catalog.supports_media("CW-C4000", "epson-matte-4x6"));
         assert!(catalog.supports_media("CW-C4000", "epson-cont-108"));
         let c6500 = catalog.lookup_printer("CW-C6500A").unwrap();
         assert_eq!(c6500.max_width_mm, 215.9);
+        assert!(c6500.connections.is_empty());
         assert!(catalog.supports_media("CW-C6500A", "epson-cont-215"));
         let matte = catalog.lookup("epson-matte-4x6").unwrap();
         assert_eq!(matte.media.width_mm, 102.0);
