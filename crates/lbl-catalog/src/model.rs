@@ -22,7 +22,7 @@ pub struct MediaSpec {
     /// Base color.
     #[serde(default)]
     pub color: MediaColor,
-    /// Brother QL black/red consumable (DK-22251 / DK-2251).
+    /// Dual-ink / two-color consumable (primary + secondary plane at encode).
     #[serde(default)]
     pub two_color: bool,
 }

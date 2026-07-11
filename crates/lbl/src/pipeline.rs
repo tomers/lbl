@@ -1023,10 +1023,10 @@ pub fn encode_label_traced<B: RenderBackend>(
         req_height,
     } = render_label_print(backend, authoring_html, opts)?;
 
-    let two_color = opts.media.two_color && opts.protocol == Protocol::BrotherQl;
-    let (dithered, red_plane) = if two_color {
-        let (black, red) = split_black_red(&rendered, 80);
-        (black, Some(red))
+    let two_color = opts.media.two_color;
+    let (dithered, secondary_plane) = if two_color {
+        let (primary, secondary) = split_black_red(&rendered, 80);
+        (primary, Some(secondary))
     } else {
         (dither(&rendered, opts.dither), None)
     };
@@ -1043,8 +1043,8 @@ pub fn encode_label_traced<B: RenderBackend>(
             .get(opts.protocol)
             .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
         let ctx = EncodeContext::new(&job, &caps);
-        let ctx = match &red_plane {
-            Some(red) => ctx.with_red(red),
+        let ctx = match &secondary_plane {
+            Some(secondary) => ctx.with_secondary(secondary),
             None => ctx,
         };
         (

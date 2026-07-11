@@ -92,9 +92,10 @@ pub struct Media {
     /// Base color.
     #[serde(default)]
     pub color: MediaColor,
-    /// Whether this consumable needs Brother QL black/red two-color raster
-    /// (e.g. DK-22251). When set, the encode path splits RGBA into black and
-    /// red planes and the QL driver emits `w` two-color rows.
+    /// Whether this consumable needs a dual-ink (two-color) encode path.
+    ///
+    /// When set, the pipeline supplies a secondary ink plane alongside the
+    /// primary bitmap; drivers that support dual-color media consume both.
     #[serde(default)]
     pub two_color: bool,
 }

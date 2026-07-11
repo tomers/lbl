@@ -33,12 +33,14 @@ pub struct EncodeContext<'a> {
     pub job: &'a JobSpec,
     /// Capabilities of the target printer.
     pub capabilities: &'a PrinterCapabilities,
-    /// Optional red (low-energy) plane for Brother QL two-color media.
+    /// Optional secondary ink plane for dual-color media.
     ///
-    /// When [`JobSpec::media`] has `two_color` set, callers should supply a
-    /// same-sized plane (empty is valid for black-only artwork on red/black
-    /// tape). Ignored by mono drivers.
-    pub red: Option<&'a MonoBitmap>,
+    /// The primary plane is the `bitmap` passed to [`Driver::encode`]. When
+    /// [`JobSpec::media`] has [`two_color`](lbl_core::media::Media::two_color)
+    /// set, callers should supply a same-sized secondary plane (an empty plane
+    /// is valid when artwork uses only the primary ink). Mono drivers ignore
+    /// this field.
+    pub secondary: Option<&'a MonoBitmap>,
 }
 
 impl<'a> EncodeContext<'a> {
@@ -47,17 +49,17 @@ impl<'a> EncodeContext<'a> {
         Self {
             job,
             capabilities,
-            red: None,
+            secondary: None,
         }
     }
 
-    /// Attach a red plane for two-color Brother QL encoding.
-    pub fn with_red(mut self, red: &'a MonoBitmap) -> Self {
-        self.red = Some(red);
+    /// Attach a secondary ink plane for dual-color encoding.
+    pub fn with_secondary(mut self, secondary: &'a MonoBitmap) -> Self {
+        self.secondary = Some(secondary);
         self
     }
 
-    /// Whether this job should use Brother QL two-color raster (`w` rows).
+    /// Whether this job targets dual-color media (`Media::two_color`).
     pub fn two_color(&self) -> bool {
         self.job.media.two_color
     }

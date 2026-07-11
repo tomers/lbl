@@ -524,11 +524,11 @@ impl Driver for BrotherQlDriver {
         let two_color = ctx.two_color();
         let black = Self::pad_to_head(bitmap, geom, head)?;
         let red = if two_color {
-            let red_src = match ctx.red {
+            let red_src = match ctx.secondary {
                 Some(r) if r.width == bitmap.width && r.height == bitmap.height => r.clone(),
                 Some(_) => {
                     return Err(DriverError::Unsupported(
-                        "red plane dimensions must match black plane".into(),
+                        "secondary plane dimensions must match primary plane".into(),
                     ));
                 }
                 None => MonoBitmap::new(bitmap.width, bitmap.height),
@@ -762,7 +762,7 @@ mod tests {
         let mut media = Media::continuous(62.0, Dpi(300.0));
         media.two_color = true;
         let (job, caps) = ctx_job(media, 1, CutMode::End, 62.0);
-        let ctx = EncodeContext::new(&job, &caps).with_red(&red);
+        let ctx = EncodeContext::new(&job, &caps).with_secondary(&red);
         let bytes = BrotherQlDriver::new().encode(&black, &ctx).unwrap();
 
         assert!(bytes.windows(3).any(|w| w == [b'w', 0x01, 90]));
