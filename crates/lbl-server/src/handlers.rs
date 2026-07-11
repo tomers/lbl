@@ -798,6 +798,7 @@ fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiErr
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
     Ok(match s.to_ascii_lowercase().as_str() {
         "b1" | "d11" | "d110" | "niimbot" => Protocol::Niimbot,
+        "letratag" | "letra-tag" | "lt200b" | "lt-200b" => Protocol::LetraTag,
         "brother-ql" | "brother_ql" | "brotherql" | "ql820" => Protocol::BrotherQl,
         "brother-pt" | "brother_pt" | "brotherpt" | "pt" | "tze" => Protocol::BrotherPt,
         "console" | "term" => Protocol::Console,
@@ -1228,7 +1229,7 @@ fn dispatch_bluetooth(
     protocol: Protocol,
     target: String,
 ) -> anyhow::Result<lbl_spool::SpoolReport> {
-    let mut t = lbl_device::BleTransport::new(target);
+    let mut t = lbl_device::BleTransport::for_protocol(protocol, target);
     Ok(lbl::dispatch::dispatch_encoded(encoded, protocol, &mut t))
 }
 
@@ -1249,6 +1250,7 @@ fn handshake_for_protocol(protocol: Protocol) -> &'static str {
         Protocol::DymoLw => "dymo_lw",
         Protocol::DymoLwClassic => "fire_and_forget",
         Protocol::Niimbot => "niimbot_poll",
+        Protocol::LetraTag => "letratag_notify",
         _ => "fire_and_forget",
     }
 }
@@ -1330,6 +1332,7 @@ pub fn browser_transport_hints(
 fn default_browser_api(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Niimbot => "web_serial",
+        Protocol::LetraTag => "web_bluetooth",
         Protocol::Phomemo
         | Protocol::PhomemoM02x
         | Protocol::PhomemoM110

@@ -689,6 +689,36 @@ name         = "DYMO Rhino 1805416 19mm x 5.5m Vinyl Black on Yellow"
 purchase_url = "https://www.dymo.com/"
 media        = { width_mm = 19.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
 
+# --- DYMO LetraTag 12 mm thermal tapes (LT-200B) -----------------------------
+#
+# LetraTag cassettes are a separate consumable family from LabelManager D1 and
+# Rhino IND. Geometry is continuous 12 mm tape; printable head height is ~30 of
+# 32 protocol rows. Keys are LT-prefixed so they are not confused with D1 SKUs.
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["lt-12-white-paper", "91200", "S0721610"]
+name         = "DYMO LetraTag 12mm White Paper Tape"
+purchase_url = "https://www.dymo.com/"
+product_ids  = ["91200", "S0721610"]
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["lt-12-yellow-paper", "91201", "S0721620"]
+name         = "DYMO LetraTag 12mm Yellow Paper Tape"
+purchase_url = "https://www.dymo.com/"
+product_ids  = ["91201", "S0721620"]
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "paper", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "DYMO"
+keys         = ["lt-12-white-plastic", "91221", "S0721660"]
+name         = "DYMO LetraTag 12mm White Plastic Tape"
+purchase_url = "https://www.dymo.com/"
+product_ids  = ["91221", "S0721660"]
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "polypropylene", adhesive = "permanent", color = "white" }
+
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
 #
 # D11/D110-family printers use a 12 mm (96-dot) thermal head at 203 dpi. Tape
@@ -2419,6 +2449,24 @@ supported_media = [
   "18053",
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1008 }]
+
+[[printers]]
+brand = "DYMO"
+keys = ["LT-200B", "LetraTag LT-200B", "LT200B"]
+name = "DYMO LetraTag LT-200B"
+protocol = "letratag"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 12.0
+supports_cut = true
+head_printable_height_mm = 11.0
+default_media = "lt-12-white-paper"
+supported_media = ["lt-12-white-paper", "lt-12-yellow-paper", "lt-12-white-plastic"]
+connections = [
+  { kind = "ble", name = "Letratag" },
+  { kind = "ble", name = "DYMO LT-200B" },
+  { kind = "ble", name = "LT-200B" },
+]
 
 [[printers]]
 brand           = "NIIMBOT"

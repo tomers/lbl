@@ -24,7 +24,10 @@ use tokio::time::{sleep, timeout as wait_for};
 use uuid::Uuid;
 
 #[cfg(feature = "ble")]
-use crate::ble::{peripheral_label, peripheral_matches_target, NIIMBOT_CHAR};
+use crate::ble::{
+    peripheral_label, peripheral_matches_target, uuid_prefix_eq, LETRATAG_NOTIFY, LETRATAG_WRITE,
+    NIIMBOT_CHAR,
+};
 
 #[cfg(feature = "usb")]
 use nusb::descriptors::{ConfigurationDescriptor, TransferType};
@@ -544,15 +547,24 @@ pub const BLE_DEFAULT_SCAN_SECS: u64 = 15;
 #[cfg(feature = "ble")]
 const BLE_CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 
+/// How [`BleTransport`] splits an encoded job into GATT writes.
+#[cfg(feature = "ble")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BleFrameMode {
+    /// NIIMBOT `55 55 … AA AA` packets (default).
+    #[default]
+    Niimbot,
+    /// LetraTag header + indexed body chunks (`FF F0 12 34…`).
+    LetraTag,
+}
+
 /// A bidirectional Bluetooth Low Energy (GATT) transport.
 ///
-/// This is how cable-less label printers such as the NIIMBOT D-series (D11,
-/// D110, …) are reached: they expose no USB data port, only a BLE GATT service
-/// with a writable characteristic (for the job byte stream) and a notify
-/// characteristic (for status replies). The transport finds the printer by its
-/// advertised name (or address), connects, and — unless overridden — picks the
-/// write/notify characteristics automatically, so the same NIIMBOT byte stream
-/// used over serial works here too, including the status handshake.
+/// Cable-less label printers such as the NIIMBOT D-series and DYMO LetraTag
+/// LT-200B expose a BLE GATT service with a writable characteristic (job byte
+/// stream) and a notify characteristic (status). The transport finds the
+/// printer by advertised name or address, connects, and writes framed payloads
+/// according to [`BleFrameMode`].
 ///
 /// The connection is opened lazily on first use and kept open across calls so a
 /// protocol can interleave writes and reads.
@@ -565,7 +577,10 @@ pub struct BleTransport {
     write_uuid: Option<Uuid>,
     /// Explicit notify characteristic UUID (auto-detected when `None`).
     notify_uuid: Option<Uuid>,
-    /// Maximum bytes per BLE write.
+    /// How to split `send` payloads into BLE writes.
+    frame_mode: BleFrameMode,
+    /// Maximum bytes per BLE write (used when a frame exceeds the link MTU and
+    /// must be subdivided further — uncommon for NIIMBOT whole-frame writes).
     chunk: usize,
     /// How long to scan for the device before giving up.
     scan: Duration,
@@ -601,15 +616,34 @@ impl std::fmt::Debug for BleTransport {
 impl BleTransport {
     /// Create a transport that connects to the first BLE peripheral whose
     /// advertised name or address contains `target` (case-insensitive).
+    /// Defaults to NIIMBOT characteristic UUIDs and framing.
     pub fn new(target: impl Into<String>) -> Self {
         Self {
             target: target.into(),
             write_uuid: Some(NIIMBOT_CHAR),
             notify_uuid: Some(NIIMBOT_CHAR),
+            frame_mode: BleFrameMode::Niimbot,
             chunk: BLE_DEFAULT_CHUNK,
             scan: Duration::from_secs(BLE_DEFAULT_SCAN_SECS),
             rt: None,
             state: None,
+        }
+    }
+
+    /// Build a transport configured for `protocol` (UUIDs + frame splitter).
+    pub fn for_protocol(protocol: lbl_core::printer::Protocol, target: impl Into<String>) -> Self {
+        match protocol {
+            lbl_core::printer::Protocol::LetraTag => Self {
+                target: target.into(),
+                write_uuid: Some(LETRATAG_WRITE),
+                notify_uuid: Some(LETRATAG_NOTIFY),
+                frame_mode: BleFrameMode::LetraTag,
+                chunk: 501, // index + 500 payload (link MTU may still clamp)
+                scan: Duration::from_secs(BLE_DEFAULT_SCAN_SECS),
+                rt: None,
+                state: None,
+            },
+            _ => Self::new(target),
         }
     }
 
@@ -692,8 +726,13 @@ impl Transport for BleTransport {
         self.ensure_connected()?;
         let rt = self.rt.as_ref().expect("connected");
         let state = self.state.as_ref().expect("connected");
+        let mode = self.frame_mode;
         rt.block_on(async {
-            for frame in niimbot_frames(data) {
+            let frames: Vec<&[u8]> = match mode {
+                BleFrameMode::Niimbot => niimbot_frames(data),
+                BleFrameMode::LetraTag => letratag_frames(data),
+            };
+            for frame in frames {
                 state
                     .peripheral
                     .write(&state.write_char, frame, state.write_type)
@@ -827,6 +866,43 @@ fn niimbot_frames(data: &[u8]) -> Vec<&[u8]> {
     out
 }
 
+/// Split a LetraTag framed job into BLE writes (9-byte header, then indexed chunks).
+///
+/// Mirrors `lbl_driver_letratag::tx_frames` so `lbl-device` does not depend on
+/// the driver crate.
+#[cfg(feature = "ble")]
+fn letratag_frames(data: &[u8]) -> Vec<&[u8]> {
+    const CHUNK_PAYLOAD: usize = 500;
+    if data.len() < 9 || data[0] != 0xff || data[1] != 0xf0 {
+        return if data.is_empty() {
+            Vec::new()
+        } else {
+            vec![data]
+        };
+    }
+    let body_len = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
+    let mut frames = vec![&data[..9]];
+    let mut offset = 9;
+    let mut remaining = body_len;
+    let mut i = 0;
+    while remaining > 0 || (body_len == 0 && i == 0) {
+        let take = remaining.min(CHUNK_PAYLOAD);
+        let is_last = take == remaining;
+        let wire_len = 1 + take + if is_last { 2 } else { 0 };
+        if offset + wire_len > data.len() {
+            break;
+        }
+        frames.push(&data[offset..offset + wire_len]);
+        offset += wire_len;
+        remaining = remaining.saturating_sub(take);
+        i += 1;
+        if body_len == 0 {
+            break;
+        }
+    }
+    frames
+}
+
 /// Get the first available Bluetooth adapter.
 #[cfg(feature = "ble")]
 async fn ble_adapter() -> Result<Adapter, DeviceError> {
@@ -880,9 +956,9 @@ async fn find_peripheral(
     }
 }
 
-/// Choose a characteristic by explicit UUID, else by capability: for writing,
-/// prefer write-without-response then any writable; for reading, prefer notify
-/// then indicate.
+/// Choose a characteristic by explicit UUID (exact or LetraTag-style prefix
+/// match), else by capability: for writing, prefer write-without-response then
+/// any writable; for reading, prefer notify then indicate.
 #[cfg(feature = "ble")]
 fn pick_characteristic(
     chars: &std::collections::BTreeSet<Characteristic>,
@@ -890,7 +966,14 @@ fn pick_characteristic(
     writable: bool,
 ) -> Option<Characteristic> {
     if let Some(uuid) = want {
-        return chars.iter().find(|c| c.uuid == uuid).cloned();
+        if let Some(c) = chars.iter().find(|c| c.uuid == uuid).cloned() {
+            return Some(c);
+        }
+        // LetraTag firmwares may vary the UUID body; match on the stable prefix.
+        if let Some(c) = chars.iter().find(|c| uuid_prefix_eq(c.uuid, uuid)).cloned() {
+            return Some(c);
+        }
+        return None;
     }
     let (primary, secondary) = if writable {
         (CharPropFlags::WRITE_WITHOUT_RESPONSE, CharPropFlags::WRITE)

@@ -554,6 +554,26 @@ mod tests {
     }
 
     #[test]
+    fn letratag_lt200b_is_catalogued() {
+        let catalog = Catalog::bundled().unwrap();
+        let tape = catalog.lookup("lt-12-white-paper").unwrap();
+        assert_eq!(tape.brand, "DYMO");
+        assert_eq!(tape.media.width_mm, 12.0);
+        let printer = catalog.lookup_printer("LT-200B").unwrap();
+        assert_eq!(printer.protocol, Protocol::LetraTag);
+        assert_eq!(printer.maturity, Maturity::Experimental);
+        assert!(printer.supports_cut);
+        assert!(printer
+            .supported_media
+            .iter()
+            .any(|k| k == "lt-12-white-paper"));
+        assert!(printer.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Ble { name } if name.contains("Letratag") || name.contains("LT-200")
+        )));
+    }
+
+    #[test]
     fn resolve_dpi_from_printer() {
         let catalog = Catalog::bundled().unwrap();
         assert_eq!(

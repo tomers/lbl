@@ -1,0 +1,13 @@
+[package]
+name                   = "lbl-driver-letratag"
+description            = "DYMO LetraTag LT-200B BLE print-job encoder for lbl (clean-room; not affiliated with DYMO)."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core       = { workspace = true }
+lbl-driver-api = { workspace = true }

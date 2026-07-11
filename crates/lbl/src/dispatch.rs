@@ -3,7 +3,8 @@
 //!
 //! Write-only protocols (ESC/POS, ZPL, TSPL, legacy DYMO tape) are
 //! fire-and-forget: the spooler sends the bytes and moves on. DYMO LabelWriter
-//! 550 (LW5) and NIIMBOT use bidirectional handshakes over USB/serial.
+//! 550 (LW5), NIIMBOT, and LetraTag use bidirectional handshakes over
+//! USB/serial/BLE.
 
 use std::time::{Duration, Instant};
 
@@ -44,16 +45,19 @@ pub fn finish_dispatch(report: SpoolReport, target: Option<TransportTarget>) -> 
 }
 
 /// After a job's bytes are delivered, perform any protocol-specific completion
-/// handshake. NIIMBOT polls the printer's status over a bidirectional
-/// transport; every other protocol is fire-and-forget.
+/// handshake. NIIMBOT polls status; LetraTag waits for an `ESC R` notify;
+/// every other protocol is fire-and-forget.
 pub fn finalize_job<T: Transport>(
     protocol: Protocol,
     transport: &mut T,
 ) -> Result<(), DeviceError> {
-    if protocol == Protocol::Niimbot && transport.is_bidirectional() {
-        wait_for_niimbot_completion(transport)
-    } else {
-        Ok(())
+    if !transport.is_bidirectional() {
+        return Ok(());
+    }
+    match protocol {
+        Protocol::Niimbot => wait_for_niimbot_completion(transport),
+        Protocol::LetraTag => wait_for_letratag_completion(transport),
+        _ => Ok(()),
     }
 }
 
@@ -87,6 +91,34 @@ fn wait_for_niimbot_completion<T: Transport>(transport: &mut T) -> Result<(), De
             return Ok(());
         }
         std::thread::sleep(POLL_INTERVAL);
+    }
+}
+
+/// Wait for a LetraTag `ESC R` result notification after the job was written.
+///
+/// The job body already contains `ESC A`, which schedules the notify — no
+/// further TX is required. A quiet printer after the hard cap is treated as
+/// success (bytes are already committed).
+fn wait_for_letratag_completion<T: Transport>(transport: &mut T) -> Result<(), DeviceError> {
+    const POLL_TIMEOUT: Duration = Duration::from_millis(500);
+    const HARD_CAP: Duration = Duration::from_secs(30);
+
+    let deadline = Instant::now() + HARD_CAP;
+    loop {
+        let resp = transport.receive(POLL_TIMEOUT)?;
+        if let Some(result) = lbl_driver_letratag::parse_result(&resp) {
+            if !result.success() {
+                tracing::warn!(
+                    "letratag: printer reported result code {} after job",
+                    result.code
+                );
+            }
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            tracing::warn!("letratag: no ESC R notify within {HARD_CAP:?}; assuming done");
+            return Ok(());
+        }
     }
 }
 

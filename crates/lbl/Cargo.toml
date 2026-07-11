@@ -18,29 +18,30 @@ name = "generate-doc-examples"
 path = "src/bin/generate-doc-examples.rs"
 
 [features]
-# Bluetooth Low Energy transport (NIIMBOT D-series). Opt-in; forwards to
-# `lbl-device`'s `ble` feature, which pulls in `btleplug` (and a vendored
-# `libdbus` on Linux).
+# Bluetooth Low Energy transport (NIIMBOT D-series, DYMO LetraTag LT-200B).
+# Opt-in; forwards to `lbl-device`'s `ble` feature, which pulls in `btleplug`
+# (and a vendored `libdbus` on Linux).
 ble = ["lbl-device/ble"]
 
 [dependencies]
-lbl-core           = { workspace = true }
-lbl-config         = { workspace = true }
-lbl-catalog        = { workspace = true }
-lbl-text           = { workspace = true }
-lbl-markdown       = { workspace = true }
-lbl-template       = { workspace = true }
-lbl-transpile-html = { workspace = true }
-lbl-render         = { workspace = true }
-lbl-dither         = { workspace = true }
-lbl-pattern        = { workspace = true }
-lbl-encode         = { workspace = true }
-lbl-driver-api     = { workspace = true }
-lbl-driver-file    = { workspace = true }
-lbl-driver-console = { workspace = true }
-lbl-driver-niimbot = { workspace = true }
-lbl-device         = { workspace = true }
-lbl-spool          = { workspace = true }
+lbl-core            = { workspace = true }
+lbl-config          = { workspace = true }
+lbl-catalog         = { workspace = true }
+lbl-text            = { workspace = true }
+lbl-markdown        = { workspace = true }
+lbl-template        = { workspace = true }
+lbl-transpile-html  = { workspace = true }
+lbl-render          = { workspace = true }
+lbl-dither          = { workspace = true }
+lbl-pattern         = { workspace = true }
+lbl-encode          = { workspace = true }
+lbl-driver-api      = { workspace = true }
+lbl-driver-file     = { workspace = true }
+lbl-driver-console  = { workspace = true }
+lbl-driver-niimbot  = { workspace = true }
+lbl-driver-letratag = { workspace = true }
+lbl-device          = { workspace = true }
+lbl-spool           = { workspace = true }
 
 serde              = { workspace = true }
 serde_json         = { workspace = true }

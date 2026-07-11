@@ -481,6 +481,9 @@ enum ProtocolArg {
     Tpcl,
     /// NIIMBOT thermal label printers (D11 / D110 family).
     Niimbot,
+    /// DYMO LetraTag LT-200B (Bluetooth LE; not LabelManager).
+    #[value(name = "letratag", aliases = ["letra-tag", "lt200b"])]
+    LetraTag,
     /// Brother QL-series raster printers (QL-820NWB(c), …).
     #[value(name = "brother-ql", alias = "brotherql")]
     BrotherQl,
@@ -517,6 +520,7 @@ impl From<ProtocolArg> for Protocol {
             ProtocolArg::Dpl => Protocol::Dpl,
             ProtocolArg::Tpcl => Protocol::Tpcl,
             ProtocolArg::Niimbot => Protocol::Niimbot,
+            ProtocolArg::LetraTag => Protocol::LetraTag,
             ProtocolArg::BrotherQl => Protocol::BrotherQl,
             ProtocolArg::BrotherPt => Protocol::BrotherPt,
             ProtocolArg::Virtual => Protocol::Virtual,
@@ -1229,7 +1233,7 @@ fn dispatch_bluetooth(
     target: String,
     summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
-    let mut t = lbl_device::BleTransport::new(target);
+    let mut t = lbl_device::BleTransport::for_protocol(protocol, target);
     dispatch_with(encoded, protocol, &mut t, None, summary)
 }
 

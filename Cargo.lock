@@ -1627,6 +1627,7 @@ dependencies = [
  "lbl-driver-api",
  "lbl-driver-console",
  "lbl-driver-file",
+ "lbl-driver-letratag",
  "lbl-driver-niimbot",
  "lbl-encode",
  "lbl-markdown",
@@ -1807,6 +1808,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-driver-letratag"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+]
+
+[[package]]
 name = "lbl-driver-niimbot"
 version = "0.1.0"
 dependencies = [
@@ -1872,6 +1881,7 @@ dependencies = [
  "lbl-driver-escpos",
  "lbl-driver-ezpl",
  "lbl-driver-file",
+ "lbl-driver-letratag",
  "lbl-driver-niimbot",
  "lbl-driver-sbpl",
  "lbl-driver-slcs",

@@ -1,8 +1,8 @@
-//! Shared Bluetooth LE helpers for NIIMBOT printer discovery and transport.
+//! Shared Bluetooth LE helpers for label-printer discovery and transport.
 //!
-//! NIIMBOT D-series printers advertise a vendor GATT service documented at
-//! <https://printers.niim.blue/interfacing/connecting/> and used by NiimBlue,
-//! niimprint, and other community clients.
+//! Covers NIIMBOT D-series (vendor GATT service documented at
+//! <https://printers.niim.blue/interfacing/connecting/>) and DYMO LetraTag
+//! LT-200B (service UUID prefix `be3dd650-…`).
 
 use uuid::Uuid;
 
@@ -18,6 +18,24 @@ pub const NIIMBOT_CHAR: Uuid = Uuid::from_u128(0xbef8d6c9_9c21_4c9e_b632_bd58c10
 /// Documented by NiimBlue / niimbluelib; arms the printer for a print session.
 pub const NIIMBOT_BLE_CONNECT: [u8; 9] = [0x03, 0x55, 0x55, 0xC1, 0x01, 0x01, 0xC1, 0xAA, 0xAA];
 
+/// LetraTag LT-200B primary GATT service (canonical body; prefix is stable).
+pub const LETRATAG_SERVICE: Uuid = Uuid::from_u128(0xbe3dd650_2b3d_42f1_99c1_f0f749dd0678);
+
+/// LetraTag print-request characteristic (write-without-response).
+pub const LETRATAG_WRITE: Uuid = Uuid::from_u128(0xbe3dd651_2b3d_42f1_99c1_f0f749dd0678);
+
+/// LetraTag print-reply characteristic (notify).
+pub const LETRATAG_NOTIFY: Uuid = Uuid::from_u128(0xbe3dd652_2b3d_42f1_99c1_f0f749dd0678);
+
+/// LetraTag short-command characteristic (set-cassette).
+pub const LETRATAG_SHORT: Uuid = Uuid::from_u128(0xbe3dd653_2b3d_42f1_99c1_f0f749dd0678);
+
+/// Whether two UUIDs share the same first 8 hex digits (LetraTag firmware may
+/// vary the UUID body while keeping the `be3dd65x` prefix).
+pub fn uuid_prefix_eq(a: Uuid, b: Uuid) -> bool {
+    (a.as_u128() >> 96) == (b.as_u128() >> 96)
+}
+
 /// Does an advertised local name look like a NIIMBOT label printer?
 pub fn name_looks_like_niimbot(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
@@ -29,6 +47,19 @@ pub fn name_looks_like_niimbot(name: &str) -> bool {
         "d110", "d101", "d11", "b203", "b21", "b18", "b1", "b3s", "z401",
     ];
     PREFIXES.iter().any(|p| n.starts_with(p))
+}
+
+/// Does an advertised local name look like a DYMO LetraTag LT-200B?
+pub fn name_looks_like_letratag(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.contains("letratag")
+        || n.contains("letra-tag")
+        || n.contains("letra tag")
+        || n.starts_with("dymo lt-200")
+        || n.starts_with("dymo lt200")
+        || n.starts_with("lt-200")
+        || n.starts_with("lt200")
+        || n.starts_with("lt20")
 }
 
 /// Whether advertisement data identifies a NIIMBOT printer (by name or service).
@@ -48,9 +79,48 @@ pub fn props_look_like_niimbot(props: &btleplug::api::PeripheralProperties, addr
     if props.service_data.contains_key(&NIIMBOT_SERVICE) {
         return true;
     }
-    // NIIMBOT BLE addresses often use a recognizable pattern (e.g. xx:03:03:…).
     let _ = address;
     false
+}
+
+/// Whether advertisement data identifies a LetraTag printer (by name or service).
+#[cfg(feature = "ble")]
+pub fn props_look_like_letratag(
+    props: &btleplug::api::PeripheralProperties,
+    address: &str,
+) -> bool {
+    if props
+        .local_name
+        .as_deref()
+        .is_some_and(name_looks_like_letratag)
+    {
+        return true;
+    }
+    if props
+        .services
+        .iter()
+        .any(|u| uuid_prefix_eq(*u, LETRATAG_SERVICE))
+    {
+        return true;
+    }
+    if props
+        .service_data
+        .keys()
+        .any(|u| uuid_prefix_eq(*u, LETRATAG_SERVICE))
+    {
+        return true;
+    }
+    let _ = address;
+    false
+}
+
+/// Any known label-printer BLE advertisement (NIIMBOT or LetraTag).
+#[cfg(feature = "ble")]
+pub fn props_look_like_label_printer(
+    props: &btleplug::api::PeripheralProperties,
+    address: &str,
+) -> bool {
+    props_look_like_niimbot(props, address) || props_look_like_letratag(props, address)
 }
 
 /// Human-readable label for a peripheral: `"D110-ABC (26:03:03:C3:F9:11)"` or just
@@ -68,8 +138,9 @@ pub async fn peripheral_label(p: &btleplug::platform::Peripheral) -> String {
 }
 
 /// Whether `target` matches this peripheral. An empty `target` matches any
-/// NIIMBOT-looking device; otherwise the advertised name or BLE address must
-/// contain `target` (case-insensitive).
+/// known label printer; otherwise the advertised name or BLE address must
+/// contain `target` (case-insensitive). Tokens `niimbot` / `letratag` match by
+/// family when the device has no useful local name.
 #[cfg(feature = "ble")]
 pub async fn peripheral_matches_target(p: &btleplug::platform::Peripheral, target: &str) -> bool {
     use btleplug::api::Peripheral as _;
@@ -88,7 +159,7 @@ pub async fn peripheral_matches_target(p: &btleplug::platform::Peripheral, targe
     };
 
     if needle.is_empty() {
-        return props_look_like_niimbot(&props, &addr);
+        return props_look_like_label_printer(&props, &addr);
     }
 
     if addr.contains(&needle) {
@@ -102,9 +173,18 @@ pub async fn peripheral_matches_target(p: &btleplug::platform::Peripheral, targe
         return true;
     }
 
-    // Allow `--bluetooth niimbot` to pick the sole NIIMBOT-service device even
-    // when it advertises no local name.
-    if needle == "niimbot" && props_look_like_niimbot(&props, &addr) {
+    if (needle == "niimbot" || needle == "d110" || needle == "d11")
+        && props_look_like_niimbot(&props, &addr)
+    {
+        return true;
+    }
+    if (needle == "letratag"
+        || needle == "letra-tag"
+        || needle == "lt200b"
+        || needle == "lt-200b"
+        || needle == "lt20")
+        && props_look_like_letratag(&props, &addr)
+    {
         return true;
     }
 

@@ -48,6 +48,8 @@ pub enum Protocol {
     Tpcl,
     /// NIIMBOT thermal label protocol (packet-framed; D11/D110 family).
     Niimbot,
+    /// DYMO LetraTag LT-200B Bluetooth LE chunked-GATT protocol (not LabelManager).
+    LetraTag,
     /// Brother QL-series raster protocol (QL-800 / QL-810W / QL-820NWB(c), …).
     BrotherQl,
     /// Brother P-touch / TZe tape raster protocol (PT-P700 / H500 / E500 family).
@@ -89,7 +91,7 @@ impl Protocol {
     /// Labelle sample-pattern layout). Row-oriented drivers (NIIMBOT, ESC/POS,
     /// ZPL, …) use width = head and height = feed instead.
     pub fn bitmap_width_is_feed(self) -> bool {
-        matches!(self, Protocol::Dymo | Protocol::DymoLw)
+        matches!(self, Protocol::Dymo | Protocol::DymoLw | Protocol::LetraTag)
     }
 }
 
@@ -301,6 +303,7 @@ mod tests {
             Protocol::Dpl,
             Protocol::Tpcl,
             Protocol::Niimbot,
+            Protocol::LetraTag,
             Protocol::BrotherQl,
             Protocol::BrotherPt,
         ] {

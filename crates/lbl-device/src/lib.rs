@@ -69,7 +69,7 @@ pub use zpl::{
 pub use transport::{SerialTransport, DEFAULT_SERIAL_BAUD};
 
 #[cfg(feature = "ble")]
-pub use transport::{BleTransport, BLE_DEFAULT_CHUNK, BLE_DEFAULT_SCAN_SECS};
+pub use transport::{BleFrameMode, BleTransport, BLE_DEFAULT_CHUNK, BLE_DEFAULT_SCAN_SECS};
 
 pub use troubleshoot::{format_dispatch_failure, format_send_failure, TransportTarget};
 

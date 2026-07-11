@@ -154,11 +154,13 @@ pub fn discover_serial() -> Vec<DiscoveredPrinter> {
 #[cfg(feature = "ble")]
 const BLE_DISCOVERY_SCAN_SECS: u64 = 10;
 
-/// Scan for nearby Bluetooth Low Energy label printers (NIIMBOT D-series).
+/// Scan for nearby Bluetooth Low Energy label printers (NIIMBOT D-series and
+/// DYMO LetraTag LT-200B).
 ///
 /// Unlike USB/serial enumeration this performs a short radio scan (a few
-/// seconds) and reports peripherals whose advertised name looks like a NIIMBOT
-/// printer. The advertised name is returned in `path` to pass to `--bluetooth`.
+/// seconds) and reports peripherals whose advertised name or service UUID looks
+/// like a known label printer. The advertised name is returned in `path` to
+/// pass to `--bluetooth`.
 ///
 /// Returns an empty list when the `ble` feature is disabled, no adapter is
 /// present, or the scan fails.
@@ -209,24 +211,37 @@ pub fn discover_ble() -> Vec<DiscoveredPrinter> {
                 Ok(Some(props)) => props,
                 _ => continue,
             };
-            if !crate::ble::props_look_like_niimbot(&props, &addr) {
-                continue;
-            }
             let name = props
                 .local_name
                 .clone()
                 .filter(|n| !n.is_empty())
                 .unwrap_or_else(|| addr.clone());
-            out.push(DiscoveredPrinter {
-                vendor_id: None,
-                product_id: None,
-                serial: None,
-                brand: Some("NIIMBOT".to_string()),
-                model: Some(name.clone()),
-                protocol: Some(Protocol::Niimbot),
-                connection: "ble".to_string(),
-                path: Some(name),
-            });
+
+            if crate::ble::props_look_like_letratag(&props, &addr) {
+                out.push(DiscoveredPrinter {
+                    vendor_id: None,
+                    product_id: None,
+                    serial: None,
+                    brand: Some("DYMO".to_string()),
+                    model: Some(name.clone()),
+                    protocol: Some(Protocol::LetraTag),
+                    connection: "ble".to_string(),
+                    path: Some(name),
+                });
+                continue;
+            }
+            if crate::ble::props_look_like_niimbot(&props, &addr) {
+                out.push(DiscoveredPrinter {
+                    vendor_id: None,
+                    product_id: None,
+                    serial: None,
+                    brand: Some("NIIMBOT".to_string()),
+                    model: Some(name.clone()),
+                    protocol: Some(Protocol::Niimbot),
+                    connection: "ble".to_string(),
+                    path: Some(name),
+                });
+            }
         }
         out
     })
