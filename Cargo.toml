@@ -23,6 +23,7 @@ members = [
   "crates/drivers/lbl-driver-zpl",
   "crates/drivers/lbl-driver-esclabel",
   "crates/drivers/lbl-driver-tspl",
+  "crates/drivers/lbl-driver-slcs",
   "crates/drivers/lbl-driver-niimbot",
   "crates/drivers/lbl-driver-brother-ql",
   "crates/drivers/lbl-driver-brother-pt",
@@ -57,6 +58,7 @@ lbl-driver-escpos     = { path = "crates/drivers/lbl-driver-escpos" }
 lbl-driver-zpl        = { path = "crates/drivers/lbl-driver-zpl" }
 lbl-driver-esclabel   = { path = "crates/drivers/lbl-driver-esclabel" }
 lbl-driver-tspl       = { path = "crates/drivers/lbl-driver-tspl" }
+lbl-driver-slcs       = { path = "crates/drivers/lbl-driver-slcs" }
 lbl-driver-niimbot    = { path = "crates/drivers/lbl-driver-niimbot" }
 lbl-driver-brother-ql = { path = "crates/drivers/lbl-driver-brother-ql" }
 lbl-driver-brother-pt = { path = "crates/drivers/lbl-driver-brother-pt" }

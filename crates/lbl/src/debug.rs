@@ -67,6 +67,7 @@ pub fn protocol_cli_name(protocol: Protocol) -> &'static str {
         Protocol::Zpl => "zpl",
         Protocol::EscLabel => "esc-label",
         Protocol::Tspl => "tspl",
+        Protocol::Slcs => "slcs",
         Protocol::Niimbot => "niimbot",
         Protocol::BrotherQl => "brother-ql",
         Protocol::BrotherPt => "brother-pt",
