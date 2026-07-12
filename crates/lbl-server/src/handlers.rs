@@ -1,5 +1,7 @@
 //! Request handlers.
 
+use std::fmt::{Debug, Display};
+
 use anyhow::Context;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -7,7 +9,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use lbl::pipeline::{
     authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
@@ -16,6 +18,7 @@ use lbl::pipeline::{
     PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
+use lbl_config::ConfigError;
 use lbl_core::job::CutMode;
 use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, PrinterProfile, Protocol};
@@ -43,13 +46,16 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl<E: std::fmt::Display> From<E> for ApiError {
-    fn from(e: E) -> Self {
-        // Catch-all for `?` conversions. Prefer explicit `error!`/`warn!` +
-        // `internal_server_error` / `bad_request` at call sites (openapp style).
-        let msg = e.to_string();
-        tracing::error!(error = %msg, "request failed");
-        ApiError(StatusCode::INTERNAL_SERVER_ERROR, msg)
+impl From<anyhow::Error> for ApiError {
+    fn from(e: anyhow::Error) -> Self {
+        // openapp style: log Debug (full anyhow chain) before returning 500.
+        fail_internal(e)
+    }
+}
+
+impl From<ConfigError> for ApiError {
+    fn from(e: ConfigError) -> Self {
+        fail_internal(e)
     }
 }
 
@@ -59,6 +65,23 @@ fn bad_request(message: impl Into<String>) -> ApiError {
 
 fn internal_server_error(message: impl Into<String>) -> ApiError {
     ApiError(StatusCode::INTERNAL_SERVER_ERROR, message.into())
+}
+
+/// Log a server failure with Debug (anyhow chains included) and return 500.
+///
+/// Response body uses Alternate Display (`{err:#}`) so `.context("…")` wrappers
+/// do not hide the root cause the way plain Display / `to_string()` does.
+fn fail_internal(err: impl Debug + Display) -> ApiError {
+    let msg = format!("{err:#}");
+    error!(error = ?err, "request failed");
+    ApiError(StatusCode::INTERNAL_SERVER_ERROR, msg)
+}
+
+/// Log a client rejection at warn and return 400.
+fn reject_bad_request(err: impl Display) -> ApiError {
+    let msg = err.to_string();
+    warn!(error = %msg, "request rejected");
+    ApiError(StatusCode::BAD_REQUEST, msg)
 }
 
 type ApiResult = Result<axum::response::Response, ApiError>;
@@ -167,7 +190,7 @@ pub async fn profile_detected_media(
     let profile = profile.clone();
     let sku = tokio::task::spawn_blocking(move || detect_loaded_media_sku(&profile))
         .await
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(fail_internal)?;
 
     let detected = sku.and_then(|sku| detected_media_from_catalog(&state.catalog, &sku));
     Ok(Json(json!({ "detected": detected })).into_response())
@@ -194,8 +217,8 @@ pub async fn profile_printer_status(
     let profile = profile.clone();
     let status = tokio::task::spawn_blocking(move || query_profile_print_status(&profile))
         .await
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+        .map_err(fail_internal)?
+        .map_err(reject_bad_request)?;
 
     Ok(Json(status).into_response())
 }
@@ -446,8 +469,8 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             Ok(out)
         })
         .await
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(fail_internal)?
+        .map_err(fail_internal)?;
 
     let (width_px, height_px) = rendered
         .first()
@@ -533,8 +556,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
 
     let mut rendered = Vec::with_capacity(count);
     for label in labels {
-        let transpiled = transpile_label_html(&label.html, &opts)
-            .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let transpiled = transpile_label_html(&label.html, &opts).map_err(fail_internal)?;
         let computed_font_size_mm = injected_fit_font_px(&transpiled.html).map(|px| px / px_per_mm);
         let mut label_json = json!({
             "index": label.index,
@@ -968,18 +990,39 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     .await
     .map_err(|e| {
         error!(error = ?e, "print task join failed");
-        internal_server_error(e.to_string())
+        fail_internal(e)
     })?
     .map_err(|e| {
-        let msg = e.to_string();
+        let msg = format!("{e:#}");
         if msg.contains("no print target") {
-            warn!(error = %msg, "print rejected");
+            warn!(error = ?e, "print rejected");
             bad_request(msg)
         } else {
-            error!(error = %msg, "print failed");
+            error!(error = ?e, "print failed");
+            // Surface the full chain in the HTTP body too (not just "encoding").
             internal_server_error(msg)
         }
     })?;
+
+    // Browser-mode prints stop at encode here; WebUSB/BLE failures happen in
+    // the client and never reach these logs. Emit an explicit success line so
+    // compose/backend output is not silent for a 200 /api/print.
+    let label_count = report
+        .get("labels")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .or_else(|| {
+            report
+                .get("total")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize)
+        })
+        .unwrap_or(0);
+    info!(
+        dispatch_mode = ?dispatch_mode,
+        labels = label_count,
+        "print encode ok"
+    );
 
     Ok(Json(report).into_response())
 }
@@ -1177,8 +1220,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         }
     })
     .await
-    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    .map_err(fail_internal)?
+    .map_err(fail_internal)?;
 
     Ok(Json(result).into_response())
 }

@@ -173,7 +173,7 @@ mod tests {
             let err = json["error"].as_str().unwrap_or("");
             if err.contains("Chromium")
                 || err.contains("chrome")
-                || err.eq_ignore_ascii_case("rendering")
+                || err.to_ascii_lowercase().contains("rendering")
             {
                 eprintln!("skipping preview_returns_labels: {err}");
                 return;
