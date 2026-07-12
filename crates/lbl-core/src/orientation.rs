@@ -131,10 +131,10 @@ impl Rotation {
 
     /// Quarter-turn applied to the rendered raster before encode.
     ///
-    /// Row-oriented drivers (ZPL, ESC/POS, …) use the same mapping as
-    /// [`Self::for_print_with_media`]. Feed-oriented drivers (DYMO tape and
-    /// LabelWriter raster) consume bitmaps with width = feed and height = head,
-    /// so portrait and landscape swap their base quarter-turns.
+    /// Row-oriented drivers (ZPL, ESC/POS, LabelWriter, …) use the same mapping
+    /// as [`Self::for_print_with_media`]. Feed-oriented drivers (LabelManager
+    /// tape, LetraTag) consume bitmaps with width = feed and height = head, so
+    /// portrait and landscape swap their base quarter-turns.
     pub fn for_head_with_media(
         orientation: Orientation,
         media: &Media,
@@ -268,6 +268,10 @@ mod tests {
         );
         assert_eq!(
             Rotation::for_head_with_media(Orientation::Landscape, &tape, 0, 0, Protocol::Zpl),
+            Rotation::Cw90
+        );
+        assert_eq!(
+            Rotation::for_head_with_media(Orientation::Landscape, &tape, 0, 0, Protocol::DymoLw),
             Rotation::Cw90
         );
     }

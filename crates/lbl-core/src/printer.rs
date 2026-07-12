@@ -87,11 +87,13 @@ impl Protocol {
 
     /// Whether [`MonoBitmap::width`] runs along the feed direction.
     ///
-    /// DYMO drivers consume the bitmap with width = feed and height = head (the
-    /// Labelle sample-pattern layout). Row-oriented drivers (NIIMBOT, ESC/POS,
-    /// ZPL, …) use width = head and height = feed instead.
+    /// LabelManager tape ([`Dymo`](Protocol::Dymo)) and LetraTag consume the
+    /// bitmap with width = feed and height = head (column-major / sample-pattern
+    /// layout). LabelWriter raster ([`DymoLw`](Protocol::DymoLw) /
+    /// [`DymoLwClassic`](Protocol::DymoLwClassic)) and other row-oriented
+    /// drivers (NIIMBOT, ESC/POS, ZPL, …) use width = head and height = feed.
     pub fn bitmap_width_is_feed(self) -> bool {
-        matches!(self, Protocol::Dymo | Protocol::DymoLw | Protocol::LetraTag)
+        matches!(self, Protocol::Dymo | Protocol::LetraTag)
     }
 }
 
@@ -315,7 +317,14 @@ mod tests {
     }
 
     #[test]
-    fn dymo_lw_classic_is_row_oriented() {
+    fn dymo_labelwriter_protocols_are_row_oriented() {
+        assert!(!Protocol::DymoLw.bitmap_width_is_feed());
         assert!(!Protocol::DymoLwClassic.bitmap_width_is_feed());
+    }
+
+    #[test]
+    fn tape_protocols_are_feed_oriented() {
+        assert!(Protocol::Dymo.bitmap_width_is_feed());
+        assert!(Protocol::LetraTag.bitmap_width_is_feed());
     }
 }

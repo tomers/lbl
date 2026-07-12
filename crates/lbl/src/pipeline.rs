@@ -1356,6 +1356,41 @@ mod tests {
     }
 
     #[test]
+    fn dymo_lw_landscape_turns_onto_the_head() {
+        let registry = Registry::with_builtin_drivers();
+        // 54×101 mm name-badge stock is longer than the 57 mm head along feed.
+        // Misclassifying DymoLw as feed-oriented leaves feed on bitmap width and
+        // LabelWriter550Driver::pad_to_head rejects it (> 672 dots).
+        let mut opts = landscape_opts(Protocol::DymoLw);
+        opts.media = Media::fixed(54.0, 101.0, Dpi(300.0));
+        opts.encode_caps = PrinterCapabilities {
+            dpi: Dpi(300.0),
+            max_width_mm: 57.0,
+            ..Default::default()
+        };
+        opts.rotation = Rotation::for_print_with_media(Orientation::Landscape, &opts.media, 0, 0);
+        opts.head_rotation = Rotation::for_head_with_media(
+            Orientation::Landscape,
+            &opts.media,
+            0,
+            0,
+            Protocol::DymoLw,
+        );
+        let trace = encode_label_traced(&SolidBackend, &registry, 0, "<div>x</div>", &opts)
+            .expect("LabelWriter encode should accept head-oriented raster");
+        let (w, h) = trace.rendered.dimensions();
+        assert!(
+            h > w,
+            "expected head-oriented LabelWriter raster, got {w}×{h}"
+        );
+        assert_eq!(trace.rotation, Rotation::Cw90);
+        assert!(
+            w <= 672,
+            "bitmap width {w} must fit the 57 mm LabelWriter head"
+        );
+    }
+
+    #[test]
     fn text_source_makes_one_label() {
         let labels = authoring_labels(
             Source::Text {
