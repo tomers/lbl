@@ -8,27 +8,30 @@
 //!
 //! ## Print job structure
 //!
+//! Per DYMO *LabelWriter 550 Series Technical Reference* / lw5-raster:
+//!
 //! ```text
 //! ESC s <job-id:u32>      start of print job
-//! ESC i                   select graphics output mode (300×600 dpi feed; use only
-//!                         when the raster was rendered for that mode)
-//! ESC h                   select text output mode (300×300 dpi; default for lbl)
-//! [ESC L <lines:u32>]     set length to continuous stock (continuous media only)
+//! [ESC L <lines:u32>]     continuous stock length (optional; early header)
+//! ESC h | ESC i           text (300×300) or graphics (300×600 feed) mode
+//! ESC C <duty:u8>         print density percent (0..=200; after mode)
 //! per label:
 //!   ESC n <index:u16>     set label index
 //!   ESC D <bpp:u8> <align:u8> <width:u32> <height:u32> <data...>
-//!                         start of label print data (width = number of lines,
-//!                         height = dots across the head); data is width lines of
-//!                         roundup(height/8) bytes, MSB-first, 1 = dot printed
-//!   ESC G                   short form feed (every label; mandatory footer)
+//!                         width = feed lines, height = dots across the head;
+//!                         data is width lines of roundup(height/8) bytes,
+//!                         MSB-first, 1 = dot printed
+//!   ESC G                 short form feed (every label; mandatory footer)
 //! [host: ESC A handshake after each ESC G]
 //! ESC E                   feed to tear position (once, after the last handshake)
 //! ESC Q                   end of print job
 //! ```
 //!
-//! Multi-byte fields are encoded little-endian. Raster rows are left-aligned on
+//! Multi-byte fields are little-endian. Raster rows are left-aligned on
 //! the physical print head (672 dots on 57 mm models; 1248 on the 5XL); the
 //! `ESC D` height field is always the full head width, not the media width.
+//! `lbl` renders at 300 dpi, so the job header uses text mode (`ESC h`), not
+//! graphics mode (`ESC i`, 300×600 along feed).
 
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
@@ -150,16 +153,17 @@ impl Driver for LabelWriter550Driver {
 
         let mut out = Vec::with_capacity(bitmap.data.len() + 64);
 
-        // --- Print job header ---
+        // --- Print job header (Tech Ref order: s → [L] → h|i → C) ---
         out.extend_from_slice(&[ESC, START_JOB]);
         out.extend_from_slice(&self.job_id.to_le_bytes());
-        out.extend_from_slice(&[ESC, SET_DENSITY, density_percent(ctx.job.density)]);
-        out.extend_from_slice(&[ESC, TEXT_MODE]);
         if continuous {
             // Set length to continuous stock; pass the line count as the length.
             out.extend_from_slice(&[ESC, SET_MAX_LENGTH]);
             out.extend_from_slice(&lines.to_le_bytes());
         }
+        // 300 dpi raster → text mode. Graphics mode (ESC i) expects 600 dpi feed.
+        out.extend_from_slice(&[ESC, TEXT_MODE]);
+        out.extend_from_slice(&[ESC, SET_DENSITY, density_percent(ctx.job.density)]);
 
         // --- One label per copy ---
         let copies = ctx.copies();
@@ -211,9 +215,8 @@ mod tests {
         // ESC s <jobid=1 le>
         assert_eq!(&bytes[0..2], &[ESC, b's']);
         assert_eq!(&bytes[2..6], &[1, 0, 0, 0]);
-        // ESC C 100 (density) + ESC h (300×300 text mode)
-        assert_eq!(&bytes[6..10], &[ESC, b'C', 100, ESC]);
-        assert_eq!(&bytes[10..11], b"h");
+        // ESC h (300×300 text mode) then ESC C 100 (density) — Tech Ref order
+        assert_eq!(&bytes[6..11], &[ESC, b'h', ESC, b'C', 100]);
         // ESC n <index=0 le16>
         assert_eq!(&bytes[11..13], &[ESC, b'n']);
         assert_eq!(&bytes[13..15], &[0, 0]);

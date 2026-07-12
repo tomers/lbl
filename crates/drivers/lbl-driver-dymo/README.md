@@ -29,14 +29,17 @@ head and print row-by-row, which maps directly onto the row-major `MonoBitmap`.
 It emits a structured print job:
 
 - `ESC s <job-id:u32>` — start of print job
-- `ESC i` — select graphics output mode (best for dithered raster)
-- `ESC L <lines:u32>` — set length to continuous stock (continuous media only)
+- `[ESC L <lines:u32>]` — continuous stock length (optional)
+- `ESC h` — text output mode at 300×300 (use `ESC i` only for 300×600 feed rasters)
+- `ESC C <duty>` — print density percent
 - per label: `ESC n <index:u16>`, then
   `ESC D <bpp> <align> <width:u32> <height:u32> <data…>` (width = number of
   lines, height = dots across the head)
-- `ESC G` between labels (short form feed) / `ESC E` after the last (feed to
-  tear), then `ESC Q` to end the job
+- `ESC G` between labels (short form feed) / host `ESC A` handshake after each,
+  then `ESC E` after the last handshake (feed to tear) and `ESC Q` to end the job
 
-Multi-byte fields are little-endian.
+Header command order matches the Tech Ref (`s` → `[L]` → `h|i` → `C`).
+Putting `ESC C` before the mode select has been observed to stall the print
+engine (status handshake never completes).
 
 `lbl` is not affiliated with DYMO; see the repository disclaimer.
