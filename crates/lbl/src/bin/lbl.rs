@@ -30,8 +30,8 @@ use lbl_encode::Registry;
 use lbl_pattern::resolve_head_dots;
 use lbl_render::{ChromiumBackend, SidecarBackend};
 use lbl_transpile_html::{
-    parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign,
-    MediaInsetPx, TranspileOptions,
+    parse_fit_scale, transpile, AssetsBase, FontDelivery, LabelAlign, LabelFit, LabelFitSetting,
+    LabelValign, MediaInsetPx, TranspileOptions,
 };
 
 type EncodedPrintBatch = (
@@ -950,6 +950,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         head_rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery: FontDelivery::default(),
         style,
         media_type,
         virtual_export_mode,

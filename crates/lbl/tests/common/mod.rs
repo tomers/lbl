@@ -226,6 +226,7 @@ pub fn render_vector_pdf_with_layout(
             font_fit_scale: 1.0,
             media_inset: layout.media_inset,
             page_size: Some(page_size),
+            ..Default::default()
         },
     );
     let html = inline_assets(&transpiled);

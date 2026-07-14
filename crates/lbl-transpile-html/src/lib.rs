@@ -26,7 +26,7 @@ mod qr;
 mod text_fit;
 mod transpile;
 
-pub use assets::AssetsBase;
+pub use assets::{AssetsBase, FontDelivery};
 pub use qr::{QrElementOverrides, QrErrorCorrection};
 pub use text_fit::{fitted_font_px, injected_fit_font_px};
 pub use transpile::{

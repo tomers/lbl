@@ -1,12 +1,12 @@
 //! Core transpilation: rewrite custom elements and assemble the document.
 
 use lbl_core::job::OutputMode;
-use lbl_text::{google_fonts_link, resolve_slug};
+use lbl_text::{font_face_css_inline, font_face_css_remote, resolve_slug};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::assets;
-use crate::assets::AssetsBase;
+use crate::assets::{AssetsBase, FontDelivery};
 use crate::layout_fit::{apply_content_head_text_fit, apply_layout_fit};
 use crate::qr::{QrElementOverrides, QrErrorCorrection};
 
@@ -512,6 +512,8 @@ pub struct TranspileOptions {
     pub mode: OutputMode,
     /// Where third-party libraries are loaded from.
     pub assets_base: AssetsBase,
+    /// How catalog web fonts are injected (`@font-face` URLs vs data URIs).
+    pub font_delivery: FontDelivery,
     /// Label index within a batch (preview gallery addressing).
     pub index: Option<usize>,
     /// Total number of labels in the batch (preview gallery addressing).
@@ -542,6 +544,7 @@ impl Default for TranspileOptions {
         Self {
             mode: OutputMode::Print,
             assets_base: AssetsBase::default(),
+            font_delivery: FontDelivery::default(),
             index: None,
             count: None,
             style: LabelStyle::default(),
@@ -679,8 +682,8 @@ fn preview_corner_radius_css(style: &LabelStyle) -> String {
 static LBL_FONT_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"data-lbl-font="([^"]+)""#).expect("lbl font attr regex"));
 
-/// CSS rules and optional Google Fonts link for `data-lbl-font` spans in `body`.
-fn font_assets_for_body(body: &str) -> (String, Option<String>) {
+/// CSS rules (`@font-face` + `font-family`) for `data-lbl-font` spans in `body`.
+fn font_assets_for_body(body: &str, delivery: &FontDelivery) -> String {
     let mut slugs: Vec<String> = Vec::new();
     for caps in LBL_FONT_ATTR_RE.captures_iter(body) {
         let slug = caps[1].to_string();
@@ -691,17 +694,24 @@ fn font_assets_for_body(body: &str) -> (String, Option<String>) {
 
     let mut css = String::new();
     for slug in &slugs {
-        if let Some(def) = resolve_slug(slug) {
-            css.push_str(&format!(
-                ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{css}}}\n",
-                slug = slug,
-                css = def.css
-            ));
+        let Some(def) = resolve_slug(slug) else {
+            continue;
+        };
+        match delivery {
+            FontDelivery::Remote { base_url } => {
+                css.push_str(&font_face_css_remote(def, base_url));
+            }
+            FontDelivery::Inline { files } => {
+                css.push_str(&font_face_css_inline(def, files));
+            }
         }
+        css.push_str(&format!(
+            ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{family}}}\n",
+            slug = slug,
+            family = def.css
+        ));
     }
-
-    let link = google_fonts_link(&slugs.iter().map(String::as_str).collect::<Vec<_>>());
-    (css, link)
+    css
 }
 
 fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &str) -> String {
@@ -713,8 +723,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
     }
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
-    let (font_css, font_link) = font_assets_for_body(body);
-    head.push_str(&font_css);
+    head.push_str(&font_assets_for_body(body, &opts.font_delivery));
     if opts.label_fit == LabelFit::Fill {
         head.push_str(&format!(
             ".lbl-label{{--lbl-font-fit-scale:{:.4}}}\n",
@@ -753,12 +762,6 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
         }
     }
     head.push_str("</style>\n");
-    if let Some(url) = font_link {
-        head.push_str(&format!(
-            "<link rel=\"stylesheet\" href=\"{}\">\n",
-            attr(&url)
-        ));
-    }
 
     // Wrap body: preview mode adds an addressable, gallery-friendly container.
     let wrapped_body = if opts.mode == OutputMode::Preview {
@@ -810,14 +813,79 @@ mod tests {
     use super::*;
 
     #[test]
-    fn font_directive_injects_css_and_google_link() {
+    fn font_directive_injects_css_and_remote_font_face() {
         let out = transpile(
             "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"roboto\">Hi</span><span class=\"lbl-text\" data-lbl-font=\"bebas-neue\">Title</span></div>",
-            &TranspileOptions::default(),
+            &TranspileOptions {
+                font_delivery: FontDelivery::Remote {
+                    base_url: "https://fonts.example/v1".into(),
+                },
+                ..TranspileOptions::default()
+            },
         );
         assert!(out.contains("font-family:'Roboto',sans-serif"), "{out}");
         assert!(out.contains("font-family:'Bebas Neue',sans-serif"), "{out}");
-        assert!(out.contains("fonts.googleapis.com"), "{out}");
+        assert!(out.contains("@font-face"), "{out}");
+        assert!(
+            out.contains("https://fonts.example/v1/files/roboto/"),
+            "{out}"
+        );
+        assert!(!out.contains("fonts.googleapis.com"), "{out}");
+    }
+
+    #[test]
+    fn unknown_font_slug_gets_no_font_face() {
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"not-a-font\">Hi</span></div>",
+            &TranspileOptions::default(),
+        );
+        assert!(!out.contains("@font-face"), "{out}");
+        assert!(!out.contains("not-a-font\"]{font-family"), "{out}");
+    }
+
+    #[test]
+    fn inline_font_delivery_embeds_woff2_data_uri() {
+        use std::collections::HashMap;
+        let path = "files/heebo/400-latin.woff2";
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../assets/label-fonts-fixtures")
+            .join(path);
+        let bytes = std::fs::read(&fixture).expect("fixture woff2");
+        let mut files = HashMap::new();
+        files.insert(path.to_string(), bytes);
+        // include hebrew face path so catalog faces that require it are present
+        let heb = "files/heebo/400-hebrew.woff2";
+        files.insert(
+            heb.to_string(),
+            std::fs::read(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../assets/label-fonts-fixtures")
+                    .join(heb),
+            )
+            .expect("hebrew fixture"),
+        );
+        for w in [700u16] {
+            for subset in ["latin", "hebrew"] {
+                let p = format!("files/heebo/{w}-{subset}.woff2");
+                let b = std::fs::read(
+                    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../assets/label-fonts-fixtures")
+                        .join(&p),
+                )
+                .expect("heebo face");
+                files.insert(p, b);
+            }
+        }
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"heebo\">אבג</span></div>",
+            &TranspileOptions {
+                font_delivery: FontDelivery::Inline { files },
+                ..TranspileOptions::default()
+            },
+        );
+        assert!(out.contains("data:font/woff2;base64,"), "{out}");
+        assert!(out.contains("font-family:'Heebo'"), "{out}");
+        assert!(!out.contains("fonts.googleapis.com"), "{out}");
     }
 
     #[test]

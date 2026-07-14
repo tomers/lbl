@@ -16,7 +16,7 @@
 //! - `{{size:1.5:World}}` -> text at 1.5x the base font size (aliases:
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
 //! - `{{font:roboto:Hello}}` -> text in a named font (aliases: `font-family`,
-//!   `ff`; see [`fonts::FONTS`] for supported slugs)
+//!   `ff`; see [`fonts::catalog`] for supported slugs)
 //! - `{{color:#ff0000:Hello}}` -> colored text (aliases: `fg`, `foreground`,
 //!   `text-color`, `tc`; hex `#rgb` or `#rrggbb`)
 //!
@@ -37,7 +37,11 @@ mod fonts;
 mod parse;
 mod qr;
 
-pub use fonts::{google_fonts_link, resolve_slug, FontDef, FONTS};
+pub use fonts::{
+    catalog, default_font_assets_base_url, face_paths_for_slugs, font_asset_url,
+    font_assets_base_url_from_env, font_face_css_inline, font_face_css_remote, fonts, resolve_slug,
+    FontCatalog, FontDef, FontEntry, FontFaceFile,
+};
 pub use parse::{
     barcode_from_spec, parse_directive, scan_directive_at, BarcodeHeightMode, Block, Document,
 };

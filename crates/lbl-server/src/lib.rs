@@ -4,6 +4,7 @@
 //! printer discovery and profile management, label preview (server raster), and
 //! printing (the full pipeline).
 
+mod font_cache;
 mod handlers;
 mod state;
 
@@ -62,6 +63,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/config", get(handlers::get_config))
         .route("/api/config/sources", get(handlers::get_config_sources))
         .route("/api/catalog", get(handlers::list_catalog))
+        .route("/api/fonts", get(handlers::list_fonts))
         .route(
             "/api/catalog/printers",
             get(handlers::list_catalog_printers),
@@ -116,6 +118,10 @@ mod tests {
             loader: Arc::new(Loader::new()),
             host_discovery_enabled: true,
             chromium_lock: Arc::new(std::sync::Mutex::new(())),
+            font_assets_base_url: lbl_text::default_font_assets_base_url().to_string(),
+            font_cache: Arc::new(crate::font_cache::FontFileCache::new(
+                std::env::temp_dir().join("lbl-server-test-font-cache"),
+            )),
         }
     }
 
@@ -132,6 +138,44 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn fonts_lists_catalog_with_heebo() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/fonts")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["version"], "v1");
+        assert!(json["assetsBaseUrl"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://"));
+        let fonts = json["fonts"].as_array().unwrap();
+        assert!(fonts.len() > 10);
+        let heebo = fonts.iter().find(|f| f["slug"] == "heebo").unwrap();
+        assert_eq!(heebo["system"], false);
+        assert!(heebo["scripts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s == "hebrew"));
+        assert!(heebo["previewUrl"]
+            .as_str()
+            .unwrap()
+            .contains("/previews/heebo.png"));
+        assert!(!serde_json::to_string(&json)
+            .unwrap()
+            .contains("fonts.googleapis.com"));
     }
 
     #[tokio::test]

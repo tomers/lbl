@@ -4,6 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use lbl_catalog::Catalog;
 use lbl_config::{Loader, ProfileStore};
+use lbl_text::font_assets_base_url_from_env;
+
+use crate::font_cache::FontFileCache;
 
 /// Application state shared across handlers (cheaply cloneable).
 #[derive(Clone)]
@@ -23,6 +26,10 @@ pub struct AppState {
     /// `/api/preview` requests on refresh) reset the upstream connection and
     /// surface as gateway `500 Internal Server Error`.
     pub chromium_lock: Arc<Mutex<()>>,
+    /// Base URL for label font binaries (prod CDN or local fixture dir).
+    pub font_assets_base_url: String,
+    /// Disk cache for fetched font faces (raster inlining).
+    pub font_cache: Arc<FontFileCache>,
 }
 
 impl AppState {
@@ -38,6 +45,8 @@ impl AppState {
             loader: Arc::new(loader),
             host_discovery_enabled: host_discovery_enabled_from_env(),
             chromium_lock: Arc::new(Mutex::new(())),
+            font_assets_base_url: font_assets_base_url_from_env(),
+            font_cache: Arc::new(FontFileCache::from_env_or_default()),
         })
     }
 }

@@ -1,6 +1,10 @@
 //! Static assets injected into transpiled documents: flex utilities, base CSS,
 //! and third-party library references for QR/barcode rendering.
 
+use std::collections::HashMap;
+
+use lbl_text::font_assets_base_url_from_env;
+
 /// Where third-party JS libraries are loaded from.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum AssetsBase {
@@ -30,6 +34,23 @@ impl AssetsBase {
             AssetsBase::Local(base) => {
                 format!("{}/JsBarcode.all.min.js", base.trim_end_matches('/'))
             }
+        }
+    }
+}
+
+/// How web fonts referenced by `data-lbl-font` are delivered to the document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FontDelivery {
+    /// `@font-face` with absolute URLs under this base (CDN / fixtures HTTP).
+    Remote { base_url: String },
+    /// `@font-face` with `data:` URIs (for Chromium `data:text/html` raster).
+    Inline { files: HashMap<String, Vec<u8>> },
+}
+
+impl Default for FontDelivery {
+    fn default() -> Self {
+        Self::Remote {
+            base_url: font_assets_base_url_from_env(),
         }
     }
 }

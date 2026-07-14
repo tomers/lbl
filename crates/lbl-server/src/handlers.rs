@@ -15,7 +15,7 @@ use lbl::pipeline::{
     authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
     resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
     resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
-    PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
+    AuthoringLabel, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_config::ConfigError;
@@ -27,9 +27,43 @@ use lbl_dither::Algorithm;
 use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
 use lbl_encode::Registry;
 use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
-use lbl_transpile_html::{injected_fit_font_px, AssetsBase, LabelFitSetting};
+use lbl_text::{catalog, font_asset_url};
+use lbl_transpile_html::{injected_fit_font_px, AssetsBase, FontDelivery, LabelFitSetting};
 
+use crate::font_cache::load_font_files_for_html;
 use crate::AppState;
+
+fn remote_font_delivery(state: &AppState) -> FontDelivery {
+    FontDelivery::Remote {
+        base_url: state.font_assets_base_url.clone(),
+    }
+}
+
+fn inline_font_delivery_for_labels(
+    state: &AppState,
+    labels: &[AuthoringLabel],
+) -> Result<FontDelivery, ApiError> {
+    let mut combined = String::new();
+    for label in labels {
+        combined.push_str(&label.html);
+        combined.push('\n');
+    }
+    let files = load_font_files_for_html(
+        &combined,
+        &state.font_assets_base_url,
+        state.font_cache.as_ref(),
+    )
+    .map_err(|e| {
+        ApiError(
+            StatusCode::BAD_GATEWAY,
+            format!(
+                "failed to load label fonts from {}: {e}",
+                state.font_assets_base_url
+            ),
+        )
+    })?;
+    Ok(FontDelivery::Inline { files })
+}
 
 fn lock_chromium(lock: &std::sync::Mutex<()>) -> std::sync::MutexGuard<'_, ()> {
     // A poisoned lock still means the previous Chromium work finished (or
@@ -106,6 +140,51 @@ pub async fn get_config_sources(State(state): State<AppState>) -> ApiResult {
 
 pub async fn list_catalog(State(state): State<AppState>) -> ApiResult {
     Ok(Json(state.catalog.entries()).into_response())
+}
+
+/// Font picker catalog (metadata + CDN URLs). Binary faces are not embedded.
+pub async fn list_fonts(State(state): State<AppState>) -> ApiResult {
+    let cat = catalog();
+    let base = state.font_assets_base_url.trim_end_matches('/');
+    let fonts: Vec<serde_json::Value> = cat
+        .fonts
+        .iter()
+        .map(|f| {
+            let preview_url = f.preview.as_ref().map(|p| font_asset_url(base, p));
+            let faces: Vec<serde_json::Value> = f
+                .faces
+                .iter()
+                .map(|face| {
+                    json!({
+                        "weight": face.weight,
+                        "subset": face.subset,
+                        "path": face.path,
+                        "url": font_asset_url(base, &face.path),
+                        "unicodeRange": face.unicode_range,
+                    })
+                })
+                .collect();
+            json!({
+                "slug": f.slug,
+                "label": f.label,
+                "family": f.family,
+                "category": f.category,
+                "scripts": f.scripts,
+                "weights": f.weights,
+                "license": f.license,
+                "css": f.css,
+                "system": f.system,
+                "previewUrl": preview_url,
+                "faces": faces,
+            })
+        })
+        .collect();
+    Ok(Json(json!({
+        "version": cat.version,
+        "assetsBaseUrl": base,
+        "fonts": fonts,
+    }))
+    .into_response())
 }
 
 pub async fn list_catalog_printers(State(state): State<AppState>) -> ApiResult {
@@ -394,6 +473,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     };
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     let feed_along_width = rotation.swaps_axes();
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
         protocol,
         media: media.clone(),
@@ -406,6 +486,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         head_rotation: rotation,
         supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type: None,
         virtual_export_mode: VirtualExportMode::Raster,
@@ -541,6 +622,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         head_rotation: rotation,
         supersample: 1,
         assets_base: AssetsBase::Cdn,
+        font_delivery: remote_font_delivery(&state),
         style,
         media_type: None,
         virtual_export_mode: lbl_driver_file::VirtualExportMode::Vector,
@@ -930,6 +1012,9 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         &media,
         req.supports_cut,
     );
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
+        .map_err(ApiError::from)?;
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
         protocol,
         media,
@@ -943,6 +1028,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         head_rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type: None,
         virtual_export_mode: lbl_driver_file::VirtualExportMode::Raster,
@@ -955,8 +1041,6 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         encode_caps,
     };
 
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
     let use_sidecar = req.use_sidecar;
     let dispatch_mode = req.dispatch_mode;
     let network = req.network.clone();
@@ -1129,6 +1213,10 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         &media,
         req.supports_cut,
     );
+    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
+        .map_err(ApiError::from)?;
+    // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
         protocol,
         media,
@@ -1142,6 +1230,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         head_rotation,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type,
         virtual_export_mode,
@@ -1154,8 +1243,6 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         encode_caps,
     };
 
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
     let use_sidecar = req.use_sidecar;
     let want_debug = req.debug;
     let (extension, mime) = match media_type {

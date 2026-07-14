@@ -1,0 +1,5 @@
+{
+  "version": "v1",
+  "slugs": ["roboto", "heebo", "open-sans"],
+  "note": "Offline test assets; production binaries live on the fonts CDN."
+}

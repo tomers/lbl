@@ -27,8 +27,9 @@ type PrintTransportTargets = (
 pub use lbl_template::BatchSelection;
 use lbl_template::{select_batch_indices, Engine, RenderOptions};
 use lbl_transpile_html::{
-    transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    MediaInset, MediaInsetPx, PageSizeMm, QrErrorCorrection, TranspileOptions, ViewportPx,
+    transpile, AssetsBase, FontDelivery, LabelAlign, LabelFit, LabelFitSetting, LabelStyle,
+    LabelValign, MediaInset, MediaInsetPx, PageSizeMm, QrErrorCorrection, TranspileOptions,
+    ViewportPx,
 };
 
 /// CSS reference resolution for vector PDF export. Alias for
@@ -481,6 +482,8 @@ pub struct PipelineOptions {
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
     pub assets_base: AssetsBase,
+    /// How catalog web fonts are injected into transpiled HTML.
+    pub font_delivery: FontDelivery,
     /// Font / QR / barcode sizing (already resolved to pixels for this run's
     /// DPI and supersample factor; see [`resolve_style`]).
     pub style: LabelStyle,
@@ -779,6 +782,7 @@ pub fn transpile_label_html(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -932,6 +936,7 @@ fn render_label_print<B: RenderBackend>(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -1094,6 +1099,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -1265,6 +1271,7 @@ mod tests {
             head_rotation,
             supersample: 1,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
@@ -1513,6 +1520,7 @@ mod tests {
             head_rotation: Rotation::None,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
@@ -1547,6 +1555,7 @@ mod tests {
             head_rotation: Rotation::None,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,

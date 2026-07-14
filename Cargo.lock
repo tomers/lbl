@@ -1957,7 +1957,11 @@ dependencies = [
  "lbl-render",
  "lbl-spool",
  "lbl-template",
+ "lbl-text",
  "lbl-transpile-html",
+ "once_cell",
+ "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
@@ -2009,6 +2013,7 @@ dependencies = [
  "clap",
  "lbl-cli",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
 ]
 

@@ -21,9 +21,13 @@ It injects the base/flex CSS and only the third-party libraries actually needed.
 
 ## Assets
 
-Libraries load from a CDN by default; pass `--assets-base /assets` (or a
-`file://` path) to serve vendored copies (useful offline or for deterministic
-print rendering).
+QR/barcode libraries load from a CDN by default; pass `--assets-base /assets`
+(or a `file://` path) to serve vendored copies.
+
+Label web fonts come from the self-hosted catalog (`FONT_ASSETS_BASE_URL`,
+default `https://fonts.lblprint.com/v1`). Transpile injects `@font-face` rules
+for known `data-lbl-font` slugs only — never Google Fonts. See
+[`tooling/fonts/README.md`](../../../tooling/fonts/README.md).
 
 ## CLI
 
