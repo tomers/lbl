@@ -2468,6 +2468,9 @@ connections = [
   { kind = "ble", name = "LT-200B" },
 ]
 
+# NIIMBOT models read RFID on official rolls (size / remaining). Keep
+# `reports_media = true` so Studio live status can resolve loaded media.
+
 [[printers]]
 brand           = "NIIMBOT"
 keys            = ["D110", "D11", "D11S"]
@@ -2476,6 +2479,7 @@ protocol        = "niimbot"
 maturity        = "verified"
 dpi             = 203.0
 max_width_mm    = 12.0
+reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D110" }, { kind = "ble", name = "D11S" }, { kind = "ble", name = "D11" }]
@@ -2492,6 +2496,7 @@ protocol        = "niimbot"
 maturity        = "experimental"
 dpi             = 203.0
 max_width_mm    = 12.0
+reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
@@ -2505,6 +2510,7 @@ protocol        = "niimbot"
 maturity        = "experimental"
 dpi             = 203.0
 max_width_mm    = 12.0
+reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "N1" }]
@@ -2541,6 +2547,7 @@ protocol        = "niimbot"
 maturity        = "supported"
 dpi             = 203.0
 max_width_mm    = 24.0
+reports_media   = true
 default_media   = "24x40"
 supported_media = ["24x40", "12x22", "12x30", "12x40", "12x50", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D101" }]
@@ -2576,6 +2583,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 48.0
+reports_media = true
 default_media = "50x30"
 supported_media = [
   "50x30",
@@ -2598,6 +2606,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 48.0
+reports_media = true
 default_media = "50x30"
 supported_media = [
   "50x30",
@@ -2620,6 +2629,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 50.0
+reports_media = true
 default_media = "50x30"
 supported_media = [
   "50x30",
@@ -2642,6 +2652,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 72.0
+reports_media = true
 default_media = "70x50"
 supported_media = [
   "70x50",
@@ -2666,6 +2677,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 300.0
 max_width_mm = 48.0
+reports_media = true
 default_media = "50x30"
 supported_media = [
   "50x30",
@@ -2688,6 +2700,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 300.0
 max_width_mm = 50.0
+reports_media = true
 default_media = "50x30"
 supported_media = [
   "50x30",
@@ -2710,6 +2723,7 @@ protocol        = "niimbot"
 maturity        = "supported"
 dpi             = 300.0
 max_width_mm    = 12.0
+reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D11" }]
@@ -2722,6 +2736,7 @@ protocol        = "niimbot"
 maturity        = "supported"
 dpi             = 203.0
 max_width_mm    = 12.0
+reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
 connections     = [{ kind = "ble", name = "D110" }]
@@ -2734,6 +2749,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 75.0
+reports_media = true
 default_media = "70x40"
 supported_media = [
   "70x40",
@@ -2759,6 +2775,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 104.0
+reports_media = true
 default_media = "102x152"
 supported_media = [
   "102x152",
@@ -2794,6 +2811,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 80.0
+reports_media = true
 default_media = "70x50"
 supported_media = [
   "70x40",
@@ -2819,6 +2837,7 @@ protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
 max_width_mm = 104.0
+reports_media = true
 default_media = "102x152"
 supported_media = [
   "102x152",
