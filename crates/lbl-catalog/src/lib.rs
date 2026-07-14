@@ -551,6 +551,22 @@ mod tests {
         assert!(d110.iter().any(|e| e.matches_key("12x40")));
         let printer = catalog.lookup_printer("D110").unwrap();
         assert_eq!(printer.dpi, 203.0);
+        assert!(printer.reports_media);
+    }
+
+    #[test]
+    fn niimbot_printers_report_media() {
+        let catalog = Catalog::bundled().unwrap();
+        let missing: Vec<_> = catalog
+            .printers()
+            .iter()
+            .filter(|p| p.protocol == Protocol::Niimbot && !p.reports_media)
+            .map(|p| p.canonical_key())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "NIIMBOT RFID printers must set reports_media: {missing:?}"
+        );
     }
 
     #[test]
