@@ -13,11 +13,15 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 | GET | `/api/catalog/:key` | Resolve a media SKU/alias |
 | GET | `/api/catalog/compatible?printer=` | Media compatible with a printer |
 | GET | `/api/printers` | Discovered printers (USB bulk, serial, BLE when enabled) |
-| GET | `/api/printers/profiles` | Persisted printer profiles |
-| PUT | `/api/printers/profiles` | Upsert a printer profile |
-| DELETE | `/api/printers/profiles/:id` | Remove a printer profile |
-| GET | `/api/printers/profiles/:id/media` | Detected media SKU when connected (if the profile reports media) |
-| GET | `/api/printers/profiles/:id/status` | Print-engine status when connected (if supported by the profile protocol) |
+| GET | `/api/printers/profiles` | Persisted printer profiles (host discovery only) |
+| PUT | `/api/printers/profiles` | Upsert a printer profile (host discovery only) |
+| DELETE | `/api/printers/profiles/:id` | Remove a printer profile (host discovery only) |
+| GET | `/api/printers/profiles/:id/media` | Detected media SKU when connected (host discovery only) |
+| GET | `/api/printers/profiles/:id/status` | Print-engine status when connected (host discovery only) |
+
+Host profile routes are mounted only when `LBL_HOST_DISCOVERY` is enabled
+(server print mode). With discovery off (browser print mode), those paths
+return 404; clients keep printer profiles locally.
 | POST | `/api/preview` | Rasterize source via the print pipeline (PNG gallery) |
 | POST | `/api/print` | Run the full pipeline and dispatch to a printer |
 | POST | `/api/print/file` | Virtual printer: return encoded files inline (raster or vector PDF) |

@@ -17,7 +17,8 @@ pub struct AppState {
     pub profiles: Arc<ProfileStore>,
     /// Configuration loader (paths + figment).
     pub loader: Arc<Loader>,
-    /// When false, local device enumeration is skipped (`GET /api/printers`, etc.).
+    /// When false, local device enumeration is skipped and host profile routes
+    /// (`/api/printers/profiles*`) are not mounted.
     pub host_discovery_enabled: bool,
     /// Serializes in-process Chromium launches.
     ///

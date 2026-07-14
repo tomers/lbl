@@ -56,9 +56,30 @@ async fn http_request_span(request: Request, next: Next) -> Response {
     next.run(request).instrument(span).await
 }
 
+/// Host-attached profile CRUD + status/media. Mounted only when
+/// `LBL_HOST_DISCOVERY` is enabled (server print mode). Browser print mode
+/// keeps profiles in the client and must not share a host-global store.
+fn host_profile_routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/printers/profiles", get(handlers::list_profiles))
+        .route("/api/printers/profiles", put(handlers::upsert_profile))
+        .route(
+            "/api/printers/profiles/{id}",
+            delete(handlers::delete_profile),
+        )
+        .route(
+            "/api/printers/profiles/{id}/media",
+            get(handlers::profile_detected_media),
+        )
+        .route(
+            "/api/printers/profiles/{id}/status",
+            get(handlers::profile_printer_status),
+        )
+}
+
 /// Build the application router with all routes mounted under `/api`.
 pub fn router(state: AppState) -> Router {
-    Router::new()
+    let mut app = Router::new()
         .route("/api/health", get(handlers::health))
         .route("/api/config", get(handlers::get_config))
         .route("/api/config/sources", get(handlers::get_config_sources))
@@ -75,25 +96,16 @@ pub fn router(state: AppState) -> Router {
         .route("/api/catalog/compatible", get(handlers::compatible_catalog))
         .route("/api/catalog/{key}", get(handlers::show_catalog))
         .route("/api/printers", get(handlers::list_printers))
-        .route("/api/printers/profiles", get(handlers::list_profiles))
-        .route("/api/printers/profiles", put(handlers::upsert_profile))
-        .route(
-            "/api/printers/profiles/{id}",
-            delete(handlers::delete_profile),
-        )
-        .route(
-            "/api/printers/profiles/{id}/media",
-            get(handlers::profile_detected_media),
-        )
-        .route(
-            "/api/printers/profiles/{id}/status",
-            get(handlers::profile_printer_status),
-        )
         .route("/api/preview", post(handlers::preview))
         .route("/api/preview/html", post(handlers::preview_html))
         .route("/api/print", post(handlers::print))
-        .route("/api/print/file", post(handlers::print_file))
-        .layer(from_fn(http_request_span))
+        .route("/api/print/file", post(handlers::print_file));
+
+    if state.host_discovery_enabled {
+        app = app.merge(host_profile_routes());
+    }
+
+    app.layer(from_fn(http_request_span))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -360,5 +372,39 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn host_profile_routes_absent_when_discovery_disabled() {
+        let state = AppState {
+            host_discovery_enabled: false,
+            ..test_state()
+        };
+        let app = router(state);
+        for (method, uri) in [
+            ("GET", "/api/printers/profiles"),
+            ("PUT", "/api/printers/profiles"),
+            ("DELETE", "/api/printers/profiles/x"),
+            ("GET", "/api/printers/profiles/x/media"),
+            ("GET", "/api/printers/profiles/x/status"),
+        ] {
+            let mut builder = Request::builder().method(method).uri(uri);
+            let body = if method == "PUT" {
+                builder = builder.header("content-type", "application/json");
+                Body::from("{}")
+            } else {
+                Body::empty()
+            };
+            let resp = app
+                .clone()
+                .oneshot(builder.body(body).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(
+                resp.status(),
+                StatusCode::NOT_FOUND,
+                "{method} {uri} should be unmounted when host discovery is off"
+            );
+        }
     }
 }
