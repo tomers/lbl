@@ -1,5 +1,6 @@
 //! In-process headless Chromium backend via chromiumoxide.
 
+use std::fs;
 use std::time::Duration;
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
@@ -68,10 +69,29 @@ impl ChromiumBackend {
             .tempdir()
             .map_err(RenderError::Io)?;
 
+        // Recent Chromium requires a writable Crashpad database. Container
+        // users without a home dir (e.g. ECS `app` with `--no-create-home`)
+        // otherwise die on launch with `chrome_crashpad_handler: --database
+        // is required`. Pin XDG/HOME and crash dumps into the profile dir.
+        let xdg_home = profile_dir.path().join("xdg");
+        fs::create_dir_all(&xdg_home)?;
+        let xdg_home = xdg_home
+            .to_str()
+            .ok_or_else(|| RenderError::Backend("chromium profile path is not UTF-8".into()))?
+            .to_owned();
+
         let (browser, handler) = rt.block_on(async {
             // chromiumoxide `.arg()` expects bare flag names (e.g. `disable-gpu`),
             // not `--`-prefixed strings; use `.no_sandbox()` for Docker/root.
-            let mut builder = BrowserConfig::builder().no_sandbox().arg("disable-gpu");
+            let mut builder = BrowserConfig::builder()
+                .no_sandbox()
+                .arg("disable-gpu")
+                // Small Fargate /dev/shm makes Chromium crash without this.
+                .arg("disable-dev-shm-usage")
+                .arg(("crash-dumps-dir", xdg_home.as_str()))
+                .env("HOME", &xdg_home)
+                .env("XDG_CONFIG_HOME", &xdg_home)
+                .env("XDG_CACHE_HOME", &xdg_home);
             if let Ok(chrome) = std::env::var("CHROME") {
                 builder = builder.chrome_executable(chrome);
             }
