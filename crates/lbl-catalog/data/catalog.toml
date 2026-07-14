@@ -4654,9 +4654,13 @@ supported_media = [
 ]
 connections = []
 
+# Munbyn 4″ direct-thermal shippers — vendor Print Command is TSPL (TSPL2 on some
+# older portables). USB PIDs beyond ITPP941/941B are unpublished; pair by model.
+# Wi-Fi / AirPrint 941 SKUs share the USB-only language path (alias keys below).
+
 [[printers]]
 brand = "Munbyn"
-keys = ["ITPP941", "941"]
+keys = ["ITPP941", "941", "RW941", "ITPP941-WiFi", "941 WiFi", "941 AirPrint"]
 name = "Munbyn ITPP941"
 protocol = "tspl"
 maturity = "experimental"
@@ -4689,7 +4693,7 @@ connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 
 [[printers]]
 brand = "Munbyn"
-keys = ["ITPP941B", "941B"]
+keys = ["ITPP941B", "941B", "RW941B"]
 name = "Munbyn ITPP941B"
 protocol = "tspl"
 maturity = "experimental"
@@ -4720,11 +4724,180 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 
+# 300 dpi Bluetooth 941 sibling (RW941BP / ITPP941BP). USB PID unpublished.
+[[printers]]
+brand = "Munbyn"
+keys = ["ITPP941BP", "941BP", "RW941BP"]
+name = "Munbyn ITPP941BP"
+protocol = "tspl"
+maturity = "experimental"
+dpi = 300.0
+max_width_mm = 108.0
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "50x30",
+  "40x30",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
 # USB PID unconfirmed in public ID DBs — pair by model / network :9100.
 [[printers]]
 brand = "Munbyn"
-keys = ["RW130B", "ITPP130", "130B"]
+keys = ["RW130B", "ITPP130", "ITPP130B", "130B", "P130B"]
 name = "Munbyn RW130B"
+protocol = "tspl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "50x30",
+  "40x30",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+# Older portable (ITPP129 / RW129B). Vendor lists TSPL / TSPL2 (+ EPL2); we emit TSPL BITMAP.
+[[printers]]
+brand = "Munbyn"
+keys = ["ITPP129", "RW129B", "129B", "P129"]
+name = "Munbyn ITPP129"
+protocol = "tspl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "50x30",
+  "40x30",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+# RealWriter current-gen desktop shippers (USB + Bluetooth). PID unpublished.
+[[printers]]
+brand = "Munbyn"
+keys = ["RW402B", "402B"]
+name = "Munbyn RW402B"
+protocol = "tspl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "50x30",
+  "40x30",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+[[printers]]
+brand = "Munbyn"
+keys = ["RW403B", "403B"]
+name = "Munbyn RW403B"
+protocol = "tspl"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 108.0
+default_media = "102x152"
+supported_media = [
+  "102x152",
+  "100x150",
+  "50x25",
+  "cont-104",
+  "50x30",
+  "40x30",
+  "50x30-pro",
+  "40x30-pro",
+  "50x30-redblack",
+  "40x30-clear",
+  "50x30-yellow",
+  "z-perform-1000d-4x6",
+  "z-perform-2000d-4x6",
+  "z-select-4000d-4x6",
+  "zebra-4x6-blackmark",
+  "tsc-4x6",
+  "tsc-4x6-blackmark",
+  "rollo-4x6",
+  "z-perform-1000d-2x1",
+  "tsc-50x25",
+]
+connections = []
+
+# Dual-color capable hardware; catalog encodes mono TSPL BITMAP only.
+[[printers]]
+brand = "Munbyn"
+keys = ["RW405B", "405B"]
+name = "Munbyn RW405B"
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
