@@ -7,15 +7,19 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine as _;
 use serde::Deserialize;
 use serde_json::json;
+use tokio::task::spawn_blocking;
 use tracing::{error, info, warn};
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, render_label_raster, resolve_font_fit_scale,
-    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
-    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
-    AuthoringLabel, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
+    authoring_labels, encode_label, pad_preview_encode_feed, pad_preview_head_tape,
+    render_label_raster, resolve_font_fit_scale, resolve_label_align, resolve_label_fit,
+    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
+    resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel, PipelineOptions,
+    Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_config::ConfigError;
@@ -26,7 +30,7 @@ use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
 use lbl_encode::Registry;
-use lbl_render::{ChromiumBackend, RenderBackend, SidecarBackend};
+use lbl_render::{RenderBackend, SidecarBackend};
 use lbl_text::{catalog, font_asset_url};
 use lbl_transpile_html::{injected_fit_font_px, AssetsBase, FontDelivery, LabelFitSetting};
 
@@ -63,12 +67,6 @@ fn inline_font_delivery_for_labels(
         )
     })?;
     Ok(FontDelivery::Inline { files })
-}
-
-fn lock_chromium(lock: &std::sync::Mutex<()>) -> std::sync::MutexGuard<'_, ()> {
-    // A poisoned lock still means the previous Chromium work finished (or
-    // panicked); recover so one bad render does not brick the server.
-    lock.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// A handler error that renders as a JSON `{ "error": ... }` with a status.
@@ -267,7 +265,7 @@ pub async fn profile_detected_media(
     }
 
     let profile = profile.clone();
-    let sku = tokio::task::spawn_blocking(move || detect_loaded_media_sku(&profile))
+    let sku = spawn_blocking(move || detect_loaded_media_sku(&profile))
         .await
         .map_err(fail_internal)?;
 
@@ -294,7 +292,7 @@ pub async fn profile_printer_status(
     }
 
     let profile = profile.clone();
-    let status = tokio::task::spawn_blocking(move || query_profile_print_status(&profile))
+    let status = spawn_blocking(move || query_profile_print_status(&profile))
         .await
         .map_err(fail_internal)?
         .map_err(reject_bad_request)?;
@@ -427,7 +425,6 @@ impl SourceReq {
 }
 
 pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
-    use base64::Engine as _;
     use lbl_driver_file::VirtualExportMode;
     use std::io::Cursor;
 
@@ -499,24 +496,25 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         encode_caps: encode_caps.clone(),
     };
     let px_per_mm = dpi * supersample as f64 / 25.4;
-    let chromium_lock = state.chromium_lock.clone();
+    let renderer = state.renderer.clone();
+    // Reserve a render slot before moving onto a blocking thread: a client that
+    // navigates away while still queued drops this future and frees the slot.
+    let permit = renderer.acquire().await;
 
-    let rendered =
-        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<serde_json::Value>> {
-            let _chromium = lock_chromium(&chromium_lock);
-            let backend = ChromiumBackend::launch()?;
+    let rendered = spawn_blocking(move || -> anyhow::Result<Vec<serde_json::Value>> {
+        let _permit = permit;
+        renderer.render_blocking(|backend| {
             let mut out = Vec::with_capacity(count);
-            for label in labels {
-                let raster = render_label_raster(&backend, &label.html, &opts)?;
+            for label in &labels {
+                let raster = render_label_raster(backend, &label.html, &opts)?;
                 let transpiled_html = raster.transpiled_html;
-                let image = lbl::pipeline::pad_preview_head_tape(
+                let image = pad_preview_head_tape(
                     raster.image,
                     &opts.media,
                     &encode_caps,
                     feed_along_width,
                 );
-                let padded =
-                    lbl::pipeline::pad_preview_encode_feed(image, &encode_caps, feed_along_width);
+                let padded = pad_preview_encode_feed(image, &encode_caps, feed_along_width);
                 let image = padded.image;
                 let mut png = Vec::new();
                 image
@@ -528,7 +526,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     "index": label.index,
                     "width_px": image.width(),
                     "height_px": image.height(),
-                    "image_base64": base64::engine::general_purpose::STANDARD.encode(&png),
+                    "image_base64": STANDARD.encode(&png),
                 });
                 if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 {
                     label_json["content_feed_end_px"] =
@@ -549,9 +547,10 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             }
             Ok(out)
         })
-        .await
-        .map_err(fail_internal)?
-        .map_err(fail_internal)?;
+    })
+    .await
+    .map_err(fail_internal)?
+    .map_err(fail_internal)?;
 
     let (width_px, height_px) = rendered
         .first()
@@ -1049,10 +1048,16 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let bluetooth = req.bluetooth.clone();
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
-    let chromium_lock = state.chromium_lock.clone();
+    let renderer = state.renderer.clone();
+    // Only the browser path uses a render slot; the sidecar spawns its own process.
+    let permit = if use_sidecar {
+        None
+    } else {
+        Some(renderer.acquire().await)
+    };
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
-    let report = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
+    let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let registry = if protocol == Protocol::Niimbot {
             niimbot_registry(printer_key.as_deref())
         } else {
@@ -1061,9 +1066,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         let encoded: Vec<(String, Vec<u8>)> = if use_sidecar {
             encode_all(&SidecarBackend::node_default(), &registry, &labels, &opts)?
         } else {
-            let _chromium = lock_chromium(&chromium_lock);
-            let backend = ChromiumBackend::launch()?;
-            encode_all(&backend, &registry, &labels, &opts)?
+            let _permit = permit;
+            renderer.render_blocking(|backend| encode_all(backend, &registry, &labels, &opts))?
         };
         if dispatch_mode == DispatchMode::Client {
             build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
@@ -1133,8 +1137,6 @@ fn encode_all<B: RenderBackend>(
 /// debug report, returning the artifacts inline so the browser can download
 /// them. No physical device is contacted.
 pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>) -> ApiResult {
-    use base64::Engine as _;
-
     let source = req.source.clone().into_source()?;
     let protocol = parse_protocol(&req.protocol)?;
     let dpi = resolve_request_dpi(
@@ -1251,9 +1253,15 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     };
 
     let printer_key = req.printer.clone();
-    let chromium_lock = state.chromium_lock.clone();
+    let renderer = state.renderer.clone();
+    // Only the browser path uses a render slot; the sidecar spawns its own process.
+    let permit = if use_sidecar {
+        None
+    } else {
+        Some(renderer.acquire().await)
+    };
 
-    let result = tokio::task::spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
+    let result = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let mut registry = if protocol == Protocol::Niimbot {
             niimbot_registry(printer_key.as_deref())
         } else {
@@ -1270,10 +1278,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
             let mut traces = Vec::new();
             for label in &labels {
                 let trace = backend.encode_traced(&registry, label.index, &label.html, &opts)?;
-                let data_url = format!(
-                    "data:{mime};base64,{}",
-                    base64::engine::general_purpose::STANDARD.encode(&trace.encoded)
-                );
+                let data_url = format!("data:{mime};base64,{}", STANDARD.encode(&trace.encoded));
                 out_labels.push(json!({
                     "index": label.index,
                     "filename": format!("label-{:04}.{extension}", label.index),
@@ -1302,8 +1307,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         if use_sidecar {
             encode(&SidecarBackend::node_default())
         } else {
-            let _chromium = lock_chromium(&chromium_lock);
-            encode(&ChromiumBackend::launch()?)
+            let _permit = permit;
+            renderer.render_blocking(|backend| encode(backend))
         }
     })
     .await
@@ -1520,8 +1525,6 @@ fn build_client_print_response(
     printer_key: Option<&str>,
     encoded: Vec<(String, Vec<u8>)>,
 ) -> anyhow::Result<serde_json::Value> {
-    use base64::Engine as _;
-
     let labels: Vec<serde_json::Value> = encoded
         .iter()
         .enumerate()
@@ -1530,7 +1533,7 @@ fn build_client_print_response(
                 "index": i,
                 "filename": name,
                 "size": bytes.len(),
-                "data_base64": base64::engine::general_purpose::STANDARD.encode(bytes),
+                "data_base64": STANDARD.encode(bytes),
             })
         })
         .collect();
