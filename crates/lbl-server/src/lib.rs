@@ -5,8 +5,10 @@
 //! printing (the full pipeline).
 
 mod handlers;
+mod render_pool;
 mod state;
 
+pub use render_pool::RenderPool;
 pub use state::AppState;
 
 use axum::extract::Request;
@@ -116,6 +118,7 @@ mod tests {
     use http_body_util::BodyExt;
     use lbl_catalog::Catalog;
     use lbl_config::{Loader, ProfileStore};
+    use std::env;
     use std::sync::Arc;
     use tower::ServiceExt;
 
@@ -123,11 +126,13 @@ mod tests {
         AppState {
             catalog: Arc::new(Catalog::bundled().unwrap()),
             profiles: Arc::new(ProfileStore::new(
-                std::env::temp_dir().join("lbl-server-test-printers.toml"),
+                env::temp_dir().join("lbl-server-test-printers.toml"),
             )),
             loader: Arc::new(Loader::new()),
             host_discovery_enabled: true,
-            chromium_lock: Arc::new(std::sync::Mutex::new(())),
+            renderer: Arc::new(RenderPool::new(1)),
+                env::temp_dir().join("lbl-server-test-font-cache"),
+            )),
         }
     }
 
@@ -145,6 +150,7 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
+
 
     #[tokio::test]
     async fn catalog_lists_entries() {

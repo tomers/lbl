@@ -1,9 +1,12 @@
 //! Shared application state.
 
-use std::sync::{Arc, Mutex};
+use std::env;
+use std::sync::Arc;
 
 use lbl_catalog::Catalog;
 use lbl_config::{Loader, ProfileStore};
+
+use crate::render_pool::RenderPool;
 
 /// Application state shared across handlers (cheaply cloneable).
 #[derive(Clone)]
@@ -17,13 +20,9 @@ pub struct AppState {
     /// When false, local device enumeration is skipped and host profile routes
     /// (`/api/printers/profiles*`) are not mounted.
     pub host_discovery_enabled: bool,
-    /// Serializes in-process Chromium launches.
-    ///
-    /// Each `ChromiumBackend::launch` starts a browser plus a nested Tokio
-    /// runtime. Overlapping launches (common when Studio fires several
-    /// `/api/preview` requests on refresh) reset the upstream connection and
-    /// surface as gateway `500 Internal Server Error`.
-    pub chromium_lock: Arc<Mutex<()>>,
+    /// Shared headless-Chromium renderer reused across all preview/print
+    /// requests, with a bound on how many renders run concurrently.
+    pub renderer: Arc<RenderPool>,
 }
 
 impl AppState {
@@ -38,16 +37,41 @@ impl AppState {
             profiles: Arc::new(profiles),
             loader: Arc::new(loader),
             host_discovery_enabled: host_discovery_enabled_from_env(),
-            chromium_lock: Arc::new(Mutex::new(())),
+            renderer: Arc::new(RenderPool::new(render_concurrency_from_env())),
         })
     }
+
+    /// Launch the shared browser ahead of the first request so an interactive
+    /// preview does not pay Chromium's cold-start cost. Failures are logged and
+    /// left for the first render to retry; a missing browser must not stop the
+    /// server from starting (e.g. deployments that only use the sidecar).
+    pub fn warm_renderer(&self) {
+        let renderer = self.renderer.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Err(e) = renderer.warm() {
+                tracing::warn!(error = ?e, "browser warm-up failed; first render will retry");
+            }
+        });
+    }
+}
+
+/// Maximum concurrent renders, from `LBL_RENDER_CONCURRENCY` (default 2).
+///
+/// The right value tracks the CPU available to the process; deployments set it
+/// to match their allotted cores.
+fn render_concurrency_from_env() -> usize {
+    env::var("LBL_RENDER_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(2)
 }
 
 /// Read `LBL_HOST_DISCOVERY` (default: enabled).
 ///
 /// Set to `0`, `false`, `off`, `no`, or `disabled` to skip USB / serial / BLE enumeration.
 fn host_discovery_enabled_from_env() -> bool {
-    match std::env::var("LBL_HOST_DISCOVERY") {
+    match env::var("LBL_HOST_DISCOVERY") {
         Ok(v) => !matches!(
             v.trim().to_ascii_lowercase().as_str(),
             "0" | "disabled" | "false" | "no" | "off"
@@ -58,23 +82,53 @@ fn host_discovery_enabled_from_env() -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
+
+    // Process environment is shared across the threads the test harness runs in
+    // parallel, so tests that mutate it must not overlap. Poison-tolerant so one
+    // failing test does not cascade into spurious failures in the others.
+    static ENV_GUARD: Mutex<()> = Mutex::new(());
 
     #[test]
     fn host_discovery_defaults_to_enabled() {
-        std::env::remove_var("LBL_HOST_DISCOVERY");
+        let _env = ENV_GUARD.lock().unwrap_or_else(|e| e.into_inner());
+        env::remove_var("LBL_HOST_DISCOVERY");
         assert!(host_discovery_enabled_from_env());
     }
 
     #[test]
     fn host_discovery_respects_disable_values() {
+        let _env = ENV_GUARD.lock().unwrap_or_else(|e| e.into_inner());
         for v in ["0", "disabled", "false", "no", "off"] {
-            std::env::set_var("LBL_HOST_DISCOVERY", v);
+            env::set_var("LBL_HOST_DISCOVERY", v);
             assert!(
                 !host_discovery_enabled_from_env(),
                 "expected disabled for LBL_HOST_DISCOVERY={v}"
             );
         }
-        std::env::remove_var("LBL_HOST_DISCOVERY");
+        env::remove_var("LBL_HOST_DISCOVERY");
+    }
+
+    #[test]
+    fn render_concurrency_defaults_and_overrides() {
+        let _env = ENV_GUARD.lock().unwrap_or_else(|e| e.into_inner());
+        env::remove_var("LBL_RENDER_CONCURRENCY");
+        assert_eq!(render_concurrency_from_env(), 2);
+
+        env::set_var("LBL_RENDER_CONCURRENCY", "4");
+        assert_eq!(render_concurrency_from_env(), 4);
+
+        // Non-positive / unparseable values fall back to the default.
+        for v in ["0", "-1", "abc", ""] {
+            env::set_var("LBL_RENDER_CONCURRENCY", v);
+            assert_eq!(
+                render_concurrency_from_env(),
+                2,
+                "LBL_RENDER_CONCURRENCY={v}"
+            );
+        }
+        env::remove_var("LBL_RENDER_CONCURRENCY");
     }
 }
