@@ -1,6 +1,7 @@
 //! In-process headless Chromium backend via chromiumoxide.
 
 use std::fs;
+use std::thread;
 use std::time::Duration;
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
@@ -44,6 +45,14 @@ async fn wait_for_load(page: &Page) -> Result<()> {
 /// A single browser is launched for the lifetime of the backend and reused for
 /// every label, which makes batch rendering fast.
 pub struct ChromiumBackend {
+    // `None` only transiently during drop, after the live resources have been
+    // handed to the shutdown thread. All access goes through [`Self::inner`].
+    inner: Option<BackendInner>,
+}
+
+/// The live resources backing a [`ChromiumBackend`]. Bundled so [`Drop`] can
+/// move them, as a unit, onto a thread that has no ambient runtime.
+struct BackendInner {
     rt: Runtime,
     browser: Browser,
     _handler: JoinHandle<()>,
@@ -53,6 +62,12 @@ pub struct ChromiumBackend {
 }
 
 impl ChromiumBackend {
+    fn inner(&self) -> &BackendInner {
+        self.inner
+            .as_ref()
+            .expect("ChromiumBackend used after drop")
+    }
+
     /// Launch a headless Chromium instance.
     pub fn launch() -> Result<Self> {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -110,24 +125,57 @@ impl ChromiumBackend {
         };
 
         Ok(Self {
-            rt,
-            browser,
-            _handler: handler_task,
-            _profile_dir: profile_dir,
+            inner: Some(BackendInner {
+                rt,
+                browser,
+                _handler: handler_task,
+                _profile_dir: profile_dir,
+            }),
+        })
+    }
+
+    /// Report whether the underlying browser still answers CDP requests.
+    ///
+    /// A reused backend can outlive its Chromium process (a crash, an OOM kill,
+    /// or a lost websocket). Callers use this to tell a genuine render error
+    /// (bad input, timeout under load) apart from a dead browser that must be
+    /// relaunched, so a slow render never triggers a needless relaunch.
+    pub fn healthy(&self) -> bool {
+        let inner = self.inner();
+        inner.rt.block_on(async {
+            matches!(
+                timeout(Duration::from_secs(2), inner.browser.version()).await,
+                Ok(Ok(_))
+            )
         })
     }
 }
 
 impl Drop for ChromiumBackend {
     fn drop(&mut self) {
-        // Close the browser explicitly so chromiumoxide doesn't emit a
-        // "Browser was not closed manually" warning and leave a child process
-        // to be reaped in the background. Disjoint field borrows let us drive
-        // the async close on the owned runtime.
-        let Self { rt, browser, .. } = self;
-        rt.block_on(async {
-            let _ = browser.close().await;
-            let _ = browser.wait().await;
+        // The backend is meant to be long-lived and reused, so it may be dropped
+        // from within an async runtime (owning state torn down on an executor
+        // thread, or at server shutdown). Both calling `Runtime::block_on` and
+        // dropping a `Runtime` panic when a runtime is entered on the current
+        // thread, so the whole teardown — graceful browser close, then dropping
+        // the runtime, handler task and profile dir — is handed to a dedicated
+        // thread that has no ambient runtime. Closing explicitly also avoids
+        // chromiumoxide's "Browser was not closed manually" warning and reaps the
+        // child process instead of leaking it.
+        let Some(inner) = self.inner.take() else {
+            return;
+        };
+        thread::spawn(move || {
+            let BackendInner {
+                rt,
+                mut browser,
+                _handler,
+                _profile_dir,
+            } = inner;
+            rt.block_on(async {
+                let _ = browser.close().await;
+                let _ = browser.wait().await;
+            });
         });
     }
 }
@@ -137,13 +185,14 @@ impl RenderBackend for ChromiumBackend {
         // A `None` axis is content-determined: pin the other axis and let a
         // full-page screenshot capture the laid-out extent of the free one.
         let auto = width.is_none() || height.is_none();
-        let bytes = self.rt.block_on(async {
+        let inner = self.inner();
+        let bytes = inner.rt.block_on(async {
             // Guard the whole interaction so a misbehaving page can never wedge
             // the render indefinitely.
             timeout(NAV_TIMEOUT, async {
                 let data_url =
                     format!("data:text/html;charset=utf-8,{}", urlencoding::encode(html));
-                let page = self
+                let page = inner
                     .browser
                     .new_page(data_url.as_str())
                     .await
@@ -206,11 +255,12 @@ impl RenderBackend for ChromiumBackend {
     }
 
     fn export_pdf(&self, html: &str, req: &PdfExportRequest) -> Result<Vec<u8>> {
-        self.rt.block_on(async {
+        let inner = self.inner();
+        inner.rt.block_on(async {
             timeout(NAV_TIMEOUT, async {
                 let data_url =
                     format!("data:text/html;charset=utf-8,{}", urlencoding::encode(html));
-                let page = self
+                let page = inner
                     .browser
                     .new_page(data_url.as_str())
                     .await
