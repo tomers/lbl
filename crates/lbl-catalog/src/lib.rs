@@ -1196,6 +1196,12 @@ mod tests {
             .lookup_by_product_id("T40X30-230")
             .unwrap()
             .matches_key("40x30"));
+        // Numeric code observed on a physical D110 15x30 RFID tag (the tag does
+        // not report the printed "T15X30-200" pack code).
+        assert!(catalog
+            .lookup_by_product_id("02282280")
+            .unwrap()
+            .matches_key("15x30"));
     }
 
     #[test]
