@@ -18,6 +18,9 @@ name = "generate-doc-examples"
 path = "src/bin/generate-doc-examples.rs"
 
 [features]
+default = ["chromium"]
+# In-process headless Chromium via lbl-render (default for CLI / golden tests).
+chromium = ["lbl-render/chromium"]
 # Bluetooth Low Energy transport (NIIMBOT D-series, DYMO LetraTag LT-200B).
 # Opt-in; forwards to `lbl-device`'s `ble` feature, which pulls in `btleplug`
 # (and a vendored `libdbus` on Linux).

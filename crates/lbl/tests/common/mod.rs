@@ -208,7 +208,7 @@ pub fn render_vector_pdf_with_layout(
 ) -> Vec<u8> {
     use lbl::pipeline::{page_size_mm, render_viewport_vector};
 
-    let viewport = render_viewport_vector(media, lbl_core::Rotation::None);
+    let viewport = render_viewport_vector(media, lbl_core::Rotation::None, None);
     let page_size = page_size_mm(media, lbl_core::Rotation::None);
     let transpiled = transpile(
         authoring_html,

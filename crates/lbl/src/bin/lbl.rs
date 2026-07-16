@@ -28,7 +28,9 @@ use lbl_dither::Algorithm;
 use lbl_driver_file::{MediaType, VirtualExportMode};
 use lbl_encode::Registry;
 use lbl_pattern::resolve_head_dots;
-use lbl_render::{ChromiumBackend, SidecarBackend};
+#[cfg(feature = "chromium")]
+use lbl_render::ChromiumBackend;
+use lbl_render::SidecarBackend;
 use lbl_transpile_html::{
     parse_fit_scale, transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelValign,
     MediaInsetPx, TranspileOptions,
@@ -1029,8 +1031,17 @@ fn run_print(args: PrintArgs) -> Result<()> {
                 preprocess_duration,
             } = match &backend {
                 BackendArg::Chromium => {
-                    let backend = ChromiumBackend::launch()?;
-                    encode_labels(&backend, &registry, &labels, &opts, encode_opts)?
+                    #[cfg(feature = "chromium")]
+                    {
+                        let backend = ChromiumBackend::launch()?;
+                        encode_labels(&backend, &registry, &labels, &opts, encode_opts)?
+                    }
+                    #[cfg(not(feature = "chromium"))]
+                    {
+                        anyhow::bail!(
+                            "this binary was built without the chromium feature; use --backend sidecar"
+                        )
+                    }
                 }
                 BackendArg::Sidecar => {
                     let backend = SidecarBackend::node_default();
@@ -1347,11 +1358,18 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
     let media_inset = resolve_media_inset(&style_cfg).to_px(args.media.dpi, PREVIEW_SUPERSAMPLE);
     let viewport = render_viewport_px(&media, PREVIEW_SUPERSAMPLE, Rotation::None, None);
 
-    let backend = if args.render {
+    #[cfg(feature = "chromium")]
+    let backend: Option<ChromiumBackend> = if args.render {
         Some(ChromiumBackend::launch()?)
     } else {
         None
     };
+    #[cfg(not(feature = "chromium"))]
+    if args.render {
+        anyhow::bail!(
+            "this binary was built without the chromium feature; omit --render or rebuild with chromium"
+        );
+    }
 
     let mut manifest = Vec::new();
     for label in &labels {
@@ -1378,6 +1396,7 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
 
         let mut entry = serde_json::json!({"index": label.index, "html": html_name});
 
+        #[cfg(feature = "chromium")]
         if let Some(backend) = &backend {
             let req = lbl_render::RenderRequest {
                 width_dots: Some(media.width_dots().0),
