@@ -2476,6 +2476,10 @@ connections = [
 # NIIMBOT models read RFID on official rolls (size / remaining). Keep
 # `reports_media = true` so Studio live status can resolve loaded media.
 
+# D110 head axis matches ~203 dpi (96 dots / 12 mm). Feed-axis pitch on
+# measured hardware is denser (~217 dpi): a 30 mm job at catalog dpi prints
+# ~7% short along feed on true ~30 mm die-cuts. Catalog keeps isotropic 203
+# until optional `feed_dpi` exists — do not raise `dpi` or head math breaks.
 [[printers]]
 brand           = "NIIMBOT"
 keys            = ["D110", "D11", "D11S"]
