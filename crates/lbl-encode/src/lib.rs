@@ -80,6 +80,45 @@ impl Registry {
         self.drivers.insert(driver.protocol(), driver);
     }
 
+    /// Override the builtin driver for `protocol` when `variant` selects a
+    /// non-default implementation (firmware / task profile, etc.).
+    ///
+    /// Protocols with no variant support ignore `variant`. Callers stay
+    /// protocol-agnostic: pass the string through; the matching driver
+    /// interprets it via [`Driver::override_for_variant`].
+    pub fn with_driver_variant(mut self, protocol: Protocol, variant: Option<&str>) -> Self {
+        let override_driver = self
+            .get(protocol)
+            .and_then(|d| d.override_for_variant(variant));
+        if let Some(driver) = override_driver {
+            self.register(driver);
+        }
+        self
+    }
+
+    /// Resolve a catalog printer key to a driver-variant string for `protocol`.
+    ///
+    /// Asks the registered driver for that protocol
+    /// ([`Driver::variant_for_printer_key`]); returns `None` when there is no
+    /// driver or no mapping.
+    pub fn driver_variant_for_printer_key(
+        protocol: Protocol,
+        printer_key: &str,
+    ) -> Option<&'static str> {
+        Self::with_builtin_drivers()
+            .get(protocol)
+            .and_then(|d| d.variant_for_printer_key(printer_key))
+    }
+
+    /// Apply any catalog-key driver override for `protocol`.
+    pub fn with_printer_key(self, protocol: Protocol, printer_key: Option<&str>) -> Self {
+        let variant = printer_key.and_then(|key| {
+            self.get(protocol)
+                .and_then(|d| d.variant_for_printer_key(key))
+        });
+        self.with_driver_variant(protocol, variant)
+    }
+
     /// Look up the driver for a protocol.
     pub fn get(&self, protocol: Protocol) -> Option<&dyn Driver> {
         self.drivers.get(&protocol).map(|d| d.as_ref())
@@ -124,5 +163,32 @@ mod tests {
         ] {
             assert!(registry.get(p).is_some(), "missing driver for {p:?}");
         }
+    }
+
+    #[test]
+    fn with_driver_variant_overrides_niimbot_b1() {
+        let registry =
+            Registry::with_builtin_drivers().with_driver_variant(Protocol::Niimbot, Some("b1"));
+        let driver = registry.get(Protocol::Niimbot).unwrap();
+        assert_eq!(driver.name(), "niimbot");
+    }
+
+    #[test]
+    fn with_driver_variant_ignores_unrelated_protocol() {
+        let registry =
+            Registry::with_builtin_drivers().with_driver_variant(Protocol::EscPos, Some("b1"));
+        assert!(registry.get(Protocol::EscPos).is_some());
+    }
+
+    #[test]
+    fn driver_variant_for_printer_key_maps_b1() {
+        assert_eq!(
+            Registry::driver_variant_for_printer_key(Protocol::Niimbot, "B21"),
+            Some("b1")
+        );
+        assert_eq!(
+            Registry::driver_variant_for_printer_key(Protocol::EscPos, "B21"),
+            None
+        );
     }
 }

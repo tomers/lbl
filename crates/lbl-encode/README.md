@@ -11,6 +11,12 @@ family), and the non-hardware preview drivers `virtual`
 (raster image file or vector PDF via the orchestrator) and `console` (terminal
 art). Additional drivers can be registered into a custom `Registry`.
 
+Protocol-specific firmware/task overrides go through
+`Registry::with_driver_variant(protocol, variant)` (or
+`with_printer_key` when resolving from a catalog key). Callers pass an opaque
+variant string; the registered [`Driver`] interprets it via
+`override_for_variant` / `variant_for_printer_key`.
+
 The virtual driver's raster path encodes a dithered bitmap to PNG/BMP/TIFF/GIF/PBM.
 Vector PDF export skips `lbl-encode` and uses `lbl-render::export_pdf` instead.
 
