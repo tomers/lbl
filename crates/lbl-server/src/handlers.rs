@@ -33,7 +33,6 @@ use lbl_core::media::Media;
 use lbl_core::printer::{PrinterCapabilities, PrinterProfile, Protocol};
 use lbl_core::Rotation;
 use lbl_dither::Algorithm;
-use lbl_driver_niimbot::{NiimbotDriver, NiimbotTask};
 use lbl_encode::Registry;
 use lbl_render::{RenderBackend, SidecarBackend};
 use lbl_text::{catalog, font_asset_url};
@@ -1182,11 +1181,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
 
     // The pipeline (browser render) is blocking; run it off the async runtime.
     let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
-        let registry = if protocol == Protocol::Niimbot {
-            niimbot_registry(printer_key.as_deref())
-        } else {
-            Registry::with_builtin_drivers()
-        };
+        let registry =
+            Registry::with_builtin_drivers().with_printer_key(protocol, printer_key.as_deref());
         let encoded: Vec<(String, Vec<u8>)> = if use_sidecar {
             encode_all(&SidecarBackend::node_default(), &registry, &labels, &opts)?
         } else {
@@ -1402,11 +1398,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     };
 
     let result = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
-        let mut registry = if protocol == Protocol::Niimbot {
-            niimbot_registry(printer_key.as_deref())
-        } else {
-            Registry::with_builtin_drivers()
-        };
+        let mut registry =
+            Registry::with_builtin_drivers().with_printer_key(protocol, printer_key.as_deref());
         if let Some(mt) =
             media_type.filter(|_| virtual_export_mode == lbl_driver_file::VirtualExportMode::Raster)
         {
@@ -1579,24 +1572,6 @@ fn handshake_for_protocol(protocol: Protocol) -> &'static str {
     }
 }
 
-fn resolve_niimbot_task_name(printer_key: Option<&str>) -> Option<&'static str> {
-    printer_key
-        .and_then(NiimbotDriver::task_for_printer_key)
-        .map(NiimbotDriver::task_name)
-}
-
-fn niimbot_registry(printer_key: Option<&str>) -> Registry {
-    let mut registry = Registry::with_builtin_drivers();
-    if let Some(task) = printer_key.and_then(NiimbotDriver::task_for_printer_key) {
-        match task {
-            NiimbotTask::V4 => registry.register(Box::new(NiimbotDriver::v4())),
-            NiimbotTask::B1 => registry.register(Box::new(NiimbotDriver::b1())),
-            NiimbotTask::Standard => {}
-        }
-    }
-    registry
-}
-
 fn resolve_catalog_printer<'a>(
     catalog: &'a Catalog,
     printer_key: Option<&str>,
@@ -1687,14 +1662,15 @@ fn build_client_print_response(
         .collect();
 
     let handshake = handshake_for_protocol(protocol);
-    let niimbot_task = resolve_niimbot_task_name(printer_key);
+    let driver_variant =
+        printer_key.and_then(|key| Registry::driver_variant_for_printer_key(protocol, key));
 
     Ok(json!({
         "dispatch_mode": "client",
         "protocol": opts_protocol_name(protocol),
         "handshake": handshake,
         "transport": browser_transport_hints(catalog, protocol, printer_key),
-        "niimbot_task": niimbot_task,
+        "driver_variant": driver_variant,
         "labels": labels,
     }))
 }
@@ -1748,7 +1724,7 @@ mod browser_hints_tests {
             vec![("label-0000.bin".into(), vec![0x55, 0x55])],
         )
         .unwrap();
-        assert_eq!(resp["niimbot_task"], "b1");
+        assert_eq!(resp["driver_variant"], "b1");
         assert_eq!(resp["transport"]["api"], "web_bluetooth");
     }
 
