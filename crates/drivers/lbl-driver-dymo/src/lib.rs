@@ -23,7 +23,7 @@ pub mod lw550;
 pub use lw450::LabelWriter450Driver;
 pub use lw550::LabelWriter550Driver;
 
-use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 const ESC: u8 = 0x1B;
 const SYN: u8 = 0x16;
@@ -179,6 +179,10 @@ impl Driver for DymoDriver {
 
     fn name(&self) -> &'static str {
         "dymo-labelmanager"
+    }
+
+    fn handshake(&self) -> ClientHandshake {
+        ClientHandshake::DymoD1
     }
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {

@@ -56,6 +56,9 @@ impl Driver for FooDriver {
   (job requested **and** printer supports it).
 - **Limits.** Reject inputs that exceed the protocol's field sizes with
   `DriverError::Unsupported`.
+- **Client handshake.** If bidirectional clients must pace or wait for status
+  after encode, override `handshake()` (default is fire-and-forget). Do not
+  add protocol branches in the server — the driver owns the strategy.
 
 ## 3. Register it
 

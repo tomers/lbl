@@ -33,7 +33,7 @@
 //! `lbl` renders at 300 dpi, so the job header uses text mode (`ESC h`), not
 //! graphics mode (`ESC i`, 300×600 along feed).
 
-use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 use crate::ESC;
 
@@ -134,6 +134,10 @@ impl Driver for LabelWriter550Driver {
 
     fn name(&self) -> &'static str {
         "dymo-labelwriter-550"
+    }
+
+    fn handshake(&self) -> ClientHandshake {
+        ClientHandshake::DymoLw
     }
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {

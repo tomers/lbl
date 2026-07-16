@@ -24,9 +24,11 @@ impl Driver for MyDriver {
 Optional planes: `with_secondary` for dual-ink media, `with_color_png` for
 full-color graphic registration (e.g. ESC/Label `~DY`).
 
-Optional hooks for protocol-specific firmware/task profiles (default no-ops):
-`variant_for_printer_key` and `override_for_variant`. The registry forwards
-opaque variant strings through these without naming individual drivers.
+Optional hooks (defaults are no-ops / fire-and-forget):
+
+- `handshake` — client delivery strategy after encode (`ClientHandshake`)
+- `variant_for_printer_key` / `override_for_variant` — firmware/task profiles;
+  the registry forwards opaque variant strings without naming individual drivers
 
 Concrete drivers live alongside this crate under `crates/drivers/`:
 `lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`,

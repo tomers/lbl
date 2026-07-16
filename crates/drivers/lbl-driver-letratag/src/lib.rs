@@ -11,7 +11,7 @@
 //!
 //! `lbl` is not affiliated with DYMO / Newell. LetraTag is a trademark of DYMO.
 
-use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 /// Canonical GATT service UUID (first 8 hex digits are the stable prefix).
 pub const SERVICE_UUID: &str = "be3dd650-2b3d-42f1-99c1-f0f749dd0678";
@@ -90,6 +90,10 @@ impl Driver for LetraTagDriver {
 
     fn name(&self) -> &'static str {
         "letratag"
+    }
+
+    fn handshake(&self) -> ClientHandshake {
+        ClientHandshake::LetraTagNotify
     }
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
