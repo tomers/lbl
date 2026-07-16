@@ -9,13 +9,21 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
-name = "lbl-dither"
-path = "src/bin/lbl-dither.rs"
+name              = "lbl-dither"
+path              = "src/bin/lbl-dither.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# CLI binary deps (not needed by library consumers, including wasm32).
+cli = ["dep:clap", "dep:lbl-cli", "dep:anyhow"]
 
 [dependencies]
 lbl-core  = { workspace = true }
 thiserror = { workspace = true }
-clap      = { workspace = true }
-lbl-cli   = { workspace = true }
-anyhow    = { workspace = true }
-image     = { workspace = true }
+# Keep the lib free of rayon/exr so wasm32 consumers can link. PNG is enough for
+# optional encode helpers; the CLI feature adds more decoders for the binary.
+image   = { workspace = true }
+clap    = { workspace = true, optional = true }
+lbl-cli = { workspace = true, optional = true }
+anyhow  = { workspace = true, optional = true }
