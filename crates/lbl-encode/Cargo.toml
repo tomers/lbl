@@ -9,8 +9,14 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
-name = "lbl-encode"
-path = "src/bin/lbl-encode.rs"
+name              = "lbl-encode"
+path              = "src/bin/lbl-encode.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# CLI binary deps (not needed by library consumers, including wasm32).
+cli = ["dep:clap", "dep:lbl-cli", "dep:anyhow", "dep:lbl-pattern"]
 
 [dependencies]
 lbl-core              = { workspace = true }
@@ -32,7 +38,7 @@ lbl-driver-brother-pt = { workspace = true }
 lbl-driver-file       = { workspace = true }
 lbl-driver-console    = { workspace = true }
 thiserror             = { workspace = true }
-clap                  = { workspace = true }
-lbl-cli               = { workspace = true }
-anyhow                = { workspace = true }
-lbl-pattern           = { workspace = true }
+clap                  = { workspace = true, optional = true }
+lbl-cli               = { workspace = true, optional = true }
+anyhow                = { workspace = true, optional = true }
+lbl-pattern           = { workspace = true, optional = true }

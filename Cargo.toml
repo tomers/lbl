@@ -54,7 +54,7 @@ lbl-text              = { path = "crates/lbl-text" }
 lbl-markdown          = { path = "crates/lbl-markdown" }
 lbl-template          = { path = "crates/lbl-template" }
 lbl-transpile-html    = { path = "crates/lbl-transpile-html" }
-lbl-render            = { path = "crates/lbl-render" }
+lbl-render            = { path = "crates/lbl-render", default-features = false }
 lbl-dither            = { path = "crates/lbl-dither" }
 lbl-pattern           = { path = "crates/lbl-pattern" }
 lbl-driver-api        = { path = "crates/drivers/lbl-driver-api" }
@@ -91,13 +91,14 @@ tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio              = { version = "1", features = ["full"] }
 figment            = { version = "0.10", features = ["toml", "env"] }
-image              = "0.25"
-base64             = "0.22"
-directories        = "6"
-reqwest            = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
-tempfile           = "3"
-console            = "0.16"
-unicode-width      = "0.2"
+# default-features off so wasm32 consumers avoid rayon (pulled in via exr).
+image         = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "tiff", "webp"] }
+base64        = "0.22"
+directories   = "6"
+reqwest       = { version = "0.13", default-features = false, features = ["rustls", "blocking", "json"] }
+tempfile      = "3"
+console       = "0.16"
+unicode-width = "0.2"
 # Serial (USB CDC-ACM) transport. `libudev` (default) is only needed for port
 # enumeration; we open ports by path, so it is disabled to avoid a system dep.
 serialport = { version = "4", default-features = false }
