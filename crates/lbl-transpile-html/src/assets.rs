@@ -178,9 +178,11 @@ pub const QR_INIT_JS: &str = r#"
         }
         QRCode.toString(value, opts, function(err, svg){
           if(!err && svg){ el.innerHTML = svg; }
+          el.dataset.rendered = '1';
         });
+      } else {
+        el.dataset.rendered = '1';
       }
-      el.dataset.rendered = '1';
     });
   }
   if(document.readyState!=='loading'){render();}else{document.addEventListener('DOMContentLoaded',render);}
