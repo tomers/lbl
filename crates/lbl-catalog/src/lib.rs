@@ -17,11 +17,13 @@
 //! ```
 
 mod model;
+mod validate;
 
 pub use model::{
     encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, Maturity, MediaSpec,
     PrinterEntry, ResolvedTransport,
 };
+pub use validate::{validate_catalog_geometry, CatalogGeometryError};
 
 use lbl_core::printer::Protocol;
 use model::CatalogFile;
@@ -547,11 +549,41 @@ mod tests {
         let roll = catalog.lookup("12x40").unwrap();
         assert_eq!(roll.brand, "NIIMBOT");
         assert_eq!(roll.media.width_mm, 12.0);
+        let wide = catalog.lookup("15x30").unwrap();
+        assert_eq!(wide.media.width_mm, 15.0);
+        assert!(matches!(
+            wide.media.length,
+            lbl_core::media::MediaLength::Fixed(30.0)
+        ));
         let d110 = catalog.compatible_with("NIIMBOT D110");
         assert!(d110.iter().any(|e| e.matches_key("12x40")));
+        assert!(d110.iter().any(|e| e.matches_key("15x30")));
         let printer = catalog.lookup_printer("D110").unwrap();
         assert_eq!(printer.dpi, 203.0);
+        assert_eq!(printer.max_width_mm, 12.0);
         assert!(printer.reports_media);
+    }
+
+    #[test]
+    fn niimbot_b1_stores_physical_50mm_stock() {
+        let catalog = Catalog::bundled().unwrap();
+        let label = catalog.lookup("50x30").unwrap();
+        assert_eq!(label.media.width_mm, 50.0);
+        let printer = catalog.lookup_printer("B1").unwrap();
+        assert_eq!(printer.max_width_mm, 48.0);
+    }
+
+    #[test]
+    fn bundled_catalog_geometry_is_consistent() {
+        let catalog = Catalog::bundled().unwrap();
+        validate_catalog_geometry(&catalog).unwrap_or_else(|errors| {
+            let joined = errors
+                .iter()
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            panic!("catalog geometry errors:\n{joined}");
+        });
     }
 
     #[test]

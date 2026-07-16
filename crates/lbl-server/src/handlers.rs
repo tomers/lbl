@@ -15,11 +15,11 @@ use tokio::task::spawn_blocking;
 use tracing::{error, info, warn};
 
 use lbl::pipeline::{
-    authoring_labels, encode_label, pad_preview_encode_feed, pad_preview_head_tape,
-    render_label_raster, resolve_font_fit_scale, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel, PipelineOptions,
-    Source, TemplateFormat, VECTOR_CSS_DPI,
+    authoring_labels, effective_printable_width_mm, encode_label, pad_preview_encode_feed,
+    pad_preview_head_tape, render_label_raster, resolve_font_fit_scale, resolve_label_align,
+    resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
+    resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
+    PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_config::ConfigError;
@@ -394,6 +394,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         lbl_core::media::MediaLength::Continuous => 0.0,
     };
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
+    let printable_width_mm = effective_printable_width_mm(&media, &encode_caps);
     let feed_along_width = rotation.swaps_axes();
     let opts = PipelineOptions {
         protocol,
@@ -431,13 +432,14 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             for label in &labels {
                 let raster = render_label_raster(backend, &label.html, &opts)?;
                 let transpiled_html = raster.transpiled_html;
-                let image = pad_preview_head_tape(
+                let head_pad = pad_preview_head_tape(
                     raster.image,
                     &opts.media,
                     &encode_caps,
                     feed_along_width,
                 );
-                let padded = pad_preview_encode_feed(image, &encode_caps, feed_along_width);
+                let padded =
+                    pad_preview_encode_feed(head_pad.image, &encode_caps, feed_along_width);
                 let image = padded.image;
                 let mut png = Vec::new();
                 image
@@ -451,6 +453,13 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     "height_px": image.height(),
                     "image_base64": STANDARD.encode(&png),
                 });
+                if head_pad.pad_before_px > 0 || head_pad.pad_after_px > 0 {
+                    label_json["head_pad_before_px"] =
+                        serde_json::Value::from(head_pad.pad_before_px);
+                    label_json["head_pad_after_px"] =
+                        serde_json::Value::from(head_pad.pad_after_px);
+                    label_json["head_along_height"] = serde_json::Value::from(feed_along_width);
+                }
                 if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 {
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(padded.content_feed_end_px);
@@ -495,6 +504,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         "width_px": width_px,
         "height_px": height_px,
         "corner_radius_px": corner_radius_px,
+        "printable_width_mm": printable_width_mm,
     });
 
     Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())
@@ -532,6 +542,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         req.rotate_cw,
         req.rotate_ccw,
     );
+    let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     let opts = PipelineOptions {
         protocol: Protocol::Virtual,
         media: media.clone(),
@@ -553,7 +564,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         label_fit_scale,
         font_fit_scale,
         media_inset,
-        encode_caps: resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false),
+        encode_caps: encode_caps.clone(),
     };
     let px_per_mm = VECTOR_CSS_DPI / 25.4;
 
@@ -596,6 +607,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
             lbl_core::media::MediaLength::Continuous => 0.0,
         },
+        "printable_width_mm": effective_printable_width_mm(&media, &encode_caps),
     });
 
     Ok(Json(json!({ "count": count, "labels": rendered, "media": media_info })).into_response())

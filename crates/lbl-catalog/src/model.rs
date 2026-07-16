@@ -13,7 +13,12 @@ fn default_true() -> bool {
 /// resolution. Combine with a [`Dpi`] to produce a device-ready [`Media`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MediaSpec {
-    /// Printable width in millimeters.
+    /// Physical stock width across the head, in millimeters.
+    ///
+    /// This is the marketed / die-cut / cassette width — not the printer's
+    /// inkable band. When stock is wider than a printer's `max_width_mm` (or
+    /// `head_printable_height_mm`), layout/encode clamp to the printable band
+    /// and preview pads the unprintable margins.
     pub width_mm: f64,
     /// Fixed (die-cut) or continuous length.
     pub length: MediaLength,

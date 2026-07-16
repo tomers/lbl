@@ -7,12 +7,17 @@ Curated database of known label/tape media and printer models.
 `data/catalog.toml` ships with the crate and contains:
 
 - **`[[entries]]`** — media SKUs keyed by part number or alias. Each entry
-  describes physical dimensions (`width_mm`, fixed or continuous `length`),
-  material, adhesive, and color. Device resolution is applied from the target
-  printer at resolve time.
-- **`[[printers]]`** — known printer models with native DPI, head width,
-  protocol, maturity (`verified` / `supported` / `experimental`), and a
-  `supported_media` list naming the media keys each model can use.
+  describes physical stock dimensions (`width_mm` across the head, fixed or
+  continuous `length`), material, adhesive, and color. Device resolution is
+  applied from the target printer at resolve time. When physical stock is
+  wider than a printer's inkable band (`max_width_mm` /
+  `head_printable_height_mm`), encode clamps to the printable width and
+  preview pads the unprintable margins.
+- **`[[printers]]`** — known printer models with native DPI, maximum printable
+  head width (`max_width_mm`), optional laminate printable band
+  (`head_printable_height_mm`), protocol, maturity (`verified` / `supported` /
+  `experimental`), and a `supported_media` list naming the media keys each
+  model can use.
   `verified` means on-hand hardware; `supported` means the same protocol as a
   verified model; `experimental` means we have not exercised that protocol on
   real hardware yet.
