@@ -111,7 +111,7 @@ write-only transport — a file or raw socket — the job is still emitted, just
 without the completion handshake.)
 
 When printing over **Bluetooth** (`--bluetooth`), use the default `standard`
-task. For 2025+ D110M V4 firmware, pass `--niimbot-task v4`.
+task. For 2025+ D110M V4 firmware, pass `--driver-variant v4`.
 
 ### Which models can print over USB? Which over Bluetooth?
 

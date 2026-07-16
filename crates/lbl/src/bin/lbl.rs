@@ -532,16 +532,6 @@ impl From<ProtocolArg> for Protocol {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-enum NiimbotTaskArg {
-    /// Legacy D110 / B-series (PageStart + separate PrintQuantity).
-    Standard,
-    /// D110M V4 (9-byte PrintStart, 13-byte SetPageSize, no PageStart).
-    V4,
-    /// B1 / B21 (protocol 3: 7-byte PrintStart, 6-byte SetPageSize, total-mode rows).
-    B1,
-}
-
 #[derive(Clone, Copy, ValueEnum)]
 enum BackendArg {
     Chromium,
@@ -679,11 +669,12 @@ struct PrintArgs {
     #[arg(long)]
     bluetooth: Option<String>,
 
-    /// NIIMBOT print-task variant. Use `v4` for 2025+ D110M firmware over BLE;
-    /// `standard` (default) for B-series USB and older D110 units. Overrides
-    /// config `[print] niimbot_task` / `LBL_PRINT__NIIMBOT_TASK`.
-    #[arg(long, value_enum)]
-    niimbot_task: Option<NiimbotTaskArg>,
+    /// Protocol-specific driver variant (firmware/task profile). Opaque string
+    /// interpreted by the selected protocol's driver (e.g. `v4` / `b1` for
+    /// `niimbot`). Overrides catalog inference and config
+    /// `[print] driver_variant` / `LBL_PRINT__DRIVER_VARIANT`.
+    #[arg(long = "driver-variant", visible_alias = "niimbot-task")]
+    driver_variant: Option<String>,
 
     /// Instead of printing, write encoded bytes to this directory.
     #[arg(long)]
@@ -783,28 +774,16 @@ fn run_print(args: PrintArgs) -> Result<()> {
         Some(b) => b,
         None => config_enum::<BackendArg>("print.backend", &print_cfg.backend)?,
     };
-    let niimbot_task = match args.niimbot_task {
-        Some(t) => t,
-        None => {
-            if let Some(key) = args
-                .printer
-                .as_deref()
-                .or_else(|| printer_entry.map(|p| p.canonical_key()))
-            {
-                if let Some(task) = lbl_driver_niimbot::NiimbotDriver::task_for_printer_key(key) {
-                    match task {
-                        lbl_driver_niimbot::NiimbotTask::Standard => NiimbotTaskArg::Standard,
-                        lbl_driver_niimbot::NiimbotTask::V4 => NiimbotTaskArg::V4,
-                        lbl_driver_niimbot::NiimbotTask::B1 => NiimbotTaskArg::B1,
-                    }
-                } else {
-                    config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?
-                }
-            } else {
-                config_enum::<NiimbotTaskArg>("print.niimbot_task", &print_cfg.niimbot_task)?
-            }
-        }
-    };
+    let printer_key = args
+        .printer
+        .as_deref()
+        .or_else(|| printer_entry.map(|p| p.canonical_key()));
+    let driver_variant = args.driver_variant.clone().or_else(|| {
+        printer_key
+            .and_then(|key| Registry::driver_variant_for_printer_key(protocol, key))
+            .map(str::to_owned)
+            .or_else(|| print_cfg.driver_variant.clone())
+    });
     let (network, usb, serial, bluetooth) = resolve_print_transport(
         printer_entry,
         args.network.or_else(|| print_cfg.network.clone()),
@@ -978,15 +957,10 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     // The virtual driver carries its selected media type, so register an
     // instance configured for this run (overriding the PNG default).
-    let mut registry = Registry::with_builtin_drivers();
+    let mut registry =
+        Registry::with_builtin_drivers().with_driver_variant(protocol, driver_variant.as_deref());
     if let Some(mt) = media_type.filter(|_| virtual_export_mode == VirtualExportMode::Raster) {
         registry.register(Box::new(lbl_driver_file::FileDriver::new(mt)));
-    }
-    if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::V4 {
-        registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::v4()));
-    }
-    if protocol == Protocol::Niimbot && niimbot_task == NiimbotTaskArg::B1 {
-        registry.register(Box::new(lbl_driver_niimbot::NiimbotDriver::b1()));
     }
 
     let extension = if protocol == Protocol::Console {

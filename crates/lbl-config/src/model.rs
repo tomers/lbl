@@ -188,8 +188,12 @@ pub struct PrintConfig {
     pub usb: Option<String>,
     /// Default network target (`host:port`).
     pub network: Option<String>,
-    /// NIIMBOT task variant (`standard`, `v4`, or `b1`).
-    pub niimbot_task: String,
+    /// Opaque protocol-specific driver variant (firmware/task profile).
+    ///
+    /// Interpreted by the selected protocol's driver; unused by protocols with
+    /// no variants. Accepts the legacy TOML/env key `niimbot_task`.
+    #[serde(default, alias = "niimbot_task")]
+    pub driver_variant: Option<String>,
     /// Virtual-printer output format (`png`, `bmp`, …).
     pub media_type: Option<String>,
     /// Virtual-printer export mode: `raster` (default) or `vector` (PDF).
@@ -212,7 +216,7 @@ impl Default for PrintConfig {
             serial: None,
             usb: None,
             network: None,
-            niimbot_task: "standard".into(),
+            driver_variant: None,
             media_type: None,
             export_mode: None,
         }
