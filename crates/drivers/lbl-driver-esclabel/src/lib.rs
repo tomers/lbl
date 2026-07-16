@@ -133,6 +133,10 @@ impl Driver for EscLabelDriver {
         "esclabel"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["esc-label", "esc/label", "esclabel", "colorworks"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if let Some(png) = ctx.color_png.filter(|_| ctx.capabilities.supports_color) {
             let height = if bitmap.height > 0 {

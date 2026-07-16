@@ -81,6 +81,10 @@ impl Driver for EzplDriver {
         "ezpl-bmp"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["ezpl", "godex"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if bitmap.data.is_empty() {
             return Err(DriverError::Unsupported("empty bitmap".into()));

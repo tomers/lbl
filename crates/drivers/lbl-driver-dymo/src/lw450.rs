@@ -100,6 +100,10 @@ impl Driver for LabelWriter450Driver {
         "dymo-labelwriter-450"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["dymo-lw-classic", "dymolwclassic", "lw450"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if bitmap.width == 0 || bitmap.height == 0 {
             return Err(DriverError::Unsupported("empty bitmap".into()));

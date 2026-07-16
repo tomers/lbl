@@ -958,37 +958,7 @@ fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiErr
 }
 
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
-    Ok(match s.to_ascii_lowercase().as_str() {
-        "b1" | "d11" | "d110" | "niimbot" => Protocol::Niimbot,
-        "letratag" | "letra-tag" | "lt200b" | "lt-200b" => Protocol::LetraTag,
-        "brother-ql" | "brother_ql" | "brotherql" | "ql820" => Protocol::BrotherQl,
-        "brother-pt" | "brother_pt" | "brotherpt" | "pt" | "tze" => Protocol::BrotherPt,
-        "console" | "term" => Protocol::Console,
-        "dymo" => Protocol::Dymo,
-        "dymo-lw" | "dymolw" | "lw550" => Protocol::DymoLw,
-        "dymo-lw-classic" | "dymolwclassic" | "lw450" => Protocol::DymoLwClassic,
-        "esc/pos" | "escpos" => Protocol::EscPos,
-        "phomemo" | "m02" => Protocol::Phomemo,
-        "phomemo-m02x" | "phomemom02x" | "m02x" => Protocol::PhomemoM02x,
-        "phomemo-m110" | "phomemom110" | "m110" => Protocol::PhomemoM110,
-        "phomemo-d30" | "phomemod30" | "d30" | "q30" => Protocol::PhomemoD30,
-        "file" | "virtual" => Protocol::Virtual,
-        "html" => Protocol::Html,
-        "esc-label" | "esc/label" | "esclabel" | "colorworks" => Protocol::EscLabel,
-        "tspl" => Protocol::Tspl,
-        "slcs" | "bixolon" => Protocol::Slcs,
-        "ezpl" | "godex" => Protocol::Ezpl,
-        "sbpl" | "sato" => Protocol::Sbpl,
-        "dpl" | "honeywell" | "datamax" | "citizen" => Protocol::Dpl,
-        "tpcl" | "toshiba" | "tec" => Protocol::Tpcl,
-        "zpl" => Protocol::Zpl,
-        other => {
-            return Err(ApiError(
-                StatusCode::BAD_REQUEST,
-                format!("unknown protocol '{other}'"),
-            ))
-        }
-    })
+    Registry::resolve_protocol(s).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))
 }
 
 #[tracing::instrument(skip(state, req), fields(protocol = %req.protocol, printer = ?req.printer))]

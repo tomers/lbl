@@ -256,6 +256,10 @@ impl Driver for NiimbotDriver {
         "niimbot"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["niimbot"]
+    }
+
     fn handshake(&self) -> ClientHandshake {
         ClientHandshake::NiimbotPoll
     }

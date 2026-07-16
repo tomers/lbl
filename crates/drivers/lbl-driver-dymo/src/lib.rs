@@ -181,6 +181,10 @@ impl Driver for DymoDriver {
         "dymo-labelmanager"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["dymo"]
+    }
+
     fn handshake(&self) -> ClientHandshake {
         ClientHandshake::DymoD1
     }

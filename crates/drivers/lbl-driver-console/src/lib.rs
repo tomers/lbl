@@ -149,6 +149,10 @@ impl Driver for ConsoleDriver {
         "console"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["console", "term"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, _ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if bitmap.width == 0 || bitmap.height == 0 {
             return Err(DriverError::Unsupported("empty bitmap".into()));

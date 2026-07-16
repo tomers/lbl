@@ -56,6 +56,10 @@ impl Driver for ZplDriver {
         "zpl-gfa"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["zpl"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if bitmap.data.is_empty() {
             return Err(DriverError::Unsupported("empty bitmap".into()));

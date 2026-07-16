@@ -26,6 +26,8 @@ full-color graphic registration (e.g. ESC/Label `~DY`).
 
 Optional hooks (defaults are no-ops / fire-and-forget):
 
+- `aliases` / `matches_id` — wire / CLI / API ids this driver claims;
+  `lbl-encode::Registry::resolve_protocol` selects the unique match
 - `handshake` — client delivery strategy after encode (`ClientHandshake`)
 - `variant_for_printer_key` / `override_for_variant` — firmware/task profiles;
   the registry forwards opaque variant strings without naming individual drivers
@@ -33,5 +35,5 @@ Optional hooks (defaults are no-ops / fire-and-forget):
 Concrete drivers live alongside this crate under `crates/drivers/`:
 `lbl-driver-dymo`, `lbl-driver-escpos`, `lbl-driver-zpl`, `lbl-driver-tspl`,
 `lbl-driver-niimbot`, and the non-hardware preview drivers `lbl-driver-file`
-(image file) and `lbl-driver-console` (terminal art).
+(image file + HTML gallery) and `lbl-driver-console` (terminal art).
 `lbl-encode` aggregates them and selects one by `Protocol`.

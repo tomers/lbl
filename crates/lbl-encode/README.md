@@ -8,8 +8,14 @@ includes every bundled driver: DYMO LabelManager tape (`dymo`), DYMO
 LabelWriter 550 raster (`dymo-lw`), ESC/POS, ZPL, TSPL, NIIMBOT
 (`niimbot`; D11/D110 family), Brother QL raster (`brother-ql`; QL-820NWB
 family), and the non-hardware preview drivers `virtual`
-(raster image file or vector PDF via the orchestrator) and `console` (terminal
-art). Additional drivers can be registered into a custom `Registry`.
+(raster image file or vector PDF via the orchestrator), `console` (terminal
+art), and `html` (browser gallery). Additional drivers can be registered into a
+custom `Registry`.
+
+Wire / CLI / API protocol ids are resolved by asking each driver for its
+`aliases` (`Registry::resolve` / `resolve_protocol`). Unknown and ambiguous
+ids fail loudly. Printer model catalog keys are not protocol aliases — use
+`--printer` / catalog resolution (and `variant_for_printer_key`) for those.
 
 Protocol-specific firmware/task overrides go through
 `Registry::with_driver_variant(protocol, variant)` (or

@@ -3,7 +3,7 @@
 use std::io::{Read, Write};
 
 use anyhow::{anyhow, bail, Context, Result};
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use lbl_core::bitmap::MonoBitmap;
 use lbl_core::job::{CutMode, JobSpec};
 use lbl_core::media::Media;
@@ -12,88 +12,8 @@ use lbl_core::units::Dpi;
 use lbl_driver_api::EncodeContext;
 use lbl_encode::Registry;
 
-#[derive(Clone, Copy, ValueEnum)]
-enum ProtocolArg {
-    Dymo,
-    #[value(name = "dymo-lw", alias = "lw550")]
-    DymoLw,
-    #[value(name = "dymo-lw-classic", aliases = ["dymolwclassic", "lw450"])]
-    DymoLwClassic,
-    Escpos,
-    #[value(name = "phomemo", alias = "m02")]
-    Phomemo,
-    #[value(name = "phomemo-m02x", aliases = ["phomemom02x", "m02x"])]
-    PhomemoM02x,
-    #[value(name = "phomemo-m110", aliases = ["phomemom110", "m110"])]
-    PhomemoM110,
-    #[value(name = "phomemo-d30", aliases = ["phomemod30", "d30", "q30"])]
-    PhomemoD30,
-    Zpl,
-    /// Epson ESC/Label (ColorWorks).
-    #[value(name = "esc-label", aliases = ["esclabel", "colorworks"])]
-    EscLabel,
-    Tspl,
-    /// Bixolon SLCS label printers.
-    #[value(name = "slcs", aliases = ["bixolon"])]
-    Slcs,
-    /// Godex EZPL label printers.
-    #[value(name = "ezpl", aliases = ["godex"])]
-    Ezpl,
-    /// SATO SBPL label printers.
-    #[value(name = "sbpl", aliases = ["sato"])]
-    Sbpl,
-    /// Honeywell / Datamax-O'Neil / Citizen DPL label printers.
-    #[value(name = "dpl", aliases = ["honeywell", "datamax", "citizen"])]
-    Dpl,
-    /// Toshiba TEC TPCL label printers.
-    #[value(name = "tpcl", aliases = ["toshiba", "tec"])]
-    Tpcl,
-    /// NIIMBOT thermal label printers (D11 / D110 family).
-    Niimbot,
-    /// DYMO LetraTag LT-200B (Bluetooth LE; not LabelManager).
-    #[value(name = "letratag", aliases = ["letra-tag", "lt200b"])]
-    LetraTag,
-    /// Brother QL-series raster printers (QL-820NWB(c), …).
-    #[value(name = "brother-ql", alias = "brotherql")]
-    BrotherQl,
-    /// Brother P-touch / TZe tape printers (PT-P700, …).
-    #[value(name = "brother-pt", aliases = ["brotherpt", "pt", "tze"])]
-    BrotherPt,
-    /// Virtual printer: encode to an image file ("media type" via --media-type).
-    #[value(alias = "file")]
-    Virtual,
-    /// Console printer: encode to terminal art (plain block glyphs).
-    #[value(alias = "term")]
-    Console,
-}
-
-impl From<ProtocolArg> for Protocol {
-    fn from(p: ProtocolArg) -> Self {
-        match p {
-            ProtocolArg::Dymo => Protocol::Dymo,
-            ProtocolArg::DymoLw => Protocol::DymoLw,
-            ProtocolArg::DymoLwClassic => Protocol::DymoLwClassic,
-            ProtocolArg::Escpos => Protocol::EscPos,
-            ProtocolArg::Phomemo => Protocol::Phomemo,
-            ProtocolArg::PhomemoM02x => Protocol::PhomemoM02x,
-            ProtocolArg::PhomemoM110 => Protocol::PhomemoM110,
-            ProtocolArg::PhomemoD30 => Protocol::PhomemoD30,
-            ProtocolArg::Zpl => Protocol::Zpl,
-            ProtocolArg::EscLabel => Protocol::EscLabel,
-            ProtocolArg::Tspl => Protocol::Tspl,
-            ProtocolArg::Slcs => Protocol::Slcs,
-            ProtocolArg::Ezpl => Protocol::Ezpl,
-            ProtocolArg::Sbpl => Protocol::Sbpl,
-            ProtocolArg::Dpl => Protocol::Dpl,
-            ProtocolArg::Tpcl => Protocol::Tpcl,
-            ProtocolArg::Niimbot => Protocol::Niimbot,
-            ProtocolArg::LetraTag => Protocol::LetraTag,
-            ProtocolArg::BrotherQl => Protocol::BrotherQl,
-            ProtocolArg::BrotherPt => Protocol::BrotherPt,
-            ProtocolArg::Virtual => Protocol::Virtual,
-            ProtocolArg::Console => Protocol::Console,
-        }
-    }
+fn parse_protocol_arg(s: &str) -> Result<Protocol, String> {
+    Registry::resolve_protocol(s).map_err(|e| e.to_string())
 }
 
 #[derive(Parser)]
@@ -113,9 +33,9 @@ struct Cli {
     #[arg(long, num_args = 0..=1, conflicts_with = "input")]
     sample_pattern: Option<Option<u32>>,
 
-    /// Target protocol / driver.
-    #[arg(long, value_enum)]
-    protocol: ProtocolArg,
+    /// Target protocol / driver (aliases owned by each driver).
+    #[arg(long, value_parser = parse_protocol_arg)]
+    protocol: Protocol,
 
     /// For `--protocol virtual`: output image format ("media type"):
     /// png | bmp | tiff | gif | pbm. Defaults to png.
@@ -167,7 +87,7 @@ fn main() -> Result<()> {
         Some(len) => Media::fixed(cli.width_mm, len, dpi),
         None => Media::continuous(cli.width_mm, dpi),
     };
-    let protocol: Protocol = cli.protocol.into();
+    let protocol = cli.protocol;
 
     let bitmap = if cli.sample_pattern.is_some() {
         let head_dots = lbl_pattern::resolve_head_dots(cli.sample_pattern.flatten(), &media)

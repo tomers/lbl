@@ -20,6 +20,7 @@
 //! ```
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use lbl_driver_api::{ClientHandshake, Driver, Protocol};
 
@@ -33,6 +34,17 @@ pub enum EncodeError {
     /// A driver failed to encode.
     #[error(transparent)]
     Driver(#[from] lbl_driver_api::DriverError),
+}
+
+/// Errors from resolving a wire / CLI / API protocol id to a [`Protocol`].
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum ResolveProtocolError {
+    /// No registered driver claims `id`.
+    #[error("unknown protocol '{0}'")]
+    Unknown(String),
+    /// More than one registered driver claims `id`.
+    #[error("{0}")]
+    Ambiguous(String),
 }
 
 /// A registry of available drivers, keyed by protocol.
@@ -71,13 +83,72 @@ impl Registry {
         registry.register(Box::new(lbl_driver_brother_ql::BrotherQlDriver::new()));
         registry.register(Box::new(lbl_driver_brother_pt::BrotherPtDriver::new()));
         registry.register(Box::new(lbl_driver_file::FileDriver::default()));
+        registry.register(Box::new(lbl_driver_file::HtmlDriver::new()));
         registry.register(Box::new(lbl_driver_console::ConsoleDriver::new()));
+        registry
+            .alias_conflicts()
+            .expect("builtin driver aliases must be unique");
         registry
     }
 
     /// Register (or replace) the driver for its protocol.
     pub fn register(&mut self, driver: Box<dyn Driver>) {
         self.drivers.insert(driver.protocol(), driver);
+    }
+
+    /// Resolve a wire / CLI / API id by asking every registered driver whether
+    /// it claims the string ([`Driver::matches_id`]).
+    ///
+    /// * Zero claims → [`ResolveProtocolError::Unknown`]
+    /// * One claim → that driver's [`Driver::protocol`]
+    /// * Multiple claims → [`ResolveProtocolError::Ambiguous`]
+    pub fn resolve(&self, id: &str) -> Result<Protocol, ResolveProtocolError> {
+        let mut hits: Vec<(&str, Protocol)> = self
+            .drivers
+            .values()
+            .filter(|d| d.matches_id(id))
+            .map(|d| (d.name(), d.protocol()))
+            .collect();
+        hits.sort_by(|a, b| a.0.cmp(b.0));
+        hits.dedup_by(|a, b| a.1 == b.1);
+        match hits.as_slice() {
+            [] => Err(ResolveProtocolError::Unknown(id.trim().to_string())),
+            [(_, protocol)] => Ok(*protocol),
+            many => {
+                let mut msg = format!("ambiguous protocol '{}': matches", id.trim());
+                for (name, protocol) in many {
+                    let _ = write!(msg, " {name} ({protocol:?})");
+                }
+                Err(ResolveProtocolError::Ambiguous(msg))
+            }
+        }
+    }
+
+    /// Resolve `id` against the builtin driver set.
+    pub fn resolve_protocol(id: &str) -> Result<Protocol, ResolveProtocolError> {
+        Self::with_builtin_drivers().resolve(id)
+    }
+
+    /// Returns an error if two different protocols claim the same alias.
+    pub fn alias_conflicts(&self) -> Result<(), ResolveProtocolError> {
+        let mut by_alias: HashMap<String, (Protocol, &'static str)> = HashMap::new();
+        for driver in self.drivers.values() {
+            let protocol = driver.protocol();
+            let name = driver.name();
+            for alias in driver.aliases() {
+                let key = alias.to_ascii_lowercase();
+                if let Some((other_protocol, other_name)) = by_alias.get(&key) {
+                    if *other_protocol != protocol {
+                        return Err(ResolveProtocolError::Ambiguous(format!(
+                            "alias '{alias}' claimed by both {other_name} ({other_protocol:?}) and {name} ({protocol:?})"
+                        )));
+                    }
+                } else {
+                    by_alias.insert(key, (protocol, name));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Override the builtin driver for `protocol` when `variant` selects a
@@ -170,8 +241,71 @@ mod tests {
             Protocol::BrotherPt,
             Protocol::Virtual,
             Protocol::Console,
+            Protocol::Html,
         ] {
             assert!(registry.get(p).is_some(), "missing driver for {p:?}");
+        }
+    }
+
+    #[test]
+    fn resolve_protocol_matches_driver_aliases() {
+        assert_eq!(
+            Registry::resolve_protocol("dymo-lw").unwrap(),
+            Protocol::DymoLw
+        );
+        assert_eq!(
+            Registry::resolve_protocol("DYMOLW").unwrap(),
+            Protocol::DymoLw
+        );
+        assert_eq!(
+            Registry::resolve_protocol("brotherql").unwrap(),
+            Protocol::BrotherQl
+        );
+        assert_eq!(
+            Registry::resolve_protocol("colorworks").unwrap(),
+            Protocol::EscLabel
+        );
+        assert_eq!(Registry::resolve_protocol("html").unwrap(), Protocol::Html);
+        assert!(matches!(
+            Registry::resolve_protocol("b1"),
+            Err(ResolveProtocolError::Unknown(_))
+        ));
+        assert!(matches!(
+            Registry::resolve_protocol("nope"),
+            Err(ResolveProtocolError::Unknown(_))
+        ));
+    }
+
+    #[test]
+    fn resolve_reports_ambiguous_aliases() {
+        let mut registry = Registry::new();
+        registry.register(Box::new(lbl_driver_zpl::ZplDriver::new()));
+        registry.register(Box::new(AmbiguousEscPos));
+        let err = registry.resolve("zpl").unwrap_err();
+        assert!(matches!(err, ResolveProtocolError::Ambiguous(_)), "{err}");
+    }
+
+    struct AmbiguousEscPos;
+
+    impl Driver for AmbiguousEscPos {
+        fn protocol(&self) -> Protocol {
+            Protocol::EscPos
+        }
+
+        fn name(&self) -> &'static str {
+            "ambiguous-escpos"
+        }
+
+        fn aliases(&self) -> &'static [&'static str] {
+            &["zpl"]
+        }
+
+        fn encode(
+            &self,
+            _bitmap: &lbl_core::bitmap::MonoBitmap,
+            _ctx: &lbl_driver_api::EncodeContext,
+        ) -> Result<Vec<u8>, lbl_driver_api::DriverError> {
+            Ok(Vec::new())
         }
     }
 

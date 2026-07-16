@@ -29,6 +29,7 @@ pub struct FooDriver;
 impl Driver for FooDriver {
     fn protocol(&self) -> Protocol { Protocol::Foo } // add the variant to lbl-core
     fn name(&self) -> &'static str { "foo" }
+    fn aliases(&self) -> &'static [&'static str] { &["foo"] }
 
     fn encode(&self, bmp: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let mut out = Vec::new();
@@ -59,6 +60,10 @@ impl Driver for FooDriver {
 - **Client handshake.** If bidirectional clients must pace or wait for status
   after encode, override `handshake()` (default is fire-and-forget). Do not
   add protocol branches in the server — the driver owns the strategy.
+- **Protocol aliases.** Override `aliases()` with the wire / CLI / API ids
+  (and brand synonyms) this driver claims. `Registry::resolve_protocol` picks
+  the unique match; conflicts fail. Do not list printer model catalog keys
+  here — those go through catalog resolution and `variant_for_printer_key`.
 
 ## 3. Register it
 

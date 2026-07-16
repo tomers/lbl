@@ -147,6 +147,29 @@ pub trait Driver: Send + Sync {
     /// A short, stable driver name (for diagnostics).
     fn name(&self) -> &'static str;
 
+    /// Wire / CLI / API ids that resolve to this driver's protocol.
+    ///
+    /// Include the canonical protocol id, orthographic variants, serde /
+    /// catalog spellings, and brand synonyms. Do **not** list printer model
+    /// catalog keys (those belong on catalog resolution and
+    /// [`Self::variant_for_printer_key`]).
+    ///
+    /// Ids are matched case-insensitively by [`Self::matches_id`]. Prefer
+    /// lowercase entries here.
+    fn aliases(&self) -> &'static [&'static str];
+
+    /// Whether `id` is one of this driver's [`Self::aliases`] (ASCII
+    /// case-insensitive; surrounding whitespace trimmed).
+    fn matches_id(&self, id: &str) -> bool {
+        let key = id.trim();
+        if key.is_empty() {
+            return false;
+        }
+        self.aliases()
+            .iter()
+            .any(|alias| alias.eq_ignore_ascii_case(key))
+    }
+
     /// Encode `bitmap` into the printer-native byte stream for `ctx`.
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError>;
 
