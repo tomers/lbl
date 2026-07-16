@@ -1561,17 +1561,6 @@ fn dispatch_bluetooth(
     )
 }
 
-fn handshake_for_protocol(protocol: Protocol) -> &'static str {
-    match protocol {
-        Protocol::Dymo => "dymo_d1",
-        Protocol::DymoLw => "dymo_lw",
-        Protocol::DymoLwClassic => "fire_and_forget",
-        Protocol::Niimbot => "niimbot_poll",
-        Protocol::LetraTag => "letratag_notify",
-        _ => "fire_and_forget",
-    }
-}
-
 fn resolve_catalog_printer<'a>(
     catalog: &'a Catalog,
     printer_key: Option<&str>,
@@ -1661,7 +1650,7 @@ fn build_client_print_response(
         })
         .collect();
 
-    let handshake = handshake_for_protocol(protocol);
+    let handshake = Registry::handshake_for(protocol).as_str();
     let driver_variant =
         printer_key.and_then(|key| Registry::driver_variant_for_printer_key(protocol, key));
 

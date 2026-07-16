@@ -36,7 +36,7 @@
 //! (<https://printers.niim.blue/interfacing/proto/>) and the `niimprint` project.
 //! `lbl` is not affiliated with NIIMBOT; see the repository disclaimer.
 
-use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 // Packet framing.
 const HEAD: [u8; 2] = [0x55, 0x55];
@@ -254,6 +254,10 @@ impl Driver for NiimbotDriver {
 
     fn name(&self) -> &'static str {
         "niimbot"
+    }
+
+    fn handshake(&self) -> ClientHandshake {
+        ClientHandshake::NiimbotPoll
     }
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {

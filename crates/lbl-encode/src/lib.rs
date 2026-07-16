@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 
-use lbl_driver_api::{Driver, Protocol};
+use lbl_driver_api::{ClientHandshake, Driver, Protocol};
 
 /// Errors produced by the encode stage.
 #[derive(Debug, thiserror::Error)]
@@ -110,6 +110,16 @@ impl Registry {
             .and_then(|d| d.variant_for_printer_key(printer_key))
     }
 
+    /// Client delivery handshake for `protocol` ([`Driver::handshake`]).
+    ///
+    /// Returns [`ClientHandshake::FireAndForget`] when no driver is registered.
+    pub fn handshake_for(protocol: Protocol) -> ClientHandshake {
+        Self::with_builtin_drivers()
+            .get(protocol)
+            .map(|d| d.handshake())
+            .unwrap_or_default()
+    }
+
     /// Apply any catalog-key driver override for `protocol`.
     pub fn with_printer_key(self, protocol: Protocol, printer_key: Option<&str>) -> Self {
         let variant = printer_key.and_then(|key| {
@@ -178,6 +188,34 @@ mod tests {
         let registry =
             Registry::with_builtin_drivers().with_driver_variant(Protocol::EscPos, Some("b1"));
         assert!(registry.get(Protocol::EscPos).is_some());
+    }
+
+    #[test]
+    fn handshake_comes_from_driver() {
+        assert_eq!(
+            Registry::handshake_for(Protocol::Dymo),
+            ClientHandshake::DymoD1
+        );
+        assert_eq!(
+            Registry::handshake_for(Protocol::DymoLw),
+            ClientHandshake::DymoLw
+        );
+        assert_eq!(
+            Registry::handshake_for(Protocol::DymoLwClassic),
+            ClientHandshake::FireAndForget
+        );
+        assert_eq!(
+            Registry::handshake_for(Protocol::Niimbot),
+            ClientHandshake::NiimbotPoll
+        );
+        assert_eq!(
+            Registry::handshake_for(Protocol::LetraTag),
+            ClientHandshake::LetraTagNotify
+        );
+        assert_eq!(
+            Registry::handshake_for(Protocol::EscPos),
+            ClientHandshake::FireAndForget
+        );
     }
 
     #[test]

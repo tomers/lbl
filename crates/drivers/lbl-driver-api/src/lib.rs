@@ -107,6 +107,38 @@ impl<'a> EncodeContext<'a> {
     }
 }
 
+/// How a bidirectional client should deliver encoded protocol bytes.
+///
+/// Server-side transports that already implement status pacing ignore this;
+/// browser / client-print paths use it to pick a delivery strategy after encode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ClientHandshake {
+    /// Write the byte stream; do not wait for printer status.
+    #[default]
+    FireAndForget,
+    /// DYMO LabelManager D1 status-paced delivery.
+    DymoD1,
+    /// DYMO LabelWriter 550 `ESC A` handshake after each label.
+    DymoLw,
+    /// NIIMBOT packet status polling between chunks.
+    NiimbotPoll,
+    /// LetraTag GATT notify completion.
+    LetraTagNotify,
+}
+
+impl ClientHandshake {
+    /// Stable wire / JSON id for client-print responses.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FireAndForget => "fire_and_forget",
+            Self::DymoD1 => "dymo_d1",
+            Self::DymoLw => "dymo_lw",
+            Self::NiimbotPoll => "niimbot_poll",
+            Self::LetraTagNotify => "letratag_notify",
+        }
+    }
+}
+
 /// A printer protocol driver: encodes a bitmap into protocol bytes.
 pub trait Driver: Send + Sync {
     /// The protocol this driver implements.
@@ -117,6 +149,15 @@ pub trait Driver: Send + Sync {
 
     /// Encode `bitmap` into the printer-native byte stream for `ctx`.
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError>;
+
+    /// Client delivery strategy after encode (status pacing, notify wait, …).
+    ///
+    /// Default: [`ClientHandshake::FireAndForget`]. Drivers that need
+    /// bidirectional pacing override this so callers (server client-print,
+    /// browser encode) do not hard-code protocol lists.
+    fn handshake(&self) -> ClientHandshake {
+        ClientHandshake::FireAndForget
+    }
 
     /// Resolve a catalog printer key to a driver-variant string.
     ///
