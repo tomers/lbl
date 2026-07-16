@@ -165,6 +165,36 @@ impl NiimbotDriver {
         }
     }
 
+    /// Resolve a driver-variant string from config or the API.
+    ///
+    /// `None` selects [`NiimbotTask::Standard`]. Unrecognized names return
+    /// `None` so callers can reject or fall back explicitly.
+    pub fn resolve_task(driver_variant: Option<&str>) -> Option<NiimbotTask> {
+        match driver_variant {
+            None => Some(NiimbotTask::Standard),
+            Some(name) => Self::parse_task_name(name),
+        }
+    }
+
+    /// Non-default driver instance for `task`, if the builtin registry entry
+    /// should be overridden.
+    pub fn driver_for_task(task: NiimbotTask) -> Option<Self> {
+        match task {
+            NiimbotTask::Standard => None,
+            NiimbotTask::V4 => Some(Self::v4()),
+            NiimbotTask::B1 => Some(Self::b1()),
+        }
+    }
+
+    /// Override driver for a generic variant string, if the builtin default is
+    /// not correct.
+    ///
+    /// Returns `None` when the registry's standard entry should be kept
+    /// (absent/`standard` variant, or an unrecognized name).
+    pub fn for_variant(variant: Option<&str>) -> Option<Self> {
+        Self::resolve_task(variant).and_then(Self::driver_for_task)
+    }
+
     /// Infer the NIIMBOT print task from a catalog printer key.
     ///
     /// Returns `None` when the model has no known task override (callers fall
@@ -259,6 +289,14 @@ impl Driver for NiimbotDriver {
             NiimbotTask::V4 => self.encode_v4(bitmap, rows, cols, copies, stride, density),
             NiimbotTask::B1 => self.encode_b1(bitmap, rows, cols, copies, stride, density),
         }
+    }
+
+    fn variant_for_printer_key(&self, key: &str) -> Option<&'static str> {
+        Self::task_for_printer_key(key).map(Self::task_name)
+    }
+
+    fn override_for_variant(&self, variant: Option<&str>) -> Option<Box<dyn Driver>> {
+        Self::for_variant(variant).map(|d| Box::new(d) as Box<dyn Driver>)
     }
 }
 
@@ -735,6 +773,63 @@ mod tests {
         let done = frame_packet(PRINT_STATUS_RESPONSE, &[0x00, 0x01, 50, 0]);
         let s = parse_status(&done).unwrap();
         assert!(s.is_page_done());
+    }
+
+    #[test]
+    fn resolve_task_defaults_none_to_standard() {
+        assert_eq!(
+            NiimbotDriver::resolve_task(None),
+            Some(NiimbotTask::Standard)
+        );
+    }
+
+    #[test]
+    fn resolve_task_parses_known_names() {
+        assert_eq!(
+            NiimbotDriver::resolve_task(Some("v4")),
+            Some(NiimbotTask::V4)
+        );
+        assert_eq!(
+            NiimbotDriver::resolve_task(Some("B1")),
+            Some(NiimbotTask::B1)
+        );
+    }
+
+    #[test]
+    fn resolve_task_rejects_unknown_names() {
+        assert_eq!(NiimbotDriver::resolve_task(Some("unknown")), None);
+    }
+
+    #[test]
+    fn driver_for_task_overrides_only_non_standard() {
+        assert!(NiimbotDriver::driver_for_task(NiimbotTask::Standard).is_none());
+        assert_eq!(
+            NiimbotDriver::driver_for_task(NiimbotTask::V4)
+                .unwrap()
+                .task,
+            NiimbotTask::V4
+        );
+        assert_eq!(
+            NiimbotDriver::driver_for_task(NiimbotTask::B1)
+                .unwrap()
+                .task,
+            NiimbotTask::B1
+        );
+    }
+
+    #[test]
+    fn for_variant_selects_override_drivers() {
+        assert!(NiimbotDriver::for_variant(None).is_none());
+        assert!(NiimbotDriver::for_variant(Some("standard")).is_none());
+        assert_eq!(
+            NiimbotDriver::for_variant(Some("v4")).unwrap().task,
+            NiimbotTask::V4
+        );
+        assert_eq!(
+            NiimbotDriver::for_variant(Some("b1")).unwrap().task,
+            NiimbotTask::B1
+        );
+        assert!(NiimbotDriver::for_variant(Some("unknown")).is_none());
     }
 
     #[test]
