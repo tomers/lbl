@@ -704,6 +704,59 @@ pub struct HeadTapePad {
     pub pad_after_px: u32,
 }
 
+/// Axis-aligned bounds of inked pixels in a preview raster.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContentBoundsPx {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Tight bounding box from the first to last inked pixel (inclusive).
+///
+/// White layout gaps *between* inked elements (e.g. space between text and a
+/// QR code) are inside this box by design: it is the span from the leftmost
+/// to the rightmost ink, matching a ruler placed across the printed content.
+pub fn inked_content_bounds(image: &RgbaImage) -> Option<ContentBoundsPx> {
+    let (w, h) = image.dimensions();
+    if w == 0 || h == 0 {
+        return None;
+    }
+    let mut min_x = w;
+    let mut min_y = h;
+    let mut max_x = 0u32;
+    let mut max_y = 0u32;
+    let mut found = false;
+    for (x, y, pixel) in image.enumerate_pixels() {
+        if !is_inked_preview_pixel(pixel.0) {
+            continue;
+        }
+        found = true;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+    if !found {
+        return None;
+    }
+    Some(ContentBoundsPx {
+        x: min_x,
+        y: min_y,
+        width: max_x - min_x + 1,
+        height: max_y - min_y + 1,
+    })
+}
+
+fn is_inked_preview_pixel([r, g, b, a]: [u8; 4]) -> bool {
+    if a < 128 {
+        return false;
+    }
+    let luma = (u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114) / 1000;
+    luma <= 128
+}
+
 /// Pad a preview raster to the full tape width on the head axis when content
 /// was rendered into a narrower printable band.
 pub fn pad_preview_head_tape(
@@ -1320,6 +1373,48 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             encode_caps: PrinterCapabilities::default(),
         }
+    }
+
+    #[test]
+    fn inked_content_bounds_excludes_blank_margins() {
+        use image::Rgba;
+
+        let mut image = RgbaImage::from_pixel(20, 10, Rgba([255, 255, 255, 255]));
+        // Inked block from (3,2) through (14,7) inclusive → 12×6 px.
+        for y in 2..=7 {
+            for x in 3..=14 {
+                image.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+            }
+        }
+        let bounds = inked_content_bounds(&image).expect("inked bounds");
+        assert_eq!(
+            bounds,
+            ContentBoundsPx {
+                x: 3,
+                y: 2,
+                width: 12,
+                height: 6,
+            }
+        );
+    }
+
+    #[test]
+    fn inked_content_bounds_includes_gap_between_ink_runs() {
+        use image::Rgba;
+
+        let mut image = RgbaImage::from_pixel(30, 8, Rgba([255, 255, 255, 255]));
+        // Two inked blocks with a white gap between them.
+        for y in 1..=6 {
+            for x in 2..=8 {
+                image.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+            }
+            for x in 16..=24 {
+                image.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+            }
+        }
+        let bounds = inked_content_bounds(&image).expect("inked bounds");
+        assert_eq!(bounds.x, 2);
+        assert_eq!(bounds.width, 23); // 2..=24 inclusive
     }
 
     #[test]
