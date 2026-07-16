@@ -12,11 +12,17 @@ rust-version.workspace = true
 name = "lbl-server"
 path = "src/bin/lbl-server.rs"
 
+[features]
+default = ["chromium"]
+# In-process headless Chromium for raster preview / print (omit for transpile-only HTTP).
+chromium = ["lbl/chromium", "lbl-render/chromium"]
+ble      = ["lbl-device/ble"]
+
 [dependencies]
 lbl-core           = { workspace = true }
 lbl-config         = { workspace = true }
 lbl-catalog        = { workspace = true }
-lbl                = { path = "../lbl" }
+lbl                = { path = "../lbl", default-features = false }
 lbl-template       = { workspace = true }
 lbl-transpile-html = { workspace = true }
 lbl-device         = { workspace = true }
@@ -39,10 +45,6 @@ tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 axum               = "0.8"
 tower-http         = { version = "0.7", features = ["cors", "trace"] }
-
-[features]
-default = []
-ble     = ["lbl-device/ble"]
 
 [dev-dependencies]
 tower          = { version = "0.5", features = ["util"] }

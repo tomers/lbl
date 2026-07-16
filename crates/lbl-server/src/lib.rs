@@ -171,6 +171,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preview_html_print_geometry_returns_html() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"hi","geometry":"print","dpi":300,"supersample":2,"media":"30252"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["count"], 1);
+        assert_eq!(json["media"]["geometry"], "print");
+        assert!(json["labels"][0]["html"].as_str().unwrap().contains("lbl-"));
+        let width = json["labels"][0]["width_px"]
+            .as_f64()
+            .or_else(|| json["labels"][0]["width_px"].as_u64().map(|n| n as f64))
+            .unwrap_or(0.0);
+        assert!(
+            width > 0.0,
+            "expected positive width_px, got {}",
+            json["labels"][0]
+        );
+        assert!(
+            !json["labels"][0]["html"]
+                .as_str()
+                .unwrap()
+                .contains("lbl-stock"),
+            "print geometry must stay printable-only (no stock frame)"
+        );
+    }
+
+    #[tokio::test]
+    async fn preview_html_vector_pads_physical_stock() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"hi","geometry":"vector","media":"15x30","printer":"D110"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["media"]["geometry"], "vector");
+        let label = &json["labels"][0];
+        assert!(
+            label["html"].as_str().unwrap().contains("lbl-stock"),
+            "vector preview should frame printable content in physical stock"
+        );
+        let pad_before = label["head_pad_before_px"].as_u64().unwrap_or(0);
+        let pad_after = label["head_pad_after_px"].as_u64().unwrap_or(0);
+        assert!(
+            pad_before > 0 && pad_after > 0,
+            "D110 on 15 mm stock should pad unprintable head gaps, got before={pad_before} after={pad_after}"
+        );
+        assert!(
+            label.get("content_bounds_px").is_none(),
+            "vector HTML preview leaves ink bounds to the browser"
+        );
+    }
+
+    #[tokio::test]
     async fn preview_returns_labels() {
         let app = router(test_state());
         let resp = app

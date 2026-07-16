@@ -2,6 +2,7 @@
 
 use std::fmt::{Debug, Display};
 
+#[cfg(feature = "chromium")]
 use anyhow::Context;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -15,11 +16,15 @@ use tokio::task::spawn_blocking;
 use tracing::{error, info, warn};
 
 use lbl::pipeline::{
-    authoring_labels, effective_printable_width_mm, encode_label, inked_content_bounds,
-    pad_preview_encode_feed, pad_preview_head_tape, render_label_raster, resolve_font_fit_scale,
-    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
-    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
-    AuthoringLabel, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
+    authoring_labels, effective_printable_width_mm, encode_label, frame_html_preview_stock,
+    preview_stock_frame, resolve_font_fit_scale, resolve_label_align, resolve_label_fit,
+    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
+    resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel, PipelineOptions,
+    Source, TemplateFormat, VECTOR_CSS_DPI,
+};
+#[cfg(feature = "chromium")]
+use lbl::pipeline::{
+    inked_content_bounds, pad_preview_encode_feed, pad_preview_head_tape, render_label_raster,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_config::ConfigError;
@@ -349,6 +354,20 @@ impl SourceReq {
     }
 }
 
+#[cfg_attr(feature = "chromium", allow(dead_code))]
+fn rendering_unavailable() -> ApiError {
+    ApiError(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "rendering unavailable".into(),
+    )
+}
+
+#[cfg(not(feature = "chromium"))]
+pub async fn preview(State(_state): State<AppState>, Json(_req): Json<PreviewReq>) -> ApiResult {
+    Err(rendering_unavailable())
+}
+
+#[cfg(feature = "chromium")]
 pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
     use lbl_driver_file::VirtualExportMode;
     use std::io::Cursor;
@@ -526,7 +545,18 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let count = labels.len();
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
     let style_cfg = load_style_cfg(&state, &req.style);
-    let style = resolve_style_vector(&style_cfg);
+    let print_geometry = req.geometry == PreviewGeometry::Print;
+    let supersample = if print_geometry {
+        req.supersample.max(1)
+    } else {
+        1
+    };
+    let layout_dpi = if print_geometry { dpi } else { VECTOR_CSS_DPI };
+    let style = if print_geometry {
+        resolve_style(&style_cfg, dpi, supersample)
+    } else {
+        resolve_style_vector(&style_cfg)
+    };
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
@@ -543,7 +573,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(VECTOR_CSS_DPI, 1);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(layout_dpi, supersample);
     let rotation = resolve_rotation(
         &state,
         &media,
@@ -562,11 +592,15 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
-        supersample: 1,
+        supersample,
         assets_base: AssetsBase::Cdn,
         style,
         media_type: None,
-        virtual_export_mode: lbl_driver_file::VirtualExportMode::Vector,
+        virtual_export_mode: if print_geometry {
+            lbl_driver_file::VirtualExportMode::Raster
+        } else {
+            lbl_driver_file::VirtualExportMode::Vector
+        },
         label_fit,
         label_align,
         label_valign,
@@ -575,18 +609,61 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         media_inset,
         encode_caps: encode_caps.clone(),
     };
-    let px_per_mm = VECTOR_CSS_DPI / 25.4;
+    let px_per_mm = layout_dpi * supersample as f64 / 25.4;
 
+    let feed_along_width = rotation.swaps_axes();
     let mut rendered = Vec::with_capacity(count);
     for label in labels {
         let transpiled = transpile_label_html(&label.html, &opts).map_err(fail_internal)?;
         let computed_font_size_mm = injected_fit_font_px(&transpiled.html).map(|px| px / px_per_mm);
+        // Interactive Studio preview: pad printable HTML out to physical stock so
+        // head/feed gaps match the raster preview gallery. Print-geometry capture
+        // stays printable-only for client encode.
+        let (html, width_px, height_px, stock) = if print_geometry {
+            (
+                transpiled.html,
+                transpiled.width_px,
+                transpiled.height_px,
+                None,
+            )
+        } else {
+            let stock = preview_stock_frame(
+                transpiled.width_px,
+                transpiled.height_px,
+                &media,
+                &encode_caps,
+                feed_along_width,
+                layout_dpi,
+            );
+            let html = frame_html_preview_stock(&transpiled.html, &stock);
+            (html, stock.width_px, stock.height_px, Some(stock))
+        };
         let mut label_json = json!({
             "index": label.index,
-            "html": transpiled.html,
-            "width_px": transpiled.width_px,
-            "height_px": transpiled.height_px,
+            "html": html,
+            "width_px": width_px,
+            "height_px": height_px,
         });
+        if let Some(stock) = stock {
+            if stock.head_pad_before_px > 0 || stock.head_pad_after_px > 0 {
+                label_json["head_pad_before_px"] =
+                    serde_json::Value::from(stock.head_pad_before_px);
+                label_json["head_pad_after_px"] = serde_json::Value::from(stock.head_pad_after_px);
+                label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
+            }
+            if stock.lead_feed_px > 0 || stock.trail_feed_px > 0 {
+                label_json["content_feed_end_px"] =
+                    serde_json::Value::from(stock.content_feed_end_px);
+                label_json["feed_trail_px"] = serde_json::Value::from(stock.trail_feed_px);
+                if stock.feed_end_margin_px > 0 {
+                    label_json["feed_end_margin_px"] =
+                        serde_json::Value::from(stock.feed_end_margin_px);
+                }
+                if stock.lead_feed_px > 0 {
+                    label_json["feed_lead_px"] = serde_json::Value::from(stock.lead_feed_px);
+                }
+            }
+        }
         if let Some(mm) = computed_font_size_mm {
             label_json["computed_font_size_mm"] = serde_json::Value::from(mm);
         }
@@ -602,6 +679,13 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             )
         })
         .unwrap_or((0.0, 0.0));
+    let corner_radius_px = match media.length {
+        lbl_core::media::MediaLength::Fixed(_) if print_geometry => {
+            opts.style.corner_radius_px / supersample as f64
+        }
+        lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
+        lbl_core::media::MediaLength::Continuous => 0.0,
+    };
     let media_info = json!({
         "width_mm": media.width_mm,
         "length_mm": match media.length {
@@ -609,13 +693,11 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             lbl_core::media::MediaLength::Continuous => serde_json::Value::Null,
         },
         "continuous": matches!(media.length, lbl_core::media::MediaLength::Continuous),
-        "dpi": VECTOR_CSS_DPI,
+        "dpi": if print_geometry { dpi * supersample as f64 } else { VECTOR_CSS_DPI },
+        "geometry": if print_geometry { "print" } else { "vector" },
         "width_px": width_px,
         "height_px": height_px,
-        "corner_radius_px": match media.length {
-            lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
-            lbl_core::media::MediaLength::Continuous => 0.0,
-        },
+        "corner_radius_px": corner_radius_px,
         "printable_width_mm": effective_printable_width_mm(&media, &encode_caps),
     });
 
@@ -663,6 +745,17 @@ fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config
     style
 }
 
+/// HTML preview layout mode for [`preview_html`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PreviewGeometry {
+    /// Screen-oriented CSS reference DPI (interactive Studio preview).
+    #[default]
+    Vector,
+    /// Device DPI × supersample (print-resolution capture).
+    Print,
+}
+
 #[derive(Deserialize)]
 pub struct PreviewReq {
     #[serde(flatten)]
@@ -688,6 +781,9 @@ pub struct PreviewReq {
     /// Render supersample factor (same default as print).
     #[serde(default = "default_supersample")]
     supersample: u32,
+    /// `vector` (default) or `print` geometry for `/api/preview/html`.
+    #[serde(default)]
+    geometry: PreviewGeometry,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
 }
@@ -982,6 +1078,12 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     };
 
     let use_sidecar = req.use_sidecar;
+    if !use_sidecar {
+        #[cfg(not(feature = "chromium"))]
+        {
+            return Err(rendering_unavailable());
+        }
+    }
     let dispatch_mode = req.dispatch_mode;
     let network = req.network.clone();
     let usb = req.usb.clone();
@@ -991,7 +1093,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let printer_key = req.printer.clone();
     let renderer = state.renderer.clone();
     // Only the browser path uses a render slot; the sidecar spawns its own process.
-    let permit = if use_sidecar {
+    #[cfg_attr(not(feature = "chromium"), allow(unused_variables))]
+    let permit: Option<tokio::sync::OwnedSemaphorePermit> = if use_sidecar {
         None
     } else {
         Some(renderer.acquire().await)
@@ -1007,8 +1110,17 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         let encoded: Vec<(String, Vec<u8>)> = if use_sidecar {
             encode_all(&SidecarBackend::node_default(), &registry, &labels, &opts)?
         } else {
-            let _permit = permit;
-            renderer.render_blocking(|backend| encode_all(backend, &registry, &labels, &opts))?
+            #[cfg(feature = "chromium")]
+            {
+                let _permit = permit;
+                renderer
+                    .render_blocking(|backend| encode_all(backend, &registry, &labels, &opts))?
+            }
+            #[cfg(not(feature = "chromium"))]
+            {
+                let _ = (permit, renderer);
+                anyhow::bail!("rendering unavailable")
+            }
         };
         if dispatch_mode == DispatchMode::Client {
             build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
@@ -1185,6 +1297,12 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     };
 
     let use_sidecar = req.use_sidecar;
+    if !use_sidecar {
+        #[cfg(not(feature = "chromium"))]
+        {
+            return Err(rendering_unavailable());
+        }
+    }
     let want_debug = req.debug;
     let (extension, mime) = match media_type {
         Some(mt) => (mt.extension().to_string(), mt.mime().to_string()),
@@ -1194,7 +1312,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let printer_key = req.printer.clone();
     let renderer = state.renderer.clone();
     // Only the browser path uses a render slot; the sidecar spawns its own process.
-    let permit = if use_sidecar {
+    #[cfg_attr(not(feature = "chromium"), allow(unused_variables))]
+    let permit: Option<tokio::sync::OwnedSemaphorePermit> = if use_sidecar {
         None
     } else {
         Some(renderer.acquire().await)
@@ -1246,8 +1365,16 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         if use_sidecar {
             encode(&SidecarBackend::node_default())
         } else {
-            let _permit = permit;
-            renderer.render_blocking(|backend| encode(backend))
+            #[cfg(feature = "chromium")]
+            {
+                let _permit = permit;
+                renderer.render_blocking(|backend| encode(backend))
+            }
+            #[cfg(not(feature = "chromium"))]
+            {
+                let _ = (permit, renderer);
+                anyhow::bail!("rendering unavailable")
+            }
         }
     })
     .await

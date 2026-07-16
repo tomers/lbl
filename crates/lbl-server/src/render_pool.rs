@@ -1,22 +1,23 @@
 //! Shared headless-Chromium renderer with bounded concurrency.
 //!
-//! Launching a browser is expensive, so a single [`ChromiumBackend`] is started
-//! once and reused for every request. Chromium is itself multi-process (each
-//! page is an isolated renderer), so one browser renders many labels in
-//! parallel; the parallelism ceiling is CPU, not the number of browsers. A
-//! [`Semaphore`] caps how many renders run at once so a burst of requests can
-//! never oversubscribe the available cores.
+//! When the `chromium` feature is disabled, [`RenderPool`] is a no-op stub so
+//! transpile-only HTTP deployments can build without linking chromiumoxide.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use lbl_render::ChromiumBackend;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-/// A reusable, self-healing headless-Chromium renderer.
+#[cfg(feature = "chromium")]
+use std::sync::Mutex;
+
+#[cfg(feature = "chromium")]
+use lbl_render::ChromiumBackend;
+
+/// A reusable, self-healing headless-Chromium renderer (or a stub without the
+/// `chromium` feature).
 pub struct RenderPool {
     permits: Arc<Semaphore>,
-    /// The current browser, launched lazily on first use and replaced when it
-    /// stops answering. `None` means "launch on next use".
+    #[cfg(feature = "chromium")]
     backend: Mutex<Option<Arc<ChromiumBackend>>>,
 }
 
@@ -25,16 +26,12 @@ impl RenderPool {
     pub fn new(concurrency: usize) -> Self {
         Self {
             permits: Arc::new(Semaphore::new(concurrency.max(1))),
+            #[cfg(feature = "chromium")]
             backend: Mutex::new(None),
         }
     }
 
     /// Reserve one render slot, waiting if all are in use.
-    ///
-    /// This is `async` on purpose: callers acquire the slot before moving the
-    /// blocking render onto a worker thread, so a client that disconnects while
-    /// still queued simply drops its future and frees the slot instead of
-    /// running a render nobody is waiting for.
     pub async fn acquire(&self) -> OwnedSemaphorePermit {
         self.permits
             .clone()
@@ -46,9 +43,8 @@ impl RenderPool {
     /// Run `render` against the shared browser on the calling (blocking) thread.
     ///
     /// If the render fails and the browser is no longer alive, the browser is
-    /// relaunched and the render is retried once, so a crashed Chromium heals
-    /// within the same request. `render` is therefore called at most twice and
-    /// must be idempotent.
+    /// relaunched and the render is retried once.
+    #[cfg(feature = "chromium")]
     pub fn render_blocking<F, T>(&self, render: F) -> anyhow::Result<T>
     where
         F: Fn(&ChromiumBackend) -> anyhow::Result<T>,
@@ -66,9 +62,16 @@ impl RenderPool {
     }
 
     /// Eagerly launch the browser so the first real render is not slowed by a
-    /// cold start.
+    /// cold start. No-op when built without the `chromium` feature.
     pub fn warm(&self) -> anyhow::Result<()> {
-        self.backend().map(|_| ())
+        #[cfg(feature = "chromium")]
+        {
+            self.backend().map(|_| ())
+        }
+        #[cfg(not(feature = "chromium"))]
+        {
+            Ok(())
+        }
     }
 
     /// Number of render slots currently free (for tests and diagnostics).
@@ -76,10 +79,7 @@ impl RenderPool {
         self.permits.available_permits()
     }
 
-    /// Return the live browser, launching it if there is none.
-    ///
-    /// Launches are serialized by the mutex, so a burst of first requests
-    /// produces exactly one browser rather than several racing launches.
+    #[cfg(feature = "chromium")]
     fn backend(&self) -> anyhow::Result<Arc<ChromiumBackend>> {
         let mut guard = self.backend.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(backend) = guard.as_ref() {
@@ -90,8 +90,7 @@ impl RenderPool {
         Ok(backend)
     }
 
-    /// Drop `dead` so the next [`Self::backend`] relaunches, but only if it is
-    /// still the current browser (a concurrent caller may have replaced it).
+    #[cfg(feature = "chromium")]
     fn invalidate(&self, dead: &Arc<ChromiumBackend>) {
         let mut guard = self.backend.lock().unwrap_or_else(|e| e.into_inner());
         if guard
