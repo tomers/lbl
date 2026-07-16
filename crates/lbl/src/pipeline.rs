@@ -812,10 +812,20 @@ pub fn pad_preview_head_tape(
     }
 }
 
-/// CSS-pixel viewport for vector PDF export (reference DPI, no supersampling).
-pub fn render_viewport_vector(media: &Media, rotation: Rotation) -> ViewportPx {
+/// CSS-pixel viewport for vector PDF/HTML (reference DPI, no supersampling).
+///
+/// When `encode_caps` is set, the head axis uses the printable band (same clamp
+/// as [`render_viewport_px`]) so Studio HTML preview can pad out to physical
+/// stock the same way the raster preview path does.
+pub fn render_viewport_vector(
+    media: &Media,
+    rotation: Rotation,
+    encode_caps: Option<&PrinterCapabilities>,
+) -> ViewportPx {
     let px_per_mm = CSS_LAYOUT_REFERENCE_DPI / 25.4;
-    let head_mm = media.width_mm;
+    let head_mm = encode_caps
+        .map(|caps| effective_printable_width_mm(media, caps))
+        .unwrap_or(media.width_mm);
     let feed_mm = match media.length {
         lbl_core::media::MediaLength::Fixed(len) => Some(len),
         lbl_core::media::MediaLength::Continuous => None,
@@ -829,6 +839,162 @@ pub fn render_viewport_vector(media: &Media, rotation: Rotation) -> ViewportPx {
         width: width_mm.map(|w| w * px_per_mm),
         height: height_mm.map(|h| h * px_per_mm),
     }
+}
+
+/// Stock framing for HTML preview: printable content centered in physical tape.
+///
+/// Mirrors [`pad_preview_head_tape`] + [`pad_preview_encode_feed`] without a
+/// raster — sizes are CSS pixels at `layout_dpi`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewStockFrame {
+    pub content_width_px: f64,
+    pub content_height_px: f64,
+    pub width_px: f64,
+    pub height_px: f64,
+    pub head_pad_before_px: u32,
+    pub head_pad_after_px: u32,
+    pub head_along_height: bool,
+    pub lead_feed_px: u32,
+    pub feed_end_margin_px: u32,
+    pub trail_feed_px: u32,
+    pub content_feed_end_px: u32,
+}
+
+fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
+    (mm / 25.4) * layout_dpi
+}
+
+/// Compute head + feed padding that expands printable HTML to physical stock.
+pub fn preview_stock_frame(
+    content_width_px: f64,
+    content_height_px: f64,
+    media: &Media,
+    caps: &PrinterCapabilities,
+    head_along_height: bool,
+    layout_dpi: f64,
+) -> PreviewStockFrame {
+    let tape_head_px = mm_to_layout_px(media.width_mm, layout_dpi).round().max(0.0);
+    let content_head = if head_along_height {
+        content_height_px
+    } else {
+        content_width_px
+    };
+    let (head_before, head_after) = if tape_head_px > content_head + 0.5 {
+        let gap = (tape_head_px - content_head).round().max(0.0) as u32;
+        let before = gap / 2;
+        (before, gap - before)
+    } else {
+        (0, 0)
+    };
+
+    let feed_along_width = head_along_height;
+    let content_feed = if feed_along_width {
+        content_width_px.round().max(0.0) as u32
+    } else {
+        content_height_px.round().max(0.0) as u32
+    };
+    let dx = feed_margin_px(caps.feed_trail_mm, layout_dpi);
+    let explicit_lead = feed_margin_px(caps.feed_lead_mm, layout_dpi);
+    let (lead_feed, end_margin, cutter_gap) = if explicit_lead > 0 {
+        (explicit_lead, 0, dx)
+    } else if dx > 0 {
+        (dx, dx, dx)
+    } else {
+        (0, 0, 0)
+    };
+    let content_feed_end = lead_feed + content_feed;
+
+    let (width_px, height_px) = if head_along_height {
+        (
+            content_width_px + f64::from(lead_feed + end_margin),
+            content_height_px + f64::from(head_before + head_after),
+        )
+    } else {
+        (
+            content_width_px + f64::from(head_before + head_after),
+            content_height_px + f64::from(lead_feed + end_margin),
+        )
+    };
+
+    PreviewStockFrame {
+        content_width_px,
+        content_height_px,
+        width_px,
+        height_px,
+        head_pad_before_px: head_before,
+        head_pad_after_px: head_after,
+        head_along_height,
+        lead_feed_px: lead_feed,
+        feed_end_margin_px: end_margin,
+        trail_feed_px: cutter_gap,
+        content_feed_end_px: content_feed_end,
+    }
+}
+
+/// Wrap transpiled label HTML in a physical-stock frame (white head/feed pads).
+///
+/// The printable content keeps its layout size; the outer `.lbl-stock` matches
+/// [`PreviewStockFrame::width_px`] × [`PreviewStockFrame::height_px`].
+pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String {
+    if frame.head_pad_before_px == 0
+        && frame.head_pad_after_px == 0
+        && frame.lead_feed_px == 0
+        && frame.feed_end_margin_px == 0
+    {
+        return html.to_string();
+    }
+
+    let (left, top) = if frame.head_along_height {
+        (frame.lead_feed_px, frame.head_pad_before_px)
+    } else {
+        (frame.head_pad_before_px, frame.lead_feed_px)
+    };
+
+    let stock_css = format!(
+        ".lbl-stock{{position:relative;width:{w:.2}px;height:{h:.2}px;background:#fff;overflow:hidden;box-sizing:border-box}}\n\
+         .lbl-stock-print{{position:absolute;left:{left}px;top:{top}px;width:{cw:.2}px;height:{ch:.2}px;box-sizing:border-box}}\n\
+         html,body{{margin:0;width:{w:.2}px;height:{h:.2}px}}\n",
+        w = frame.width_px,
+        h = frame.height_px,
+        left = left,
+        top = top,
+        cw = frame.content_width_px,
+        ch = frame.content_height_px,
+    );
+
+    let with_css = if let Some(idx) = html.rfind("</style>") {
+        let mut out = String::with_capacity(html.len() + stock_css.len());
+        out.push_str(&html[..idx]);
+        out.push_str(&stock_css);
+        out.push_str(&html[idx..]);
+        out
+    } else if let Some(idx) = html.find("</head>") {
+        let mut out = String::with_capacity(html.len() + stock_css.len() + 16);
+        out.push_str(&html[..idx]);
+        out.push_str("<style>\n");
+        out.push_str(&stock_css);
+        out.push_str("</style>\n");
+        out.push_str(&html[idx..]);
+        out
+    } else {
+        format!("<style>\n{stock_css}</style>\n{html}")
+    };
+
+    if let Some(body_open) = with_css.find("<body>") {
+        let after = body_open + "<body>".len();
+        if let Some(body_rel) = with_css[after..].rfind("</body>") {
+            let body_end = after + body_rel;
+            let inner = &with_css[after..body_end];
+            let mut out = String::with_capacity(with_css.len() + 64);
+            out.push_str(&with_css[..after]);
+            out.push_str("\n<div class=\"lbl-stock\"><div class=\"lbl-stock-print\">");
+            out.push_str(inner);
+            out.push_str("</div></div>\n");
+            out.push_str(&with_css[body_end..]);
+            return out;
+        }
+    }
+    format!("<div class=\"lbl-stock\"><div class=\"lbl-stock-print\">{with_css}</div></div>")
 }
 
 /// Physical page size for vector PDF export in the label reading frame.
@@ -860,12 +1026,25 @@ pub struct TranspiledLabelHtml {
     pub corner_radius_px: f64,
 }
 
-/// Transpile authoring HTML for browser preview or OS print (vector layout).
+/// Transpile authoring HTML for browser preview or OS print.
+///
+/// Uses CSS-reference vector geometry for vector export/preview, or
+/// device-DPI × supersample geometry when [`PipelineOptions::virtual_export_mode`]
+/// is raster (print-resolution capture).
 pub fn transpile_label_html(
     authoring_html: &str,
     opts: &PipelineOptions,
 ) -> Result<TranspiledLabelHtml> {
-    let viewport = render_viewport_vector(&opts.media, opts.rotation);
+    let viewport = if opts.virtual_export_mode == VirtualExportMode::Raster {
+        render_viewport_px(
+            &opts.media,
+            opts.supersample,
+            opts.rotation,
+            Some(&opts.encode_caps),
+        )
+    } else {
+        render_viewport_vector(&opts.media, opts.rotation, Some(&opts.encode_caps))
+    };
     let page_size = page_size_mm(&opts.media, opts.rotation);
     let transpiled = transpile(
         authoring_html,
@@ -1084,6 +1263,71 @@ pub fn render_label_raster<B: RenderBackend>(
     })
 }
 
+/// Dither + protocol-encode result from a pre-rendered RGBA image.
+#[derive(Debug)]
+pub struct EncodeFromRgbaResult {
+    /// 1-bit primary plane after dithering (or black plane for two-color).
+    pub dithered: MonoBitmap,
+    /// Final protocol (or virtual image) bytes.
+    pub encoded: Vec<u8>,
+    /// Driver name that produced [`Self::encoded`].
+    pub driver_name: String,
+}
+
+/// Dither and encode a pre-rendered RGBA label (no transpile/render).
+///
+/// Used by the Chromium print path after rasterization, and by callers that
+/// already hold a print-resolution image.
+pub fn encode_label_from_rgba(
+    registry: &Registry,
+    rendered: &RgbaImage,
+    opts: &PipelineOptions,
+) -> Result<EncodeFromRgbaResult> {
+    let two_color = opts.media.two_color;
+    let color_png =
+        if !two_color && opts.encode_caps.supports_color && opts.protocol == Protocol::EscLabel {
+            Some(encode_rgba_png(rendered).context("encoding color PNG")?)
+        } else {
+            None
+        };
+    let (dithered, secondary_plane) = if two_color {
+        let (primary, secondary) = split_black_red(rendered, 80);
+        (primary, Some(secondary))
+    } else {
+        (dither(rendered, opts.dither), None)
+    };
+
+    if opts.protocol == Protocol::Html {
+        return Ok(EncodeFromRgbaResult {
+            dithered,
+            encoded: Vec::new(),
+            driver_name: "html-preview".to_string(),
+        });
+    }
+
+    let mut job = JobSpec::new(opts.media.clone());
+    job.cut_mode = opts.cut_mode;
+    job.copies = opts.copies;
+    job.density = opts.density;
+    let caps = opts.encode_caps.clone();
+    let driver = registry
+        .get(opts.protocol)
+        .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
+    let mut ctx = EncodeContext::new(&job, &caps);
+    if let Some(secondary) = &secondary_plane {
+        ctx = ctx.with_secondary(secondary);
+    }
+    if let Some(png) = &color_png {
+        ctx = ctx.with_color_png(png);
+    }
+    let encoded = driver.encode(&dithered, &ctx).context("encoding")?;
+    Ok(EncodeFromRgbaResult {
+        dithered,
+        encoded,
+        driver_name: driver.name().to_string(),
+    })
+}
+
 /// Run one authoring-HTML label through transpile -> render -> dither -> encode,
 /// producing printer-native bytes.
 pub fn encode_label<B: RenderBackend>(
@@ -1118,43 +1362,11 @@ pub fn encode_label_traced<B: RenderBackend>(
         req_height,
     } = render_label_print(backend, authoring_html, opts)?;
 
-    let two_color = opts.media.two_color;
-    let color_png =
-        if !two_color && opts.encode_caps.supports_color && opts.protocol == Protocol::EscLabel {
-            Some(encode_rgba_png(&rendered).context("encoding color PNG")?)
-        } else {
-            None
-        };
-    let (dithered, secondary_plane) = if two_color {
-        let (primary, secondary) = split_black_red(&rendered, 80);
-        (primary, Some(secondary))
-    } else {
-        (dither(&rendered, opts.dither), None)
-    };
-
-    let (encoded, driver_name) = if opts.protocol == Protocol::Html {
-        (Vec::new(), "html-preview".to_string())
-    } else {
-        let mut job = JobSpec::new(opts.media.clone());
-        job.cut_mode = opts.cut_mode;
-        job.copies = opts.copies;
-        job.density = opts.density;
-        let caps = opts.encode_caps.clone();
-        let driver = registry
-            .get(opts.protocol)
-            .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
-        let mut ctx = EncodeContext::new(&job, &caps);
-        if let Some(secondary) = &secondary_plane {
-            ctx = ctx.with_secondary(secondary);
-        }
-        if let Some(png) = &color_png {
-            ctx = ctx.with_color_png(png);
-        }
-        (
-            driver.encode(&dithered, &ctx).context("encoding")?,
-            driver.name().to_string(),
-        )
-    };
+    let EncodeFromRgbaResult {
+        dithered,
+        encoded,
+        driver_name,
+    } = encode_label_from_rgba(registry, &rendered, opts)?;
 
     Ok(crate::debug::LabelTrace {
         index,
@@ -1182,7 +1394,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
     opts: &PipelineOptions,
 ) -> Result<crate::debug::LabelTrace> {
     let applied_rotation = Rotation::None;
-    let viewport = render_viewport_vector(&opts.media, opts.rotation);
+    let viewport = render_viewport_vector(&opts.media, opts.rotation, Some(&opts.encode_caps));
     let page_size = page_size_mm(&opts.media, opts.rotation);
     let transpiled = transpile(
         authoring_html,
@@ -1459,6 +1671,36 @@ mod tests {
     }
 
     #[test]
+    fn preview_stock_frame_pads_head_axis_at_css_dpi() {
+        use lbl_core::units::Dpi;
+
+        let media = Media::fixed(15.0, 30.0, Dpi(203.0));
+        let caps = PrinterCapabilities {
+            dpi: Dpi(203.0),
+            max_width_mm: 12.0,
+            ..Default::default()
+        };
+        let content_w = mm_to_layout_px(12.0, VECTOR_CSS_DPI);
+        let content_h = mm_to_layout_px(30.0, VECTOR_CSS_DPI);
+        let frame = preview_stock_frame(content_w, content_h, &media, &caps, false, VECTOR_CSS_DPI);
+        assert!(frame.head_pad_before_px > 0);
+        assert!(frame.head_pad_after_px > 0);
+        assert!(
+            (frame.width_px - mm_to_layout_px(15.0, VECTOR_CSS_DPI)).abs() < 1.0,
+            "stock width should match 15 mm tape, got {}",
+            frame.width_px
+        );
+        assert_eq!(frame.content_height_px, content_h);
+        let framed = frame_html_preview_stock(
+            "<!doctype html><html><head><style>body{}</style></head><body><div class=\"lbl-label\">x</div></body></html>",
+            &frame,
+        );
+        assert!(framed.contains("lbl-stock"));
+        assert!(framed.contains("lbl-stock-print"));
+        assert!(framed.contains(&format!("left:{}px", frame.head_pad_before_px)));
+    }
+
+    #[test]
     fn preview_shows_symmetric_head_offset_and_cutter_gap() {
         use image::Rgba;
 
@@ -1676,6 +1918,41 @@ mod tests {
         let media = Media::fixed(12.0, 30.0, Dpi(203.0));
         assert_eq!(resolve_head_dots(None, &media).unwrap(), 96);
         assert_eq!(resolve_head_dots(Some(64), &media).unwrap(), 64);
+    }
+
+    #[test]
+    fn encode_from_rgba_produces_protocol_bytes() {
+        let registry = Registry::with_builtin_drivers();
+        let opts = PipelineOptions {
+            protocol: Protocol::EscPos,
+            media: Media::continuous(58.0, Dpi(203.0)),
+            supports_cut: false,
+            cut_mode: CutMode::None,
+            copies: 1,
+            density: None,
+            dither: Algorithm::Threshold(128),
+            rotation: Rotation::None,
+            head_rotation: Rotation::None,
+            supersample: 1,
+            assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
+            style: LabelStyle::default(),
+            media_type: None,
+            virtual_export_mode: VirtualExportMode::Raster,
+            label_fit: LabelFit::Fill,
+            label_align: LabelAlign::default(),
+            label_valign: LabelValign::default(),
+            label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
+            media_inset: MediaInsetPx::default(),
+            encode_caps: PrinterCapabilities::default(),
+        };
+        let img = RgbaImage::from_pixel(64, 32, image::Rgba([0, 0, 0, 255]));
+        let result = encode_label_from_rgba(&registry, &img, &opts).unwrap();
+        assert_eq!(result.dithered.width, 64);
+        assert_eq!(result.dithered.height, 32);
+        assert!(!result.encoded.is_empty());
+        assert_eq!(result.driver_name, "escpos-raster");
     }
 
     #[test]
