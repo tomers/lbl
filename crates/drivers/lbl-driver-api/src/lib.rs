@@ -117,4 +117,20 @@ pub trait Driver: Send + Sync {
 
     /// Encode `bitmap` into the printer-native byte stream for `ctx`.
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError>;
+
+    /// Resolve a catalog printer key to a driver-variant string.
+    ///
+    /// Default: no mapping. Drivers with model-specific firmware/task profiles
+    /// override this; the registry forwards keys without knowing which.
+    fn variant_for_printer_key(&self, _key: &str) -> Option<&'static str> {
+        None
+    }
+
+    /// Return a replacement driver for `variant`, or `None` to keep `self`.
+    ///
+    /// Default: no variants. Opaque strings are interpreted only by the driver
+    /// that understands them.
+    fn override_for_variant(&self, _variant: Option<&str>) -> Option<Box<dyn Driver>> {
+        None
+    }
 }
