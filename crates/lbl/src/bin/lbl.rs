@@ -446,93 +446,6 @@ impl StyleArgs {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum ProtocolArg {
-    Dymo,
-    #[value(name = "dymo-lw", alias = "lw550")]
-    DymoLw,
-    #[value(name = "dymo-lw-classic", aliases = ["dymolwclassic", "lw450"])]
-    DymoLwClassic,
-    Escpos,
-    #[value(name = "phomemo", alias = "m02")]
-    Phomemo,
-    #[value(name = "phomemo-m02x", aliases = ["phomemom02x", "m02x"])]
-    PhomemoM02x,
-    #[value(name = "phomemo-m110", aliases = ["phomemom110", "m110"])]
-    PhomemoM110,
-    #[value(name = "phomemo-d30", aliases = ["phomemod30", "d30", "q30"])]
-    PhomemoD30,
-    Zpl,
-    /// Epson ESC/Label (ColorWorks).
-    #[value(name = "esc-label", aliases = ["esclabel", "colorworks"])]
-    EscLabel,
-    Tspl,
-    /// Bixolon SLCS label printers.
-    #[value(name = "slcs", aliases = ["bixolon"])]
-    Slcs,
-    /// Godex EZPL label printers.
-    #[value(name = "ezpl", aliases = ["godex"])]
-    Ezpl,
-    /// SATO SBPL label printers.
-    #[value(name = "sbpl", aliases = ["sato"])]
-    Sbpl,
-    /// Honeywell / Datamax-O'Neil / Citizen DPL label printers.
-    #[value(name = "dpl", aliases = ["honeywell", "datamax", "citizen"])]
-    Dpl,
-    /// Toshiba TEC TPCL label printers.
-    #[value(name = "tpcl", aliases = ["toshiba", "tec"])]
-    Tpcl,
-    /// NIIMBOT thermal label printers (D11 / D110 family).
-    Niimbot,
-    /// DYMO LetraTag LT-200B (Bluetooth LE; not LabelManager).
-    #[value(name = "letratag", aliases = ["letra-tag", "lt200b"])]
-    LetraTag,
-    /// Brother QL-series raster printers (QL-820NWB(c), …).
-    #[value(name = "brother-ql", alias = "brotherql")]
-    BrotherQl,
-    /// Brother P-touch / TZe tape printers (PT-P700, …).
-    #[value(name = "brother-pt", aliases = ["brotherpt", "pt", "tze"])]
-    BrotherPt,
-    /// Virtual printer: render to an image file instead of hardware.
-    #[value(alias = "file")]
-    Virtual,
-    /// Console printer: render the raster to the terminal as text.
-    #[value(alias = "term")]
-    Console,
-    /// HTML preview: write a browser gallery of full-resolution PNGs.
-    Html,
-}
-
-impl From<ProtocolArg> for Protocol {
-    fn from(p: ProtocolArg) -> Self {
-        match p {
-            ProtocolArg::Dymo => Protocol::Dymo,
-            ProtocolArg::DymoLw => Protocol::DymoLw,
-            ProtocolArg::DymoLwClassic => Protocol::DymoLwClassic,
-            ProtocolArg::Escpos => Protocol::EscPos,
-            ProtocolArg::Phomemo => Protocol::Phomemo,
-            ProtocolArg::PhomemoM02x => Protocol::PhomemoM02x,
-            ProtocolArg::PhomemoM110 => Protocol::PhomemoM110,
-            ProtocolArg::PhomemoD30 => Protocol::PhomemoD30,
-            ProtocolArg::Zpl => Protocol::Zpl,
-            ProtocolArg::EscLabel => Protocol::EscLabel,
-            ProtocolArg::Tspl => Protocol::Tspl,
-            ProtocolArg::Slcs => Protocol::Slcs,
-            ProtocolArg::Ezpl => Protocol::Ezpl,
-            ProtocolArg::Sbpl => Protocol::Sbpl,
-            ProtocolArg::Dpl => Protocol::Dpl,
-            ProtocolArg::Tpcl => Protocol::Tpcl,
-            ProtocolArg::Niimbot => Protocol::Niimbot,
-            ProtocolArg::LetraTag => Protocol::LetraTag,
-            ProtocolArg::BrotherQl => Protocol::BrotherQl,
-            ProtocolArg::BrotherPt => Protocol::BrotherPt,
-            ProtocolArg::Virtual => Protocol::Virtual,
-            ProtocolArg::Console => Protocol::Console,
-            ProtocolArg::Html => Protocol::Html,
-        }
-    }
-}
-
-#[derive(Clone, Copy, ValueEnum)]
 enum BackendArg {
     Chromium,
     Sidecar,
@@ -555,6 +468,10 @@ impl From<OrientationArg> for Orientation {
     }
 }
 
+fn parse_protocol_arg(s: &str) -> Result<Protocol, String> {
+    Registry::resolve_protocol(s).map_err(|e| e.to_string())
+}
+
 // ---------------------------------------------------------------------------
 // print
 // ---------------------------------------------------------------------------
@@ -571,9 +488,9 @@ struct PrintArgs {
     style: StyleArgs,
 
     /// Target protocol. May also be set in config (`[print] protocol`) or via
-    /// `LBL_PRINT__PROTOCOL`.
-    #[arg(long, value_enum)]
-    protocol: Option<ProtocolArg>,
+    /// `LBL_PRINT__PROTOCOL`. Aliases are owned by each driver.
+    #[arg(long, value_parser = parse_protocol_arg)]
+    protocol: Option<Protocol>,
 
     /// Printer model key from the catalog (e.g. `LabelWriter 550`, `D110`).
     /// Sets protocol, native DPI, default media, and transport when the
@@ -741,13 +658,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
     };
 
     let protocol: Protocol = match args.protocol {
-        Some(p) => p.into(),
+        Some(p) => p,
         None => {
             if let Some(printer) = printer_entry {
                 printer.protocol
             } else {
                 match &print_cfg.protocol {
-                    Some(name) => config_enum::<ProtocolArg>("print.protocol", name)?.into(),
+                    Some(name) => Registry::resolve_protocol(name)
+                        .map_err(|e| anyhow!("invalid config print.protocol: {e}"))?,
                     None => bail!(
                         "protocol required: pass --protocol, --printer, or set [print] protocol / LBL_PRINT__PROTOCOL"
                     ),

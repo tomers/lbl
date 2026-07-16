@@ -66,6 +66,10 @@ impl Driver for PhomemoM110Driver {
         "phomemo-m110"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["phomemo-m110", "phomemom110", "m110"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let stride = bitmap.stride();
         if stride > 0xFFFF {

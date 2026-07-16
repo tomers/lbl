@@ -63,6 +63,10 @@ impl Driver for TpclDriver {
         "tpcl-sg"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["tpcl", "toshiba", "tec"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         if bitmap.data.is_empty() {
             return Err(DriverError::Unsupported("empty bitmap".into()));

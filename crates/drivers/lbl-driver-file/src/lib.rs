@@ -1,8 +1,11 @@
-//! Virtual printer driver: "prints" a label to an image file.
+//! Virtual printer drivers for on-screen sinks (image file and HTML gallery).
 //!
-//! Unlike the hardware drivers, this one does not target a physical printer
-//! protocol. Instead it turns the dithered [`MonoBitmap`] into the bytes of an
-//! image file. The concrete file format is the virtual printer's selected
+//! Unlike the hardware drivers, these do not target a physical printer
+//! protocol. [`FileDriver`] turns the dithered [`MonoBitmap`] into image-file
+//! bytes; [`HtmlDriver`] is a no-op encode so the pipeline can own the gallery
+//! write. Both are registered so protocol id resolution stays driver-owned.
+//!
+//! The concrete file format for [`FileDriver`] is the virtual printer's selected
 //! **media type** ([`MediaType`]) — choosing PNG vs BMP vs PBM is analogous to
 //! loading a different roll of media into a real printer.
 //!
@@ -13,6 +16,10 @@ use std::io::Cursor;
 
 use image::{DynamicImage, GrayImage, ImageFormat, Luma};
 use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+
+mod html;
+
+pub use html::HtmlDriver;
 
 /// How the virtual printer stores labels to disk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -204,6 +211,10 @@ impl Driver for FileDriver {
 
     fn name(&self) -> &'static str {
         "virtual-file"
+    }
+
+    fn aliases(&self) -> &'static [&'static str] {
+        &["virtual", "file"]
     }
 
     fn encode(&self, bitmap: &MonoBitmap, _ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {

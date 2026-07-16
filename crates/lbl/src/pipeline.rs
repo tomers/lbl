@@ -1297,14 +1297,6 @@ pub fn encode_label_from_rgba(
         (dither(rendered, opts.dither), None)
     };
 
-    if opts.protocol == Protocol::Html {
-        return Ok(EncodeFromRgbaResult {
-            dithered,
-            encoded: Vec::new(),
-            driver_name: "html-preview".to_string(),
-        });
-    }
-
     let mut job = JobSpec::new(opts.media.clone());
     job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;

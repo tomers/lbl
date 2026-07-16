@@ -556,6 +556,10 @@ impl Driver for BrotherQlDriver {
         "brother-ql"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["brother-ql", "brother_ql", "brotherql"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let head = head_profile(ctx);
         let invalidate_bytes = ctx

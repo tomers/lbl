@@ -136,6 +136,10 @@ impl Driver for LabelWriter550Driver {
         "dymo-labelwriter-550"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["dymo-lw", "dymolw", "lw550"]
+    }
+
     fn handshake(&self) -> ClientHandshake {
         ClientHandshake::DymoLw
     }

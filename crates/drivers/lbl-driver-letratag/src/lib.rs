@@ -92,6 +92,10 @@ impl Driver for LetraTagDriver {
         "letratag"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["letratag", "letra-tag"]
+    }
+
     fn handshake(&self) -> ClientHandshake {
         ClientHandshake::LetraTagNotify
     }

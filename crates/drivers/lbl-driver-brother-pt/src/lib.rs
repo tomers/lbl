@@ -331,6 +331,10 @@ impl Driver for BrotherPtDriver {
         "brother-pt"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["brother-pt", "brother_pt", "brotherpt", "pt", "tze"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let (head, geom) = Self::resolve_media(ctx);
         let bitmap = Self::pad_to_head(bitmap, head, geom)?;

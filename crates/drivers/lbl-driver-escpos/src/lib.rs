@@ -44,6 +44,10 @@ impl Driver for EscPosDriver {
         "escpos-raster"
     }
 
+    fn aliases(&self) -> &'static [&'static str] {
+        &["escpos", "esc/pos"]
+    }
+
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let stride = bitmap.stride();
         if stride > 0xFFFF {
