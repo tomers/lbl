@@ -15,11 +15,11 @@ use tokio::task::spawn_blocking;
 use tracing::{error, info, warn};
 
 use lbl::pipeline::{
-    authoring_labels, effective_printable_width_mm, encode_label, pad_preview_encode_feed,
-    pad_preview_head_tape, render_label_raster, resolve_font_fit_scale, resolve_label_align,
-    resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
-    resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
-    PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
+    authoring_labels, effective_printable_width_mm, encode_label, inked_content_bounds,
+    pad_preview_encode_feed, pad_preview_head_tape, render_label_raster, resolve_font_fit_scale,
+    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
+    resolve_media, resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html,
+    AuthoringLabel, PipelineOptions, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
 use lbl_config::ConfigError;
@@ -441,6 +441,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                 let padded =
                     pad_preview_encode_feed(head_pad.image, &encode_caps, feed_along_width);
                 let image = padded.image;
+                let content_bounds = inked_content_bounds(&image);
                 let mut png = Vec::new();
                 image
                     .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
@@ -453,6 +454,14 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     "height_px": image.height(),
                     "image_base64": STANDARD.encode(&png),
                 });
+                if let Some(bounds) = content_bounds {
+                    label_json["content_bounds_px"] = json!({
+                        "x": bounds.x,
+                        "y": bounds.y,
+                        "width": bounds.width,
+                        "height": bounds.height,
+                    });
+                }
                 if head_pad.pad_before_px > 0 || head_pad.pad_after_px > 0 {
                     label_json["head_pad_before_px"] =
                         serde_json::Value::from(head_pad.pad_before_px);
