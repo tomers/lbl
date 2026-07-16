@@ -131,7 +131,10 @@ impl MediaSense {
 /// printer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Media {
-    /// Printable width across the head, in millimeters.
+    /// Physical stock width across the head, in millimeters.
+    ///
+    /// Layout and encode may use a narrower inkable band when printer
+    /// capabilities clamp below this value; preview pads to this full width.
     pub width_mm: f64,
     /// Length dimension (fixed label or continuous).
     pub length: MediaLength,

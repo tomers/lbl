@@ -650,13 +650,24 @@ pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     }
 }
 
-/// Head-axis dots used for layout and rasterize when the head inkable band is
-/// narrower than the loaded tape (laminate / dead zones).
-pub fn effective_render_head_dots(media: &Media, caps: &PrinterCapabilities) -> u32 {
-    match caps.head_printable_height_mm {
-        Some(h) => Millimeters(h.min(media.width_mm)).to_dots(media.dpi).0,
-        None => media.width_dots().0,
+/// Inkable width across the head after applying printer clamps.
+///
+/// Order: physical stock → printer `max_width_mm` → optional laminate
+/// `head_printable_height_mm`. Preview pads any leftover side gaps so the
+/// gallery shows physical stock, not only the printable raster.
+pub fn effective_printable_width_mm(media: &Media, caps: &PrinterCapabilities) -> f64 {
+    let mut width = media.width_mm.min(caps.max_width_mm);
+    if let Some(printable) = caps.head_printable_height_mm {
+        width = width.min(printable);
     }
+    width.max(0.0)
+}
+
+/// Head-axis dots used for layout and rasterize after printable-band clamps.
+pub fn effective_render_head_dots(media: &Media, caps: &PrinterCapabilities) -> u32 {
+    Millimeters(effective_printable_width_mm(media, caps))
+        .to_dots(media.dpi)
+        .0
 }
 
 /// CSS-pixel viewport matching the rasterizer's [`RenderRequest`] dimensions.
@@ -682,6 +693,17 @@ pub fn render_viewport_px(
     }
 }
 
+/// Result of centering a printable-band raster inside the physical stock width.
+#[derive(Debug, Clone)]
+pub struct HeadTapePad {
+    /// Preview image sized to the physical stock on the head axis.
+    pub image: RgbaImage,
+    /// Blank pixels before the printable band on the head axis.
+    pub pad_before_px: u32,
+    /// Blank pixels after the printable band on the head axis.
+    pub pad_after_px: u32,
+}
+
 /// Pad a preview raster to the full tape width on the head axis when content
 /// was rendered into a narrower printable band.
 pub fn pad_preview_head_tape(
@@ -689,24 +711,30 @@ pub fn pad_preview_head_tape(
     media: &Media,
     caps: &PrinterCapabilities,
     head_along_height: bool,
-) -> RgbaImage {
+) -> HeadTapePad {
     use image::{imageops, Rgba};
 
-    if caps.head_printable_height_mm.is_none() {
-        return image;
-    }
     let tape_dots = media.width_dots().0;
     let printable_dots = effective_render_head_dots(media, caps);
     if printable_dots >= tape_dots {
-        return image;
+        return HeadTapePad {
+            image,
+            pad_before_px: 0,
+            pad_after_px: 0,
+        };
     }
     let pad_before = (tape_dots - printable_dots) / 2;
+    let pad_after = tape_dots - printable_dots - pad_before;
     let label_white = Rgba([255, 255, 255, 255]);
 
-    if head_along_height {
+    let image = if head_along_height {
         let (w, h) = image.dimensions();
         if h != printable_dots {
-            return image;
+            return HeadTapePad {
+                image,
+                pad_before_px: 0,
+                pad_after_px: 0,
+            };
         }
         let mut out = RgbaImage::from_pixel(w, tape_dots, label_white);
         imageops::overlay(&mut out, &image, 0, pad_before as i64);
@@ -714,11 +742,20 @@ pub fn pad_preview_head_tape(
     } else {
         let (w, h) = image.dimensions();
         if w != printable_dots {
-            return image;
+            return HeadTapePad {
+                image,
+                pad_before_px: 0,
+                pad_after_px: 0,
+            };
         }
         let mut out = RgbaImage::from_pixel(tape_dots, h, label_white);
         imageops::overlay(&mut out, &image, pad_before as i64, 0);
         out
+    };
+    HeadTapePad {
+        image,
+        pad_before_px: pad_before,
+        pad_after_px: pad_after,
     }
 }
 
@@ -1283,6 +1320,47 @@ mod tests {
             media_inset: MediaInsetPx::default(),
             encode_caps: PrinterCapabilities::default(),
         }
+    }
+
+    #[test]
+    fn preview_pads_physical_stock_wider_than_print_head() {
+        use image::Rgba;
+        use lbl_core::units::Dpi;
+
+        let media = Media::fixed(15.0, 30.0, Dpi(203.0));
+        let caps = PrinterCapabilities {
+            dpi: Dpi(203.0),
+            max_width_mm: 12.0,
+            ..Default::default()
+        };
+        let printable = effective_render_head_dots(&media, &caps);
+        let tape = media.width_dots().0;
+        assert!(
+            printable < tape,
+            "12 mm head should be narrower than 15 mm stock"
+        );
+
+        let image = RgbaImage::from_pixel(printable, 40, Rgba([0, 0, 0, 255]));
+        let padded = pad_preview_head_tape(image, &media, &caps, false);
+        assert_eq!(padded.image.width(), tape);
+        assert_eq!(padded.image.height(), 40);
+        assert!(padded.pad_before_px > 0);
+        assert!(padded.pad_after_px > 0);
+        assert_eq!(padded.pad_before_px + printable + padded.pad_after_px, tape);
+    }
+
+    #[test]
+    fn printable_width_clamps_to_max_and_laminate_band() {
+        use lbl_core::units::Dpi;
+
+        let media = Media::fixed(12.0, 40.0, Dpi(180.0));
+        let caps = PrinterCapabilities {
+            dpi: Dpi(180.0),
+            max_width_mm: 12.0,
+            head_printable_height_mm: Some(8.2),
+            ..Default::default()
+        };
+        assert!((effective_printable_width_mm(&media, &caps) - 8.2).abs() < 1e-9);
     }
 
     #[test]

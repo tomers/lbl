@@ -10,8 +10,11 @@ Each entry has:
 - `brand` — manufacturer.
 - `keys` — SKUs/aliases; the first is canonical (e.g. `11352`, alias `S0722520`).
 - `name` — human-friendly label.
-- `media` — physical `MediaSpec`: `width_mm`, `length` (fixed/continuous),
-  `material`, `adhesive`, `color`. Combine with a DPI to get device-ready media.
+- `media` — physical `MediaSpec`: stock `width_mm` across the head, `length`
+  (fixed/continuous), `material`, `adhesive`, `color`. Combine with a DPI to
+  get device-ready media. Printable-band clamps live on the printer
+  (`max_width_mm`, optional `head_printable_height_mm`), not by shrinking
+  `width_mm` to the inkable width.
 - `image` — optional product image: `url`, `license`, `attribution`,
   `redistributable`.
 - `purchase_url` — optional buy link (an affiliate tag may be appended at

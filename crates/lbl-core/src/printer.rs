@@ -192,6 +192,10 @@ pub struct PrinterCapabilities {
     /// Native print resolution.
     pub dpi: Dpi,
     /// Maximum printable width across the head, in millimeters.
+    ///
+    /// Physical media may be wider (`Media::width_mm`); layout/encode clamp to
+    /// this value (and optional [`Self::head_printable_height_mm`]), and preview
+    /// pads the leftover stock margins.
     pub max_width_mm: f64,
     /// Whether the printer can cut between jobs/items.
     pub supports_cut: bool,
