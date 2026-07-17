@@ -15,7 +15,13 @@ pub const LINE_HEIGHT: f64 = 1.1;
 const VISUAL_WIDTH_MARGIN: f64 = 1.35;
 
 /// Estimated em width of one terminal column at the transpiled font size.
+/// Used with [`VISUAL_WIDTH_MARGIN`] for fit checks inside a fixed box.
 const EM_PER_COLUMN: f64 = 0.55;
+/// Tighter column width for continuous feed advance estimates (proportional
+/// Latin is narrower than the fit-safety column used above).
+const ADVANCE_EM_PER_COLUMN: f64 = 0.42;
+/// Whitespace advance for continuous feed estimates (tighter than fit-check `0.28`).
+const ADVANCE_EM_WHITESPACE: f64 = 0.22;
 
 pub(crate) fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
     (px * opts.font_fit_scale.clamp(0.01, 5.0)).max(1.0)
@@ -24,8 +30,20 @@ pub(crate) fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
 /// Parse the auto-fit font size actually injected into transpiled HTML.
 pub fn injected_fit_font_px(html: &str) -> Option<f64> {
     static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"\.lbl-(?:label>\.lbl-text:only-child|row>\.lbl-text)\{font-size:([\d.]+)px\}")
-            .expect("injected fit font regex")
+        Regex::new(
+            r"\.lbl-(?:label>\.lbl-text:only-child|row>\.lbl-text)\{[^}]*font-size:([\d.]+)px",
+        )
+        .expect("injected fit font regex")
+    });
+    RE.captures(html)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse().ok())
+}
+
+/// Parse continuous-feed length estimate pinned by content head-fit.
+pub fn injected_label_min_width_px(html: &str) -> Option<f64> {
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"\.lbl-label\{--lbl-feed-px:([\d.]+)\}").expect("label feed width regex")
     });
     RE.captures(html)
         .and_then(|caps| caps.get(1))
@@ -124,6 +142,25 @@ pub fn row_text_qr_fit_css(body: &str, opts: &TranspileOptions) -> Option<String
 
 pub(crate) fn text_line_width_px(text: &str, font_px: f64) -> f64 {
     line_em_width(text) * font_px * VISUAL_WIDTH_MARGIN
+}
+
+/// Nominal advance width (no fit-safety margin) for continuous stock sizing.
+pub(crate) fn text_advance_width_px(text: &str, font_px: f64) -> f64 {
+    text.lines()
+        .map(|line| {
+            line.chars()
+                .map(|c| {
+                    if c.is_whitespace() {
+                        ADVANCE_EM_WHITESPACE
+                    } else {
+                        let cols = c.width().unwrap_or(1).max(1);
+                        cols as f64 * ADVANCE_EM_PER_COLUMN
+                    }
+                })
+                .sum::<f64>()
+        })
+        .fold(0.0_f64, f64::max)
+        * font_px
 }
 
 pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
