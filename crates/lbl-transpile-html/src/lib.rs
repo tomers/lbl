@@ -28,7 +28,7 @@ mod transpile;
 
 pub use assets::AssetsBase;
 pub use qr::{QrElementOverrides, QrErrorCorrection};
-pub use text_fit::{fitted_font_px, injected_fit_font_px};
+pub use text_fit::{fitted_font_px, injected_fit_font_px, injected_label_min_width_px};
 pub use transpile::{
     parse_fit_scale, transpile, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
     MediaInset, MediaInsetPx, PageSizeMm, TranspileOptions, ViewportPx,

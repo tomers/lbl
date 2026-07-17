@@ -12,7 +12,7 @@ use lbl_text::BarcodeHeightMode;
 use crate::assets::ROW_TEXT_LINE_HEIGHT;
 use crate::text_fit::{
     fit_box_px, html_to_plain_text, is_fit_measurable_html, max_fit_font_px, scaled_fit_px,
-    text_line_width_px, LINE_HEIGHT,
+    text_advance_width_px, text_line_width_px, LINE_HEIGHT,
 };
 use crate::transpile::TranspileOptions;
 
@@ -189,9 +189,25 @@ fn fit_lone(
             }
             let text = html_to_plain_text(inner);
             let font_px = scaled_fit_px(max_fit_font_px(box_w, box_h, &text), opts);
+            // Advance width only — VISUAL_WIDTH_MARGIN is for fit checks inside a
+            // fixed box, not for sizing continuous stock around known text.
+            let content_w = text_advance_width_px(&text, font_px)
+                + 2.0 * opts.style.padding_px.max(0.0)
+                + 2.0 * opts.style.border_width_px.max(0.0);
+            // Match text_fit::LINE_HEIGHT (1.1). Base .lbl-label uses 1.3, which
+            // would clip head-fitted glyphs. nowrap keeps continuous feed text on
+            // one line so a narrow preview iframe cannot re-wrap and overflow.
+            // --lbl-feed-px is parsed by the preview API for initial iframe sizing;
+            // do not set min-width or the tape grows a hollow feed gap.
             LayoutFit {
                 body: body.to_string(),
-                css: format!(".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px}}\n"),
+                css: format!(
+                    ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};white-space:nowrap}}\n\
+                     .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
+                    font_px = font_px,
+                    lh = LINE_HEIGHT,
+                    content_w = content_w,
+                ),
                 font_px: Some(font_px),
             }
         }
