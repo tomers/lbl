@@ -36,7 +36,9 @@ use lbl_dither::Algorithm;
 use lbl_encode::Registry;
 use lbl_render::{RenderBackend, SidecarBackend};
 use lbl_text::{catalog, font_asset_url};
-use lbl_transpile_html::{injected_fit_font_px, AssetsBase, FontDelivery, LabelFitSetting};
+use lbl_transpile_html::{
+    injected_fit_font_px, injected_label_min_width_px, AssetsBase, FontDelivery, LabelFitSetting,
+};
 
 use crate::font_cache::load_font_files_for_html;
 use crate::AppState;
@@ -713,7 +715,14 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 layout_dpi,
             );
             let html = frame_html_preview_stock(&transpiled.html, &stock);
-            (html, stock.width_px, stock.height_px, Some(stock))
+            // Continuous feed: content head-fit pins `.lbl-label{min-width}` so
+            // Studio can size the iframe without measuring opaque sandbox docs.
+            let width_px = if stock.width_px > 0.0 {
+                stock.width_px
+            } else {
+                injected_label_min_width_px(&html).unwrap_or(0.0)
+            };
+            (html, width_px, stock.height_px, Some(stock))
         };
         let mut label_json = json!({
             "index": label.index,
