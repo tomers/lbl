@@ -720,8 +720,15 @@ mod tests {
         let d110m = catalog.lookup_printer("D110_M").unwrap();
         assert_eq!(d110m.max_width_mm, 12.0);
         assert!(d110m.matches_key("D110M"));
+        let d11 = catalog.lookup_printer("D11").unwrap();
+        assert_eq!(d11.name, "NIIMBOT D11");
+        assert!(!d11.matches_key("D110"));
         let d11s = catalog.lookup_printer("D11S").unwrap();
-        assert!(d11s.matches_key("D110"));
+        assert_eq!(d11s.name, "NIIMBOT D11S");
+        assert!(!d11s.matches_key("D110"));
+        let d110 = catalog.lookup_printer("D110").unwrap();
+        assert_eq!(d110.name, "NIIMBOT D110");
+        assert!(!d110.matches_key("D11"));
     }
 
     #[test]
@@ -801,7 +808,7 @@ mod tests {
             .collect();
         assert_eq!(
             verified,
-            vec!["LabelWriter 550", "LabelManager 280", "D110", "B1",]
+            vec!["LabelWriter 550", "LabelManager 280", "D110", "D11", "B1",]
         );
         assert!(catalog
             .printers()
