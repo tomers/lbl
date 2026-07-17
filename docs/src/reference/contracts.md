@@ -14,7 +14,9 @@ The output of `lbl-text`/`lbl-template` and the input to `lbl-transpile-html`.
 - Images: standard `<img src="…">` (path or URL; `lbl-template` can inline these
   as `data:` URIs).
 - Flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
-  `lbl-grow`, `lbl-wrap`.
+  `lbl-grow`, `lbl-wrap`, `lbl-justify-*` / `lbl-items-*` (independent main- and
+  cross-axis alignment), `lbl-slot` (empty flex child for nested layouts),
+  `lbl-frame` (bordered padded box).
 
 On fixed-length media (`label_fit` = `fill` / `auto`), a lone
 `<div class="lbl-text">` child is auto-sized at transpile time to the largest

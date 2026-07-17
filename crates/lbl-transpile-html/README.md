@@ -7,7 +7,7 @@ Authoring HTML uses compact custom concepts that this stage expands:
 - `<qr>PAYLOAD</qr>` -> SVG via the QR JS library (`QRCode.toString`, `type: 'svg'`)
 - `<barcode type="CODE128">DATA</barcode>` -> SVG via JsBarcode
 - flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
-  `lbl-grow`, `lbl-wrap`
+  `lbl-grow`, `lbl-wrap`, `lbl-justify-*`, `lbl-items-*`, `lbl-slot`, `lbl-frame`
 
 It injects the base/flex CSS and only the third-party libraries actually needed.
 
