@@ -862,6 +862,11 @@ fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
 }
 
 /// Compute head + feed padding that expands printable HTML to physical stock.
+///
+/// A non-positive content size on the feed axis means continuous / content-sized
+/// media: that axis stays `0` in the returned frame (Studio sizes it from the
+/// viewport). Feed lead/end margins are only baked in once content length is
+/// known — otherwise stock framing collapses to margins-only and clips text.
 pub fn preview_stock_frame(
     content_width_px: f64,
     content_height_px: f64,
@@ -890,27 +895,41 @@ pub fn preview_stock_frame(
     } else {
         content_height_px.round().max(0.0) as u32
     };
-    let dx = feed_margin_px(caps.feed_trail_mm, layout_dpi);
-    let explicit_lead = feed_margin_px(caps.feed_lead_mm, layout_dpi);
-    let (lead_feed, end_margin, cutter_gap) = if explicit_lead > 0 {
-        (explicit_lead, 0, dx)
-    } else if dx > 0 {
-        (dx, dx, dx)
+    // Raster preview adds feed margins after Chromium measures content. Vector
+    // HTML cannot measure yet — keep the feed axis open instead of framing
+    // lead+end around a 0-wide (or 0-tall) printable box.
+    let (lead_feed, end_margin, cutter_gap, content_feed_end) = if content_feed == 0 {
+        (0, 0, 0, 0)
     } else {
-        (0, 0, 0)
+        let dx = feed_margin_px(caps.feed_trail_mm, layout_dpi);
+        let explicit_lead = feed_margin_px(caps.feed_lead_mm, layout_dpi);
+        let (lead_feed, end_margin, cutter_gap) = if explicit_lead > 0 {
+            (explicit_lead, 0, dx)
+        } else if dx > 0 {
+            (dx, dx, dx)
+        } else {
+            (0, 0, 0)
+        };
+        (lead_feed, end_margin, cutter_gap, lead_feed + content_feed)
     };
-    let content_feed_end = lead_feed + content_feed;
 
     let (width_px, height_px) = if head_along_height {
+        let feed = if content_feed == 0 {
+            0.0
+        } else {
+            content_width_px + f64::from(lead_feed + end_margin)
+        };
         (
-            content_width_px + f64::from(lead_feed + end_margin),
+            feed,
             content_height_px + f64::from(head_before + head_after),
         )
     } else {
-        (
-            content_width_px + f64::from(head_before + head_after),
-            content_height_px + f64::from(lead_feed + end_margin),
-        )
+        let feed = if content_feed == 0 {
+            0.0
+        } else {
+            content_height_px + f64::from(lead_feed + end_margin)
+        };
+        (content_width_px + f64::from(head_before + head_after), feed)
     };
 
     PreviewStockFrame {
@@ -930,8 +949,10 @@ pub fn preview_stock_frame(
 
 /// Wrap transpiled label HTML in a physical-stock frame (white head/feed pads).
 ///
-/// The printable content keeps its layout size; the outer `.lbl-stock` matches
-/// [`PreviewStockFrame::width_px`] × [`PreviewStockFrame::height_px`].
+/// When both axes have known content sizes, the outer `.lbl-stock` matches
+/// [`PreviewStockFrame::width_px`] × [`PreviewStockFrame::height_px`] with the
+/// printable band absolutely positioned inside. When a continuous feed axis is
+/// still `0`, padding + `100%` keeps that axis open so Studio can size it.
 pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String {
     if frame.head_pad_before_px == 0
         && frame.head_pad_after_px == 0
@@ -941,23 +962,71 @@ pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String
         return html.to_string();
     }
 
-    let (left, top) = if frame.head_along_height {
+    let (pad_left, pad_top) = if frame.head_along_height {
         (frame.lead_feed_px, frame.head_pad_before_px)
     } else {
         (frame.head_pad_before_px, frame.lead_feed_px)
     };
+    let (pad_right, pad_bottom) = if frame.head_along_height {
+        (frame.feed_end_margin_px, frame.head_pad_after_px)
+    } else {
+        (frame.head_pad_after_px, frame.feed_end_margin_px)
+    };
 
-    let stock_css = format!(
-        ".lbl-stock{{position:relative;width:{w:.2}px;height:{h:.2}px;background:#fff;overflow:hidden;box-sizing:border-box}}\n\
-         .lbl-stock-print{{position:absolute;left:{left}px;top:{top}px;width:{cw:.2}px;height:{ch:.2}px;box-sizing:border-box}}\n\
-         html,body{{margin:0;width:{w:.2}px;height:{h:.2}px}}\n",
-        w = frame.width_px,
-        h = frame.height_px,
-        left = left,
-        top = top,
-        cw = frame.content_width_px,
-        ch = frame.content_height_px,
-    );
+    let open_width = frame.content_width_px <= 0.0;
+    let open_height = frame.content_height_px <= 0.0;
+    let stock_css = if open_width || open_height {
+        // Continuous feed axis: size to content (max-content), not 100% of a
+        // placeholder iframe width — otherwise head-fitted text re-wraps and
+        // overflows the tape height.
+        let width_rule = if open_width {
+            "width:max-content;max-width:none".to_string()
+        } else {
+            format!("width:{:.2}px", frame.width_px)
+        };
+        let height_rule = if open_height {
+            "height:max-content;max-height:none".to_string()
+        } else {
+            format!("height:{:.2}px", frame.height_px)
+        };
+        format!(
+            ".lbl-stock{{position:relative;{width_rule};{height_rule};box-sizing:border-box;\
+             padding:{pad_top}px {pad_right}px {pad_bottom}px {pad_left}px;\
+             background:#fff;overflow:visible;align-self:flex-start;flex:0 0 auto}}\n\
+             .lbl-stock-print{{box-sizing:border-box;display:flex;flex-direction:column;\
+             justify-content:center;{print_width};{print_height}}}\n\
+             html,body{{margin:0;{width_rule};{height_rule};align-items:flex-start}}\n\
+             .lbl-label{{width:max-content;max-width:none;flex:0 0 auto}}\n",
+            width_rule = width_rule,
+            height_rule = height_rule,
+            print_width = if open_width {
+                "width:max-content;max-width:none"
+            } else {
+                "width:100%"
+            },
+            print_height = if open_height {
+                "height:max-content;max-height:none"
+            } else {
+                "height:100%"
+            },
+            pad_top = pad_top,
+            pad_right = pad_right,
+            pad_bottom = pad_bottom,
+            pad_left = pad_left,
+        )
+    } else {
+        format!(
+            ".lbl-stock{{position:relative;width:{w:.2}px;height:{h:.2}px;background:#fff;overflow:hidden;box-sizing:border-box}}\n\
+             .lbl-stock-print{{position:absolute;left:{left}px;top:{top}px;width:{cw:.2}px;height:{ch:.2}px;box-sizing:border-box}}\n\
+             html,body{{margin:0;width:{w:.2}px;height:{h:.2}px}}\n",
+            w = frame.width_px,
+            h = frame.height_px,
+            left = pad_left,
+            top = pad_top,
+            cw = frame.content_width_px,
+            ch = frame.content_height_px,
+        )
+    };
 
     let with_css = if let Some(idx) = html.rfind("</style>") {
         let mut out = String::with_capacity(html.len() + stock_css.len());
@@ -1683,6 +1752,49 @@ mod tests {
         assert!(framed.contains("lbl-stock"));
         assert!(framed.contains("lbl-stock-print"));
         assert!(framed.contains(&format!("left:{}px", frame.head_pad_before_px)));
+    }
+
+    #[test]
+    fn preview_stock_frame_keeps_continuous_feed_axis_open() {
+        use lbl_core::units::Dpi;
+
+        // LabelManager-style: continuous D1 with feed trail + laminate band.
+        let media = Media::continuous(12.0, Dpi(180.0));
+        let caps = PrinterCapabilities {
+            dpi: Dpi(180.0),
+            max_width_mm: 12.0,
+            feed_trail_mm: Some(8.1),
+            head_printable_height_mm: Some(8.2),
+            ..Default::default()
+        };
+        let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
+        let frame = preview_stock_frame(0.0, content_h, &media, &caps, true, VECTOR_CSS_DPI);
+        assert_eq!(
+            frame.width_px, 0.0,
+            "continuous feed must stay open (not margins-only)"
+        );
+        assert!(
+            frame.height_px > content_h,
+            "12 mm stock should pad the 8.2 mm printable band"
+        );
+        assert_eq!(frame.lead_feed_px, 0);
+        assert_eq!(frame.feed_end_margin_px, 0);
+        assert!(frame.head_pad_before_px > 0 || frame.head_pad_after_px > 0);
+
+        let framed = frame_html_preview_stock(
+            "<!doctype html><html><head><style>body{}</style></head><body><div class=\"lbl-label\">Hello, World!</div></body></html>",
+            &frame,
+        );
+        assert!(framed.contains("lbl-stock"));
+        assert!(
+            !framed.contains("width:0.00px"),
+            "open feed axis must not clip content in a 0-wide print box: {framed}"
+        );
+        assert!(
+            framed.contains("width:max-content"),
+            "open feed axis must size to content, got: {framed}"
+        );
+        assert!(framed.contains(&format!("padding:{}px", frame.head_pad_before_px)));
     }
 
     #[test]
