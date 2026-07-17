@@ -248,6 +248,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preview_html_continuous_dymo_keeps_feed_axis_open() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"Hello, World!","geometry":"vector","media":"45013","printer":"LabelManager PnP","orientation":"landscape"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["media"]["continuous"], true);
+        let width = json["media"]["width_px"].as_f64().unwrap_or(-1.0);
+        assert!(
+            width > 0.0,
+            "continuous D1 should report content-estimated width_px, got {width}"
+        );
+        let height = json["media"]["height_px"].as_f64().unwrap_or(0.0);
+        assert!(height > 0.0, "tape head axis should be sized, got {height}");
+        let html = json["labels"][0]["html"].as_str().unwrap();
+        assert!(
+            html.contains("lbl-stock"),
+            "LabelManager should still pad laminate head gaps"
+        );
+        assert!(
+            !html.contains("width:0.00px"),
+            "must not clip continuous content in a 0-wide stock print box"
+        );
+        assert!(
+            html.contains("--lbl-feed-px:") && html.contains("white-space:nowrap"),
+            "continuous head-fit text should pin feed estimate and nowrap"
+        );
+    }
+
+    #[tokio::test]
     async fn preview_returns_labels() {
         let app = router(test_state());
         let resp = app
