@@ -865,8 +865,9 @@ fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
 ///
 /// A non-positive content size on the feed axis means continuous / content-sized
 /// media: that axis stays `0` in the returned frame (Studio sizes it from the
-/// viewport). Feed lead/end margins are only baked in once content length is
-/// known — otherwise stock framing collapses to margins-only and clips text.
+/// viewport / `--lbl-feed-px`). Head-to-cutter lead/end margins from
+/// [`PrinterCapabilities`] are still applied as stock padding so the preview
+/// matches real cut gaps (same DX rule as Labelle / [`pad_preview_encode_feed`]).
 pub fn preview_stock_frame(
     content_width_px: f64,
     content_height_px: f64,
@@ -895,22 +896,13 @@ pub fn preview_stock_frame(
     } else {
         content_height_px.round().max(0.0) as u32
     };
-    // Raster preview adds feed margins after Chromium measures content. Vector
-    // HTML cannot measure yet — keep the feed axis open instead of framing
-    // lead+end around a 0-wide (or 0-tall) printable box.
-    let (lead_feed, end_margin, cutter_gap, content_feed_end) = if content_feed == 0 {
-        (0, 0, 0, 0)
+    let (lead_feed, end_margin, cutter_gap) = preview_feed_margins(caps, layout_dpi);
+    // Unknown continuous length: leave feed axis open (0). Known length: bake
+    // lead+end into the stock box. Margins themselves always come from caps.
+    let content_feed_end = if content_feed > 0 {
+        lead_feed + content_feed
     } else {
-        let dx = feed_margin_px(caps.feed_trail_mm, layout_dpi);
-        let explicit_lead = feed_margin_px(caps.feed_lead_mm, layout_dpi);
-        let (lead_feed, end_margin, cutter_gap) = if explicit_lead > 0 {
-            (explicit_lead, 0, dx)
-        } else if dx > 0 {
-            (dx, dx, dx)
-        } else {
-            (0, 0, 0)
-        };
-        (lead_feed, end_margin, cutter_gap, lead_feed + content_feed)
+        0
     };
 
     let (width_px, height_px) = if head_along_height {
@@ -1161,6 +1153,23 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
         .unwrap_or(0)
 }
 
+/// Lead / end / cutter-gap along feed for preview (matches [`pad_preview_encode_feed`]).
+///
+/// When only [`PrinterCapabilities::feed_trail_mm`] is set, the head-to-cutter
+/// distance is used as both lead and end so the preview shows the same blank
+/// tape Labelle draws for DX on each side of the payload.
+fn preview_feed_margins(caps: &PrinterCapabilities, dpi: f64) -> (u32, u32, u32) {
+    let dx = feed_margin_px(caps.feed_trail_mm, dpi);
+    let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
+    if explicit_lead > 0 {
+        (explicit_lead, 0, dx)
+    } else if dx > 0 {
+        (dx, dx, dx)
+    } else {
+        (0, 0, 0)
+    }
+}
+
 /// Feed-axis padding applied to a preview raster.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewFeedPad {
@@ -1190,15 +1199,7 @@ pub fn pad_preview_encode_feed(
     use image::{imageops, Rgba};
 
     let dpi = caps.dpi.0;
-    let dx = feed_margin_px(caps.feed_trail_mm, dpi);
-    let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
-    let (preview_lead, end_margin, cutter_gap) = if explicit_lead > 0 {
-        (explicit_lead, 0, dx)
-    } else if dx > 0 {
-        (dx, dx, dx)
-    } else {
-        (0, 0, 0)
-    };
+    let (preview_lead, end_margin, cutter_gap) = preview_feed_margins(caps, dpi);
 
     let content_feed = if feed_along_width {
         image.width()
@@ -1769,6 +1770,7 @@ mod tests {
         };
         let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
         let frame = preview_stock_frame(0.0, content_h, &media, &caps, true, VECTOR_CSS_DPI);
+        let dx = feed_margin_px(caps.feed_trail_mm, VECTOR_CSS_DPI);
         assert_eq!(
             frame.width_px, 0.0,
             "continuous feed must stay open (not margins-only)"
@@ -1777,8 +1779,19 @@ mod tests {
             frame.height_px > content_h,
             "12 mm stock should pad the 8.2 mm printable band"
         );
-        assert_eq!(frame.lead_feed_px, 0);
-        assert_eq!(frame.feed_end_margin_px, 0);
+        assert_eq!(
+            frame.lead_feed_px, dx,
+            "open continuous feed still shows head-to-cutter lead"
+        );
+        assert_eq!(
+            frame.feed_end_margin_px, dx,
+            "open continuous feed still shows matching end margin"
+        );
+        assert_eq!(frame.trail_feed_px, dx);
+        assert_eq!(
+            frame.content_feed_end_px, 0,
+            "content end is unknown until feed length is measured"
+        );
         assert!(frame.head_pad_before_px > 0 || frame.head_pad_after_px > 0);
 
         let framed = frame_html_preview_stock(
@@ -1794,7 +1807,13 @@ mod tests {
             framed.contains("width:max-content"),
             "open feed axis must size to content, got: {framed}"
         );
-        assert!(framed.contains(&format!("padding:{}px", frame.head_pad_before_px)));
+        assert!(
+            framed.contains(&format!(
+                "padding:{}px {}px {}px {}px",
+                frame.head_pad_before_px, dx, frame.head_pad_after_px, dx
+            )),
+            "stock must pad head laminate and feed DX gaps, got: {framed}"
+        );
     }
 
     #[test]
