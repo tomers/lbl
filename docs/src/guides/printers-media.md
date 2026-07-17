@@ -72,14 +72,6 @@ thermal head at 203 dpi, so labels are 96 dots wide regardless of tape width.
 Their die-cut tape sizes (`12x40`, `12x30`, `15x30`, …) ship in the bundled
 catalog under the `NIIMBOT` brand.
 
-> **Known limitation (feed pitch):** Catalog DPI is isotropic (one `dpi` for
-> head and feed). On a measured D110 with true ~30 mm 15×30 stock, ink spans
-> along the feed print ~7% shorter than the mm implied by 203 dpi (effective
-> feed pitch ≈ 217 dpi). Preview content bounds in *dots* match the bitmap;
-> absolute feed-axis millimeters use catalog DPI. A future optional `feed_dpi`
-> (defaulting to `dpi`) would fix render row counts and mm readouts without
-> breaking the 96-dot head. Until then, treat feed-axis mm as nominal.
-
 ```bash
 lbl-catalog compatible --printer "D110"
 # Print over USB cable (serial / CDC-ACM, B-series only):

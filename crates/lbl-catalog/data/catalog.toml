@@ -2476,13 +2476,13 @@ connections = [
 # NIIMBOT models read RFID on official rolls (size / remaining). Keep
 # `reports_media = true` so Studio live status can resolve loaded media.
 
-# D110 head axis matches ~203 dpi (96 dots / 12 mm). Feed-axis pitch on
-# measured hardware is denser (~217 dpi): a 30 mm job at catalog dpi prints
-# ~7% short along feed on true ~30 mm die-cuts. Catalog keeps isotropic 203
-# until optional `feed_dpi` exists — do not raise `dpi` or head math breaks.
+# Pocket D-series (D11 / D11S / D110) share a 12 mm (96-dot) head at 203 dpi
+# and the same media SKUs, but advertise distinct BLE name prefixes and report
+# distinct numeric model ids — keep them as separate catalog entries so pairing
+# does not collapse D11 into D110 (or the reverse).
 [[printers]]
 brand           = "NIIMBOT"
-keys            = ["D110", "D11", "D11S"]
+keys            = ["D110"]
 name            = "NIIMBOT D110"
 protocol        = "niimbot"
 maturity        = "verified"
@@ -2491,7 +2491,33 @@ max_width_mm    = 12.0
 reports_media   = true
 default_media   = "12x40"
 supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D110" }, { kind = "ble", name = "D11S" }, { kind = "ble", name = "D11" }]
+connections     = [{ kind = "ble", name = "D110" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["D11"]
+name            = "NIIMBOT D11"
+protocol        = "niimbot"
+maturity        = "verified"
+dpi             = 203.0
+max_width_mm    = 12.0
+reports_media   = true
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "D11" }]
+
+[[printers]]
+brand           = "NIIMBOT"
+keys            = ["D11S"]
+name            = "NIIMBOT D11S"
+protocol        = "niimbot"
+maturity        = "supported"
+dpi             = 203.0
+max_width_mm    = 12.0
+reports_media   = true
+default_media   = "12x40"
+supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
+connections     = [{ kind = "ble", name = "D11S" }]
 
 # Thermal-transfer pocket / mid-size: ribbon + label required. Encode uses `b1`
 # task (niimbluelib modelPrintTasks: N1 + M2_H; B18/B18S geometric siblings of N1).
