@@ -287,6 +287,27 @@ mod tests {
             html.contains("--lbl-feed-px:") && html.contains("white-space:nowrap"),
             "continuous head-fit text should pin feed estimate and nowrap"
         );
+        let label = &json["labels"][0];
+        let lead = label["feed_lead_px"].as_u64().unwrap_or(0);
+        let end_margin = label["feed_end_margin_px"].as_u64().unwrap_or(0);
+        assert!(
+            lead > 0 && end_margin > 0,
+            "LabelManager feed_trail_mm should show symmetric head-to-cutter gaps, got lead={lead} end={end_margin}"
+        );
+        assert!(
+            label["content_feed_end_px"].as_u64().unwrap_or(0) > lead,
+            "content end marker should sit after lead + estimated payload"
+        );
+        assert!(
+            html.contains(&format!(
+                "padding:{}px {}px {}px {}px",
+                label["head_pad_before_px"].as_u64().unwrap_or(0),
+                end_margin,
+                label["head_pad_after_px"].as_u64().unwrap_or(0),
+                lead
+            )),
+            "expected feed+head padding lead={lead} end={end_margin} in stock CSS, got: {html}"
+        );
     }
 
     #[tokio::test]
