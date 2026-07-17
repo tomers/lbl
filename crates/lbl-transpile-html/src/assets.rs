@@ -62,16 +62,28 @@ html,body{margin:0;padding:0}
 .lbl-label{display:flex;flex-direction:column}
 .lbl-row{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center}
 .lbl-row>.lbl-text{flex:1 1 auto;min-width:0}
-.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>.lbl-col{flex:0 0 auto;min-width:0}
-.lbl-row>.lbl-col{flex:1 1 auto}
+.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>.lbl-col,.lbl-row>.lbl-slot{flex:0 0 auto;min-width:0}
+.lbl-row>.lbl-col,.lbl-row>.lbl-slot{flex:1 1 auto}
 .lbl-row .lbl-barcode{width:auto;height:auto}
 .lbl-row .lbl-barcode svg{display:block;width:auto;max-width:none;height:auto}
 .lbl-row .lbl-qr svg{display:block;width:100%;height:100%;object-fit:contain}
 .lbl-col{display:flex;flex-direction:column}
+.lbl-slot{flex:1 1 auto;min-width:0;min-height:1em}
 .lbl-center{align-items:center;justify-content:center}
 .lbl-between{justify-content:space-between}
+.lbl-justify-start{justify-content:flex-start}
+.lbl-justify-center{justify-content:center}
+.lbl-justify-end{justify-content:flex-end}
+.lbl-justify-between{justify-content:space-between}
+.lbl-justify-around{justify-content:space-around}
+.lbl-justify-evenly{justify-content:space-evenly}
+.lbl-items-start{align-items:flex-start}
+.lbl-items-center{align-items:center}
+.lbl-items-end{align-items:flex-end}
+.lbl-items-stretch{align-items:stretch}
 .lbl-grow{flex:1 1 auto}
 .lbl-wrap{flex-wrap:wrap}
+.lbl-frame{border:1px solid currentColor;padding:0.5em;box-sizing:border-box}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
 .lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
@@ -280,3 +292,39 @@ pub const BARCODE_INIT_JS: &str = r#"
   if(document.readyState!=='loading'){render();}else{document.addEventListener('DOMContentLoaded',render);}
 })();
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::BASE_CSS;
+
+    #[test]
+    fn base_css_includes_justify_and_items_modifiers() {
+        for class in [
+            "lbl-justify-start",
+            "lbl-justify-center",
+            "lbl-justify-end",
+            "lbl-justify-between",
+            "lbl-justify-around",
+            "lbl-justify-evenly",
+            "lbl-items-start",
+            "lbl-items-center",
+            "lbl-items-end",
+            "lbl-items-stretch",
+        ] {
+            assert!(BASE_CSS.contains(class), "BASE_CSS missing .{class}");
+        }
+    }
+
+    #[test]
+    fn base_css_includes_slot_and_frame() {
+        assert!(BASE_CSS.contains(".lbl-slot{"));
+        assert!(BASE_CSS.contains(".lbl-frame{"));
+        assert!(BASE_CSS.contains(".lbl-row>.lbl-slot"));
+    }
+
+    #[test]
+    fn base_css_keeps_legacy_center_and_between() {
+        assert!(BASE_CSS.contains(".lbl-center{"));
+        assert!(BASE_CSS.contains(".lbl-between{"));
+    }
+}

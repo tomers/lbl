@@ -3,7 +3,8 @@
 //! Authoring HTML uses compact custom concepts:
 //! - `<qr>PAYLOAD</qr>` — a QR code
 //! - `<barcode type="CODE128">DATA</barcode>` — a barcode
-//! - flex utility classes (`lbl-row`, `lbl-col`, `lbl-center`, `lbl-grow`, ...)
+//! - flex utility classes (`lbl-row`, `lbl-col`, `lbl-center`, `lbl-grow`,
+//!   `lbl-justify-*`, `lbl-items-*`, `lbl-slot`, ...)
 //!
 //! Transpilation rewrites those custom elements into placeholder `<div>`s,
 //! injects the flex/base CSS, and pulls in the third-party JS libraries that
