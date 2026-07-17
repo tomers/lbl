@@ -698,12 +698,13 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         // Interactive Studio preview: pad printable HTML out to physical stock so
         // head/feed gaps match the raster preview gallery. Print-geometry capture
         // stays printable-only for client encode.
-        let (html, width_px, height_px, stock) = if print_geometry {
+        let (html, width_px, height_px, stock, content_feed_end_px) = if print_geometry {
             (
                 transpiled.html,
                 transpiled.width_px,
                 transpiled.height_px,
                 None,
+                0u32,
             )
         } else {
             let stock = preview_stock_frame(
@@ -715,14 +716,25 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 layout_dpi,
             );
             let html = frame_html_preview_stock(&transpiled.html, &stock);
-            // Continuous feed: content head-fit pins `.lbl-label{min-width}` so
+            // Continuous feed: content head-fit pins `.lbl-label{--lbl-feed-px}` so
             // Studio can size the iframe without measuring opaque sandbox docs.
-            let width_px = if stock.width_px > 0.0 {
-                stock.width_px
+            // Include stock lead/end so the estimate matches the padded tape.
+            let (width_px, content_feed_end_px) = if stock.width_px > 0.0 {
+                (stock.width_px, stock.content_feed_end_px)
+            } else if let Some(content_feed) = injected_label_min_width_px(&html) {
+                let feed = content_feed + f64::from(stock.lead_feed_px + stock.feed_end_margin_px);
+                let content_end = stock.lead_feed_px + content_feed.round().max(0.0) as u32;
+                (feed, content_end)
             } else {
-                injected_label_min_width_px(&html).unwrap_or(0.0)
+                (0.0, stock.content_feed_end_px)
             };
-            (html, width_px, stock.height_px, Some(stock))
+            (
+                html,
+                width_px,
+                stock.height_px,
+                Some(stock),
+                content_feed_end_px,
+            )
         };
         let mut label_json = json!({
             "index": label.index,
@@ -738,8 +750,10 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
             }
             if stock.lead_feed_px > 0 || stock.trail_feed_px > 0 {
-                label_json["content_feed_end_px"] =
-                    serde_json::Value::from(stock.content_feed_end_px);
+                if content_feed_end_px > 0 {
+                    label_json["content_feed_end_px"] =
+                        serde_json::Value::from(content_feed_end_px);
+                }
                 label_json["feed_trail_px"] = serde_json::Value::from(stock.trail_feed_px);
                 if stock.feed_end_margin_px > 0 {
                     label_json["feed_end_margin_px"] =
