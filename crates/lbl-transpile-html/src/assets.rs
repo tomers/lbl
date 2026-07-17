@@ -74,6 +74,41 @@ html,body{margin:0;padding:0}
 .lbl-label p,.lbl-label li{font-size:1em}
 "#;
 
+/// Higher-specificity flex utilities on `.lbl-label` so authoring classes win
+/// over Fill-mode `label_align` / `label_valign` rules (inject after those).
+pub const LABEL_FLEX_OVERRIDE_CSS: &str = r#"
+.lbl-label.lbl-justify-start{justify-content:flex-start}
+.lbl-label.lbl-justify-center{justify-content:center}
+.lbl-label.lbl-justify-end{justify-content:flex-end}
+.lbl-label.lbl-justify-between{justify-content:space-between}
+.lbl-label.lbl-justify-around{justify-content:space-around}
+.lbl-label.lbl-justify-evenly{justify-content:space-evenly}
+.lbl-label.lbl-items-start{align-items:flex-start}
+.lbl-label.lbl-items-center{align-items:center}
+.lbl-label.lbl-items-end{align-items:flex-end}
+.lbl-label.lbl-items-stretch{align-items:stretch}
+"#;
+
+/// CSS injected for Fill-mode so a lone flex row/col spans the label width.
+///
+/// Width is stretched (`align-self` + `width:100%`) so nested `lbl-justify-*`
+/// runs across the full label. Height stays content-sized (`flex-grow:0`) so
+/// `.lbl-label` `lbl-justify-*` can still center/place the block vertically —
+/// forcing `height:100%` made the child fill the label and turned outer
+/// justify into a no-op (inner `lbl-items-*` then looked like it “owned” the
+/// label).
+pub const LABEL_FIT_ROW_CSS: &str = r#"
+.lbl-label>.lbl-row:only-child,
+.lbl-label>.lbl-col:only-child{
+  flex:0 1 auto;
+  align-self:stretch;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  box-sizing:border-box;
+}
+"#;
+
 /// CSS injected when [`LabelFit::Fill`] is active: stretch the document to the
 /// render viewport. Fit-box size, scale, and alignment are set at transpile time.
 pub const LABEL_FIT_FILL_CSS: &str = r#"
@@ -305,5 +340,23 @@ mod tests {
     fn base_css_keeps_legacy_center_and_between() {
         assert!(BASE_CSS.contains(".lbl-center{"));
         assert!(BASE_CSS.contains(".lbl-between{"));
+    }
+
+    #[test]
+    fn fill_row_css_stretches_lone_flex_child() {
+        use super::LABEL_FIT_ROW_CSS;
+        assert!(LABEL_FIT_ROW_CSS.contains("align-self:stretch"));
+        assert!(LABEL_FIT_ROW_CSS.contains("width:100%"));
+        assert!(LABEL_FIT_ROW_CSS.contains("flex:0 1 auto"));
+        assert!(!LABEL_FIT_ROW_CSS.contains("height:100%"));
+        assert!(LABEL_FIT_ROW_CSS.contains(".lbl-label>.lbl-row:only-child"));
+        assert!(LABEL_FIT_ROW_CSS.contains(".lbl-label>.lbl-col:only-child"));
+    }
+
+    #[test]
+    fn label_flex_override_targets_lbl_label_modifiers() {
+        use super::LABEL_FLEX_OVERRIDE_CSS;
+        assert!(LABEL_FLEX_OVERRIDE_CSS.contains(".lbl-label.lbl-justify-center"));
+        assert!(LABEL_FLEX_OVERRIDE_CSS.contains(".lbl-label.lbl-items-stretch"));
     }
 }

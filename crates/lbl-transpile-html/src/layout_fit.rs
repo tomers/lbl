@@ -28,13 +28,8 @@ static DATA_WIDTH_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"\bdata-width\s*=\s*"(\d+)""#).expect("data-width regex"));
 
 /// CSS injected for Fill-mode rows so flex children share the label box.
-pub const LABEL_FIT_ROW_CSS: &str = r#"
-.lbl-label>.lbl-row:only-child{
-  flex:1 1 auto;
-  width:100%;
-  height:100%;
-  min-height:0;
-}
+/// Stretch rules live in [`crate::assets::LABEL_FIT_ROW_CSS`] (always on in Fill).
+pub const LABEL_FIT_ROW_CHILD_CSS: &str = r#"
 .lbl-row>.lbl-text{
   flex:0 0 auto;
   min-width:0;
@@ -102,7 +97,7 @@ pub fn apply_layout_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
     }
 
     let gap = opts.style.element_gap_px.max(0.0);
-    let mut css = String::from(LABEL_FIT_ROW_CSS);
+    let mut css = String::from(LABEL_FIT_ROW_CHILD_CSS);
 
     let result = if children.len() == 1 {
         fit_lone(&children[0], body, box_w, box_h, opts)
@@ -745,12 +740,38 @@ fn qr_explicit_width(attrs: &str, default: f64) -> f64 {
 
 fn label_inner(body: &str) -> Option<&str> {
     let body = body.trim();
-    const OPEN: &str = r#"<div class="lbl-label">"#;
+    let open_end = label_open_tag_end(body)?;
     const CLOSE: &str = "</div>";
-    if !body.starts_with(OPEN) || !body.ends_with(CLOSE) {
+    if !body.ends_with(CLOSE) {
         return None;
     }
-    Some(body[OPEN.len()..body.len() - CLOSE.len()].trim())
+    Some(body[open_end..body.len() - CLOSE.len()].trim())
+}
+
+/// End offset of a root `<div … class="…lbl-label…">` opening tag.
+fn label_open_tag_end(body: &str) -> Option<usize> {
+    if body.as_bytes().first().is_none_or(|b| *b != b'<') {
+        return None;
+    }
+    if !body[1..].starts_with("div") && !body[1..].starts_with("DIV") {
+        return None;
+    }
+    let gt = body.find('>')?;
+    let open = &body[..=gt];
+    let class = class_attr_value(open)?;
+    if class.split_whitespace().any(|c| c == "lbl-label") {
+        Some(gt + 1)
+    } else {
+        None
+    }
+}
+
+fn class_attr_value(open_tag: &str) -> Option<&str> {
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r#"\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')"#).expect("class attr regex")
+    });
+    let caps = RE.captures(open_tag)?;
+    caps.get(1).or_else(|| caps.get(2)).map(|m| m.as_str())
 }
 
 #[derive(Debug, Clone)]
@@ -1027,7 +1048,6 @@ mod tests {
             fit.css
         );
         assert!(fit.body.contains("data-fit-width="), "{}", fit.body);
-        assert!(fit.css.contains("lbl-row:only-child"), "{}", fit.css);
         assert!(
             fit.css
                 .contains(".lbl-row>.lbl-barcode:nth-child(2){width:"),
