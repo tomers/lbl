@@ -1241,6 +1241,28 @@ mod tests {
             .lookup_by_product_id("02282280")
             .unwrap()
             .matches_key("15x30"));
+        // EAN from a physical D11 15x50 roll (retail NB107 / NIIMBOT.UK).
+        assert!(catalog
+            .lookup_by_product_id("6972842743596")
+            .unwrap()
+            .matches_key("15x50"));
+        assert!(catalog.supports_media("D11", "15x50"));
+        // Official white D-series EAN block (NIIMBOT.UK / getCloudTemplateByOneCode).
+        assert!(catalog
+            .lookup_by_product_id("6972842743558")
+            .unwrap()
+            .matches_key("12x22"));
+        assert!(catalog
+            .lookup_by_product_id("6972842743572")
+            .unwrap()
+            .matches_key("12x40"));
+        assert!(catalog
+            .lookup_by_product_id("6972842743589")
+            .unwrap()
+            .matches_key("15x30"));
+        assert!(catalog.supports_media("D11", "15x26"));
+        assert!(catalog.supports_media("D11", "14x40"));
+        assert!(catalog.supports_media("D101", "25x50"));
     }
 
     #[test]
