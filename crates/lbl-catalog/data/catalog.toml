@@ -721,19 +721,35 @@ media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "
 
 # --- NIIMBOT D-series die-cut thermal labels --------------------------------
 #
-# D11/D110-family printers use a 12 mm (96-dot) thermal head at 203 dpi. Tape
-# is sold by physical size; the keys below are the WxL dimensions in mm.
-# `media.width_mm` is the physical stock width across the head. When that is
-# wider than the printer's `max_width_mm` (12 mm), layout/encode clamp to the
-# head and preview pads the unprintable side gaps. Dimensions sourced from
-# NIIMBOT product listings (https://www.niimbot.com/).
+# Geometries and RFID/EAN `product_ids` from NIIMBOT.UK / NIIMBOT.CO.ZA
+# D11/D101/D110/H1S listings, cross-checked with
+# print.niimbot.com `getCloudTemplateByOneCode`. Keys are physical WxL mm
+# (width across head × length along feed). Stock wider than a printer's
+# `max_width_mm` remains listed when sold for that family; encode/preview
+# clamp to the head and pad unprintable side gaps.
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["6x22", "niimbot-6x22"]
+name         = "NIIMBOT 6x22mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977031213607"]
+media        = { width_mm = 6.0, length = { kind = "fixed", mm = 22.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["10x25", "niimbot-10x25"]
+name         = "NIIMBOT 10x25mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["06172303"]
+media        = { width_mm = 10.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "NIIMBOT"
 keys         = ["12x22", "niimbot-12x22"]
 name         = "NIIMBOT 12x22mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T12X22-260", "06202203"]
+product_ids  = ["T12X22-260", "06202203", "6972842743558"]
 media        = { width_mm = 12.0, length = { kind = "fixed", mm = 22.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
@@ -741,28 +757,20 @@ brand        = "NIIMBOT"
 keys         = ["12x30", "niimbot-12x30"]
 name         = "NIIMBOT 12x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T12X30-210"]
+product_ids  = ["T12X30-210", "6972842743565"]
 media        = { width_mm = 12.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "NIIMBOT"
 keys         = ["12x40", "niimbot-12x40"]
-name         = "NIIMBOT 12x40mm White Thermal Labels (D110 default roll)"
+name         = "NIIMBOT 12x40mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T12X40-210"]
+product_ids  = ["T12X40-210", "6972842743572"]
 media        = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "NIIMBOT"
-keys         = ["12x50", "niimbot-12x50"]
-name         = "NIIMBOT 12x50mm White Thermal Labels (D-series)"
-purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T12X50-180"]
-media        = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "NIIMBOT"
-keys         = ["12x40-clear", "niimbot-12x40-transparent"]
+keys         = ["12x40-clear", "niimbot-12x40-clear", "niimbot-12x40-transparent"]
 name         = "NIIMBOT 12x40mm Transparent Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
 product_ids  = ["T12X40-C"]
@@ -770,21 +778,331 @@ media        = { width_mm = 12.0, length = { kind = "fixed", mm = 40.0 }, materi
 
 [[entries]]
 brand        = "NIIMBOT"
+keys         = ["12x50", "niimbot-12x50"]
+name         = "NIIMBOT 12x50mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T12X50-180", "6971501225404"]
+media        = { width_mm = 12.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["12x75", "niimbot-12x75"]
+name         = "NIIMBOT 12x75mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["06172332"]
+media        = { width_mm = 12.0, length = { kind = "fixed", mm = 75.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["12.5x64", "niimbot-12.5x64"]
+name         = "NIIMBOT 12.5x64mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["06172334"]
+media        = { width_mm = 12.5, length = { kind = "fixed", mm = 64.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["12.5x74", "niimbot-12.5x74"]
+name         = "NIIMBOT 12.5x74mm Cable Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6972842743787"]
+media        = { width_mm = 12.5, length = { kind = "fixed", mm = 74.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["13x35", "niimbot-13x35"]
+name         = "NIIMBOT 13x35mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6975746633697"]
+media        = { width_mm = 13.0, length = { kind = "fixed", mm = 35.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x22", "niimbot-14x22"]
+name         = "NIIMBOT 14x22mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6942639208690"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 22.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x25", "niimbot-14x25"]
+name         = "NIIMBOT 14x25mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["03032211", "6942639215131"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x25-clear", "niimbot-14x25-clear"]
+name         = "NIIMBOT 14x25mm Transparent Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6972842743848"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 25.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x28", "niimbot-14x28"]
+name         = "NIIMBOT 14x28mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["08112116"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 28.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
 keys         = ["14x30", "niimbot-14x30"]
 name         = "NIIMBOT 14x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T14X30-210"]
+product_ids  = ["T14X30-210", "6977031213713"]
 media        = { width_mm = 14.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
-# The physical D110 15x30 RFID tag emits the numeric barcode "02282280";
-# "T15X30-200" is the printed pack code, not what the tag reports.
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x30-clear", "niimbot-14x30-clear"]
+name         = "NIIMBOT 14x30mm Transparent Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6978642803607"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 30.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x35", "niimbot-14x35"]
+name         = "NIIMBOT 14x35mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["06172317"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 35.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x40", "niimbot-14x40"]
+name         = "NIIMBOT 14x40mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977031217308"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x40-clear", "niimbot-14x40-clear"]
+name         = "NIIMBOT 14x40mm Transparent Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6972842743831"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 40.0 }, material = "polypropylene", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x44", "niimbot-14x44"]
+name         = "NIIMBOT 14x44mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977388399443"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 44.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x50", "niimbot-14x50"]
+name         = "NIIMBOT 14x50mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6972842743541"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x54", "niimbot-14x54"]
+name         = "NIIMBOT 14x54mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6942639211232"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 54.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["15x26", "niimbot-15x26"]
+name         = "NIIMBOT 15x26mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6975746637855"]
+media        = { width_mm = 15.0, length = { kind = "fixed", mm = 26.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
 [[entries]]
 brand        = "NIIMBOT"
 keys         = ["15x30", "niimbot-15x30"]
 name         = "NIIMBOT 15x30mm White Thermal Labels (D-series)"
 purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T15X30-200", "02282280"]
+product_ids  = ["T15X30-200", "02282280", "6972842743589"]
 media        = { width_mm = 15.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["15x40", "niimbot-15x40"]
+name         = "NIIMBOT 15x40mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["06242120"]
+media        = { width_mm = 15.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["15x50", "niimbot-15x50"]
+name         = "NIIMBOT 15x50mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T15X50-125", "6972842743596"]
+media        = { width_mm = 15.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["20x45", "niimbot-20x45"]
+name         = "NIIMBOT 20x45mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6971501227873", "6977031213928"]
+media        = { width_mm = 20.0, length = { kind = "fixed", mm = 45.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["20x75", "niimbot-20x75"]
+name         = "NIIMBOT 20x75mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6975746636988"]
+media        = { width_mm = 20.0, length = { kind = "fixed", mm = 75.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["24x40", "niimbot-24x40"]
+name         = "NIIMBOT 24x40mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T24X40-180"]
+media        = { width_mm = 24.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x25", "niimbot-25x25"]
+name         = "NIIMBOT 25x25mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6975746637176"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 25.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x32", "niimbot-25x32"]
+name         = "NIIMBOT 25x32mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977031217490"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 32.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x35", "niimbot-25x35"]
+name         = "NIIMBOT 25x35mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977031215021"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 35.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x38", "niimbot-25x38"]
+name         = "NIIMBOT 25x38mm Cable Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["12222122", "6942639214486"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 38.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x43", "niimbot-25x43"]
+name         = "NIIMBOT 25x43mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977388397029"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 43.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x50", "niimbot-25x50"]
+name         = "NIIMBOT 25x50mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["6977031214024"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 50.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["14x60", "niimbot-14x60"]
+name         = "NIIMBOT 14x60mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T14X60"]
+media        = { width_mm = 14.0, length = { kind = "fixed", mm = 60.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["20x30", "niimbot-20x30"]
+name         = "NIIMBOT 20x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T20X30"]
+media        = { width_mm = 20.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["20x40", "niimbot-20x40"]
+name         = "NIIMBOT 20x40mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T20X40"]
+media        = { width_mm = 20.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["22x30", "niimbot-22x30"]
+name         = "NIIMBOT 22x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T22X30"]
+media        = { width_mm = 22.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["22x42", "niimbot-22x42"]
+name         = "NIIMBOT 22x42mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T22X42"]
+media        = { width_mm = 22.0, length = { kind = "fixed", mm = 42.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x30", "niimbot-25x30"]
+name         = "NIIMBOT 25x30mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X30"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x40", "niimbot-25x40"]
+name         = "NIIMBOT 25x40mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X40"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x42", "niimbot-25x42"]
+name         = "NIIMBOT 25x42mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X42"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 42.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x45", "niimbot-25x45"]
+name         = "NIIMBOT 25x45mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X45"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 45.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x60", "niimbot-25x60"]
+name         = "NIIMBOT 25x60mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X60"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 60.0 }, material = "paper", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "NIIMBOT"
+keys         = ["25x75", "niimbot-25x75"]
+name         = "NIIMBOT 25x75mm White Thermal Labels (D-series)"
+purchase_url = "https://www.niimbot.com/"
+product_ids  = ["T25X75"]
+media        = { width_mm = 25.0, length = { kind = "fixed", mm = 75.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 # --- NIIMBOT B1 die-cut thermal labels (48 mm print head @ 203 dpi) ---------
 #
@@ -1580,14 +1898,6 @@ name         = "NIIMBOT 70x40mm White Thermal Labels (B31)"
 purchase_url = "https://www.niimbot.com/"
 product_ids  = ["T70X40-180"]
 media        = { width_mm = 70.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "NIIMBOT"
-keys         = ["24x40", "niimbot-24x40"]
-name         = "NIIMBOT 24x40mm White Thermal Labels (D101)"
-purchase_url = "https://www.niimbot.com/"
-product_ids  = ["T24X40-180"]
-media        = { width_mm = 24.0, length = { kind = "fixed", mm = 40.0 }, material = "paper", adhesive = "permanent", color = "white" }
 
 # --- Known printers ----------------------------------------------------------
 #
@@ -2481,74 +2791,219 @@ connections = [
 # distinct numeric model ids — keep them as separate catalog entries so pairing
 # does not collapse D11 into D110 (or the reverse).
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D110"]
-name            = "NIIMBOT D110"
-protocol        = "niimbot"
-maturity        = "verified"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D110" }]
+brand = "NIIMBOT"
+keys = ["D110"]
+name = "NIIMBOT D110"
+protocol = "niimbot"
+maturity = "verified"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "D110" }]
 
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D11"]
-name            = "NIIMBOT D11"
-protocol        = "niimbot"
-maturity        = "verified"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D11" }]
+brand = "NIIMBOT"
+keys = ["D11"]
+name = "NIIMBOT D11"
+protocol = "niimbot"
+maturity = "verified"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "D11" }]
 
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D11S"]
-name            = "NIIMBOT D11S"
-protocol        = "niimbot"
-maturity        = "supported"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D11S" }]
+brand = "NIIMBOT"
+keys = ["D11S"]
+name = "NIIMBOT D11S"
+protocol = "niimbot"
+maturity = "supported"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "D11S" }]
 
 # Thermal-transfer pocket / mid-size: ribbon + label required. Encode uses `b1`
 # task (niimbluelib modelPrintTasks: N1 + M2_H; B18/B18S geometric siblings of N1).
 
 [[printers]]
 
-brand           = "NIIMBOT"
-keys            = ["B18", "B18S"]
-name            = "NIIMBOT B18"
-protocol        = "niimbot"
-maturity        = "experimental"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
+brand = "NIIMBOT"
+keys = ["B18", "B18S"]
+name = "NIIMBOT B18"
+protocol = "niimbot"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
 
 [[printers]]
 
-brand           = "NIIMBOT"
-keys            = ["N1"]
-name            = "NIIMBOT N1"
-protocol        = "niimbot"
-maturity        = "experimental"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "N1" }]
+brand = "NIIMBOT"
+keys = ["N1"]
+name = "NIIMBOT N1"
+protocol = "niimbot"
+maturity = "experimental"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "N1" }]
 
 [[printers]]
 
@@ -2575,17 +3030,65 @@ connections = [{ kind = "ble", name = "M2_H" }, { kind = "ble", name = "M2H" }, 
 reports_media = true
 
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D101"]
-name            = "NIIMBOT D101"
-protocol        = "niimbot"
-maturity        = "supported"
-dpi             = 203.0
-max_width_mm    = 24.0
-reports_media   = true
-default_media   = "24x40"
-supported_media = ["24x40", "12x22", "12x30", "12x40", "12x50", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D101" }]
+brand = "NIIMBOT"
+keys = ["D101"]
+name = "NIIMBOT D101"
+protocol = "niimbot"
+maturity = "supported"
+dpi = 203.0
+max_width_mm = 24.0
+reports_media = true
+default_media = "24x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+  "20x30",
+  "20x40",
+  "20x45",
+  "20x75",
+  "22x30",
+  "22x42",
+  "24x40",
+  "25x25",
+  "25x30",
+  "25x32",
+  "25x35",
+  "25x38",
+  "25x40",
+  "25x42",
+  "25x43",
+  "25x45",
+  "25x50",
+  "25x60",
+  "25x75",
+]
+connections = [{ kind = "ble", name = "D101" }]
 
 [[printers]]
 brand = "NIIMBOT"
@@ -2751,30 +3254,88 @@ supported_media = [
 connections = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
 
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D11_H", "D11H", "D11_PRO", "D11Pro"]
-name            = "NIIMBOT D11_H"
-protocol        = "niimbot"
-maturity        = "supported"
-dpi             = 300.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D11" }]
+brand = "NIIMBOT"
+keys = ["D11_H", "D11H", "D11_PRO", "D11Pro"]
+name = "NIIMBOT D11_H"
+protocol = "niimbot"
+maturity = "supported"
+dpi = 300.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "D11" }]
 
 [[printers]]
-brand           = "NIIMBOT"
-keys            = ["D110_M", "D110M"]
-name            = "NIIMBOT D110_M"
-protocol        = "niimbot"
-maturity        = "supported"
-dpi             = 203.0
-max_width_mm    = 12.0
-reports_media   = true
-default_media   = "12x40"
-supported_media = ["12x22", "12x30", "12x40", "12x50", "12x40-clear", "14x30", "15x30"]
-connections     = [{ kind = "ble", name = "D110" }]
+brand = "NIIMBOT"
+keys = ["D110_M", "D110M"]
+name = "NIIMBOT D110_M"
+protocol = "niimbot"
+maturity = "supported"
+dpi = 203.0
+max_width_mm = 12.0
+reports_media = true
+default_media = "12x40"
+supported_media = [
+  "6x22",
+  "10x25",
+  "12x22",
+  "12x30",
+  "12x40",
+  "12x40-clear",
+  "12x50",
+  "12x75",
+  "12.5x64",
+  "12.5x74",
+  "13x35",
+  "14x22",
+  "14x25-clear",
+  "14x25",
+  "14x28",
+  "14x30",
+  "14x30-clear",
+  "14x35",
+  "14x40-clear",
+  "14x40",
+  "14x44",
+  "14x50",
+  "14x54",
+  "14x60",
+  "15x26",
+  "15x30",
+  "15x40",
+  "15x50",
+]
+connections = [{ kind = "ble", name = "D110" }]
 
 [[printers]]
 brand = "NIIMBOT"
