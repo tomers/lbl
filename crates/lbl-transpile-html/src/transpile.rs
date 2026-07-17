@@ -730,6 +730,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
             opts.font_fit_scale.clamp(0.01, 5.0)
         ));
         head.push_str(assets::LABEL_FIT_FILL_CSS);
+        head.push_str(assets::LABEL_FIT_ROW_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
         head.push_str(assets::LABEL_FIT_ROW_TEXT_CSS);
         head.push_str(assets::LABEL_FIT_CODE_CSS);
@@ -748,6 +749,9 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
         opts.label_fit_scale,
         opts.media_inset,
     ));
+    // After label_align/valign so `.lbl-label.lbl-justify-*` / `.lbl-items-*`
+    // from the layout kit win when present on the root.
+    head.push_str(assets::LABEL_FLEX_OVERRIDE_CSS);
     if let Some(viewport) = &opts.viewport {
         head.push_str(&viewport.to_css(opts.mode, opts.label_fit));
     }
