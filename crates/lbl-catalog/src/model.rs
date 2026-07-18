@@ -226,6 +226,37 @@ impl Maturity {
     }
 }
 
+/// Manufacturer support links for a printer model.
+///
+/// Prefer [`product_url`] (model-specific drivers / manuals / FAQs) at display
+/// time; fall back to [`brand_url`] (brand support hub) when the manufacturer
+/// has no stable per-model support page.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct PrinterSupport {
+    /// Model-specific support page (drivers, manuals, FAQs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_url: Option<String>,
+    /// Brand-level support hub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brand_url: Option<String>,
+}
+
+impl PrinterSupport {
+    /// Whether both URL fields are unset.
+    pub fn is_empty(&self) -> bool {
+        self.product_url.is_none() && self.brand_url.is_none()
+    }
+
+    /// Preferred URL for UI: product page when set, otherwise brand hub.
+    pub fn primary_url(&self) -> Option<&str> {
+        self.product_url.as_deref().or(self.brand_url.as_deref())
+    }
+}
+
+fn support_is_empty(support: &PrinterSupport) -> bool {
+    support.is_empty()
+}
+
 /// A known printer model in the catalog.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrinterEntry {
@@ -297,6 +328,9 @@ pub struct PrinterEntry {
     /// (laminate / dead zones). Example: 8.2 mm on DYMO LabelManager.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_printable_height_mm: Option<f64>,
+    /// Optional manufacturer support links (product page and/or brand hub).
+    #[serde(default, skip_serializing_if = "support_is_empty")]
+    pub support: PrinterSupport,
 }
 
 impl PrinterEntry {
