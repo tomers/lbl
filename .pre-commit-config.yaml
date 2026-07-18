@@ -44,8 +44,9 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
-        files: \.(json|ya?ml|css|tsx?|jsx?|mjs|cjs)$
-        exclude: ^(\.markdownlint\.json|.*\.min\.js)$
+        # Match JSX/TS/CSS/config — not plain `.js` (vendored `*.min.js` UMD).
+        files: \.(json|ya?ml|css|tsx?|jsx|mjs|cjs)$
+        exclude: ^\.markdownlint\.json$
 
   - repo: https://github.com/ComPWA/taplo-pre-commit
     rev: v0.9.3
