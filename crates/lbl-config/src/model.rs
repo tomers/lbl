@@ -173,6 +173,10 @@ pub struct PrintConfig {
     pub copies: u32,
     /// Optional print density / heat (driver-specific).
     pub density: Option<u8>,
+    /// DYMO LW550 text vs graphics engine mode (`text` | `graphics`).
+    pub lw_output_mode: Option<String>,
+    /// DYMO LW550 feed speed (`normal` | `high`).
+    pub lw_speed: Option<String>,
     /// Dithering algorithm (`auto`, `floyd-steinberg`, `ordered`, `none`).
     pub dither: String,
     /// Default protocol (`dymo`, `niimbot`, `virtual`, …) when `--protocol` is
@@ -209,6 +213,8 @@ impl Default for PrintConfig {
             supports_cut: false,
             copies: 1,
             density: None,
+            lw_output_mode: None,
+            lw_speed: None,
             dither: "auto".into(),
             protocol: None,
             backend: "chromium".into(),

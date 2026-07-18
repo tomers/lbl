@@ -13,7 +13,8 @@
 //! ```text
 //! ESC s <job-id:u32>      start of print job
 //! [ESC L <lines:u32>]     continuous stock length (optional; early header)
-//! ESC h | ESC i           text (300×300) or graphics (300×600 feed) mode
+//! ESC h | ESC i           text or graphics engine mode (same 300 dpi raster)
+//! [ESC T <speed:u8>]      content type / speed (0x10 normal, 0x20 high)
 //! ESC C <duty:u8>         print density percent (0..=200; after mode)
 //! per label:
 //!   ESC n <index:u16>     set label index
@@ -30,9 +31,12 @@
 //! Multi-byte fields are little-endian. Raster rows are left-aligned on
 //! the physical print head (672 dots on 57 mm models; 1248 on the 5XL); the
 //! `ESC D` height field is always the full head width, not the media width.
-//! `lbl` renders at 300 dpi, so the job header uses text mode (`ESC h`), not
-//! graphics mode (`ESC i`, 300×600 along feed).
+//! Header order follows the Tech Ref: `s` → `[L]` → `h|i` → `[T]` → `C`.
+//! Graphics mode (`ESC i`) still uses a 300 dpi bitmap; it only changes
+//! engine print settings (quality vs speed). High speed (`ESC T 0x20`) is
+//! clamped to normal on the 5XL head (unsupported).
 
+use lbl_core::job::{LwOutputMode, LwSpeed};
 use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 use crate::ESC;
@@ -42,11 +46,18 @@ const START_JOB: u8 = b's';
 const SET_MAX_LENGTH: u8 = b'L';
 const SET_DENSITY: u8 = b'C';
 const TEXT_MODE: u8 = b'h';
+const GRAPHICS_MODE: u8 = b'i';
+const CONTENT_TYPE: u8 = b'T';
 const SET_LABEL_INDEX: u8 = b'n';
 const LABEL_DATA: u8 = b'D';
 const SHORT_FORM_FEED: u8 = b'G'; // feed next label into print position
 const FORM_FEED_TEAR: u8 = b'E'; // feed to tear position
 const END_JOB: u8 = b'Q';
+
+/// `ESC T` normal speed.
+const SPEED_NORMAL: u8 = 0x10;
+/// `ESC T` high speed (550 / Turbo only; roll-dependent).
+const SPEED_HIGH: u8 = 0x20;
 
 // `ESC D` fixed parameters.
 const BITS_PER_PIXEL: u8 = 0x01;
@@ -125,6 +136,22 @@ impl LabelWriter550Driver {
         }
         Ok(out)
     }
+
+    /// Emit `ESC T` only when high speed is requested (normal is the engine default).
+    ///
+    /// High speed is forced to normal on the 5XL head (Tech Ref: N/A).
+    fn append_speed(out: &mut Vec<u8>, speed: Option<LwSpeed>, head_dots: u32) {
+        match speed {
+            Some(LwSpeed::High) if head_dots != HEAD_DOTS_5XL => {
+                out.extend_from_slice(&[ESC, CONTENT_TYPE, SPEED_HIGH]);
+            }
+            Some(LwSpeed::High) => {
+                // Explicit clamp so callers that force high on 5XL still set a known mode.
+                out.extend_from_slice(&[ESC, CONTENT_TYPE, SPEED_NORMAL]);
+            }
+            Some(LwSpeed::Normal) | None => {}
+        }
+    }
 }
 
 impl Driver for LabelWriter550Driver {
@@ -161,7 +188,7 @@ impl Driver for LabelWriter550Driver {
 
         let mut out = Vec::with_capacity(bitmap.data.len() + 64);
 
-        // --- Print job header (Tech Ref order: s → [L] → h|i → C) ---
+        // --- Print job header (Tech Ref order: s → [L] → h|i → [T] → C) ---
         out.extend_from_slice(&[ESC, START_JOB]);
         out.extend_from_slice(&self.job_id.to_le_bytes());
         if continuous {
@@ -169,8 +196,15 @@ impl Driver for LabelWriter550Driver {
             out.extend_from_slice(&[ESC, SET_MAX_LENGTH]);
             out.extend_from_slice(&lines.to_le_bytes());
         }
-        // 300 dpi raster → text mode. Graphics mode (ESC i) expects 600 dpi feed.
-        out.extend_from_slice(&[ESC, TEXT_MODE]);
+        let output_mode = ctx.job.lw_output_mode.unwrap_or_default();
+        out.extend_from_slice(&[
+            ESC,
+            match output_mode {
+                LwOutputMode::Text => TEXT_MODE,
+                LwOutputMode::Graphics => GRAPHICS_MODE,
+            },
+        ]);
+        Self::append_speed(&mut out, ctx.job.lw_speed, head_dots);
         out.extend_from_slice(&[ESC, SET_DENSITY, density_percent(ctx.job.density)]);
 
         // --- One label per copy ---
@@ -223,7 +257,7 @@ mod tests {
         // ESC s <jobid=1 le>
         assert_eq!(&bytes[0..2], &[ESC, b's']);
         assert_eq!(&bytes[2..6], &[1, 0, 0, 0]);
-        // ESC h (300×300 text mode) then ESC C 100 (density) — Tech Ref order
+        // ESC h (text mode) then ESC C 100 (density) — Tech Ref order; no ESC T
         assert_eq!(&bytes[6..11], &[ESC, b'h', ESC, b'C', 100]);
         // ESC n <index=0 le16>
         assert_eq!(&bytes[11..13], &[ESC, b'n']);
@@ -239,6 +273,43 @@ mod tests {
         );
         assert_eq!(bytes[27], 0x80); // first row, first dot
         assert_eq!(bytes[27 + 84], 0x00); // second row blank
+    }
+
+    #[test]
+    fn graphics_mode_emits_esc_i() {
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities::default();
+        let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
+        job.lw_output_mode = Some(LwOutputMode::Graphics);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
+        assert_eq!(&bytes[6..11], &[ESC, b'i', ESC, b'C', 100]);
+    }
+
+    #[test]
+    fn high_speed_emits_esc_t() {
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities::default();
+        let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
+        job.lw_speed = Some(LwSpeed::High);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
+        assert_eq!(&bytes[6..14], &[ESC, b'h', ESC, b'T', 0x20, ESC, b'C', 100]);
+    }
+
+    #[test]
+    fn five_xl_clamps_high_speed_to_normal() {
+        let bmp = MonoBitmap::new(8, 1);
+        let caps = PrinterCapabilities {
+            max_width_mm: 104.0,
+            dpi: Dpi(300.0),
+            ..PrinterCapabilities::default()
+        };
+        let mut job = ctx_job(Media::fixed(104.0, 159.0, Dpi(300.0)), 1);
+        job.lw_speed = Some(LwSpeed::High);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
+        assert_eq!(&bytes[6..14], &[ESC, b'h', ESC, b'T', 0x10, ESC, b'C', 100]);
     }
 
     #[test]

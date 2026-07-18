@@ -58,6 +58,55 @@ impl CutMode {
     }
 }
 
+/// DYMO LabelWriter 550-series text vs graphics engine mode (`ESC h` / `ESC i`).
+///
+/// Both modes use the same 300 dpi raster; graphics mode asks the engine for
+/// settings tuned to barcodes/images (often slower). See the LW550 Tech Ref.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LwOutputMode {
+    /// Text-oriented engine settings (`ESC h`). Default.
+    #[default]
+    Text,
+    /// Barcode / graphics-oriented engine settings (`ESC i`).
+    Graphics,
+}
+
+impl LwOutputMode {
+    /// Parse a CLI/API-friendly name (`text`, `graphics`).
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "text" | "txt" => Some(Self::Text),
+            "graphics" | "graphic" | "barcode" | "barcodes" => Some(Self::Graphics),
+            _ => None,
+        }
+    }
+}
+
+/// DYMO LabelWriter 550-series feed speed (`ESC T`).
+///
+/// High speed is not available on the 5XL and is roll-dependent on 550 / Turbo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LwSpeed {
+    /// Normal speed (`ESC T 0x10`). Default.
+    #[default]
+    Normal,
+    /// High speed (`ESC T 0x20`).
+    High,
+}
+
+impl LwSpeed {
+    /// Parse a CLI/API-friendly name (`normal`, `high`).
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "normal" | "std" | "standard" => Some(Self::Normal),
+            "high" | "fast" => Some(Self::High),
+            _ => None,
+        }
+    }
+}
+
 /// A single print job: the media to print on and whether to cut afterward.
 ///
 /// The HTML/raster content is carried alongside this spec by each stage; this
@@ -81,6 +130,12 @@ pub struct JobSpec {
     /// omitted, each driver uses its own default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub density: Option<u8>,
+    /// DYMO LW550 text vs graphics engine mode. Ignored by other protocols.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lw_output_mode: Option<LwOutputMode>,
+    /// DYMO LW550 feed speed. Ignored by other protocols / unsupported chassis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lw_speed: Option<LwSpeed>,
 }
 
 fn one() -> u32 {
@@ -96,6 +151,8 @@ impl JobSpec {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
+            lw_output_mode: None,
+            lw_speed: None,
         }
     }
 }
@@ -121,5 +178,24 @@ mod tests {
         assert!(CutMode::Every.should_cut_after_copy(2, 3));
         assert!(!CutMode::End.should_cut_after_copy(0, 3));
         assert!(CutMode::End.should_cut_after_copy(2, 3));
+    }
+
+    #[test]
+    fn lw_output_mode_parse() {
+        assert_eq!(LwOutputMode::parse("text"), Some(LwOutputMode::Text));
+        assert_eq!(
+            LwOutputMode::parse("graphics"),
+            Some(LwOutputMode::Graphics)
+        );
+        assert_eq!(LwOutputMode::parse("barcode"), Some(LwOutputMode::Graphics));
+        assert_eq!(LwOutputMode::parse("bogus"), None);
+    }
+
+    #[test]
+    fn lw_speed_parse() {
+        assert_eq!(LwSpeed::parse("normal"), Some(LwSpeed::Normal));
+        assert_eq!(LwSpeed::parse("high"), Some(LwSpeed::High));
+        assert_eq!(LwSpeed::parse("fast"), Some(LwSpeed::High));
+        assert_eq!(LwSpeed::parse("bogus"), None);
     }
 }
