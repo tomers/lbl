@@ -173,10 +173,8 @@ pub struct PrintConfig {
     pub copies: u32,
     /// Optional print density / heat (driver-specific).
     pub density: Option<u8>,
-    /// DYMO LW550 text vs graphics engine mode (`text` | `graphics`).
-    pub lw_output_mode: Option<String>,
-    /// DYMO LW550 feed speed (`normal` | `high`).
-    pub lw_speed: Option<String>,
+    /// Protocol-specific defaults (`[print.driver.<protocol>]`).
+    pub driver: DriverPrintConfig,
     /// Dithering algorithm (`auto`, `floyd-steinberg`, `ordered`, `none`).
     pub dither: String,
     /// Default protocol (`dymo`, `niimbot`, `virtual`, …) when `--protocol` is
@@ -204,6 +202,148 @@ pub struct PrintConfig {
     pub export_mode: Option<String>,
 }
 
+/// Protocol-specific print defaults (`[print.driver]`).
+///
+/// Mirrors [`lbl_core::DriverOptions`]: each driver reads only its own bag.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct DriverPrintConfig {
+    /// DYMO LabelWriter 550-series defaults (`[print.driver.dymo]`).
+    pub dymo: DymoPrintConfig,
+}
+
+/// DYMO LabelWriter 550-series print defaults (`[print.driver.dymo]`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct DymoPrintConfig {
+    /// Text vs graphics engine mode (`text` | `graphics`).
+    pub output_mode: Option<String>,
+    /// Feed speed (`normal` | `high`).
+    pub speed: Option<String>,
+}
+
+impl DriverPrintConfig {
+    /// Overlay CLI `--driver-opt KEY=VALUE` entries (dotted paths under `driver`).
+    ///
+    /// Unknown bags or fields are rejected (`deny_unknown_fields` on the
+    /// round-trip deserialize). Later specs win when they set the same path.
+    pub fn with_opt_overrides<'a, I>(&self, specs: I) -> crate::Result<Self>
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        let mut value =
+            serde_json::to_value(self).map_err(|e| crate::ConfigError::Load(e.to_string()))?;
+        for spec in specs {
+            apply_driver_opt(&mut value, spec)?;
+        }
+        serde_json::from_value(value).map_err(|e| {
+            crate::ConfigError::Load(format!("invalid --driver-opt (unknown key or type): {e}"))
+        })
+    }
+}
+
+/// Apply one `KEY=VALUE` overlay onto a JSON object tree.
+fn apply_driver_opt(root: &mut serde_json::Value, spec: &str) -> crate::Result<()> {
+    let (key, raw_val) = spec.split_once('=').ok_or_else(|| {
+        crate::ConfigError::Load(format!(
+            "invalid --driver-opt '{spec}' (expected KEY=VALUE, e.g. dymo.output_mode=graphics)"
+        ))
+    })?;
+    let key = key.trim();
+    let raw_val = raw_val.trim();
+    if key.is_empty() {
+        return Err(crate::ConfigError::Load(format!(
+            "invalid --driver-opt '{spec}' (empty key)"
+        )));
+    }
+    let parts: Vec<&str> = key.split('.').filter(|p| !p.is_empty()).collect();
+    if parts.is_empty() {
+        return Err(crate::ConfigError::Load(format!(
+            "invalid --driver-opt '{spec}' (empty key)"
+        )));
+    }
+
+    let mut cur = root;
+    for (i, part) in parts.iter().enumerate() {
+        let is_leaf = i + 1 == parts.len();
+        if is_leaf {
+            let map = cur.as_object_mut().ok_or_else(|| {
+                crate::ConfigError::Load(format!(
+                    "invalid --driver-opt '{spec}' (path prefix is not an object)"
+                ))
+            })?;
+            map.insert(
+                (*part).to_string(),
+                serde_json::Value::String(raw_val.to_string()),
+            );
+            return Ok(());
+        }
+        if !cur.is_object() {
+            return Err(crate::ConfigError::Load(format!(
+                "invalid --driver-opt '{spec}' (path prefix is not an object)"
+            )));
+        }
+        let map = cur.as_object_mut().expect("checked is_object");
+        if !map.contains_key(*part) {
+            map.insert((*part).to_string(), serde_json::json!({}));
+        } else if !map.get(*part).is_some_and(|v| v.is_object()) {
+            return Err(crate::ConfigError::Load(format!(
+                "invalid --driver-opt '{spec}' (path prefix is not an object)"
+            )));
+        }
+        cur = map.get_mut(*part).expect("inserted or existing object");
+    }
+    Err(crate::ConfigError::Load(format!(
+        "invalid --driver-opt '{spec}' (empty key)"
+    )))
+}
+
+#[cfg(test)]
+mod driver_opt_tests {
+    use super::*;
+
+    #[test]
+    fn applies_known_dymo_fields() {
+        let cfg = DriverPrintConfig::default()
+            .with_opt_overrides(["dymo.output_mode=graphics", "dymo.speed=high"])
+            .unwrap();
+        assert_eq!(cfg.dymo.output_mode.as_deref(), Some("graphics"));
+        assert_eq!(cfg.dymo.speed.as_deref(), Some("high"));
+    }
+
+    #[test]
+    fn rejects_unknown_field() {
+        let err = DriverPrintConfig::default()
+            .with_opt_overrides(["dymo.bogus=1"])
+            .unwrap_err();
+        assert!(err.to_string().contains("invalid --driver-opt"), "{err}");
+    }
+
+    #[test]
+    fn rejects_unknown_bag() {
+        let err = DriverPrintConfig::default()
+            .with_opt_overrides(["niimbot.task=b1"])
+            .unwrap_err();
+        assert!(err.to_string().contains("invalid --driver-opt"), "{err}");
+    }
+
+    #[test]
+    fn rejects_malformed_spec() {
+        let err = DriverPrintConfig::default()
+            .with_opt_overrides(["no-equals"])
+            .unwrap_err();
+        assert!(err.to_string().contains("KEY=VALUE"), "{err}");
+    }
+
+    #[test]
+    fn later_opt_wins() {
+        let cfg = DriverPrintConfig::default()
+            .with_opt_overrides(["dymo.speed=high", "dymo.speed=normal"])
+            .unwrap();
+        assert_eq!(cfg.dymo.speed.as_deref(), Some("normal"));
+    }
+}
+
 impl Default for PrintConfig {
     fn default() -> Self {
         Self {
@@ -213,8 +353,7 @@ impl Default for PrintConfig {
             supports_cut: false,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: DriverPrintConfig::default(),
             dither: "auto".into(),
             protocol: None,
             backend: "chromium".into(),

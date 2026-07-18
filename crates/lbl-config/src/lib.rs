@@ -23,7 +23,10 @@ mod paths;
 mod profiles;
 
 pub use loader::{describe_sources, format_effective, Loader};
-pub use model::{CatalogConfig, Config, GeneralConfig, PrintConfig, RenderConfig, StyleConfig};
+pub use model::{
+    CatalogConfig, Config, DriverPrintConfig, DymoPrintConfig, GeneralConfig, PrintConfig,
+    RenderConfig, StyleConfig,
+};
 pub use paths::{describe_paths, format_paths_report, stdout_color, ConfigPaths, PathLine};
 pub use profiles::ProfileStore;
 

@@ -150,6 +150,14 @@ media_type = "png"       # raster only: png | bmp | tiff | gif | pbm
 # niimbot_task = "standard"
 ```
 
+DYMO LabelWriter 550-series engine options live under the protocol bag:
+
+```toml
+[print.driver.dymo]
+output_mode = "graphics"   # text | graphics
+speed = "high"             # normal | high
+```
+
 `export_mode = "vector"` makes `--protocol virtual` emit PDF without passing
 `--export-mode` on every run. `media_type` is ignored when `export_mode` is
 `vector`.
@@ -164,11 +172,22 @@ lbl print --text "Hello {{qr:https://x}}" --media 30252 --file hello.pdf
 export LBL_PRINT__PROTOCOL=niimbot
 export LBL_PRINT__BLUETOOTH=D110
 lbl print --text "Hello" --media niimbot-12x22
+
+export LBL_PRINT__DRIVER__DYMO__OUTPUT_MODE=graphics
+export LBL_PRINT__DRIVER__DYMO__SPEED=high
+```
+
+CLI overrides use the same dotted paths:
+
+```bash
+lbl print --driver-opt dymo.output_mode=graphics --driver-opt dymo.speed=high ...
 ```
 
 Supported `[print]` / `LBL_PRINT__*` keys: `confirm`, `debug`, `cut`,
 `supports_cut`, `copies`, `dither`, `protocol`, `export_mode`, `media_type`,
-`backend`, `bluetooth`, `serial`, `usb`, `network`, `niimbot_task`.
+`backend`, `bluetooth`, `serial`, `usb`, `network`, `niimbot_task`, plus
+nested `[print.driver.*]` / `LBL_PRINT__DRIVER__*` (currently `dymo.output_mode`,
+`dymo.speed`).
 
 ## Printer profiles
 

@@ -107,6 +107,54 @@ impl LwSpeed {
     }
 }
 
+/// DYMO LabelWriter 550-series protocol options.
+///
+/// Ignored by drivers that are not `dymo-lw`. See the LW550 Tech Ref.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DymoLwOptions {
+    /// Text vs graphics engine mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_mode: Option<LwOutputMode>,
+    /// Feed speed. High speed is chassis- and roll-dependent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed: Option<LwSpeed>,
+}
+
+impl DymoLwOptions {
+    /// Whether both fields are unset.
+    pub fn is_empty(&self) -> bool {
+        self.output_mode.is_none() && self.speed.is_none()
+    }
+}
+
+/// Protocol-specific options carried with a job.
+///
+/// Shared parameters (copies, cut, density) stay on [`JobSpec`]. Each driver
+/// reads only its own bag and ignores the rest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DriverOptions {
+    /// DYMO LabelWriter 550-series options.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dymo: Option<DymoLwOptions>,
+}
+
+impl DriverOptions {
+    /// Whether no protocol bag carries any value.
+    pub fn is_empty(&self) -> bool {
+        self.dymo.as_ref().is_none_or(DymoLwOptions::is_empty)
+    }
+
+    /// Build options with a DYMO LW bag when either field is set.
+    pub fn from_dymo(output_mode: Option<LwOutputMode>, speed: Option<LwSpeed>) -> Self {
+        if output_mode.is_none() && speed.is_none() {
+            return Self::default();
+        }
+        Self {
+            dymo: Some(DymoLwOptions { output_mode, speed }),
+        }
+    }
+}
+
 /// A single print job: the media to print on and whether to cut afterward.
 ///
 /// The HTML/raster content is carried alongside this spec by each stage; this
@@ -130,12 +178,9 @@ pub struct JobSpec {
     /// omitted, each driver uses its own default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub density: Option<u8>,
-    /// DYMO LW550 text vs graphics engine mode. Ignored by other protocols.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lw_output_mode: Option<LwOutputMode>,
-    /// DYMO LW550 feed speed. Ignored by other protocols / unsupported chassis.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lw_speed: Option<LwSpeed>,
+    /// Protocol-specific options (each driver reads only its own bag).
+    #[serde(default, skip_serializing_if = "DriverOptions::is_empty")]
+    pub driver: DriverOptions,
 }
 
 fn one() -> u32 {
@@ -151,8 +196,7 @@ impl JobSpec {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: DriverOptions::default(),
         }
     }
 }
@@ -197,5 +241,11 @@ mod tests {
         assert_eq!(LwSpeed::parse("high"), Some(LwSpeed::High));
         assert_eq!(LwSpeed::parse("fast"), Some(LwSpeed::High));
         assert_eq!(LwSpeed::parse("bogus"), None);
+    }
+
+    #[test]
+    fn driver_options_from_dymo_omits_empty() {
+        assert!(DriverOptions::from_dymo(None, None).is_empty());
+        assert!(!DriverOptions::from_dymo(Some(LwOutputMode::Graphics), None).is_empty());
     }
 }

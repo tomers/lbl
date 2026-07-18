@@ -196,7 +196,8 @@ impl Driver for LabelWriter550Driver {
             out.extend_from_slice(&[ESC, SET_MAX_LENGTH]);
             out.extend_from_slice(&lines.to_le_bytes());
         }
-        let output_mode = ctx.job.lw_output_mode.unwrap_or_default();
+        let dymo = ctx.job.driver.dymo.unwrap_or_default();
+        let output_mode = dymo.output_mode.unwrap_or_default();
         out.extend_from_slice(&[
             ESC,
             match output_mode {
@@ -204,7 +205,7 @@ impl Driver for LabelWriter550Driver {
                 LwOutputMode::Graphics => GRAPHICS_MODE,
             },
         ]);
-        Self::append_speed(&mut out, ctx.job.lw_speed, head_dots);
+        Self::append_speed(&mut out, dymo.speed, head_dots);
         out.extend_from_slice(&[ESC, SET_DENSITY, density_percent(ctx.job.density)]);
 
         // --- One label per copy ---
@@ -232,7 +233,7 @@ impl Driver for LabelWriter550Driver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::job::JobSpec;
+    use lbl_core::job::{DriverOptions, JobSpec};
     use lbl_core::media::Media;
     use lbl_core::printer::PrinterCapabilities;
     use lbl_core::units::Dpi;
@@ -280,7 +281,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let caps = PrinterCapabilities::default();
         let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
-        job.lw_output_mode = Some(LwOutputMode::Graphics);
+        job.driver = DriverOptions::from_dymo(Some(LwOutputMode::Graphics), None);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[6..11], &[ESC, b'i', ESC, b'C', 100]);
@@ -291,7 +292,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let caps = PrinterCapabilities::default();
         let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
-        job.lw_speed = Some(LwSpeed::High);
+        job.driver = DriverOptions::from_dymo(None, Some(LwSpeed::High));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[6..14], &[ESC, b'h', ESC, b'T', 0x20, ESC, b'C', 100]);
@@ -306,7 +307,7 @@ mod tests {
             ..PrinterCapabilities::default()
         };
         let mut job = ctx_job(Media::fixed(104.0, 159.0, Dpi(300.0)), 1);
-        job.lw_speed = Some(LwSpeed::High);
+        job.driver = DriverOptions::from_dymo(None, Some(LwSpeed::High));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[6..14], &[ESC, b'h', ESC, b'T', 0x10, ESC, b'C', 100]);

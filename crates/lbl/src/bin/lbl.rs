@@ -567,14 +567,10 @@ struct PrintArgs {
     #[arg(long)]
     density: Option<u8>,
 
-    /// DYMO LW550 text vs graphics engine mode (`text` | `graphics`).
-    /// Overrides config `[print] lw_output_mode`.
-    #[arg(long)]
-    lw_output_mode: Option<String>,
-
-    /// DYMO LW550 feed speed (`normal` | `high`). Overrides config `[print] lw_speed`.
-    #[arg(long)]
-    lw_speed: Option<String>,
+    /// Protocol-specific option override (`dymo.output_mode=graphics`).
+    /// Repeatable. Overrides `[print.driver]` / `LBL_PRINT__DRIVER__*`.
+    #[arg(long = "driver-opt", value_name = "KEY=VALUE")]
+    driver_opt: Vec<String>,
 
     /// Rendering backend. Overrides config `[print] backend` /
     /// `LBL_PRINT__BACKEND`.
@@ -658,6 +654,23 @@ fn config_enum<E: ValueEnum>(name: &str, value: &str) -> Result<E> {
     E::from_str(value, true).map_err(|e| anyhow!("invalid config {name}: {e}"))
 }
 
+fn resolve_driver_options(cfg: &lbl_config::DriverPrintConfig) -> Result<lbl_core::DriverOptions> {
+    let output_mode = match cfg.dymo.output_mode.as_deref() {
+        None => None,
+        Some(mode) => Some(lbl_core::LwOutputMode::parse(mode).ok_or_else(|| {
+            anyhow!("unknown driver.dymo.output_mode '{mode}' (expected text|graphics)")
+        })?),
+    };
+    let speed =
+        match cfg.dymo.speed.as_deref() {
+            None => None,
+            Some(mode) => Some(lbl_core::LwSpeed::parse(mode).ok_or_else(|| {
+                anyhow!("unknown driver.dymo.speed '{mode}' (expected normal|high)")
+            })?),
+        };
+    Ok(lbl_core::DriverOptions::from_dymo(output_mode, speed))
+}
+
 fn run_print(args: PrintArgs) -> Result<()> {
     let loader = lbl_config::Loader::new();
     let config = loader
@@ -701,28 +714,11 @@ fn run_print(args: PrintArgs) -> Result<()> {
     let supports_cut = args.supports_cut.unwrap_or(print_cfg.supports_cut);
     let copies = args.copies.unwrap_or(print_cfg.copies);
     let density = args.density.or(print_cfg.density);
-    let lw_output_mode = {
-        let raw = args
-            .lw_output_mode
-            .as_deref()
-            .or(print_cfg.lw_output_mode.as_deref());
-        match raw {
-            None => None,
-            Some(mode) => Some(lbl_core::LwOutputMode::parse(mode).ok_or_else(|| {
-                anyhow!("unknown lw_output_mode '{mode}' (expected text|graphics)")
-            })?),
-        }
-    };
-    let lw_speed = {
-        let raw = args.lw_speed.as_deref().or(print_cfg.lw_speed.as_deref());
-        match raw {
-            None => None,
-            Some(mode) => Some(
-                lbl_core::LwSpeed::parse(mode)
-                    .ok_or_else(|| anyhow!("unknown lw_speed '{mode}' (expected normal|high)"))?,
-            ),
-        }
-    };
+    let driver_cfg = print_cfg
+        .driver
+        .with_opt_overrides(args.driver_opt.iter().map(String::as_str))
+        .map_err(|e| anyhow!(e))?;
+    let driver = resolve_driver_options(&driver_cfg)?;
     let dither = args.dither.unwrap_or_else(|| print_cfg.dither.clone());
     let backend = match args.backend {
         Some(b) => b,
@@ -880,8 +876,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         cut_mode,
         copies,
         density,
-        lw_output_mode,
-        lw_speed,
+        driver,
         dither: Algorithm::parse(&dither)?,
         rotation,
         head_rotation,
