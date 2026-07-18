@@ -253,6 +253,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preview_html_print_geometry_pins_continuous_d1_feed_width() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"Hello, world","geometry":"print","dpi":180,"supersample":1,"media":"45013","printer":"LabelManager 280"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["media"]["geometry"], "print");
+        assert_eq!(json["media"]["continuous"], true);
+        let html = json["labels"][0]["html"].as_str().unwrap();
+        assert!(
+            html.contains("--lbl-feed-px:"),
+            "expected content head-fit feed pin, got {html}"
+        );
+        let width = json["labels"][0]["width_px"]
+            .as_f64()
+            .or_else(|| json["labels"][0]["width_px"].as_u64().map(|n| n as f64))
+            .unwrap_or(0.0);
+        assert!(
+            width > 10.0 && width < 800.0,
+            "continuous D1 print geometry must pin a tight feed width (not 0 / not iframe placeholder), got {width}"
+        );
+        assert!(
+            !html.contains("lbl-stock"),
+            "print geometry must stay printable-only (no stock frame)"
+        );
+    }
+
+    #[tokio::test]
     async fn preview_html_vector_pads_physical_stock() {
         let app = router(test_state());
         let resp = app
