@@ -537,6 +537,11 @@ struct PrintArgs {
     #[arg(long, action = clap::ArgAction::Count)]
     rotate_ccw: u8,
 
+    /// Mirror the label left↔right in the reading frame (iron-on / reverse).
+    /// Independent of printer feed_reverse encoding.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    mirror: bool,
+
     /// When to cut: `none`, `every` (after each label), or `end` (after last).
     /// Overrides config `[print] cut_mode` / `LBL_PRINT__CUT_MODE`. The legacy
     /// `--cut` flag is an alias for `--cut-mode every`.
@@ -847,6 +852,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         dither: Algorithm::parse(&dither)?,
         rotation,
         head_rotation,
+        mirror: args.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
         style,

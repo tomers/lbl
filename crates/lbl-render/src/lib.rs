@@ -111,6 +111,14 @@ pub fn apply_rotation(img: RgbaImage, rotation: Rotation) -> RgbaImage {
     }
 }
 
+/// Flip a reading-frame raster left↔right (user “Mirror print”).
+///
+/// Apply on the reading-frame image **before** [`apply_rotation`] so the flip
+/// matches on-screen preview; head quarter-turns compose afterward.
+pub fn apply_mirror_horizontal(img: RgbaImage) -> RgbaImage {
+    image::imageops::flip_horizontal(&img)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,5 +194,26 @@ mod tests {
             (30, 10)
         );
         assert_eq!(apply_rotation(img, Rotation::Cw270).dimensions(), (10, 30));
+    }
+
+    #[test]
+    fn mirror_horizontal_flips_asymmetric_pixels() {
+        let mut img = RgbaImage::from_pixel(3, 1, image::Rgba([0, 0, 0, 255]));
+        img.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
+        img.put_pixel(2, 0, image::Rgba([0, 0, 255, 255]));
+        let flipped = apply_mirror_horizontal(img);
+        assert_eq!(flipped.dimensions(), (3, 1));
+        assert_eq!(*flipped.get_pixel(0, 0), image::Rgba([0, 0, 255, 255]));
+        assert_eq!(*flipped.get_pixel(2, 0), image::Rgba([255, 0, 0, 255]));
+    }
+
+    #[test]
+    fn mirror_then_rotation_preserves_dimensions() {
+        let img = RgbaImage::from_pixel(30, 10, image::Rgba([0, 0, 0, 255]));
+        let mirrored = apply_mirror_horizontal(img);
+        assert_eq!(
+            apply_rotation(mirrored, Rotation::Cw90).dimensions(),
+            (10, 30)
+        );
     }
 }
