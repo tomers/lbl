@@ -395,10 +395,10 @@ pub fn open_usb_bulk_session(usb: &UsbTransport) -> Result<UsbBulkSession, Devic
         .map_err(|e| DeviceError::Transport(format!("claiming interface: {e}")))?;
     let ep_out = interface
         .endpoint::<Bulk, Out>(ep_out_addr)
-        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_out_addr:#02x}: {e}")))?;
+        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_out_addr:#x}: {e}")))?;
     let ep_in = interface
         .endpoint::<Bulk, In>(ep_in_addr)
-        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_in_addr:#02x}: {e}")))?;
+        .map_err(|e| DeviceError::Transport(format!("bulk endpoint {ep_in_addr:#x}: {e}")))?;
     Ok(UsbBulkSession::new(interface, ep_out, ep_in))
 }
 
@@ -436,7 +436,7 @@ impl Transport for UsbTransport {
 
         let mut ep_out = interface
             .endpoint::<Bulk, Out>(endpoint)
-            .map_err(|e| DeviceError::Transport(format!("bulk endpoint {endpoint:#02x}: {e}")))?;
+            .map_err(|e| DeviceError::Transport(format!("bulk endpoint {endpoint:#x}: {e}")))?;
         let completion = ep_out.transfer_blocking(data.to_vec().into(), Duration::from_secs(30));
         completion
             .status
