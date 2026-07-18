@@ -642,6 +642,24 @@ mod tests {
     }
 
     #[test]
+    fn dymo_lw5_supports_soft_reboot() {
+        let catalog = Catalog::bundled().unwrap();
+        for key in [
+            "LabelWriter 550",
+            "LabelWriter 550 Turbo",
+            "LabelWriter 5XL",
+        ] {
+            let printer = catalog.lookup_printer(key).unwrap();
+            assert!(
+                printer.supports_soft_reboot,
+                "{key} should advertise soft reboot"
+            );
+        }
+        let classic = catalog.lookup_printer("LabelWriter 450").unwrap();
+        assert!(!classic.supports_soft_reboot);
+    }
+
+    #[test]
     fn usb_match_prefers_exact_product() {
         let catalog = Catalog::bundled().unwrap();
         let lw550 = catalog.match_usb(0x0922, 0x0028).unwrap();

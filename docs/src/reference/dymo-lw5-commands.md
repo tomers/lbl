@@ -20,7 +20,7 @@ from the printer’s NFC/engine state.
 
 | Opcode | Bytes | Status | Role | Feature usefulness |
 |--------|-------|--------|------|--------------------|
-| `ESC @` | `1B 40` | **Unimplemented** | Restart / soft-reboot the print engine. | **Useful.** Recovery when the engine is wedged after a failed job or stuck lock (alternative to power-cycle). Studio “wake / reset printer” and CLI troubleshoot flows. |
+| `ESC @` | `1B 40` | **Implemented** | Restart / soft-reboot the print engine. | **Useful.** Recovery when the engine is wedged after a failed job or stuck lock (alternative to power-cycle). Studio “wake / reset printer” and CLI troubleshoot flows. |
 | `ESC *` | `1B 24`¹ | **Unimplemented** | Restore factory settings. | **Low.** Rare; risky on shared devices. Only if we add an explicit advanced “factory reset” action with strong confirmation. |
 | `ESC A` | `1B 41 nn` | **Implemented** | Print-engine status (**32**-byte reply); lock acquire / inter-label / release. | **Core.** Idle polling, print handshakes, remaining label count, bay/SKU/error/voltage. |
 | `ESC C` | `1B 43 nn` | **Implemented** | Set print density (duty %). | **Core.** Job density encoding in the LW550 driver. |
@@ -63,7 +63,8 @@ Still unused from the same dump (candidates for later media auto-config):
 
 ## Related code
 
-- Device / status: `lbl-device` `dymo_lw` (`ESC A`, `ESC U`, `ESC V`)
+- Device / status: `lbl-device` `dymo_lw` (`ESC A`, `ESC U`, `ESC V`, `ESC @`)
 - Job encode: `lbl-driver-dymo` `lw550` (`ESC s/L/h|i/T/C/n/D/G/E/Q`)
 - Browser WebUSB: `apps/frontend/lib/client-dispatch/dymo-lw.ts`
+- Catalog gate: `supports_soft_reboot` on LW550 / Turbo / 5XL in `catalog.toml`
 - Status UI row: shared `labelRemainingProgressRow` in the frontend printer-status layer
