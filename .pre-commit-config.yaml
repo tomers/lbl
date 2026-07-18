@@ -16,6 +16,8 @@ repos:
       - id: check-xml
       - id: check-merge-conflict
       - id: check-added-large-files
+        # Vendored UMD builds (bwip-js ~1.1 MB) exceed the default 500 KB ceiling.
+        args: ['--maxkb=2048']
 
   - repo: local
     hooks:
