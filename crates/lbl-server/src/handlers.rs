@@ -619,13 +619,19 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         // head/feed gaps match the raster preview gallery. Print-geometry capture
         // stays printable-only for client encode.
         let (html, width_px, height_px, stock, content_feed_end_px) = if print_geometry {
-            (
-                transpiled.html,
-                transpiled.width_px,
-                transpiled.height_px,
-                None,
-                0u32,
-            )
+            // Continuous feed arrives as 0 on that axis. Pin an explicit capture
+            // size from content head-fit (`--lbl-feed-px`) so the browser does not
+            // rasterize against the sandboxed iframe placeholder width.
+            let mut width_px = transpiled.width_px;
+            let mut height_px = transpiled.height_px;
+            if let Some(feed) = injected_label_min_width_px(&transpiled.html) {
+                if feed_along_width && width_px <= 0.0 {
+                    width_px = feed;
+                } else if !feed_along_width && height_px <= 0.0 {
+                    height_px = feed;
+                }
+            }
+            (transpiled.html, width_px, height_px, None, 0u32)
         } else {
             let stock = preview_stock_frame(
                 transpiled.width_px,
