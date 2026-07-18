@@ -52,9 +52,9 @@ pub use brother_ql::{
 };
 #[cfg(feature = "usb")]
 pub use dymo_lw::{
-    parse_print_status, query_loaded_media, query_status, DymoLwUsbTransport, Lw550MainBayStatus,
-    Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage, Lw550PrintStatus,
-    STATUS_REPLY_LEN,
+    parse_print_status, parse_sku_info, query_loaded_media, query_status, DymoLwUsbTransport,
+    Lw550MainBayStatus, Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage,
+    Lw550PrintStatus, Lw550SkuInfo, SKU_INFO_REPLY_LEN, STATUS_REPLY_LEN,
 };
 #[cfg(feature = "usb")]
 pub use status::{query_loaded_media_sku, query_print_status, status_supported, PrintStatus};

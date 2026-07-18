@@ -26,6 +26,7 @@
 - [CLI Reference](./reference/cli.md)
 - [Media Catalog](./reference/catalog.md)
 - [Crates](./reference/crates.md)
+- [DYMO LW5 command coverage](./reference/dymo-lw5-commands.md)
 
 # Extending lbl
 

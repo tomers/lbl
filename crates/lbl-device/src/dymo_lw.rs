@@ -17,6 +17,12 @@ pub const ESC: u8 = 0x1B;
 /// Length of a print-engine status reply on bulk IN.
 pub const STATUS_REPLY_LEN: usize = 32;
 
+/// Length of an `ESC U` NFC consumable-info reply on bulk IN.
+pub const SKU_INFO_REPLY_LEN: usize = 63;
+
+/// Magic at bytes 0–1 of a valid `ESC U` reply (`0xCAB6` LE).
+pub const SKU_INFO_MAGIC: u16 = 0xCAB6;
+
 /// Lock byte for [`status_request`]: acquire the print engine before a job.
 pub const LOCK_ACQUIRE: u8 = 1;
 
@@ -32,9 +38,20 @@ const STATUS_SKU_START: usize = 11;
 /// Length of the SKU field in a status reply.
 const STATUS_SKU_LEN: usize = 12;
 
+/// First byte of the 12-character SKU field in a 63-byte `ESC U` reply.
+const SKU_INFO_SKU_START: usize = 8;
+
+/// Offset of total label count (u16 LE) in an `ESC U` reply.
+const SKU_INFO_TOTAL_LABEL_COUNT: usize = 50;
+
 /// Build an `ESC A` status request with the given lock byte.
 pub fn status_request(lock: u8) -> [u8; 3] {
     [ESC, b'A', lock]
+}
+
+/// Build an `ESC U` request for the inserted consumable's NFC dump.
+pub fn sku_info_request() -> [u8; 2] {
+    [ESC, b'U']
 }
 
 /// Main-bay status: media present and OK (NFC-valid genuine roll).
@@ -73,12 +90,24 @@ pub struct Lw550PrintStatus {
     pub error_id: u32,
     /// Bytes 27–28 — remaining label count on the inserted roll.
     pub label_count: u16,
+    /// Full-roll label count from `ESC U` (NFC), when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_total: Option<u16>,
     /// Byte 29 (low nibble) — external power supply detected.
     pub eps_present: bool,
     /// Byte 30 (low nibble) — print head supply voltage.
     pub print_head_voltage: Lw550PrintHeadVoltage,
     /// Raw byte 30 low nibble.
     pub print_head_voltage_code: u8,
+}
+
+/// Fields from the 63-byte `ESC U` NFC consumable-info reply.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Lw550SkuInfo {
+    /// Bytes 8–19 — NFC-reported consumable SKU (when present).
+    pub sku: Option<String>,
+    /// Bytes 50–51 — labels on a full (unused) roll.
+    pub total_label_count: u16,
 }
 
 /// JSON-friendly view of [`Lw550PrintStatus`] for APIs and CLI output.
@@ -96,6 +125,8 @@ pub struct Lw550PrintStatusView {
     pub sku: Option<String>,
     pub error_id: u32,
     pub label_count: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_total: Option<u16>,
     pub eps_present: bool,
     pub print_head_voltage: String,
     pub print_head_voltage_code: u8,
@@ -116,6 +147,7 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
             sku: status.sku.clone(),
             error_id: status.error_id,
             label_count: status.label_count,
+            label_total: status.label_total,
             eps_present: status.eps_present,
             print_head_voltage: status.print_head_voltage.label().into(),
             print_head_voltage_code: status.print_head_voltage_code,
@@ -290,6 +322,9 @@ impl Lw550PrintHeadVoltage {
 }
 
 /// Parse a 32-byte `ESC A` print-engine status reply.
+///
+/// `label_total` is left unset; callers that also issue `ESC U` should fill it
+/// (see [`query_print_status`]).
 pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, DeviceError> {
     if status.len() < STATUS_REPLY_LEN {
         return Err(DeviceError::Transport(format!(
@@ -311,17 +346,67 @@ pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, DeviceError
         sku: parse_status_sku(status),
         error_id: u32::from_le_bytes(status[23..27].try_into().unwrap()),
         label_count: u16::from_le_bytes(status[27..29].try_into().unwrap()),
+        label_total: None,
         eps_present: status[29] & 0x0f == 1,
         print_head_voltage: Lw550PrintHeadVoltage::from_nibble(status[30]),
         print_head_voltage_code: status[30] & 0x0f,
     })
 }
 
+/// Parse a 63-byte `ESC U` NFC consumable-info reply.
+pub fn parse_sku_info(data: &[u8]) -> Result<Lw550SkuInfo, DeviceError> {
+    if data.len() < SKU_INFO_REPLY_LEN {
+        return Err(DeviceError::Transport(format!(
+            "short ESC U reply ({} bytes, expected {SKU_INFO_REPLY_LEN})",
+            data.len()
+        )));
+    }
+    let magic = u16::from_le_bytes(data[0..2].try_into().unwrap());
+    if magic != SKU_INFO_MAGIC {
+        return Err(DeviceError::Transport(format!(
+            "invalid ESC U magic {magic:#06x} (expected {SKU_INFO_MAGIC:#06x})"
+        )));
+    }
+    Ok(Lw550SkuInfo {
+        sku: parse_fixed_sku(&data[SKU_INFO_SKU_START..SKU_INFO_SKU_START + STATUS_SKU_LEN]),
+        total_label_count: u16::from_le_bytes(
+            data[SKU_INFO_TOTAL_LABEL_COUNT..SKU_INFO_TOTAL_LABEL_COUNT + 2]
+                .try_into()
+                .unwrap(),
+        ),
+    })
+}
+
 /// Query the full print-engine status without acquiring the print lock.
+///
+/// Issues `ESC A` for engine/remaining-count fields, then `ESC U` for the
+/// full-roll total when media appears present.
 pub fn query_print_status(session: &mut UsbBulkSession) -> Result<Lw550PrintStatus, DeviceError> {
     session.transfer_out(&status_request(LOCK_RELEASE))?;
     let status = session.transfer_in(STATUS_REPLY_LEN)?;
-    parse_print_status(&status)
+    let mut parsed = parse_print_status(&status)?;
+    if media_likely_present(parsed.main_bay_status_code) {
+        if let Ok(info) = query_sku_info(session) {
+            if info.total_label_count > 0 {
+                parsed.label_total = Some(info.total_label_count);
+            }
+            if parsed.sku.is_none() {
+                parsed.sku = info.sku;
+            }
+        }
+    }
+    Ok(parsed)
+}
+
+/// Query the NFC consumable dump (`ESC U`) without acquiring the print lock.
+pub fn query_sku_info(session: &mut UsbBulkSession) -> Result<Lw550SkuInfo, DeviceError> {
+    session.transfer_out(&sku_info_request())?;
+    let data = session.transfer_in(SKU_INFO_REPLY_LEN)?;
+    parse_sku_info(&data)
+}
+
+fn media_likely_present(bay_code: u8) -> bool {
+    matches!(bay_code, 4..=10)
 }
 
 /// Query print-engine status over USB.
@@ -537,7 +622,10 @@ pub fn parse_status_sku(status: &[u8]) -> Option<String> {
         return None;
     }
     let end = STATUS_SKU_START + STATUS_SKU_LEN.min(status.len() - STATUS_SKU_START);
-    let raw = &status[STATUS_SKU_START..end];
+    parse_fixed_sku(&status[STATUS_SKU_START..end])
+}
+
+fn parse_fixed_sku(raw: &[u8]) -> Option<String> {
     let len = raw.iter().position(|&b| b == 0).unwrap_or(raw.len());
     if len == 0 {
         return None;
@@ -633,6 +721,26 @@ mod tests {
     fn status_request_bytes() {
         assert_eq!(status_request(LOCK_ACQUIRE), [ESC, b'A', 1]);
         assert_eq!(status_request(LOCK_INTER_LABEL), [ESC, b'A', 2]);
+        assert_eq!(sku_info_request(), [ESC, b'U']);
+    }
+
+    #[test]
+    fn parse_sku_info_total_label_count() {
+        let mut raw = vec![0u8; SKU_INFO_REPLY_LEN];
+        raw[0..2].copy_from_slice(&SKU_INFO_MAGIC.to_le_bytes());
+        raw[8..12].copy_from_slice(b"3025");
+        raw[50..52].copy_from_slice(&350u16.to_le_bytes());
+
+        let parsed = parse_sku_info(&raw).unwrap();
+        assert_eq!(parsed.sku.as_deref(), Some("3025"));
+        assert_eq!(parsed.total_label_count, 350);
+    }
+
+    #[test]
+    fn parse_sku_info_rejects_bad_magic() {
+        let raw = vec![0u8; SKU_INFO_REPLY_LEN];
+        let err = parse_sku_info(&raw).unwrap_err();
+        assert!(err.to_string().contains("magic"));
     }
 
     #[test]
