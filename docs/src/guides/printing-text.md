@@ -10,6 +10,7 @@ lbl-text "Ship to {{qr:https://example.com/order/42}}"
 lbl-text "SKU {{barcode:EAN13:4006381333931}}"
 lbl-text "Photo {{image:./logo.png}} next to text"
 lbl-text "Total {{size:2:$42.00}}"
+lbl-text "Prep {{date:%Y-%m-%d}} {{time:%H:%M}}"
 ```
 
 - `{{qr:…}}` — QR code (payload only; the entire value after `:` is encoded)
@@ -22,6 +23,11 @@ lbl-text "Total {{size:2:$42.00}}"
   (`PDF417`, `DATAMATRIX`, `AZTEC`, `MAXICODE`, `DATABAR`, `GS1128`,
   `POSTNET`, `PLANET`, `ISBN`, …)
 - `{{image:URI}}` — image (local path or URL)
+- `{{date:FORMAT}}` / `{{time:FORMAT}}` / `{{datetime:FORMAT}}` — date/time
+  stamp using a [chrono strftime](https://docs.rs/chrono/latest/chrono/format/strftime/index.html)
+  pattern (e.g. `%Y-%m-%d`, `%H:%M`). Emits `<stamp kind="…" format="…">` in
+  authoring HTML; the orchestrator resolves stamps to local wall-clock text
+  once per preview/print job.
 - `{{size:SCALE:text}}` — text at `SCALE`× the base font size (aliases:
   `font-size`, `fs`; `SCALE` accepts `1.5`, `1.5x`, or `150%`)
 

@@ -13,6 +13,9 @@
 //! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
 //!   CODE128, so `{{barcode:12345}}` also works)
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
+//! - `{{date:%Y-%m-%d}}` / `{{time:%H:%M}}` / `{{datetime:%Y-%m-%d %H:%M}}` ->
+//!   a date/time stamp (`<stamp>`); resolved to local wall-clock text once per
+//!   preview/print job via [`resolve_stamps_at`]
 //! - `{{size:1.5:World}}` -> text at 1.5x the base font size (aliases:
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
 //! - `{{font:roboto:Hello}}` -> text in a named font (aliases: `font-family`,
@@ -36,6 +39,7 @@
 mod fonts;
 mod parse;
 mod qr;
+mod stamp;
 
 pub use fonts::{
     catalog, default_font_assets_base_url, face_paths_for_slugs, font_asset_url,
@@ -46,6 +50,7 @@ pub use parse::{
     barcode_from_spec, parse_directive, scan_directive_at, BarcodeHeightMode, Block, Document,
 };
 pub use qr::{QrErrorCorrection, QrOptions};
+pub use stamp::{format_stamp, resolve_stamps, resolve_stamps_at, StampKind};
 
 /// The default barcode symbology when one isn't specified.
 pub const DEFAULT_SYMBOLOGY: &str = "CODE128";

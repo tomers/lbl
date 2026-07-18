@@ -203,6 +203,7 @@ pub(crate) fn is_fit_measurable_html(inner: &str) -> bool {
     !NESTED_LBL_TEXT.is_match(inner)
         && !inner.contains("<qr")
         && !inner.contains("<barcode")
+        && !inner.contains("<stamp")
         && !inner.contains("lbl-barcode")
         && !inner.contains("lbl-qr")
         && !inner.contains("<img")
