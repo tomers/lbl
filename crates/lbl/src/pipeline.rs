@@ -493,10 +493,8 @@ pub struct PipelineOptions {
     pub copies: u32,
     /// Optional print density / heat (driver-specific).
     pub density: Option<u8>,
-    /// DYMO LW550 text vs graphics engine mode.
-    pub lw_output_mode: Option<lbl_core::LwOutputMode>,
-    /// DYMO LW550 feed speed.
-    pub lw_speed: Option<lbl_core::LwSpeed>,
+    /// Protocol-specific options (each driver reads only its own bag).
+    pub driver: lbl_core::DriverOptions,
     /// Dithering algorithm.
     pub dither: Algorithm,
     /// Net rotation for layout viewport sizing (reading frame).
@@ -1407,8 +1405,7 @@ pub fn encode_label_from_rgba(
     job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;
     job.density = opts.density;
-    job.lw_output_mode = opts.lw_output_mode;
-    job.lw_speed = opts.lw_speed;
+    job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
@@ -1581,8 +1578,7 @@ pub fn encode_sample_pattern_traced(
     job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;
     job.density = opts.density;
-    job.lw_output_mode = opts.lw_output_mode;
-    job.lw_speed = opts.lw_speed;
+    job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
@@ -1670,8 +1666,7 @@ mod tests {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
             rotation,
             head_rotation,
@@ -2138,8 +2133,7 @@ mod tests {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
             rotation: Rotation::None,
             head_rotation: Rotation::None,
@@ -2176,8 +2170,7 @@ mod tests {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
@@ -2214,8 +2207,7 @@ mod tests {
             cut_mode: CutMode::None,
             copies: 1,
             density: None,
-            lw_output_mode: None,
-            lw_speed: None,
+            driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,

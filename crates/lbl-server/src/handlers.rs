@@ -499,8 +499,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         cut_mode: CutMode::None,
         copies: 1,
         density: None,
-        lw_output_mode: None,
-        lw_speed: None,
+        driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
@@ -670,8 +669,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         cut_mode: CutMode::None,
         copies: 1,
         density: None,
-        lw_output_mode: None,
-        lw_speed: None,
+        driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
@@ -939,12 +937,9 @@ pub struct PrintReq {
     /// Optional print density / heat (driver-specific; typically 1–5).
     #[serde(default)]
     density: Option<u8>,
-    /// DYMO LW550 text vs graphics engine mode (`text` | `graphics`).
+    /// Protocol-specific options (each driver reads only its own bag).
     #[serde(default)]
-    lw_output_mode: Option<String>,
-    /// DYMO LW550 feed speed (`normal` | `high`).
-    #[serde(default)]
-    lw_speed: Option<String>,
+    driver: DriverOptionsReq,
     #[serde(default = "default_supersample")]
     supersample: u32,
     #[serde(default = "default_dither")]
@@ -1082,30 +1077,44 @@ fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiErr
     Ok(if cut { CutMode::Every } else { CutMode::None })
 }
 
-fn resolve_lw_output_mode(raw: Option<&str>) -> Result<Option<lbl_core::LwOutputMode>, ApiError> {
-    match raw {
-        None => Ok(None),
-        Some(mode) => lbl_core::LwOutputMode::parse(mode)
-            .map(Some)
-            .ok_or_else(|| {
-                ApiError(
-                    StatusCode::BAD_REQUEST,
-                    format!("unknown lw_output_mode '{mode}' (expected text|graphics)"),
-                )
-            }),
-    }
+/// Protocol-specific options on print / encode requests.
+#[derive(Debug, Clone, Default, Deserialize)]
+struct DriverOptionsReq {
+    #[serde(default)]
+    dymo: Option<DymoLwOptionsReq>,
 }
 
-fn resolve_lw_speed(raw: Option<&str>) -> Result<Option<lbl_core::LwSpeed>, ApiError> {
-    match raw {
-        None => Ok(None),
-        Some(mode) => lbl_core::LwSpeed::parse(mode).map(Some).ok_or_else(|| {
+#[derive(Debug, Clone, Default, Deserialize)]
+struct DymoLwOptionsReq {
+    #[serde(default)]
+    output_mode: Option<String>,
+    #[serde(default)]
+    speed: Option<String>,
+}
+
+fn resolve_driver_options(req: &DriverOptionsReq) -> Result<lbl_core::DriverOptions, ApiError> {
+    let Some(dymo) = req.dymo.as_ref() else {
+        return Ok(lbl_core::DriverOptions::default());
+    };
+    let output_mode = match dymo.output_mode.as_deref() {
+        None => None,
+        Some(mode) => Some(lbl_core::LwOutputMode::parse(mode).ok_or_else(|| {
             ApiError(
                 StatusCode::BAD_REQUEST,
-                format!("unknown lw_speed '{mode}' (expected normal|high)"),
+                format!("unknown driver.dymo.output_mode '{mode}' (expected text|graphics)"),
             )
-        }),
-    }
+        })?),
+    };
+    let speed = match dymo.speed.as_deref() {
+        None => None,
+        Some(mode) => Some(lbl_core::LwSpeed::parse(mode).ok_or_else(|| {
+            ApiError(
+                StatusCode::BAD_REQUEST,
+                format!("unknown driver.dymo.speed '{mode}' (expected normal|high)"),
+            )
+        })?),
+    };
+    Ok(lbl_core::DriverOptions::from_dymo(output_mode, speed))
 }
 
 fn parse_protocol(s: &str) -> Result<Protocol, ApiError> {
@@ -1180,8 +1189,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
         density: req.density,
-        lw_output_mode: resolve_lw_output_mode(req.lw_output_mode.as_deref())?,
-        lw_speed: resolve_lw_speed(req.lw_speed.as_deref())?,
+        driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
@@ -1401,8 +1409,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
         density: req.density,
-        lw_output_mode: resolve_lw_output_mode(req.lw_output_mode.as_deref())?,
-        lw_speed: resolve_lw_speed(req.lw_speed.as_deref())?,
+        driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
