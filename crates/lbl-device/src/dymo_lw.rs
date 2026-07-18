@@ -20,6 +20,9 @@ pub const STATUS_REPLY_LEN: usize = 32;
 /// Length of an `ESC U` NFC consumable-info reply on bulk IN.
 pub const SKU_INFO_REPLY_LEN: usize = 63;
 
+/// Length of an `ESC V` engine-version reply on bulk IN.
+pub const ENGINE_VERSION_REPLY_LEN: usize = 34;
+
 /// Magic at bytes 0–1 of a valid `ESC U` reply (`0xCAB6` LE).
 pub const SKU_INFO_MAGIC: u16 = 0xCAB6;
 
@@ -52,6 +55,11 @@ pub fn status_request(lock: u8) -> [u8; 3] {
 /// Build an `ESC U` request for the inserted consumable's NFC dump.
 pub fn sku_info_request() -> [u8; 2] {
     [ESC, b'U']
+}
+
+/// Build an `ESC V` request for the print-engine HW/FW/PID block.
+pub fn engine_version_request() -> [u8; 2] {
+    [ESC, b'V']
 }
 
 /// Main-bay status: media present and OK (NFC-valid genuine roll).
@@ -99,6 +107,21 @@ pub struct Lw550PrintStatus {
     pub print_head_voltage: Lw550PrintHeadVoltage,
     /// Raw byte 30 low nibble.
     pub print_head_voltage_code: u8,
+    /// Hardware version string from `ESC V`, when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware_version: Option<String>,
+    /// Firmware version (`major.minor`) from `ESC V`, when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_version: Option<String>,
+    /// Firmware kind from `ESC V` (`FWAP` application / `FWBL` bootloader).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_kind: Option<String>,
+    /// Firmware release date from `ESC V` (`MMYY`), when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_date: Option<String>,
+    /// USB product id from `ESC V`, when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usb_pid: Option<u16>,
 }
 
 /// Fields from the 63-byte `ESC U` NFC consumable-info reply.
@@ -108,6 +131,21 @@ pub struct Lw550SkuInfo {
     pub sku: Option<String>,
     /// Bytes 50–51 — labels on a full (unused) roll.
     pub total_label_count: u16,
+}
+
+/// Fields from the 34-byte `ESC V` engine-version reply.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Lw550EngineVersion {
+    /// Bytes 0–15 — hardware version (NUL-padded UTF-8).
+    pub hardware_version: String,
+    /// Bytes 16–19 — firmware kind (`FWAP` / `FWBL`).
+    pub firmware_kind: String,
+    /// Bytes 20–27 — composed `major.minor` ASCII version.
+    pub firmware_version: String,
+    /// Bytes 28–31 — release date (`MMYY`).
+    pub firmware_date: String,
+    /// Bytes 32–33 — USB product id.
+    pub usb_pid: u16,
 }
 
 /// JSON-friendly view of [`Lw550PrintStatus`] for APIs and CLI output.
@@ -130,6 +168,16 @@ pub struct Lw550PrintStatusView {
     pub eps_present: bool,
     pub print_head_voltage: String,
     pub print_head_voltage_code: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usb_pid: Option<u16>,
 }
 
 impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
@@ -151,6 +199,11 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
             eps_present: status.eps_present,
             print_head_voltage: status.print_head_voltage.label().into(),
             print_head_voltage_code: status.print_head_voltage_code,
+            hardware_version: status.hardware_version.clone(),
+            firmware_version: status.firmware_version.clone(),
+            firmware_kind: status.firmware_kind.clone(),
+            firmware_date: status.firmware_date.clone(),
+            usb_pid: status.usb_pid,
         }
     }
 }
@@ -323,13 +376,30 @@ impl Lw550PrintHeadVoltage {
 
 /// Parse a 32-byte `ESC A` print-engine status reply.
 ///
-/// `label_total` is left unset; callers that also issue `ESC U` should fill it
-/// (see [`query_print_status`]).
+/// `label_total` and engine-version fields are left unset; callers that also
+/// issue `ESC U` / `ESC V` should fill them (see [`query_print_status`]).
+///
+/// Rejects payloads that are clearly not an `ESC A` reply — including an
+/// `ESC U` NFC dump whose magic (`0xCAB6`) would otherwise decode as
+/// print-status `182`.
 pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, DeviceError> {
     if status.len() < STATUS_REPLY_LEN {
         return Err(DeviceError::Transport(format!(
             "short status reply ({} bytes, expected {STATUS_REPLY_LEN})",
             status.len()
+        )));
+    }
+    let magic = u16::from_le_bytes(status[0..2].try_into().unwrap());
+    if magic == SKU_INFO_MAGIC {
+        return Err(DeviceError::Transport(
+            "status reply looks like an ESC U NFC dump (USB read desync); retry the status query"
+                .into(),
+        ));
+    }
+    if status[0] > 5 {
+        return Err(DeviceError::Transport(format!(
+            "invalid print-engine status byte {} (expected 0–5)",
+            status[0]
         )));
     }
 
@@ -350,6 +420,11 @@ pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, DeviceError
         eps_present: status[29] & 0x0f == 1,
         print_head_voltage: Lw550PrintHeadVoltage::from_nibble(status[30]),
         print_head_voltage_code: status[30] & 0x0f,
+        hardware_version: None,
+        firmware_version: None,
+        firmware_kind: None,
+        firmware_date: None,
+        usb_pid: None,
     })
 }
 
@@ -377,14 +452,53 @@ pub fn parse_sku_info(data: &[u8]) -> Result<Lw550SkuInfo, DeviceError> {
     })
 }
 
+fn parse_padded_ascii(raw: &[u8]) -> String {
+    let len = raw.iter().position(|&b| b == 0).unwrap_or(raw.len());
+    std::str::from_utf8(&raw[..len])
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn compose_firmware_version(major: &str, minor: &str) -> String {
+    match (major.is_empty(), minor.is_empty()) {
+        (false, false) => format!("{major}.{minor}"),
+        (false, true) => major.to_string(),
+        (true, false) => minor.to_string(),
+        (true, true) => String::new(),
+    }
+}
+
+/// Parse a 34-byte `ESC V` engine-version reply.
+pub fn parse_engine_version(data: &[u8]) -> Result<Lw550EngineVersion, DeviceError> {
+    if data.len() < ENGINE_VERSION_REPLY_LEN {
+        return Err(DeviceError::Transport(format!(
+            "short ESC V reply ({} bytes, expected {ENGINE_VERSION_REPLY_LEN})",
+            data.len()
+        )));
+    }
+    let major = parse_padded_ascii(&data[20..24]);
+    let minor = parse_padded_ascii(&data[24..28]);
+    Ok(Lw550EngineVersion {
+        hardware_version: parse_padded_ascii(&data[0..16]),
+        firmware_kind: parse_padded_ascii(&data[16..20]),
+        firmware_version: compose_firmware_version(&major, &minor),
+        firmware_date: parse_padded_ascii(&data[28..32]),
+        usb_pid: u16::from_le_bytes(data[32..34].try_into().unwrap()),
+    })
+}
+
 /// Query the full print-engine status without acquiring the print lock.
 ///
-/// Issues `ESC A` for engine/remaining-count fields, then `ESC U` for the
-/// full-roll total when media appears present.
+/// Issues `ESC A` for engine/remaining-count fields, `ESC V` for HW/FW/PID,
+/// then `ESC U` for the full-roll total when media appears present.
 pub fn query_print_status(session: &mut UsbBulkSession) -> Result<Lw550PrintStatus, DeviceError> {
     session.transfer_out(&status_request(LOCK_RELEASE))?;
     let status = session.transfer_in(STATUS_REPLY_LEN)?;
     let mut parsed = parse_print_status(&status)?;
+    if let Ok(ver) = query_engine_version(session) {
+        apply_engine_version(&mut parsed, &ver);
+    }
     if media_likely_present(parsed.main_bay_status_code) {
         if let Ok(info) = query_sku_info(session) {
             if info.total_label_count > 0 {
@@ -398,11 +512,36 @@ pub fn query_print_status(session: &mut UsbBulkSession) -> Result<Lw550PrintStat
     Ok(parsed)
 }
 
+fn apply_engine_version(status: &mut Lw550PrintStatus, ver: &Lw550EngineVersion) {
+    if !ver.hardware_version.is_empty() {
+        status.hardware_version = Some(ver.hardware_version.clone());
+    }
+    if !ver.firmware_version.is_empty() {
+        status.firmware_version = Some(ver.firmware_version.clone());
+    }
+    if !ver.firmware_kind.is_empty() {
+        status.firmware_kind = Some(ver.firmware_kind.clone());
+    }
+    if !ver.firmware_date.is_empty() {
+        status.firmware_date = Some(ver.firmware_date.clone());
+    }
+    status.usb_pid = Some(ver.usb_pid);
+}
+
 /// Query the NFC consumable dump (`ESC U`) without acquiring the print lock.
 pub fn query_sku_info(session: &mut UsbBulkSession) -> Result<Lw550SkuInfo, DeviceError> {
     session.transfer_out(&sku_info_request())?;
     let data = session.transfer_in(SKU_INFO_REPLY_LEN)?;
     parse_sku_info(&data)
+}
+
+/// Query the engine-version block (`ESC V`) without acquiring the print lock.
+pub fn query_engine_version(
+    session: &mut UsbBulkSession,
+) -> Result<Lw550EngineVersion, DeviceError> {
+    session.transfer_out(&engine_version_request())?;
+    let data = session.transfer_in(ENGINE_VERSION_REPLY_LEN)?;
+    parse_engine_version(&data)
 }
 
 fn media_likely_present(bay_code: u8) -> bool {
@@ -722,6 +861,7 @@ mod tests {
         assert_eq!(status_request(LOCK_ACQUIRE), [ESC, b'A', 1]);
         assert_eq!(status_request(LOCK_INTER_LABEL), [ESC, b'A', 2]);
         assert_eq!(sku_info_request(), [ESC, b'U']);
+        assert_eq!(engine_version_request(), [ESC, b'V']);
     }
 
     #[test]
@@ -734,6 +874,24 @@ mod tests {
         let parsed = parse_sku_info(&raw).unwrap();
         assert_eq!(parsed.sku.as_deref(), Some("3025"));
         assert_eq!(parsed.total_label_count, 350);
+    }
+
+    #[test]
+    fn parse_engine_version_block() {
+        let mut raw = vec![0u8; ENGINE_VERSION_REPLY_LEN];
+        raw[0..6].copy_from_slice(b"LW550\0");
+        raw[16..20].copy_from_slice(b"FWAP");
+        raw[20..24].copy_from_slice(b"0001");
+        raw[24..28].copy_from_slice(b"0023");
+        raw[28..32].copy_from_slice(b"0124");
+        raw[32..34].copy_from_slice(&0x0028u16.to_le_bytes());
+
+        let parsed = parse_engine_version(&raw).unwrap();
+        assert_eq!(parsed.hardware_version, "LW550");
+        assert_eq!(parsed.firmware_kind, "FWAP");
+        assert_eq!(parsed.firmware_version, "0001.0023");
+        assert_eq!(parsed.firmware_date, "0124");
+        assert_eq!(parsed.usb_pid, 0x0028);
     }
 
     #[test]
@@ -777,6 +935,22 @@ mod tests {
         assert_eq!(parsed.label_count, 250);
         assert!(parsed.eps_present);
         assert_eq!(parsed.print_head_voltage, Lw550PrintHeadVoltage::Ok);
+    }
+
+    #[test]
+    fn parse_print_status_rejects_esc_u_magic() {
+        let mut raw = vec![0u8; STATUS_REPLY_LEN];
+        raw[0..2].copy_from_slice(&SKU_INFO_MAGIC.to_le_bytes());
+        let err = parse_print_status(&raw).unwrap_err();
+        assert!(err.to_string().contains("ESC U"));
+    }
+
+    #[test]
+    fn parse_print_status_rejects_out_of_range_engine_byte() {
+        let mut raw = vec![0u8; STATUS_REPLY_LEN];
+        raw[0] = 182;
+        let err = parse_print_status(&raw).unwrap_err();
+        assert!(err.to_string().contains("182"));
     }
 
     #[test]
