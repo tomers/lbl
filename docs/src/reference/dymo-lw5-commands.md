@@ -28,14 +28,14 @@ from the printer’s NFC/engine state.
 | `ESC e` | `1B 65` | **Unimplemented** | Reset print density to 100%. | **Low.** Density is set per job via `ESC C`; a standalone reset is only useful for interactive tuning / recovery after a bad density write. |
 | `ESC E` | `1B 45` | **Implemented** | Feed to tear position (job trailer). | **Core.** End of every multi/single-label job. |
 | `ESC G` | `1B 47` | **Implemented** | Short feed to print head (per-label footer). | **Core.** Inter-label advance + handshake pacing. |
-| `ESC h` | `1B 68` | **Implemented** | Select text output mode (300×300). | **Core.** Default job header mode for 300 dpi raster. |
-| `ESC i` | `1B 69` | **Unimplemented** | Select graphics output mode (300×600 along feed). | **Maybe later.** Useful if we add a native 600 dpi-feed path for finer graphics/barcodes. Today we deliberately stay on `ESC h` at 300 dpi. |
+| `ESC h` | `1B 68` | **Implemented** | Select text output mode (300 dpi). | **Core.** Default job header mode; engine settings tuned for text. |
+| `ESC i` | `1B 69` | **Implemented** | Select graphics output mode (300 dpi). | **Useful.** Studio advanced print mode for barcodes/graphics; same raster DPI, engine slows for cleaner dots. (LW450’s 300×600 feed mode is a different protocol.) |
 | `ESC L` | `1B 4C …` | **Implemented** | Set maximum label length (continuous stock). | **Core** for continuous media; unused for die-cut (length comes from NFC). |
 | `ESC n` | `1B 6E NN` | **Implemented** | Set label index in the current job. | **Core.** Multi-copy jobs + status echo of current label. |
 | `ESC o` | `1B 6F nn` | **Unimplemented** | Override on-printer remaining label count. | **Avoid for product features.** Would desync the NFC counter from physical stock; at most a diagnostics/test hook. Prefer reading the real counter (`ESC A` / NFC). |
 | `ESC Q` | `1B 51` | **Implemented** | End of print job (releases lock). | **Core.** Job trailer + soft recovery (send alone to drop a held lock). |
 | `ESC s` | `1B 73 NNNN` | **Implemented** | Start of print job (job id). | **Core.** Job header; id echoed in status replies. |
-| `ESC T` | `1B 74 nn` | **Unimplemented** | Content type / speed mode (`0x10` normal, `0x20` high). | **Useful.** Faster throughput on supported rolls; print-quality vs speed setting in Studio. Not all media/chassis support high speed (5XL does not). |
+| `ESC T` | `1B 74 nn` | **Implemented** | Content type / speed mode (`0x10` normal, `0x20` high). | **Useful.** Faster throughput on supported rolls; print-quality vs speed setting in Studio. Not all media/chassis support high speed (5XL does not; driver clamps to normal). |
 | `ESC U` | `1B 55` | **Implemented** | Get SKU / NFC dump (63-byte reply), including **total label count**. | **Core for roll UI.** Full-roll total for depleting progress bars; richer geometry/material fields still unused (see below). |
 | `ESC V` | `1B 56` | **Implemented** | Get engine version (HW/FW/PID block, 34 bytes). | **Useful.** Printer detail “About” (firmware/hardware), support diagnostics, and compatibility checks before enabling speed modes or new job features. |
 
@@ -64,6 +64,6 @@ Still unused from the same dump (candidates for later media auto-config):
 ## Related code
 
 - Device / status: `lbl-device` `dymo_lw` (`ESC A`, `ESC U`, `ESC V`)
-- Job encode: `lbl-driver-dymo` `lw550` (`ESC s/L/h/C/n/D/G/E/Q`)
+- Job encode: `lbl-driver-dymo` `lw550` (`ESC s/L/h|i/T/C/n/D/G/E/Q`)
 - Browser WebUSB: `apps/frontend/lib/client-dispatch/dymo-lw.ts`
 - Status UI row: shared `labelRemainingProgressRow` in the frontend printer-status layer
