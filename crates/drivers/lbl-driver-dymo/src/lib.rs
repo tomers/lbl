@@ -8,7 +8,8 @@
 //!   **column** of dots across the tape, and the tape feeds horizontally, so the
 //!   encoder transposes the bitmap into columns. Command set follows the classic
 //!   dymoprint / LabelManager USB stream: `ESC C 0`, `ESC B 0`, `ESC D n`, a
-//!   `SYN`-prefixed line per column, then `ESC A` (status) and `ESC E` (feed/cut).
+//!   `SYN`-prefixed line per column, then `ESC E` (cut, when present) and
+//!   `ESC A` (status — host must read IN; reply arrives after cut/feed).
 //!   Column order matches a `ROTATE_270` transpose when
 //!   [`PrinterCapabilities::feed_reverse`] is set.
 //! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
@@ -163,10 +164,11 @@ impl DymoDriver {
             out.extend_from_slice(&Self::column_bytes(bitmap, x, bytes_per_line));
         }
 
-        // Status query (conventional job terminator; host should read IN).
-        out.extend_from_slice(&[ESC, b'A']);
-        // Form feed (advances and cuts on cutter models).
+        // Cut/feed first, then status. ESC A is the job terminator: its IN
+        // reply is only emitted after the printer finishes preceding work, so
+        // a host that drains it knows the chassis is ready for the next job.
         out.extend_from_slice(&[ESC, b'E']);
+        out.extend_from_slice(&[ESC, b'A']);
         Ok(())
     }
 }
@@ -250,8 +252,8 @@ mod tests {
         assert_eq!(&bytes[6..9], &[ESC, b'D', 0x01]);
         assert_eq!(bytes[9], SYN);
         assert_eq!(bytes[10], 0x80); // column 0, y=0 set
-                                     // ends with status + form feed
-        assert_eq!(&bytes[bytes.len() - 4..], &[ESC, b'A', ESC, b'E']);
+                                     // ends with cut/feed, then status
+        assert_eq!(&bytes[bytes.len() - 4..], &[ESC, b'E', ESC, b'A']);
     }
 
     #[test]

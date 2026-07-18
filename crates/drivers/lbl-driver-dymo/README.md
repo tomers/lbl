@@ -14,10 +14,12 @@ and emits:
 - `ESC B 0` — reset dot-tab bias (firmware can carry margin across jobs)
 - `ESC D n` — bytes per line (`ceil(height/8)`)
 - per column: `SYN` (0x16) + `n` column bytes (MSB-first across the tape)
-- `ESC A` — status query (host should read the IN endpoint)
-- `ESC E` — form feed / cut
+- `ESC E` — form feed / cut (no-op on manual-cutter chassis)
+- `ESC A` — status query (host should read the IN endpoint; reply follows cut)
 
 The command set follows the classic dymoprint / LabelManager USB stream.
+Trailer order is cut-then-status so a drained `ESC A` reply means the printer
+has finished the job and will accept another without a pacing timeout.
 
 ## `LabelWriter550Driver` — LabelWriter 550 raster protocol (`Protocol::DymoLw`)
 
