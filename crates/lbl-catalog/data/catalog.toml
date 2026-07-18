@@ -1906,11 +1906,17 @@ media        = { width_mm = 70.0, length = { kind = "fixed", mm = 40.0 }, materi
 # color (Brother QL-800-series black/red on DK-22251). Thermal 1-bit heads leave
 # this false. Preview sinks (`virtual`, `html`, `console`) are treated as
 # color-capable in the UI regardless.
+#
+# Optional manufacturer support links:
+#   support = { product_url = "…", brand_url = "…" }
+# Prefer product_url (model-specific drivers/manuals/FAQs); brand_url is the
+# brand support hub used when no stable per-model page exists.
 
 [[printers]]
 brand = "DYMO"
 keys = ["LabelWriter 550", "LW550"]
 name = "DYMO LabelWriter 550"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolw"
 maturity = "verified"
 dpi = 300.0
@@ -1962,6 +1968,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0028 }]
 brand = "DYMO"
 keys = ["LabelWriter 550 Turbo"]
 name = "DYMO LabelWriter 550 Turbo"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolw"
 maturity = "supported"
 dpi = 300.0
@@ -2013,6 +2020,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0029 }]
 brand = "DYMO"
 keys = ["LabelWriter 5XL"]
 name = "DYMO LabelWriter 5XL"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolw"
 maturity = "supported"
 dpi = 300.0
@@ -2066,6 +2074,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x002A }]
 brand = "DYMO"
 keys = ["LabelWriter 450"]
 name = "DYMO LabelWriter 450"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolwclassic"
 maturity = "experimental"
 dpi = 300.0
@@ -2114,6 +2123,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0020 }]
 brand = "DYMO"
 keys = ["LabelWriter 450 Turbo"]
 name = "DYMO LabelWriter 450 Turbo"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolwclassic"
 maturity = "experimental"
 dpi = 300.0
@@ -2162,6 +2172,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0021 }]
 brand = "DYMO"
 keys = ["LabelWriter 450 Twin Turbo"]
 name = "DYMO LabelWriter 450 Twin Turbo"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolwclassic"
 maturity = "experimental"
 dpi = 300.0
@@ -2210,6 +2221,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0022 }]
 brand = "DYMO"
 keys = ["LabelWriter 4XL"]
 name = "DYMO LabelWriter 4XL"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolwclassic"
 maturity = "experimental"
 dpi = 300.0
@@ -2239,6 +2251,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001F }]
 brand = "DYMO"
 keys = ["LabelWriter"]
 name = "DYMO LabelWriter (legacy)"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "supported"
 dpi = 300.0
@@ -2288,6 +2301,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922 }]
 brand = "DYMO"
 keys = ["LabelWriter Duo", "LW Duo", "LabelWriter 450 Duo"]
 name = "DYMO LabelWriter Duo"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymolwclassic"
 maturity = "experimental"
 dpi = 300.0
@@ -2326,6 +2340,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0023 }]
 brand = "DYMO"
 keys = ["LabelManager PnP", "LabelManager"]
 name = "DYMO LabelManager PnP"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "supported"
 dpi = 180.0
@@ -2371,6 +2386,7 @@ connections = [
 brand = "DYMO"
 keys = ["LabelManager 280", "LM280"]
 name = "DYMO LabelManager 280"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "verified"
 dpi = 180.0
@@ -2415,6 +2431,7 @@ connections = [
 brand = "DYMO"
 keys = ["LabelManager 420P", "LM420P"]
 name = "DYMO LabelManager 420P"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "supported"
 dpi = 180.0
@@ -2478,6 +2495,7 @@ connections = [
 brand = "DYMO"
 keys = ["LabelManager 500TS", "LM500TS"]
 name = "DYMO LabelManager 500TS"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "supported"
 dpi = 300.0
@@ -2549,6 +2567,7 @@ connections = []
 brand = "DYMO"
 keys = ["LabelManager PC", "LM PC", "LMPC"]
 name = "DYMO LabelManager PC"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "experimental"
 dpi = 180.0
@@ -2591,6 +2610,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0011 }]
 brand = "DYMO"
 keys = ["LabelManager PC II", "LM PC II", "LMPCII"]
 name = "DYMO LabelManager PC II"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "experimental"
 dpi = 180.0
@@ -2633,6 +2653,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001c }]
 brand = "DYMO"
 keys = ["LabelManager 400", "LM400"]
 name = "DYMO LabelManager 400"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "experimental"
 dpi = 180.0
@@ -2675,6 +2696,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0013 }]
 brand = "DYMO"
 keys = ["LabelPoint 350", "LP350"]
 name = "DYMO LabelPoint 350"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "experimental"
 dpi = 180.0
@@ -2731,6 +2753,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0015 }]
 brand = "DYMO"
 keys = ["LabelManager Wireless PnP", "LM Wireless PnP", "LMWirelessPnP"]
 name = "DYMO LabelManager Wireless PnP"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "dymo"
 maturity = "supported"
 dpi = 180.0
@@ -2772,6 +2795,7 @@ connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1008 }]
 brand = "DYMO"
 keys = ["LT-200B", "LetraTag LT-200B", "LT200B"]
 name = "DYMO LetraTag LT-200B"
+support = { brand_url = "https://www.dymo.com/support" }
 protocol = "letratag"
 maturity = "experimental"
 dpi = 203.0
@@ -2797,6 +2821,7 @@ connections = [
 brand = "NIIMBOT"
 keys = ["D110"]
 name = "NIIMBOT D110"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "verified"
 dpi = 203.0
@@ -2839,6 +2864,7 @@ connections = [{ kind = "ble", name = "D110" }]
 brand = "NIIMBOT"
 keys = ["D11"]
 name = "NIIMBOT D11"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "verified"
 dpi = 203.0
@@ -2881,6 +2907,7 @@ connections = [{ kind = "ble", name = "D11" }]
 brand = "NIIMBOT"
 keys = ["D11S"]
 name = "NIIMBOT D11S"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -2927,6 +2954,7 @@ connections = [{ kind = "ble", name = "D11S" }]
 brand = "NIIMBOT"
 keys = ["B18", "B18S"]
 name = "NIIMBOT B18"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "experimental"
 dpi = 203.0
@@ -2970,6 +2998,7 @@ connections = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
 brand = "NIIMBOT"
 keys = ["N1"]
 name = "NIIMBOT N1"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "experimental"
 dpi = 203.0
@@ -3013,6 +3042,7 @@ connections = [{ kind = "ble", name = "N1" }]
 brand = "NIIMBOT"
 keys = ["M2_H", "M2H"]
 name = "NIIMBOT M2_H"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "experimental"
 dpi = 300.0
@@ -3036,6 +3066,7 @@ reports_media = true
 brand = "NIIMBOT"
 keys = ["D101"]
 name = "NIIMBOT D101"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3097,6 +3128,7 @@ connections = [{ kind = "ble", name = "D101" }]
 brand = "NIIMBOT"
 keys = ["B1", "B1_SE", "B1SE"]
 name = "NIIMBOT B1"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "verified"
 dpi = 203.0
@@ -3120,6 +3152,7 @@ reports_media = true
 brand = "NIIMBOT"
 keys = ["B2"]
 name = "NIIMBOT B2"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3143,6 +3176,7 @@ connections = [{ kind = "ble", name = "B2" }, { kind = "serial" }]
 brand = "NIIMBOT"
 keys = ["B21", "B21S", "B21_C2B", "B21C2B", "B21_L2B", "B21L2B"]
 name = "NIIMBOT B21"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3166,6 +3200,7 @@ connections = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
 brand = "NIIMBOT"
 keys = ["B203", "A203"]
 name = "NIIMBOT B203"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3189,6 +3224,7 @@ connections = [{ kind = "serial" }, { kind = "ble", name = "B203" }]
 brand = "NIIMBOT"
 keys = ["B3S", "B3S_P"]
 name = "NIIMBOT B3S"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3214,6 +3250,7 @@ connections = [{ kind = "serial" }, { kind = "ble", name = "B3S" }]
 brand = "NIIMBOT"
 keys = ["B1 Pro", "B1Pro", "B1_PRO"]
 name = "NIIMBOT B1 Pro"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 300.0
@@ -3237,6 +3274,7 @@ connections = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
 brand = "NIIMBOT"
 keys = ["B21 Pro", "B21Pro", "B21_PRO"]
 name = "NIIMBOT B21 Pro"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 300.0
@@ -3260,6 +3298,7 @@ connections = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
 brand = "NIIMBOT"
 keys = ["D11_H", "D11H", "D11_PRO", "D11Pro"]
 name = "NIIMBOT D11_H"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 300.0
@@ -3302,6 +3341,7 @@ connections = [{ kind = "ble", name = "D11" }]
 brand = "NIIMBOT"
 keys = ["D110_M", "D110M"]
 name = "NIIMBOT D110_M"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3344,6 +3384,7 @@ connections = [{ kind = "ble", name = "D110" }]
 brand = "NIIMBOT"
 keys = ["B31"]
 name = "NIIMBOT B31"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3370,6 +3411,7 @@ connections = [{ kind = "ble", name = "B31" }, { kind = "serial" }]
 brand = "NIIMBOT"
 keys = ["B4"]
 name = "NIIMBOT B4"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3406,6 +3448,7 @@ connections = [{ kind = "ble", name = "B4" }, { kind = "serial" }]
 brand = "NIIMBOT"
 keys = ["K3", "K3_W", "K3W"]
 name = "NIIMBOT K3"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3432,6 +3475,7 @@ connections = [{ kind = "ble", name = "K3" }, { kind = "serial" }]
 brand = "NIIMBOT"
 keys = ["K4"]
 name = "NIIMBOT K4"
+support = { brand_url = "https://www.niimbot.com/us/serviceSupport" }
 protocol = "niimbot"
 maturity = "supported"
 dpi = 203.0
@@ -3476,6 +3520,7 @@ connections = [{ kind = "ble", name = "K4" }, { kind = "serial" }]
 brand = "Brother"
 keys = ["QL-500", "QL500"]
 name = "Brother QL-500"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3517,6 +3562,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2015 }]
 brand = "Brother"
 keys = ["QL-550", "QL550"]
 name = "Brother QL-550"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql550eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3558,6 +3604,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2016 }]
 brand = "Brother"
 keys = ["QL-560", "QL560"]
 name = "Brother QL-560"
+support = { brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3599,6 +3646,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2027 }]
 brand = "Brother"
 keys = ["QL-570", "QL570"]
 name = "Brother QL-570"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql570eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3640,6 +3688,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2028 }]
 brand = "Brother"
 keys = ["QL-580N", "QL580N"]
 name = "Brother QL-580N"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql580eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3681,6 +3730,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2029 }]
 brand = "Brother"
 keys = ["QL-650TD", "QL650TD"]
 name = "Brother QL-650TD"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql650eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3724,6 +3774,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x201b }]
 brand = "Brother"
 keys = ["QL-800", "QL800"]
 name = "Brother QL-800"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql800eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3763,6 +3814,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209b }]
 brand = "Brother"
 keys = ["QL-810W", "QL810W"]
 name = "Brother QL-810W"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql810weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3802,6 +3854,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209c }]
 brand = "Brother"
 keys = ["QL-820NWBc", "QL-820NWB", "QL820NWBc", "QL820NWB"]
 name = "Brother QL-820NWBc"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql820nwbeus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3841,6 +3894,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209d }]
 brand = "Brother"
 keys = ["QL-700", "QL700"]
 name = "Brother QL-700"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql700eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3879,6 +3933,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2042 }]
 brand = "Brother"
 keys = ["QL-710W", "QL710W"]
 name = "Brother QL-710W"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql710weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3917,6 +3972,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2043 }]
 brand = "Brother"
 keys = ["QL-720NW", "QL720NW"]
 name = "Brother QL-720NW"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql720nweus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3959,6 +4015,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2044 }]
 brand = "Brother"
 keys = ["QL-600", "QL600"]
 name = "Brother QL-600"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql600eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -3997,6 +4054,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c0 }]
 brand = "Brother"
 keys = ["QL-1100", "QL1100"]
 name = "Brother QL-1100"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1100eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -4048,6 +4106,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a7 }]
 brand = "Brother"
 keys = ["QL-1110NWB", "QL-1110NWBc", "QL1110NWB"]
 name = "Brother QL-1110NWB"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1110nwbeus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -4099,6 +4158,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a8 }]
 brand = "Brother"
 keys = ["QL-1115NWB", "QL1115NWB"]
 name = "Brother QL-1115NWB"
+support = { brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -4155,6 +4215,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20ab }]
 brand = "Brother"
 keys = ["QL-1050", "QL1050"]
 name = "Brother QL-1050"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1050eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -4207,6 +4268,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2020 }]
 brand = "Brother"
 keys = ["QL-1060N", "QL1060N"]
 name = "Brother QL-1060N"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=ql1060neus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
 maturity = "experimental"
 dpi = 300.0
@@ -4258,6 +4320,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x202a }]
 brand = "Zebra"
 keys = ["ZD220", "ZD220d"]
 name = "Zebra ZD220"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/ZD200d.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4291,6 +4354,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0164 }]
 brand = "Zebra"
 keys = ["ZD410", "ZD410d"]
 name = "Zebra ZD410"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/zd410.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4314,6 +4378,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x011c }]
 brand = "Zebra"
 keys = ["GK420d", "GK420"]
 name = "Zebra GK420d"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/gk420d.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4350,6 +4415,7 @@ connections = [
 brand = "Zebra"
 keys = ["ZD620", "ZD620d"]
 name = "Zebra ZD620"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/zd620d.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4383,6 +4449,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0141 }]
 brand = "Zebra"
 keys = ["ZD420", "ZD420d"]
 name = "Zebra ZD420"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/zd420d.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4416,6 +4483,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0120 }]
 brand = "Zebra"
 keys = ["ZD421", "ZD421d"]
 name = "Zebra ZD421"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/zd421.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4449,6 +4517,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0185 }]
 brand = "Zebra"
 keys = ["GC420d", "GC420"]
 name = "Zebra GC420d"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/gc420d.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4482,6 +4551,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x00d1 }]
 brand = "Zebra"
 keys = ["ZP450", "ZP 450", "ZP-450"]
 name = "Zebra ZP450"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/desktop/zp450.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4517,6 +4587,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x008c }]
 brand = "Zebra"
 keys = ["ZT231", "ZT231d"]
 name = "Zebra ZT231"
+support = { product_url = "https://www.zebra.com/us/en/support-downloads/printers/industrial/zt231.html", brand_url = "https://www.zebra.com/us/en/support-downloads/printers.html" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -4550,6 +4621,7 @@ connections = []
 brand = "TSC"
 keys = ["TE200"]
 name = "TSC TE200"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4583,6 +4655,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["TE210"]
 name = "TSC TE210"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4616,6 +4689,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["TE300"]
 name = "TSC TE300"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 300.0
@@ -4649,6 +4723,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["TE310"]
 name = "TSC TE310"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 300.0
@@ -4682,6 +4757,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["DA210"]
 name = "TSC DA210"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4715,6 +4791,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["DA220"]
 name = "TSC DA220"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4748,6 +4825,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["DA310"]
 name = "TSC DA310"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 300.0
@@ -4781,6 +4859,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["DA320"]
 name = "TSC DA320"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 300.0
@@ -4816,6 +4895,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 brand = "TSC"
 keys = ["TTP-244 Pro", "TTP244Pro", "TTP-244PRO"]
 name = "TSC TTP-244 Pro"
+support = { brand_url = "https://www.tscprinters.com/EN/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4851,6 +4931,7 @@ connections = []
 brand = "Xprinter"
 keys = ["XP-420B", "XP420B"]
 name = "Xprinter XP-420B"
+support = { brand_url = "https://www.xprintertech.com/download.html" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4884,6 +4965,7 @@ connections = []
 brand = "Xprinter"
 keys = ["XP-460B", "XP460B"]
 name = "Xprinter XP-460B"
+support = { brand_url = "https://www.xprintertech.com/download.html" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -4917,6 +4999,7 @@ connections = []
 brand = "Phomemo"
 keys = ["M02"]
 name = "Phomemo M02"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemo"
 maturity = "experimental"
 dpi = 203.0
@@ -4942,6 +5025,7 @@ connections = [{ kind = "ble", name = "M02" }]
 brand = "Phomemo"
 keys = ["M02S"]
 name = "Phomemo M02S"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemo"
 maturity = "experimental"
 dpi = 300.0
@@ -4969,6 +5053,7 @@ connections = [{ kind = "ble", name = "M02S" }]
 brand = "Phomemo"
 keys = ["M02 Pro", "M02Pro"]
 name = "Phomemo M02 Pro"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemo"
 maturity = "experimental"
 dpi = 300.0
@@ -4996,6 +5081,7 @@ connections = [{ kind = "ble", name = "M02 Pro" }]
 brand = "Phomemo"
 keys = ["T02"]
 name = "Phomemo T02"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemo"
 maturity = "experimental"
 dpi = 203.0
@@ -5021,6 +5107,7 @@ connections = [{ kind = "ble", name = "T02" }]
 brand = "Phomemo"
 keys = ["M02X"]
 name = "Phomemo M02X"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemom02x"
 maturity = "experimental"
 dpi = 203.0
@@ -5046,6 +5133,7 @@ connections = [{ kind = "ble", name = "M02X" }]
 brand = "Phomemo"
 keys = ["M110"]
 name = "Phomemo M110"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemom110"
 maturity = "experimental"
 dpi = 203.0
@@ -5074,6 +5162,7 @@ connections = [{ kind = "ble", name = "M110" }]
 brand = "Phomemo"
 keys = ["M120"]
 name = "Phomemo M120"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemom110"
 maturity = "experimental"
 dpi = 203.0
@@ -5105,6 +5194,7 @@ connections = [{ kind = "ble", name = "M120" }]
 brand = "Phomemo"
 keys = ["M220"]
 name = "Phomemo M220"
+support = { brand_url = "https://phomemo.com/pages/faq" }
 protocol = "phomemom110"
 maturity = "experimental"
 dpi = 203.0
@@ -5139,6 +5229,7 @@ connections = [{ kind = "ble", name = "M220" }]
 brand           = "Phomemo"
 keys            = ["D30"]
 name            = "Phomemo D30"
+support         = { brand_url = "https://phomemo.com/pages/faq" }
 protocol        = "phomemod30"
 maturity        = "experimental"
 dpi             = 203.0
@@ -5152,6 +5243,7 @@ connections     = [{ kind = "ble", name = "D30" }]
 brand           = "Phomemo"
 keys            = ["D35"]
 name            = "Phomemo D35"
+support         = { brand_url = "https://phomemo.com/pages/faq" }
 protocol        = "phomemod30"
 maturity        = "experimental"
 dpi             = 203.0
@@ -5164,6 +5256,7 @@ connections     = [{ kind = "ble", name = "D35" }]
 brand           = "Phomemo"
 keys            = ["Q30"]
 name            = "Phomemo Q30"
+support         = { brand_url = "https://phomemo.com/pages/faq" }
 protocol        = "phomemod30"
 maturity        = "experimental"
 dpi             = 203.0
@@ -5177,6 +5270,7 @@ connections     = [{ kind = "ble", name = "Q30" }]
 brand           = "Phomemo"
 keys            = ["Q30S"]
 name            = "Phomemo Q30S"
+support         = { brand_url = "https://phomemo.com/pages/faq" }
 protocol        = "phomemod30"
 maturity        = "experimental"
 dpi             = 203.0
@@ -5191,6 +5285,7 @@ connections     = [{ kind = "ble", name = "Q30S" }]
 brand = "Rollo"
 keys = ["X1038", "Rollo X1038"]
 name = "Rollo X1038"
+support = { brand_url = "https://www.rollo.com/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5224,6 +5319,7 @@ connections = []
 brand = "Rollo"
 keys = ["X1040", "Rollo Wireless", "Rollo X1040"]
 name = "Rollo Wireless"
+support = { brand_url = "https://www.rollo.com/support" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5261,6 +5357,7 @@ connections = []
 brand = "Munbyn"
 keys = ["ITPP941", "941", "RW941", "ITPP941-WiFi", "941 WiFi", "941 AirPrint"]
 name = "Munbyn ITPP941"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5294,6 +5391,7 @@ connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 brand = "Munbyn"
 keys = ["ITPP941B", "941B", "RW941B"]
 name = "Munbyn ITPP941B"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5328,6 +5426,7 @@ connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 brand = "Munbyn"
 keys = ["ITPP941BP", "941BP", "RW941BP"]
 name = "Munbyn ITPP941BP"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 300.0
@@ -5362,6 +5461,7 @@ connections = []
 brand = "Munbyn"
 keys = ["RW130B", "ITPP130", "ITPP130B", "130B", "P130B"]
 name = "Munbyn RW130B"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5396,6 +5496,7 @@ connections = []
 brand = "Munbyn"
 keys = ["ITPP129", "RW129B", "129B", "P129"]
 name = "Munbyn ITPP129"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5430,6 +5531,7 @@ connections = []
 brand = "Munbyn"
 keys = ["RW402B", "402B"]
 name = "Munbyn RW402B"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5463,6 +5565,7 @@ connections = []
 brand = "Munbyn"
 keys = ["RW403B", "403B"]
 name = "Munbyn RW403B"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5497,6 +5600,7 @@ connections = []
 brand = "Munbyn"
 keys = ["RW405B", "405B"]
 name = "Munbyn RW405B"
+support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
 maturity = "experimental"
 dpi = 203.0
@@ -5532,6 +5636,7 @@ connections = []
 brand = "Brother"
 keys = ["PT-P700", "PTP700", "P700"]
 name = "Brother PT-P700"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p700eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5571,6 +5676,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2061 }]
 brand = "Brother"
 keys = ["PT-P750W", "PTP750W", "P750W"]
 name = "Brother PT-P750W"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5610,6 +5716,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2062 }]
 brand = "Brother"
 keys = ["PT-H500", "PTH500", "H500"]
 name = "Brother PT-H500"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=h500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5649,6 +5756,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205e }]
 brand = "Brother"
 keys = ["PT-E500", "PTE500", "E500"]
 name = "Brother PT-E500"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5690,6 +5798,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205f }]
 brand = "Brother"
 keys = ["PT-E550W", "PTE550W", "E550W"]
 name = "Brother PT-E550W"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e550weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5729,6 +5838,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2060 }]
 brand = "Brother"
 keys = ["PT-D600", "PTD600", "D600"]
 name = "Brother PT-D600"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d600eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5768,6 +5878,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2074 }]
 brand = "Brother"
 keys = ["PT-D450", "PTD450", "D450"]
 name = "Brother PT-D450"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d450eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5802,6 +5913,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2073 }]
 brand = "Brother"
 keys = ["PT-P710BT", "PTP710BT", "P710BT", "Cube"]
 name = "Brother PT-P710BT (P-touch Cube Plus)"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p710bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5843,6 +5955,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20af }, { kind
 brand = "Brother"
 keys = ["PT-P300BT", "PTP300BT", "P300BT"]
 name = "Brother PT-P300BT (P-touch Cube)"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p300bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = false
@@ -5876,6 +5989,7 @@ connections = [{ kind = "serial" }]
 brand = "Brother"
 keys = ["PT-P900", "PTP900", "P900"]
 name = "Brother PT-P900"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p900eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5916,6 +6030,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2083 }]
 brand = "Brother"
 keys = ["PT-P900W", "PTP900W", "P900W"]
 name = "Brother PT-P900W"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p900weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5956,6 +6071,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2085 }]
 brand = "Brother"
 keys = ["PT-P950NW", "PTP950NW", "P950NW"]
 name = "Brother PT-P950NW"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p950nweus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -5996,6 +6112,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2086 }]
 brand = "Brother"
 keys = ["PT-P910BT", "PTP910BT", "P910BT"]
 name = "Brother PT-P910BT"
+support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p910bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 maturity = "experimental"
 reports_media = true
@@ -6042,6 +6159,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c7 }, { kind
 brand = "Epson"
 keys = ["CW-C4000", "CWC4000", "ColorWorks C4000", "CW-C4000u", "CW-C4000e"]
 name = "Epson ColorWorks CW-C4000"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-CW-C4000/s/SPT_C31CK03101", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 600.0
@@ -6073,6 +6191,7 @@ connections = []
 brand = "Epson"
 keys = ["CW-C6000A", "CWC6000A", "ColorWorks C6000A", "CW-C6000Au", "CW-C6000Ae"]
 name = "Epson ColorWorks CW-C6000A"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-CW-C6000A/s/SPT_C31CH76101", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 600.0
@@ -6104,6 +6223,7 @@ connections = []
 brand = "Epson"
 keys = ["CW-C6000P", "CWC6000P", "ColorWorks C6000P", "CW-C6000Pu", "CW-C6000Pe"]
 name = "Epson ColorWorks CW-C6000P"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-CW-C6000P/s/SPT_C31CH76201", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 600.0
@@ -6135,6 +6255,7 @@ connections = []
 brand = "Epson"
 keys = ["CW-C6500A", "CWC6500A", "ColorWorks C6500A", "CW-C6500Au", "CW-C6500Ae"]
 name = "Epson ColorWorks CW-C6500A"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-CW-C6500A/s/SPT_C31CH77101", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 600.0
@@ -6167,6 +6288,7 @@ connections = []
 brand = "Epson"
 keys = ["CW-C6500P", "CWC6500P", "ColorWorks C6500P", "CW-C6500Pu", "CW-C6500Pe"]
 name = "Epson ColorWorks CW-C6500P"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-CW-C6500P/s/SPT_C31CH77201", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 600.0
@@ -6199,6 +6321,7 @@ connections = []
 brand = "Epson"
 keys = ["CW-C3500", "CWC3500", "ColorWorks C3500", "TM-C3500"]
 name = "Epson ColorWorks CW-C3500"
+support = { product_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/Epson-ColorWorks-C3500/s/SPT_C31CD54011", brand_url = "https://epson.com/Support/Printers/Label-Printers/ColorWorks-Series/sh/s131" }
 protocol = "esclabel"
 maturity = "experimental"
 dpi = 720.0
@@ -6233,6 +6356,7 @@ connections = []
 brand           = "Bixolon"
 keys            = ["SLP-DX220", "SLPDX220", "DX220"]
 name            = "Bixolon SLP-DX220"
+support         = { brand_url = "https://bixolonusa.com/support/" }
 protocol        = "slcs"
 maturity        = "experimental"
 dpi             = 203.0
@@ -6246,6 +6370,7 @@ connections     = [{ kind = "usb", vendor_id = 0x1504 }]
 brand = "Bixolon"
 keys = ["SLP-DX420", "SLPDX420", "DX420"]
 name = "Bixolon SLP-DX420"
+support = { brand_url = "https://bixolonusa.com/support/" }
 protocol = "slcs"
 maturity = "experimental"
 dpi = 203.0
@@ -6273,6 +6398,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504 }]
 brand = "Bixolon"
 keys = ["SLP-TX400", "SLPTX400", "TX400"]
 name = "Bixolon SLP-TX400"
+support = { brand_url = "https://bixolonusa.com/support/" }
 protocol = "slcs"
 maturity = "experimental"
 dpi = 203.0
@@ -6300,6 +6426,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504 }]
 brand = "Bixolon"
 keys = ["SLP-TX420", "SLPTX420", "TX420"]
 name = "Bixolon SLP-TX420"
+support = { brand_url = "https://bixolonusa.com/support/" }
 protocol = "slcs"
 maturity = "experimental"
 dpi = 203.0
@@ -6327,6 +6454,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504 }]
 brand = "Bixolon"
 keys = ["SLP-T400", "SLPT400", "T400"]
 name = "Bixolon SLP-T400"
+support = { brand_url = "https://bixolonusa.com/support/" }
 protocol = "slcs"
 maturity = "experimental"
 dpi = 203.0
@@ -6354,6 +6482,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504, product_id = 0x0008 }]
 brand = "Bixolon"
 keys = ["XD3-40d", "XD340d", "XD3-40D"]
 name = "Bixolon XD3-40d"
+support = { brand_url = "https://bixolonusa.com/support/" }
 protocol = "slcs"
 maturity = "experimental"
 dpi = 203.0
@@ -6384,6 +6513,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504 }]
 brand = "Godex"
 keys = ["DT4x", "DT4X", "DT4"]
 name = "Godex DT4x"
+support = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol = "ezpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6411,6 +6541,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 brand           = "Godex"
 keys            = ["DT2x", "DT2X", "DT2"]
 name            = "Godex DT2x"
+support         = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol        = "ezpl"
 maturity        = "experimental"
 dpi             = 203.0
@@ -6424,6 +6555,7 @@ connections     = [{ kind = "usb", vendor_id = 0x6495 }]
 brand = "Godex"
 keys = ["G500", "G-500"]
 name = "Godex G500"
+support = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol = "ezpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6451,6 +6583,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 brand = "Godex"
 keys = ["G530", "G-530"]
 name = "Godex G530"
+support = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol = "ezpl"
 maturity = "experimental"
 dpi = 300.0
@@ -6478,6 +6611,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 brand = "Godex"
 keys = ["RT700", "RT-700"]
 name = "Godex RT700"
+support = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol = "ezpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6505,6 +6639,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 brand = "Godex"
 keys = ["RT730", "RT-730"]
 name = "Godex RT730"
+support = { brand_url = "https://www.godexintl.com/EN/Support/Download" }
 protocol = "ezpl"
 maturity = "experimental"
 dpi = 300.0
@@ -6535,6 +6670,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 brand = "SATO"
 keys = ["CL4NX", "CL4NX-Plus", "CL4NXPlus"]
 name = "SATO CL4NX"
+support = { brand_url = "https://www.sato-global.com/support/" }
 protocol = "sbpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6562,6 +6698,7 @@ connections = [{ kind = "usb", vendor_id = 0x0828 }]
 brand = "SATO"
 keys = ["CL6NX", "CL6NX-Plus", "CL6NXPlus"]
 name = "SATO CL6NX"
+support = { brand_url = "https://www.sato-global.com/support/" }
 protocol = "sbpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6589,6 +6726,7 @@ connections = [{ kind = "usb", vendor_id = 0x0828 }]
 brand = "SATO"
 keys = ["CT4-LX", "CT4LX"]
 name = "SATO CT4-LX"
+support = { brand_url = "https://www.sato-global.com/support/" }
 protocol = "sbpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6616,6 +6754,7 @@ connections = [{ kind = "usb", vendor_id = 0x0828 }]
 brand           = "SATO"
 keys            = ["WWCW4", "WWCW-4", "WCW4"]
 name            = "SATO WWCW4"
+support         = { brand_url = "https://www.sato-global.com/support/" }
 protocol        = "sbpl"
 maturity        = "experimental"
 dpi             = 203.0
@@ -6633,6 +6772,7 @@ connections     = [{ kind = "usb", vendor_id = 0x0828 }]
 brand = "Honeywell"
 keys = ["PC42d", "PC42D", "PC42"]
 name = "Honeywell PC42d"
+support = { brand_url = "https://hsmftp.honeywell.com/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6660,6 +6800,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 brand = "Honeywell"
 keys = ["PC42t", "PC42T"]
 name = "Honeywell PC42t"
+support = { brand_url = "https://hsmftp.honeywell.com/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6687,6 +6828,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 brand = "Honeywell"
 keys = ["PM42", "PM-42"]
 name = "Honeywell PM42"
+support = { brand_url = "https://hsmftp.honeywell.com/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6714,6 +6856,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 brand = "Honeywell"
 keys = ["PX45", "PX-45"]
 name = "Honeywell PX45"
+support = { brand_url = "https://hsmftp.honeywell.com/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6741,6 +6884,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 brand = "Honeywell"
 keys = ["PX65", "PX-65"]
 name = "Honeywell PX65"
+support = { brand_url = "https://hsmftp.honeywell.com/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 300.0
@@ -6774,6 +6918,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 brand = "Citizen"
 keys = ["CL-E321", "CLE321"]
 name = "Citizen CL-E321"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6801,6 +6946,7 @@ connections = []
 brand = "Citizen"
 keys = ["CL-S521", "CLS521", "CLP-521", "CLP521"]
 name = "Citizen CL-S521"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6829,6 +6975,7 @@ connections = [{ kind = "usb", vendor_id = 0x08bd, product_id = 0x0208 }]
 brand = "Citizen"
 keys = ["CL-S631", "CLS631", "CLP-631", "CLP631"]
 name = "Citizen CL-S631"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 300.0
@@ -6856,6 +7003,7 @@ connections = [{ kind = "usb", vendor_id = 0x1d90, product_id = 0x2037 }]
 brand = "Citizen"
 keys = ["CL-S700", "CLS700"]
 name = "Citizen CL-S700"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6885,6 +7033,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 brand = "Citizen"
 keys = ["CL-S621", "CLS621", "CLP-621", "CLP621"]
 name = "Citizen CL-S621"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6914,6 +7063,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 brand = "Citizen"
 keys = ["CL-E720", "CLE720"]
 name = "Citizen CL-E720"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "zpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6943,6 +7093,7 @@ connections = []
 brand = "Citizen"
 keys = ["CL-S700DT", "CLS700DT", "CL-S700DTII"]
 name = "Citizen CL-S700DT"
+support = { brand_url = "https://www.citizen-systems.com/support/" }
 protocol = "dpl"
 maturity = "experimental"
 dpi = 203.0
@@ -6976,6 +7127,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 brand = "Toshiba TEC"
 keys = ["B-EV4D", "BEV4D", "B-EV4"]
 name = "Toshiba TEC B-EV4D"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7003,6 +7155,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-EV4T", "BEV4T"]
 name = "Toshiba TEC B-EV4T"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7030,6 +7183,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-FV4D", "BFV4D", "B-FV4"]
 name = "Toshiba TEC B-FV4D"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7057,6 +7211,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-FV4T", "BFV4T"]
 name = "Toshiba TEC B-FV4T"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7084,6 +7239,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-SV4", "BSV4", "B-SV4D", "B-SV4T"]
 name = "Toshiba TEC B-SV4"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7112,6 +7268,7 @@ connections = [{ kind = "usb", vendor_id = 0x08a6, product_id = 0x0051 }]
 brand = "Toshiba TEC"
 keys = ["B-SX4", "BSX4", "B-SX4T"]
 name = "Toshiba TEC B-SX4"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7139,6 +7296,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-SX5", "BSX5", "B-SX5T"]
 name = "Toshiba TEC B-SX5"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7166,6 +7324,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["B-SA4TM", "BSA4TM", "B-SA4", "BSA4"]
 name = "Toshiba TEC B-SA4TM"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0
@@ -7193,6 +7352,7 @@ connections = []
 brand = "Toshiba TEC"
 keys = ["BV420D", "BV420", "BX410", "BX420"]
 name = "Toshiba TEC BV420D"
+support = { brand_url = "https://business.toshiba.com/support-drivers" }
 protocol = "tpcl"
 maturity = "experimental"
 dpi = 203.0

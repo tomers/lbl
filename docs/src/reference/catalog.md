@@ -21,6 +21,20 @@ Each entry has:
   display time).
 - `compatible` — printer model strings this media works with.
 
+## Printers
+
+Each `[[printers]]` entry describes a known model (protocol, maturity, DPI,
+head width, media, connections). Optional manufacturer support links:
+
+```toml
+support = { product_url = "https://…", brand_url = "https://…" }
+```
+
+- `product_url` — model-specific support page (drivers, manuals, FAQs).
+- `brand_url` — brand-level support hub.
+
+At display time prefer `product_url`, then fall back to `brand_url`.
+
 ## Overlays
 
 The bundled catalog (`crates/lbl-catalog/data/catalog.toml`) can be extended

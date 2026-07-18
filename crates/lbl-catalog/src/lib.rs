@@ -21,7 +21,7 @@ mod validate;
 
 pub use model::{
     encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, Maturity, MediaSpec,
-    PrinterEntry, ResolvedTransport,
+    PrinterEntry, PrinterSupport, ResolvedTransport,
 };
 pub use validate::{validate_catalog_geometry, CatalogGeometryError};
 
@@ -657,6 +657,40 @@ mod tests {
         }
         let classic = catalog.lookup_printer("LabelWriter 450").unwrap();
         assert!(!classic.supports_soft_reboot);
+    }
+
+    #[test]
+    fn printer_support_urls_prefer_product_over_brand() {
+        let catalog = Catalog::bundled().unwrap();
+        let dymo = catalog.lookup_printer("LabelWriter 550").unwrap();
+        assert_eq!(
+            dymo.support.brand_url.as_deref(),
+            Some("https://www.dymo.com/support")
+        );
+        assert!(dymo.support.product_url.is_none());
+        assert_eq!(
+            dymo.support.primary_url(),
+            Some("https://www.dymo.com/support")
+        );
+
+        let brother = catalog.lookup_printer("QL-820NWBc").unwrap();
+        assert!(brother
+            .support
+            .product_url
+            .as_deref()
+            .is_some_and(|u| u.contains("lpql820nwbeus")));
+        assert_eq!(
+            brother.support.primary_url(),
+            brother.support.product_url.as_deref()
+        );
+
+        for printer in catalog.printers() {
+            assert!(
+                !printer.support.is_empty(),
+                "{} missing support links",
+                printer.canonical_key()
+            );
+        }
     }
 
     #[test]
