@@ -268,6 +268,11 @@ pub struct PrinterEntry {
     /// Whether the printer reports loaded media for auto-detection.
     #[serde(default)]
     pub reports_media: bool,
+    /// Whether the printer supports a host-initiated soft reboot of the print
+    /// engine (recovery when wedged / lock stuck). Catalog/UI gate only — not
+    /// an encode-time capability.
+    #[serde(default)]
+    pub supports_soft_reboot: bool,
     /// Media catalog keys this printer can use.
     #[serde(default)]
     pub supported_media: Vec<String>,

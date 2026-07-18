@@ -76,6 +76,10 @@ fn host_profile_routes() -> Router<AppState> {
             "/api/printers/profiles/{id}/status",
             get(handlers::profile_printer_status),
         )
+        .route(
+            "/api/printers/profiles/{id}/soft-reboot",
+            post(handlers::profile_soft_reboot),
+        )
 }
 
 /// Build the application router with all routes mounted under `/api`.
@@ -529,6 +533,7 @@ mod tests {
             ("DELETE", "/api/printers/profiles/x"),
             ("GET", "/api/printers/profiles/x/media"),
             ("GET", "/api/printers/profiles/x/status"),
+            ("POST", "/api/printers/profiles/x/soft-reboot"),
         ] {
             let mut builder = Request::builder().method(method).uri(uri);
             let body = if method == "PUT" {

@@ -1916,6 +1916,7 @@ maturity = "verified"
 dpi = 300.0
 max_width_mm = 57.0
 reports_media = true
+supports_soft_reboot = true
 default_media = "11352"
 supported_media = [
   "99010",
@@ -1966,6 +1967,7 @@ maturity = "supported"
 dpi = 300.0
 max_width_mm = 57.0
 reports_media = true
+supports_soft_reboot = true
 default_media = "11352"
 supported_media = [
   "99010",
@@ -2016,6 +2018,7 @@ maturity = "supported"
 dpi = 300.0
 max_width_mm = 104.0
 reports_media = true
+supports_soft_reboot = true
 default_media = "11352"
 supported_media = [
   "99010",

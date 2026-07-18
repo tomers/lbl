@@ -23,6 +23,11 @@ pub fn status_supported(protocol: Protocol) -> bool {
     )
 }
 
+/// Whether `protocol` supports a host soft-reboot of the print engine.
+pub fn soft_reboot_supported(protocol: Protocol) -> bool {
+    matches!(protocol, Protocol::DymoLw)
+}
+
 /// Print-engine status from a connected printer.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "protocol", rename_all = "kebab-case")]
@@ -87,5 +92,16 @@ pub fn query_loaded_media_sku(
             Ok(brother_pt::media_key_hint(&status))
         }
         _ => Ok(None),
+    }
+}
+
+/// Soft-reboot the print engine when the protocol supports it.
+#[cfg(feature = "usb")]
+pub fn soft_reboot_print_engine(protocol: Protocol, usb: &UsbTransport) -> Result<(), DeviceError> {
+    match protocol {
+        Protocol::DymoLw => dymo_lw::soft_reboot_usb(usb),
+        other => Err(DeviceError::Transport(format!(
+            "soft reboot not supported for protocol {other:?}"
+        ))),
     }
 }

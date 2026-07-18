@@ -229,6 +229,58 @@ pub async fn profile_printer_status(
     Ok(Json(status).into_response())
 }
 
+pub async fn profile_soft_reboot(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let profiles = state.profiles.load()?;
+    let profile = profiles
+        .iter()
+        .find(|p| p.id.0 == id)
+        .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, format!("no profile '{id}'")))?;
+
+    if !lbl_device::soft_reboot_supported(profile.model.protocol) {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "soft reboot is not supported for protocol {:?}",
+                profile.model.protocol
+            ),
+        ));
+    }
+
+    let connected = profile_is_connected(profile, state.host_discovery_enabled);
+    if !connected {
+        return Err(ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "printer is not connected".into(),
+        ));
+    }
+
+    let profile = profile.clone();
+    spawn_blocking(move || soft_reboot_profile(&profile))
+        .await
+        .map_err(fail_internal)?
+        .map_err(reject_bad_request)?;
+
+    Ok(Json(json!({ "ok": true })).into_response())
+}
+
+fn soft_reboot_profile(profile: &PrinterProfile) -> Result<(), String> {
+    match &profile.transport {
+        lbl_core::printer::Transport::Usb {
+            vendor_id,
+            product_id,
+            serial,
+        } => {
+            let usb = lbl_device::UsbTransport::new(*vendor_id, *product_id, serial.clone());
+            lbl_device::soft_reboot_print_engine(profile.model.protocol, &usb)
+                .map_err(|e| e.to_string())
+        }
+        _ => Err("profile transport does not support soft reboot".into()),
+    }
+}
+
 fn query_profile_print_status(profile: &PrinterProfile) -> Result<lbl_device::PrintStatus, String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {

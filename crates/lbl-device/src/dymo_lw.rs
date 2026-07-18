@@ -62,6 +62,14 @@ pub fn engine_version_request() -> [u8; 2] {
     [ESC, b'V']
 }
 
+/// Build an `ESC @` soft-reboot request for the print engine.
+///
+/// Restarts the on-printer engine without a host power-cycle. No reply is
+/// defined; use after a wedged lock or failed job when status polls hang.
+pub fn soft_reboot_request() -> [u8; 2] {
+    [ESC, b'@']
+}
+
 /// Main-bay status: media present and OK (NFC-valid genuine roll).
 const BAY_MEDIA_OK: u8 = 8;
 
@@ -544,6 +552,11 @@ pub fn query_engine_version(
     parse_engine_version(&data)
 }
 
+/// Soft-reboot the print engine (`ESC @`). Fire-and-forget; no status reply.
+pub fn soft_reboot(session: &mut UsbBulkSession) -> Result<(), DeviceError> {
+    session.transfer_out(&soft_reboot_request())
+}
+
 fn media_likely_present(bay_code: u8) -> bool {
     matches!(bay_code, 4..=10)
 }
@@ -553,6 +566,13 @@ fn media_likely_present(bay_code: u8) -> bool {
 pub fn query_status(usb: &UsbTransport) -> Result<Lw550PrintStatus, DeviceError> {
     let mut session = open_usb_bulk_session(usb)?;
     query_print_status(&mut session)
+}
+
+/// Soft-reboot the print engine over USB (`ESC @`).
+#[cfg(feature = "usb")]
+pub fn soft_reboot_usb(usb: &UsbTransport) -> Result<(), DeviceError> {
+    let mut session = open_usb_bulk_session(usb)?;
+    soft_reboot(&mut session)
 }
 
 /// Query the loaded media SKU over USB.
@@ -862,6 +882,7 @@ mod tests {
         assert_eq!(status_request(LOCK_INTER_LABEL), [ESC, b'A', 2]);
         assert_eq!(sku_info_request(), [ESC, b'U']);
         assert_eq!(engine_version_request(), [ESC, b'V']);
+        assert_eq!(soft_reboot_request(), [ESC, b'@']);
     }
 
     #[test]

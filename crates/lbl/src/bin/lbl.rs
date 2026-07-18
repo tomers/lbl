@@ -1677,6 +1677,8 @@ enum DeviceCommand {
     List,
     /// Query print-engine status when supported by the printer protocol.
     Status(StatusArgs),
+    /// Soft-reboot the print engine when supported (`ESC @` on LabelWriter 550).
+    SoftReboot(StatusArgs),
 }
 
 #[derive(Args)]
@@ -1703,6 +1705,7 @@ fn run_device(args: DeviceArgs) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&printers)?);
         }
         DeviceCommand::Status(status) => run_device_status(status)?,
+        DeviceCommand::SoftReboot(args) => run_device_soft_reboot(args)?,
     }
     Ok(())
 }
@@ -1732,6 +1735,52 @@ fn run_device_status(args: StatusArgs) -> Result<()> {
     let status =
         lbl_device::query_print_status(target.protocol, &transport).map_err(|e| anyhow!("{e}"))?;
     println!("{}", serde_json::to_string_pretty(&status)?);
+    Ok(())
+}
+
+fn run_device_soft_reboot(args: StatusArgs) -> Result<()> {
+    let loader = lbl_config::Loader::new();
+    let config = loader
+        .load()
+        .unwrap_or_else(|_| lbl_config::Config::default());
+    let catalog = Catalog::bundled()?;
+
+    if let Some(key) = args.printer.as_deref() {
+        let entry = catalog
+            .printers()
+            .iter()
+            .find(|p| p.matches_key(key))
+            .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;
+        if !entry.supports_soft_reboot {
+            bail!("catalog printer '{key}' does not support soft reboot");
+        }
+    }
+
+    let target = resolve_status_target(
+        &catalog,
+        &config,
+        args.printer.as_deref(),
+        args.profile.as_deref(),
+        args.usb,
+    )?;
+
+    if !lbl_device::soft_reboot_supported(target.protocol) {
+        bail!(
+            "soft reboot is not supported for protocol {:?}",
+            target.protocol
+        );
+    }
+
+    let (vid, pid) = target
+        .usb
+        .split_once(':')
+        .ok_or_else(|| anyhow!("usb target must be vid:pid (hex)"))?;
+    let vendor_id = u16::from_str_radix(vid, 16)?;
+    let product_id = u16::from_str_radix(pid, 16)?;
+    let transport = lbl_device::UsbTransport::new(vendor_id, product_id, target.serial);
+    lbl_device::soft_reboot_print_engine(target.protocol, &transport)
+        .map_err(|e| anyhow!("{e}"))?;
+    eprintln!("soft-rebooted print engine at USB {}", target.usb);
     Ok(())
 }
 
