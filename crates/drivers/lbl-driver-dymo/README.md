@@ -17,8 +17,7 @@ and emits:
 - `ESC A` — status query (host should read the IN endpoint)
 - `ESC E` — form feed / cut
 
-The command set is modeled on
-[labelle](https://github.com/labelle-org/labelle) (derived from dymoprint).
+The command set follows the classic dymoprint / LabelManager USB stream.
 
 ## `LabelWriter550Driver` — LabelWriter 550 raster protocol (`Protocol::DymoLw`)
 

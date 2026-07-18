@@ -1,9 +1,9 @@
 # lbl-pattern
 
 Generate a printer calibration **sample pattern** as a 1-bit [`MonoBitmap`] (PBM).
-The layout matches [Labelle](https://github.com/labelle-org/labelle)'s
-`SamplePatternRenderEngine`: corner line groups, vertical rules, checkerboards, and
-row numbering for margin/head calibration.
+The layout is the classic LabelManager calibration composition: corner line
+groups, vertical rules, checkerboards, and row numbering for margin/head
+calibration.
 
 The raster is produced at exact device dots and is meant to pass **straight to
 [`lbl-encode`](../lbl-encode/)** — no rescaling, rotation, or dithering.
@@ -25,4 +25,3 @@ lbl print --sample-pattern 64 --width-mm 12 --dpi 180 --protocol dymo
 When omitted on `lbl print` / `lbl-encode`, it defaults to the resolved media width
 (`--media` / `--width-mm` at `--dpi` — e.g. 96 dots for NIIMBOT 12 mm @ 203 dpi).
 Pass an explicit value to override (e.g. `64` for a 64-dot DYMO head).
-[margin calibration guide](https://github.com/labelle-org/labelle/blob/main/doc/margin-calibration-howto.md).
