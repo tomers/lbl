@@ -340,6 +340,16 @@ mod tests {
     }
 
     #[test]
+    fn date_stamp_directive() {
+        let doc = MarkdownDocument::parse("Prep **{{date:%Y-%m-%d}}**");
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(r#"<stamp kind="date" format="%Y-%m-%d"></stamp>"#),
+            "{html}"
+        );
+    }
+
+    #[test]
     fn unrecognized_directive_kept_literal() {
         let doc = MarkdownDocument::parse("a {{unknown:y}} b");
         let html = doc.to_authoring_html();

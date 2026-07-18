@@ -12,6 +12,8 @@
 //! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
 //!   CODE128, so `{{barcode:12345}}` also works)
 //! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
+//! - `{{date:%Y-%m-%d}}` / `{{time:%H:%M}}` / `{{datetime:…}}` -> date/time
+//!   stamp (`<stamp>`; resolved at preview/print by the orchestrator)
 //!
 //! Underline uses `++text++` (converted to `<u>` before parsing; same marker
 //! style as GFM strikethrough `~~text~~`, which pulldown-cmark handles natively).

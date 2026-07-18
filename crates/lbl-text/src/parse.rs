@@ -1,6 +1,7 @@
 //! Parsing of text + inline directives into an authoring document.
 
 use crate::qr::{parse_qr_attrs, QrOptions};
+use crate::stamp::StampKind;
 use crate::DEFAULT_SYMBOLOGY;
 
 /// How a barcode grows in fill mode: configured bar height vs stretch to the label.
@@ -80,6 +81,13 @@ pub enum Block {
     },
     /// An image referenced by a local path or remote URL.
     Image(String),
+    /// A date/time stamp resolved to local wall-clock text at preview/print time.
+    Stamp {
+        /// Date, time, or datetime scope (Studio presets; format drives output).
+        kind: StampKind,
+        /// Chrono strftime pattern, e.g. `%Y-%m-%d`.
+        format: String,
+    },
 }
 
 impl Block {
@@ -139,6 +147,11 @@ impl Block {
                 )
             }
             Block::Image(uri) => format!("<img src=\"{}\" />", escape(uri)),
+            Block::Stamp { kind, format } => wrap_lbl_text_inlines(&format!(
+                "<stamp kind=\"{}\" format=\"{}\"></stamp>",
+                kind.as_str(),
+                escape(format)
+            )),
         }
     }
 
@@ -160,6 +173,11 @@ impl Block {
                 "<span style=\"color:{}\">{}</span>",
                 escape(color),
                 inline_blocks_html(content)
+            ),
+            Block::Stamp { kind, format } => format!(
+                "<stamp kind=\"{}\" format=\"{}\"></stamp>",
+                kind.as_str(),
+                escape(format)
             ),
             _ => self.to_authoring_html(),
         }
@@ -480,6 +498,7 @@ fn is_inline_flow_block(block: &Block) -> bool {
         Block::Sized { .. }
         | Block::Font { .. }
         | Block::Color { .. }
+        | Block::Stamp { .. }
         | Block::Qr { .. }
         | Block::Barcode { .. }
         | Block::Image(_) => true,
@@ -491,7 +510,11 @@ fn is_text_run_piece_group(pieces: &[LayoutPiece]) -> bool {
         matches!(
             piece,
             LayoutPiece::Inline(
-                Block::Text(_) | Block::Sized { .. } | Block::Font { .. } | Block::Color { .. }
+                Block::Text(_)
+                    | Block::Sized { .. }
+                    | Block::Font { .. }
+                    | Block::Color { .. }
+                    | Block::Stamp { .. }
             )
         )
     })
@@ -548,6 +571,7 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
     match kind.as_str() {
         "barcode" => Some(barcode_from_spec(rest)),
         "color" | "fg" | "foreground" | "tc" | "text-color" => color_from_spec(rest),
+        "date" | "time" | "datetime" => stamp_from_spec(&kind, rest),
         "ff" | "font" | "font-family" => font_from_spec(rest),
         "font-size" | "fs" | "size" => sized_from_spec(rest),
         "image" | "img" => Some(Block::Image(rest.to_string())),
@@ -563,6 +587,18 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         }
         _ => None,
     }
+}
+
+fn stamp_from_spec(kind: &str, format: &str) -> Option<Block> {
+    let kind = StampKind::parse(kind)?;
+    let format = format.trim();
+    if format.is_empty() {
+        return None;
+    }
+    Some(Block::Stamp {
+        kind,
+        format: format.to_string(),
+    })
 }
 
 /// Parse a sizing spec `SCALE:TEXT` (e.g. `1.5:World`) into a [`Block::Sized`].
@@ -1083,6 +1119,49 @@ mod tests {
                 Block::Image("./a.png".into()),
                 Block::Image("https://x/y.png".into()),
             ]
+        );
+    }
+
+    #[test]
+    fn date_time_datetime_directives() {
+        use crate::StampKind;
+        let doc = Document::parse(
+            "Prep {{date:%Y-%m-%d}} at {{time:%H:%M}} ({{datetime:%Y-%m-%d %H:%M}})",
+            false,
+        );
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Prep ".into()),
+                Block::Stamp {
+                    kind: StampKind::Date,
+                    format: "%Y-%m-%d".into(),
+                },
+                Block::Text(" at ".into()),
+                Block::Stamp {
+                    kind: StampKind::Time,
+                    format: "%H:%M".into(),
+                },
+                Block::Text(" (".into()),
+                Block::Stamp {
+                    kind: StampKind::DateTime,
+                    format: "%Y-%m-%d %H:%M".into(),
+                },
+                Block::Text(")".into()),
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(r#"<stamp kind="date" format="%Y-%m-%d"></stamp>"#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"<stamp kind="time" format="%H:%M"></stamp>"#),
+            "{html}"
+        );
+        assert!(
+            html.contains(r#"<stamp kind="datetime" format="%Y-%m-%d %H:%M"></stamp>"#),
+            "{html}"
         );
     }
 }

@@ -110,7 +110,26 @@ pub enum Source {
 }
 
 /// Turn a [`Source`] into one or more authoring-HTML labels.
+///
+/// Date/time `<stamp>` elements are resolved once for the job using the host
+/// local clock so every label in a batch shares the same instant.
 pub fn authoring_labels(source: Source, selection: &BatchSelection) -> Result<Vec<AuthoringLabel>> {
+    let now = chrono::Local::now();
+    let labels = authoring_labels_unresolved(source, selection)?;
+    labels
+        .into_iter()
+        .map(|mut label| {
+            label.html = lbl_text::resolve_stamps_at(&label.html, now)
+                .map_err(|e| anyhow!("resolving date/time stamps: {e}"))?;
+            Ok(label)
+        })
+        .collect()
+}
+
+fn authoring_labels_unresolved(
+    source: Source,
+    selection: &BatchSelection,
+) -> Result<Vec<AuthoringLabel>> {
     match source {
         Source::Text { text, raw } => {
             let record = serde_json::json!({ "text": text, "raw": raw });
@@ -1940,6 +1959,48 @@ mod tests {
         .unwrap();
         assert_eq!(labels.len(), 1);
         assert!(labels[0].html.contains("<qr>x</qr>"));
+    }
+
+    #[test]
+    fn stamp_directives_resolve_in_authoring_labels() {
+        let labels = authoring_labels(
+            Source::Text {
+                text: "Prep {{date:%Y-%m-%d}}".into(),
+                raw: false,
+            },
+            &BatchSelection::default(),
+        )
+        .unwrap();
+        assert_eq!(labels.len(), 1);
+        assert!(
+            !labels[0].html.contains("<stamp"),
+            "stamp should be resolved: {}",
+            labels[0].html
+        );
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        assert!(
+            labels[0].html.contains(&today),
+            "expected {today} in {}",
+            labels[0].html
+        );
+    }
+
+    #[test]
+    fn html_stamp_elements_resolve() {
+        let labels = authoring_labels(
+            Source::Html(
+                r#"<div class="lbl-label"><stamp kind="time" format="%H:%M"></stamp></div>"#.into(),
+            ),
+            &BatchSelection::default(),
+        )
+        .unwrap();
+        assert!(!labels[0].html.contains("<stamp"));
+        let now_hm = chrono::Local::now().format("%H:%M").to_string();
+        assert!(
+            labels[0].html.contains(&now_hm),
+            "expected {now_hm} in {}",
+            labels[0].html
+        );
     }
 
     #[test]
