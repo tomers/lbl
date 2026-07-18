@@ -25,7 +25,7 @@ impl AssetsBase {
         }
     }
 
-    /// URL for the barcode library (exposes global `JsBarcode`).
+    /// URL for the classic 1D barcode library (exposes global `JsBarcode`).
     pub fn jsbarcode_url(&self) -> String {
         match self {
             AssetsBase::Cdn => {
@@ -33,6 +33,16 @@ impl AssetsBase {
             }
             AssetsBase::Local(base) => {
                 format!("{}/JsBarcode.all.min.js", base.trim_end_matches('/'))
+            }
+        }
+    }
+
+    /// URL for bwip-js (exposes global `bwipjs`) — industrial 2D / postal / GS1.
+    pub fn bwip_url(&self) -> String {
+        match self {
+            AssetsBase::Cdn => "https://cdn.jsdelivr.net/npm/bwip-js@4/dist/bwip-js-min.js".into(),
+            AssetsBase::Local(base) => {
+                format!("{}/bwip-js-min.js", base.trim_end_matches('/'))
             }
         }
     }
@@ -259,69 +269,106 @@ pub const QR_INIT_JS: &str = r#"
 
 /// JS that renders barcode placeholders (`.lbl-barcode[data-value]`).
 ///
-/// Honors `window.__LBL_STYLE.barcode` (`width`/`height`/`fontSize`, all in
-/// pixels) when present, so the rendered barcode matches the configured size.
-/// Bar and caption colors inherit from the surrounding CSS `color` (e.g. when a
-/// barcode sits inside a `{{color:…:… {{barcode:…}} …}}` span).
+/// Dispatches on `data-renderer`: `jsbarcode` (default) or `bwip`. Honors
+/// `window.__LBL_STYLE.barcode` (`width`/`height`/`fontSize`, all in pixels)
+/// when present. Bar and caption colors inherit from surrounding CSS `color`.
 pub const BARCODE_INIT_JS: &str = r#"
 (function(){
+  function cssColorToHex(c){
+    if(!c) return null;
+    var m=String(c).match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if(!m) return null;
+    function h(n){var s=Number(n).toString(16);return s.length<2?'0'+s:s;}
+    return h(m[1])+h(m[2])+h(m[3]);
+  }
+  function renderJsBarcode(el,st){
+    if(!window.JsBarcode) return false;
+    var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    el.appendChild(svg);
+    var opts={format:el.getAttribute('data-symbology')||'CODE128',margin:0,textMargin:0,displayValue:true};
+    if(st.width){opts.width=st.width;}
+    if(st.height){opts.height=st.height;}
+    if(st.fontSize){opts.fontSize=st.fontSize;}
+    var fitW=el.getAttribute('data-fit-width');
+    var fitH=el.getAttribute('data-fit-height');
+    var baseH=st.height||100;
+    var baseFont=st.fontSize||20;
+    if(fitH!==null&&fitH!==''){
+      opts.height=parseInt(fitH,10);
+      var fitFont=el.getAttribute('data-fit-font-size');
+      if(fitFont!==null&&fitFont!==''){opts.fontSize=parseInt(fitFont,10);}
+      else{opts.fontSize=Math.max(8,Math.round(baseFont*(opts.height/baseH)));}
+    }
+    var color=window.getComputedStyle(el).color;
+    if(color){opts.lineColor=color;opts.textColor=color;}
+    var value=el.getAttribute('data-value')||'';
+    try{
+      if(fitW!==null&&fitW!==''){
+        var targetW=parseInt(fitW,10);
+        var moduleW=st.width||2;
+        opts.width=moduleW;
+        JsBarcode(svg,value,opts);
+        var bbox=svg.getBBox&&svg.getBBox();
+        var curW=(bbox&&bbox.width)||svg.width.baseVal.value||0;
+        if(targetW>0){
+          if(curW>0){opts.width=Math.max(0.5,moduleW*(targetW/curW));}
+          else{var estModules=Math.max(20,value.length*11+36);opts.width=Math.max(0.5,targetW/estModules);}
+          svg.innerHTML='';
+          JsBarcode(svg,value,opts);
+        }
+      }else{JsBarcode(svg,value,opts);}
+    }catch(e){}
+    if(!svg.childNodes.length){svg.remove();return false;}
+    return true;
+  }
+  function renderBwip(el,st){
+    if(!window.bwipjs||!window.bwipjs.toSVG) return false;
+    var value=el.getAttribute('data-value')||'';
+    var bcid=el.getAttribute('data-bcid');
+    if(!bcid) return false;
+    var is2d=el.getAttribute('data-barcode-2d')==='1';
+    var opts={bcid:bcid,text:value,scale:2,includetext:!is2d};
+    var fitW=el.getAttribute('data-fit-width');
+    var fitH=el.getAttribute('data-fit-height');
+    if(fitH!==null&&fitH!==''&&!is2d){
+      var hPx=parseInt(fitH,10);
+      if(hPx>0){opts.height=Math.max(1,hPx/((window.devicePixelRatio||1)*3.78));}
+    }else if(st.height&&!is2d){
+      opts.height=Math.max(1,(st.height)/((window.devicePixelRatio||1)*3.78));
+    }
+    var color=window.getComputedStyle(el).color;
+    var hex=cssColorToHex(color);
+    if(hex){opts.barcolor=hex;opts.textcolor=hex;}
+    try{
+      var svgStr=bwipjs.toSVG(opts);
+      if(fitW!==null&&fitW!==''){
+        var targetW=parseInt(fitW,10);
+        var m=/viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svgStr);
+        if(m&&targetW>0){
+          var natW=parseFloat(m[1]);
+          if(natW>0){
+            opts.scale=Math.max(1,(opts.scale||2)*(targetW/natW));
+            svgStr=bwipjs.toSVG(opts);
+          }
+        }
+      }
+      el.innerHTML=svgStr;
+      var svg=el.querySelector('svg');
+      if(svg){
+        svg.style.display='block';
+        svg.style.maxWidth='100%';
+        svg.style.height='auto';
+      }
+      return !!svg;
+    }catch(e){return false;}
+  }
   function render(){
     var st=(window.__LBL_STYLE&&window.__LBL_STYLE.barcode)||{};
     document.querySelectorAll('.lbl-barcode').forEach(function(el){
       if(el.dataset.rendered) return;
-      if(!window.JsBarcode) return;
-      var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-      el.appendChild(svg);
-      var opts={format: el.getAttribute('data-symbology')||'CODE128', margin:0, textMargin:0, displayValue:true};
-        if(st.width){opts.width=st.width;}
-        if(st.height){opts.height=st.height;}
-        if(st.fontSize){opts.fontSize=st.fontSize;}
-        var fitW=el.getAttribute('data-fit-width');
-        var fitH=el.getAttribute('data-fit-height');
-        var baseH=st.height||100;
-        var baseFont=st.fontSize||20;
-        if(fitH!==null && fitH!==''){
-          opts.height=parseInt(fitH,10);
-          var fitFont=el.getAttribute('data-fit-font-size');
-          if(fitFont!==null && fitFont!==''){
-            opts.fontSize=parseInt(fitFont,10);
-          }else{
-            opts.fontSize=Math.max(8, Math.round(baseFont*(opts.height/baseH)));
-          }
-        }
-        var color=window.getComputedStyle(el).color;
-        if(color){
-          opts.lineColor=color;
-          opts.textColor=color;
-        }
-        var value=el.getAttribute('data-value')||'';
-        try{
-          if(fitW!==null && fitW!==''){
-            var targetW=parseInt(fitW,10);
-            var moduleW=st.width||2;
-            opts.width=moduleW;
-            JsBarcode(svg, value, opts);
-            var bbox=svg.getBBox&&svg.getBBox();
-            var curW=(bbox&&bbox.width)||svg.width.baseVal.value||0;
-            if(targetW>0){
-              if(curW>0){
-                opts.width=Math.max(0.5, moduleW*(targetW/curW));
-              }else{
-                var estModules=Math.max(20, value.length*11+36);
-                opts.width=Math.max(0.5, targetW/estModules);
-              }
-              svg.innerHTML='';
-              JsBarcode(svg, value, opts);
-            }
-          }else{
-            JsBarcode(svg, value, opts);
-          }
-        }catch(e){}
-      if(!svg.childNodes.length){
-        svg.remove();
-        return;
-      }
-      el.dataset.rendered = '1';
+      var renderer=(el.getAttribute('data-renderer')||'jsbarcode').toLowerCase();
+      var ok=renderer==='bwip'?renderBwip(el,st):renderJsBarcode(el,st);
+      if(ok){el.dataset.rendered='1';}
     });
   }
   if(document.readyState!=='loading'){render();}else{document.addEventListener('DOMContentLoaded',render);}

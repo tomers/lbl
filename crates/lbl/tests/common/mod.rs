@@ -82,6 +82,8 @@ impl LayoutOptions {
 const QR_JS: &str = include_str!("../assets/qrcode.min.js");
 /// Vendored barcode library (exposes the global `JsBarcode`).
 const BARCODE_JS: &str = include_str!("../assets/JsBarcode.all.min.js");
+/// Vendored bwip-js (exposes the global `bwipjs`) for industrial 2D / postal.
+const BWIP_JS: &str = include_str!("../assets/bwip-js-min.js");
 
 /// Per-pixel grayscale delta above which two pixels are considered different.
 const PIXEL_DELTA: i16 = 8;
@@ -97,8 +99,10 @@ pub fn inline_assets(html: &str) -> String {
         "<script src=\"{}\"></script>",
         AssetsBase::Cdn.jsbarcode_url()
     );
+    let bwip_tag = format!("<script src=\"{}\"></script>", AssetsBase::Cdn.bwip_url());
     html.replace(&qr_tag, &format!("<script>{QR_JS}</script>"))
         .replace(&barcode_tag, &format!("<script>{BARCODE_JS}</script>"))
+        .replace(&bwip_tag, &format!("<script>{BWIP_JS}</script>"))
 }
 
 /// A readable default label style (millimetre sizes resolved for `dpi` and

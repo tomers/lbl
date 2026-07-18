@@ -206,9 +206,9 @@ fn fit_lone(
                 font_px: Some(font_px),
             }
         }
-        Child::Barcode { height_mode } => {
+        Child::Barcode { height_mode, is_2d } => {
             let (w, bar_h, _total_h, caption_font) =
-                barcode_fit_dims(box_w, box_h, None, *height_mode, opts);
+                barcode_fit_dims(box_w, box_h, None, *height_mode, *is_2d, opts);
             LayoutFit {
                 body: patch_nth_code(body, "lbl-barcode", 0, w, bar_h, caption_font),
                 css: format!(
@@ -291,9 +291,9 @@ fn fit_row(
     for (i, kid) in row_kids.iter().enumerate() {
         let w = widths[i].unwrap_or(avail / grow_len.max(1) as f64);
         match kid {
-            Child::Barcode { height_mode } => {
+            Child::Barcode { height_mode, is_2d } => {
                 let (fw, bar_h, _total_h, caption_font) =
-                    barcode_fit_dims(w, box_h, font_px, *height_mode, opts);
+                    barcode_fit_dims(w, box_h, font_px, *height_mode, *is_2d, opts);
                 patched =
                     patch_nth_code(&patched, "lbl-barcode", barcode_n, fw, bar_h, caption_font);
                 css.push_str(&format!(
@@ -532,9 +532,9 @@ fn fit_column(
                     ));
                 }
             }
-            Child::Barcode { height_mode } => {
+            Child::Barcode { height_mode, is_2d } => {
                 let (fw, bar_h, _total_h, caption_font) =
-                    barcode_fit_dims(box_w, slot_h, font_px, *height_mode, opts);
+                    barcode_fit_dims(box_w, slot_h, font_px, *height_mode, *is_2d, opts);
                 patched =
                     patch_nth_code(&patched, "lbl-barcode", barcode_n, fw, bar_h, caption_font);
                 css.push_str(&format!(
@@ -601,8 +601,15 @@ fn barcode_fit_dims(
     box_h: f64,
     font_px: Option<f64>,
     mode: BarcodeHeightMode,
+    is_2d: bool,
     opts: &TranspileOptions,
 ) -> (f64, f64, f64, Option<f64>) {
+    if is_2d {
+        // Matrix codes: square like QR; no human-readable caption strip.
+        let side = scaled_fit_px(width.min(box_h), opts).max(1.0);
+        return (side, side, side, None);
+    }
+
     let w = scaled_fit_px(width, opts).max(1.0);
     let base_h = opts.style.barcode_height_px.max(1.0);
     let base_font = opts.style.font_size_px.max(8.0);
@@ -670,12 +677,16 @@ fn row_content_height(
     for (i, kid) in row_kids.iter().enumerate() {
         let w = row_item_width(widths, i, avail, grow_len);
         match kid {
-            Child::Barcode { height_mode } => {
-                let (_, bar_h, _, caption) =
-                    barcode_fit_dims(w, box_h, Some(font_px), *height_mode, opts);
-                let total = caption
-                    .map(|f| jsbarcode_svg_height(bar_h, f))
-                    .unwrap_or(bar_h);
+            Child::Barcode { height_mode, is_2d } => {
+                let (_, bar_h, total_h, caption) =
+                    barcode_fit_dims(w, box_h, Some(font_px), *height_mode, *is_2d, opts);
+                let total = if *is_2d {
+                    total_h
+                } else {
+                    caption
+                        .map(|f| jsbarcode_svg_height(bar_h, f))
+                        .unwrap_or(bar_h)
+                };
                 h = h.max(total);
             }
             Child::Qr {
@@ -776,11 +787,21 @@ fn class_attr_value(open_tag: &str) -> Option<&str> {
 
 #[derive(Debug, Clone)]
 enum Child {
-    Text { inner: String },
-    Barcode { height_mode: BarcodeHeightMode },
-    Qr { attrs: String, explicit_size: bool },
+    Text {
+        inner: String,
+    },
+    Barcode {
+        height_mode: BarcodeHeightMode,
+        is_2d: bool,
+    },
+    Qr {
+        attrs: String,
+        explicit_size: bool,
+    },
     Img,
-    Row { children: Vec<Child> },
+    Row {
+        children: Vec<Child>,
+    },
     Other,
 }
 
@@ -855,9 +876,13 @@ fn parse_one_element(html: &str) -> Option<(usize, Child)> {
         let (open_end, _) = find_open_tag_end(html)?;
         let open_tag = &html[..open_end];
         let height_mode = barcode_height_mode_from_attrs(open_tag);
+        let is_2d = barcode_is_2d_from_attrs(open_tag);
         let close = format!("</{tag}>");
         if rest_is_empty_element(html, open_end, &close) {
-            return Some((open_end + close.len(), Child::Barcode { height_mode }));
+            return Some((
+                open_end + close.len(),
+                Child::Barcode { height_mode, is_2d },
+            ));
         }
     }
 
@@ -934,6 +959,19 @@ fn barcode_height_mode_from_attrs(attrs: &str) -> BarcodeHeightMode {
     RE.captures(attrs)
         .map(|c| BarcodeHeightMode::parse(&c[1]))
         .unwrap_or_default()
+}
+
+fn barcode_is_2d_from_attrs(attrs: &str) -> bool {
+    if attrs.contains(r#"data-barcode-2d="1""#) {
+        return true;
+    }
+    static SYM_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r#"data-symbology\s*=\s*"([^"]+)""#).expect("symbology attr regex")
+    });
+    SYM_RE
+        .captures(attrs)
+        .map(|c| crate::symbology::resolve_symbology(&c[1]).is_2d)
+        .unwrap_or(false)
 }
 
 fn patch_nth_code(

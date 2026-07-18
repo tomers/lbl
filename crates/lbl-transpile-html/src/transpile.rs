@@ -564,7 +564,16 @@ impl Default for TranspileOptions {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct Features {
     qr: bool,
-    barcode: bool,
+    /// Classic 1D barcodes via JsBarcode.
+    barcode_jsbarcode: bool,
+    /// Industrial / postal / GS1 via bwip-js.
+    barcode_bwip: bool,
+}
+
+impl Features {
+    fn any_barcode(self) -> bool {
+        self.barcode_jsbarcode || self.barcode_bwip
+    }
 }
 
 static QR_RE: Lazy<Regex> =
@@ -644,12 +653,20 @@ fn rewrite_qr(body: &str, features: &mut Features, px_per_mm: f64) -> String {
 fn rewrite_barcode(body: &str, features: &mut Features) -> String {
     BARCODE_RE
         .replace_all(body, |caps: &regex::Captures| {
-            features.barcode = true;
             let attrs = &caps[1];
-            let symbology = TYPE_ATTR_RE
+            let raw_sym = TYPE_ATTR_RE
                 .captures(attrs)
                 .map(|c| c[1].to_string())
                 .unwrap_or_else(|| "CODE128".to_string());
+            let info = crate::symbology::resolve_symbology(&raw_sym);
+            match info.renderer {
+                crate::symbology::BarcodeRenderer::JsBarcode => {
+                    features.barcode_jsbarcode = true;
+                }
+                crate::symbology::BarcodeRenderer::Bwip => {
+                    features.barcode_bwip = true;
+                }
+            }
             let height_attr = BARCODE_HEIGHT_ATTR_RE
                 .captures(attrs)
                 .map(|c| lbl_text::BarcodeHeightMode::parse(&c[1]))
@@ -660,10 +677,21 @@ fn rewrite_barcode(body: &str, features: &mut Features) -> String {
             } else {
                 ""
             };
+            let renderer = match info.renderer {
+                crate::symbology::BarcodeRenderer::JsBarcode => "jsbarcode",
+                crate::symbology::BarcodeRenderer::Bwip => "bwip",
+            };
+            let mut extra = String::new();
+            if let Some(bcid) = info.bcid {
+                extra.push_str(&format!(" data-bcid=\"{}\"", attr(bcid)));
+            }
+            if info.is_2d {
+                extra.push_str(r#" data-barcode-2d="1""#);
+            }
             format!(
-                "<div class=\"lbl-barcode\" data-symbology=\"{}\" data-value=\"{}\"{height_data}></div>",
-                attr(&symbology),
-                attr(value)
+                "<div class=\"lbl-barcode\" data-symbology=\"{}\" data-value=\"{}\" data-renderer=\"{renderer}\"{extra}{height_data}></div>",
+                attr(&info.name),
+                attr(value),
             )
         })
         .into_owned()
@@ -779,7 +807,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
     };
 
     let mut scripts = String::new();
-    if features.qr || features.barcode {
+    if features.qr || features.any_barcode() {
         scripts.push_str(&inline_script(&format!(
             "window.__LBL_STYLE={};",
             opts.style.to_js_config()
@@ -789,8 +817,13 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
         scripts.push_str(&script_src(&opts.assets_base.qrcode_url()));
         scripts.push_str(&inline_script(assets::QR_INIT_JS));
     }
-    if features.barcode {
+    if features.barcode_jsbarcode {
         scripts.push_str(&script_src(&opts.assets_base.jsbarcode_url()));
+    }
+    if features.barcode_bwip {
+        scripts.push_str(&script_src(&opts.assets_base.bwip_url()));
+    }
+    if features.any_barcode() {
         scripts.push_str(&inline_script(assets::BARCODE_INIT_JS));
     }
 
@@ -902,6 +935,10 @@ mod tests {
             !out.contains("JsBarcode.all.min.js"),
             "barcode lib should not be injected"
         );
+        assert!(
+            !out.contains("bwip-js-min.js"),
+            "bwip should not be injected for QR-only"
+        );
     }
 
     #[test]
@@ -919,6 +956,34 @@ mod tests {
     fn barcode_defaults_symbology() {
         let out = transpile("<barcode>999</barcode>", &TranspileOptions::default());
         assert!(out.contains("data-symbology=\"CODE128\""));
+        assert!(out.contains("data-renderer=\"jsbarcode\""));
+    }
+
+    #[test]
+    fn datamatrix_injects_bwip_not_jsbarcode() {
+        let out = transpile(
+            "<barcode type=\"DATAMATRIX\">HELLO</barcode>",
+            &TranspileOptions::default(),
+        );
+        assert!(out.contains("data-symbology=\"DATAMATRIX\""));
+        assert!(out.contains("data-bcid=\"datamatrix\""));
+        assert!(out.contains("data-renderer=\"bwip\""));
+        assert!(out.contains(r#"data-barcode-2d="1""#));
+        assert!(out.contains("bwip-js-min.js"));
+        assert!(
+            !out.contains("JsBarcode.all.min.js"),
+            "JsBarcode should not load for bwip-only labels: {out}"
+        );
+    }
+
+    #[test]
+    fn mixed_1d_and_2d_loads_both_libs() {
+        let out = transpile(
+            "<barcode type=\"CODE128\">ABC</barcode><barcode type=\"PDF417\">XYZ</barcode>",
+            &TranspileOptions::default(),
+        );
+        assert!(out.contains("JsBarcode.all.min.js"));
+        assert!(out.contains("bwip-js-min.js"));
     }
 
     #[test]
@@ -927,7 +992,7 @@ mod tests {
         let out = transpile(body, &TranspileOptions::default());
         assert!(
             out.contains(
-                r#"<span style="color:#e90b0b">aa <div class="lbl-barcode" data-symbology="CODE128" data-value="12345"></div> cc</span>"#
+                r#"<span style="color:#e90b0b">aa <div class="lbl-barcode" data-symbology="CODE128" data-value="12345" data-renderer="jsbarcode"></div> cc</span>"#
             ),
             "{out}"
         );

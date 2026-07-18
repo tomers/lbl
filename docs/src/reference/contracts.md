@@ -10,7 +10,10 @@ The output of `lbl-text`/`lbl-template` and the input to `lbl-transpile-html`.
 - Text blocks: `<div class="lbl-text">…</div>`.
 - QR: `<qr>PAYLOAD</qr>`.
 - Barcode: `<barcode type="CODE128">DATA</barcode>` (the `type` attribute is the
-  symbology; it defaults to `CODE128`).
+  symbology; it defaults to `CODE128`). Classic 1D names (`CODE128`, `EAN13`,
+  `CODE39`, …) render via JsBarcode. Industrial / postal / GS1 names
+  (`PDF417`, `DATAMATRIX`, `AZTEC`, `MAXICODE`, `DATABAR`, `POSTNET`,
+  `GS1128`, …) render via bwip-js.
 - Images: standard `<img src="…">` (path or URL; `lbl-template` can inline these
   as `data:` URIs).
 - Flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
@@ -43,7 +46,8 @@ See [Configuration](../guides/configuration.md#padding-and-insets).
 The output of `lbl-transpile-html`. Custom elements are rewritten to placeholder
 `<div>`s (`.lbl-qr[data-qr]`, `.lbl-barcode[data-symbology][data-value]`), the
 base/flex CSS is inlined, and only the needed JS libraries are referenced. QR
-codes render to **SVG**; barcodes render to **SVG** via JsBarcode.
+codes render to **SVG**; barcodes render to **SVG** via JsBarcode (1D) or
+bwip-js (2D / GS1 / postal).
 
 - **Print mode**: bare, deterministic document for the rasterizer and vector PDF
   export.
