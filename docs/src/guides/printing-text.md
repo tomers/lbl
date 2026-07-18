@@ -17,6 +17,10 @@ lbl-text "Total {{size:2:$42.00}}"
 - `<qr ec="H" margin="2">…</qr>` — QR in authoring HTML with per-element
   overrides (`ec` / `error-correction`, `margin`, `dark`, `light`)
 - `{{barcode:[SYMBOLOGY:]data}}` — barcode (defaults to `CODE128`)
+- Symbologies: classic 1D (`CODE128`, `EAN13`, `EAN8`, `UPC`, `CODE39`,
+  `ITF14`, `MSI`, `pharmacode`, `codabar`) plus industrial / GS1 / postal
+  (`PDF417`, `DATAMATRIX`, `AZTEC`, `MAXICODE`, `DATABAR`, `GS1128`,
+  `POSTNET`, `PLANET`, `ISBN`, …)
 - `{{image:URI}}` — image (local path or URL)
 - `{{size:SCALE:text}}` — text at `SCALE`× the base font size (aliases:
   `font-size`, `fs`; `SCALE` accepts `1.5`, `1.5x`, or `150%`)
