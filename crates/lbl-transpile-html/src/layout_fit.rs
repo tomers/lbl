@@ -1,7 +1,7 @@
-//! Fill-mode layout allocation: share the printable box among text, barcodes, and QR codes.
+//! Fill-mode layout allocation: share the printable box among text, barcodes, QR, and images.
 //!
 //! Uses the existing flex row/column structure from authoring HTML (`.lbl-row` with
-//! sibling `.lbl-text` / `.lbl-barcode` / `.lbl-qr` children). Transpile-time sizing
+//! sibling `.lbl-text` / `.lbl-barcode` / `.lbl-qr` / `img` children). Transpile-time sizing
 //! sets font sizes and `data-fit-*` dimensions so headless rendering is deterministic.
 
 use once_cell::sync::Lazy;
@@ -37,7 +37,7 @@ pub const LABEL_FIT_ROW_CHILD_CSS: &str = r#"
   overflow:visible;
   text-align:center;
 }
-.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr{
+.lbl-row>.lbl-barcode,.lbl-row>.lbl-qr,.lbl-row>img{
   flex:0 0 auto;
   align-self:center;
   overflow:visible;
@@ -232,6 +232,19 @@ fn fit_lone(
                 font_px: None,
             }
         }
+        Child::Img => {
+            // Same box as lone QR: fill the shorter printable axis so icons and
+            // logos are visible on continuous tape (intrinsic SVG is often 24px).
+            let s = scaled_fit_px(box_w.min(box_h), opts);
+            LayoutFit {
+                body: body.to_string(),
+                css: format!(
+                    ".lbl-label>img:only-child{{width:{s:.2}px;height:{s:.2}px;object-fit:contain;display:block}}\n\
+                     .lbl-label{{--lbl-feed-px:{s:.2}}}\n"
+                ),
+                font_px: None,
+            }
+        }
         Child::Row { children, .. } => fit_row(
             children,
             body,
@@ -241,7 +254,7 @@ fn fit_lone(
             opts,
             None,
         ),
-        Child::Img | Child::Other => LayoutFit {
+        Child::Other => LayoutFit {
             body: body.to_string(),
             ..Default::default()
         },
@@ -327,7 +340,14 @@ fn fit_row(
                     i + 1
                 ));
             }
-            _ => {}
+            Child::Img => {
+                let s = scaled_fit_px(w.min(box_h), opts);
+                css.push_str(&format!(
+                    ".lbl-row>img:nth-child({}){{width:{s:.2}px;height:{s:.2}px;object-fit:contain;flex:0 0 auto}}\n",
+                    i + 1
+                ));
+            }
+            Child::Other | Child::Row { .. } => {}
         }
     }
 
@@ -574,7 +594,14 @@ fn fit_column(
                 barcode_n += count_codes(row_kids, "barcode");
                 qr_n += count_codes(row_kids, "qr");
             }
-            Child::Img | Child::Other => {}
+            Child::Img => {
+                let s = scaled_fit_px(box_w.min(slot_h), opts);
+                css.push_str(&format!(
+                    ".lbl-label>img:nth-child({}){{width:{s:.2}px;height:{s:.2}px;object-fit:contain;display:block}}\n",
+                    i + 1
+                ));
+            }
+            Child::Other => {}
         }
     }
 
@@ -1066,6 +1093,27 @@ mod tests {
         );
         let font = fit.font_px.unwrap_or(0.0);
         assert!(font > 60.0, "font={font}");
+    }
+
+    #[test]
+    fn content_head_fit_sizes_lone_image_on_landscape_continuous() {
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: None,
+                height: Some(170.0),
+            }),
+            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            ..Default::default()
+        };
+        let body = r#"<div class="lbl-label"><img src="data:image/png;base64,xx" /></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        assert!(
+            fit.css.contains("img:only-child") && fit.css.contains("--lbl-feed-px:"),
+            "css={}",
+            fit.css
+        );
+        assert!(fit.css.contains("object-fit:contain"), "css={}", fit.css);
     }
 
     #[test]
