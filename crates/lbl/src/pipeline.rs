@@ -16,7 +16,10 @@ use lbl_driver_api::EncodeContext;
 use lbl_driver_file::{MediaType, VirtualExportMode};
 use lbl_encode::Registry;
 use lbl_pattern::sample_pattern_for_media;
-use lbl_render::{apply_rotation, render_two_pass, PdfExportRequest, RenderBackend, RenderRequest};
+use lbl_render::{
+    apply_mirror_horizontal, apply_rotation, render_two_pass, PdfExportRequest, RenderBackend,
+    RenderRequest,
+};
 
 type PrintTransportTargets = (
     Option<String>,
@@ -497,6 +500,9 @@ pub struct PipelineOptions {
     /// Quarter-turn applied to the raster before encode. Matches [`rotation`] for
     /// row-oriented heads; feed-oriented DYMO drivers invert portrait/landscape.
     pub head_rotation: Rotation,
+    /// Flip the reading-frame raster left↔right before head rotation (Mirror print).
+    /// Independent of catalog [`PrinterCapabilities::feed_reverse`].
+    pub mirror: bool,
     /// Supersample factor.
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
@@ -1276,8 +1282,8 @@ struct PrintRenderStage {
     req_height: Option<u32>,
 }
 
-/// Transpile for print, rasterize with Chromium, and apply the same rotation
-/// the encoder would use for the given protocol.
+/// Transpile for print, rasterize with Chromium, optionally mirror the reading
+/// frame, then apply the same head rotation the encoder would use.
 fn render_label_print<B: RenderBackend>(
     backend: &B,
     authoring_html: &str,
@@ -1322,6 +1328,13 @@ fn render_label_print<B: RenderBackend>(
         supersample: opts.supersample,
     };
     let rendered = render_two_pass(backend, &transpiled, &req).context("rendering")?;
+
+    // Mirror the reading frame first so Virtual preview and hardware encode agree.
+    let rendered = if opts.mirror {
+        apply_mirror_horizontal(rendered)
+    } else {
+        rendered
+    };
 
     let applied_rotation = if opts.protocol.targets_print_head() {
         opts.head_rotation
@@ -1652,6 +1665,7 @@ mod tests {
             dither: Algorithm::Threshold(128),
             rotation,
             head_rotation,
+            mirror: false,
             supersample: 1,
             assets_base: AssetsBase::Cdn,
             font_delivery: FontDelivery::default(),
@@ -2117,6 +2131,7 @@ mod tests {
             dither: Algorithm::Threshold(128),
             rotation: Rotation::None,
             head_rotation: Rotation::None,
+            mirror: false,
             supersample: 1,
             assets_base: AssetsBase::Cdn,
             font_delivery: FontDelivery::default(),
@@ -2152,6 +2167,7 @@ mod tests {
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
+            mirror: false,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
             font_delivery: FontDelivery::default(),
@@ -2187,6 +2203,7 @@ mod tests {
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
+            mirror: false,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
             font_delivery: FontDelivery::default(),

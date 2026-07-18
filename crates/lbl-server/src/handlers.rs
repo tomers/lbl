@@ -502,6 +502,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
+        mirror: req.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,
@@ -670,6 +671,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
+        mirror: req.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery: remote_font_delivery(&state),
@@ -884,6 +886,9 @@ pub struct PreviewReq {
     /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
     #[serde(default)]
     rotate_ccw: u32,
+    /// Flip left↔right in the reading frame (Mirror print).
+    #[serde(default)]
+    mirror: bool,
     /// Render supersample factor (same default as print).
     #[serde(default = "default_supersample")]
     supersample: u32,
@@ -956,6 +961,9 @@ pub struct PrintReq {
     /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
     #[serde(default)]
     rotate_ccw: u32,
+    /// Flip left↔right in the reading frame (Mirror print).
+    #[serde(default)]
+    mirror: bool,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
     /// Also build the HTML pipeline debug report.
@@ -1140,6 +1148,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
         head_rotation,
+        mirror: req.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,
@@ -1358,6 +1367,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
         head_rotation,
+        mirror: req.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,

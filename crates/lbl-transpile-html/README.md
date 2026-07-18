@@ -8,7 +8,8 @@ Authoring HTML uses compact custom concepts that this stage expands:
 - `<barcode type="CODE128">DATA</barcode>` -> SVG via JsBarcode (1D) or bwip-js
   (PDF417, Data Matrix, Aztec, MaxiCode, GS1 DataBar, POSTNET, …)
 - flex utility classes: `lbl-row`, `lbl-col`, `lbl-center`, `lbl-between`,
-  `lbl-grow`, `lbl-wrap`, `lbl-justify-*`, `lbl-items-*`, `lbl-slot`, `lbl-frame`
+  `lbl-grow`, `lbl-wrap`, `lbl-justify-*`, `lbl-items-*`, `lbl-slot`, `lbl-frame`,
+  `lbl-vertical` (stacked upright glyphs via `writing-mode: vertical-rl`)
 
 It injects the base/flex CSS and only the third-party libraries actually needed.
 
