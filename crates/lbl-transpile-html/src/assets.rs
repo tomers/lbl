@@ -97,6 +97,7 @@ html,body{margin:0;padding:0}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
 .lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
+.lbl-label>img,.lbl-row>img,.lbl-col>img,.lbl-slot>img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 .lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}
 .lbl-label h1{font-size:1.35em;font-weight:700}
 .lbl-label h2{font-size:1.2em;font-weight:700}
