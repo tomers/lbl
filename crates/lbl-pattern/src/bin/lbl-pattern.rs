@@ -27,7 +27,7 @@ struct Cli {
     width_mm: f64,
 
     /// Fixed media length in millimeters. When set, the pattern is extended along
-    /// the feed to match (Labelle / DYMO bitmap layout).
+    /// the feed to match (DYMO LabelManager bitmap layout).
     #[arg(long)]
     length_mm: Option<f64>,
 

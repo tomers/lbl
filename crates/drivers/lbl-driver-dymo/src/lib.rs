@@ -6,12 +6,11 @@
 //! - [`DymoDriver`] — the **LabelManager** tape protocol (this module). DYMO
 //!   tape printers have a vertical print head: each transmitted "line" is one
 //!   **column** of dots across the tape, and the tape feeds horizontally, so the
-//!   encoder transposes the bitmap into columns. Modeled on the command set used
-//!   by [labelle](https://github.com/labelle-org/labelle) (derived from
-//!   dymoprint). Its command stream is `ESC C 0`, `ESC B 0`, `ESC D n`, a
+//!   encoder transposes the bitmap into columns. Command set follows the classic
+//!   dymoprint / LabelManager USB stream: `ESC C 0`, `ESC B 0`, `ESC D n`, a
 //!   `SYN`-prefixed line per column, then `ESC A` (status) and `ESC E` (feed/cut).
-//!   Column order matches [labelle](https://github.com/labelle-org/labelle)'s
-//!   `ROTATE_270` transpose when [`PrinterCapabilities::feed_reverse`] is set.
+//!   Column order matches a `ROTATE_270` transpose when
+//!   [`PrinterCapabilities::feed_reverse`] is set.
 //! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
 //!   (see [`lw550`]), per DYMO's LW 550 Technical Reference.
 //!

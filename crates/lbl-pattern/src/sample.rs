@@ -1,4 +1,4 @@
-//! Labelle-compatible sample (calibration) pattern generation.
+//! Sample (calibration) pattern generation for LabelManager-style heads.
 
 use fontdue::{Font, FontSettings};
 use lbl_core::bitmap::MonoBitmap;
@@ -35,7 +35,7 @@ pub fn resolve_head_dots(height: Option<u32>, media: &Media) -> Result<u32, Stri
 /// Build a calibration pattern sized for `media`.
 ///
 /// Head height comes from `head_dots`. When the media has a fixed length, the
-/// pattern is widened along the feed (Labelle orientation) by growing the two
+/// pattern is widened along the feed (width = feed orientation) by growing the two
 /// outer staggered corner-mark segments so the marks sit on the label edges.
 /// The bitmap is then transposed when `protocol` expects width = head (NIIMBOT,
 /// ESC/POS, ZPL, …).
@@ -45,7 +45,7 @@ pub fn sample_pattern_for_media(head_dots: u32, media: &Media, protocol: Protoco
 }
 
 /// Build a horizontal calibration pattern at `height` device dots across the
-/// print head (Labelle / DYMO orientation: bitmap width = feed, height = head).
+/// print head (DYMO LabelManager orientation: bitmap width = feed, height = head).
 pub fn sample_pattern(height: u32) -> MonoBitmap {
     sample_pattern_sized(height, None)
 }
@@ -86,7 +86,7 @@ pub fn sample_pattern_sized(head_dots: u32, feed_dots: Option<u32>) -> MonoBitma
     out
 }
 
-/// Reorient a Labelle-layout pattern for the target driver's bitmap convention.
+/// Reorient a feed-width pattern for the target driver's bitmap convention.
 pub fn orient_sample_pattern(bmp: MonoBitmap, protocol: Protocol) -> MonoBitmap {
     if protocol.bitmap_width_is_feed() {
         bmp
@@ -335,10 +335,10 @@ mod tests {
         assert_eq!(resolve_head_dots(None, &media).unwrap(), 96);
     }
 
-    /// Dimensions verified against Labelle's `SamplePatternRenderEngine`
+    /// Dimensions verified against the classic LabelManager sample pattern
     /// (Carlito 12 px) when feed length is not pinned.
     #[test]
-    fn matches_labelle_dimensions() {
+    fn matches_reference_sample_dimensions() {
         let cases = [(15, 179), (64, 191), (65, 191), (100, 191), (256, 197)];
         for (height, width) in cases {
             let bmp = sample_pattern(height);

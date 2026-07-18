@@ -2538,7 +2538,7 @@ supported_media = [
 ]
 connections = []
 
-# Older 64-dot @ 180 dpi D1 tape heads (labelle / dymoprint / thermal-label).
+# Older 64-dot @ 180 dpi D1 tape heads (dymoprint / thermal-label).
 # LM 160 / 210D / 360D are keyboard-only (no host USB) — not catalogued.
 
 [[printers]]

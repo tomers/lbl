@@ -867,7 +867,7 @@ fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
 /// media: that axis stays `0` in the returned frame (Studio sizes it from the
 /// viewport / `--lbl-feed-px`). Head-to-cutter lead/end margins from
 /// [`PrinterCapabilities`] are still applied as stock padding so the preview
-/// matches real cut gaps (same DX rule as Labelle / [`pad_preview_encode_feed`]).
+/// matches real cut gaps (same DX rule as [`pad_preview_encode_feed`]).
 pub fn preview_stock_frame(
     content_width_px: f64,
     content_height_px: f64,
@@ -1157,7 +1157,7 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
 ///
 /// When only [`PrinterCapabilities::feed_trail_mm`] is set, the head-to-cutter
 /// distance is used as both lead and end so the preview shows the same blank
-/// tape Labelle draws for DX on each side of the payload.
+/// tape drawn for DX on each side of the payload.
 fn preview_feed_margins(caps: &PrinterCapabilities, dpi: f64) -> (u32, u32, u32) {
     let dx = feed_margin_px(caps.feed_trail_mm, dpi);
     let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
@@ -1510,7 +1510,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
 
 /// Encode a calibration sample pattern straight to protocol bytes (no render,
 /// dither, rotation, or rescaling). `head_dots` is the pattern height across
-/// the print head, matching Labelle's `--sample-pattern`.
+/// the print head (classic LabelManager `--sample-pattern` layout).
 pub fn encode_sample_pattern(
     registry: &Registry,
     head_dots: u32,
