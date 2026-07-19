@@ -24,15 +24,16 @@ serial  = ["dep:serialport"]
 ble = ["dep:btleplug", "dep:tokio", "dep:futures", "dep:uuid", "dep:dbus"]
 
 [dependencies]
-lbl-core    = { workspace = true }
-lbl-catalog = { workspace = true }
-serde       = { workspace = true }
-serde_json  = { workspace = true }
-thiserror   = { workspace = true }
-clap        = { workspace = true }
-lbl-cli     = { workspace = true }
-anyhow      = { workspace = true }
-tracing     = { workspace = true }
+lbl-core        = { workspace = true }
+lbl-catalog     = { workspace = true }
+lbl-driver-gpgl = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+thiserror       = { workspace = true }
+clap            = { workspace = true }
+lbl-cli         = { workspace = true }
+anyhow          = { workspace = true }
+tracing         = { workspace = true }
 
 nusb       = { version = "0.2", optional = true }
 serialport = { workspace = true, optional = true }

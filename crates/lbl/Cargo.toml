@@ -41,6 +41,7 @@ lbl-encode          = { workspace = true }
 lbl-driver-api      = { workspace = true }
 lbl-driver-file     = { workspace = true }
 lbl-driver-console  = { workspace = true }
+lbl-driver-gpgl     = { workspace = true }
 lbl-driver-niimbot  = { workspace = true }
 lbl-driver-letratag = { workspace = true }
 lbl-device          = { workspace = true }
