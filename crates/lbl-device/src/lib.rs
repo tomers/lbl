@@ -34,7 +34,7 @@ pub mod zpl;
 #[cfg(feature = "ble")]
 pub mod ble;
 
-pub use discovery::{discover, discover_ble, discover_serial, discover_usb, DiscoveredPrinter};
+pub use discovery::{discover, discover_ble, discover_serial, discover_usb, DiscoveredDevice};
 pub use media::{resolve_media, MediaSource};
 pub use transport::{FileTransport, NetworkTransport, Transport};
 

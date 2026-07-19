@@ -11,7 +11,7 @@
 
 pub use lbl_core::bitmap::MonoBitmap;
 pub use lbl_core::job::{CutMode, JobSpec};
-pub use lbl_core::printer::{PrinterCapabilities, Protocol};
+pub use lbl_core::printer::{DeviceCapabilities, Protocol};
 
 /// Errors a driver can produce while encoding.
 #[derive(Debug, thiserror::Error)]
@@ -32,7 +32,7 @@ pub struct EncodeContext<'a> {
     /// The job specification (media, cut request, copies).
     pub job: &'a JobSpec,
     /// Capabilities of the target printer.
-    pub capabilities: &'a PrinterCapabilities,
+    pub capabilities: &'a DeviceCapabilities,
     /// Optional secondary ink plane for dual-color media.
     ///
     /// The primary plane is the `bitmap` passed to [`Driver::encode`]. When
@@ -43,7 +43,7 @@ pub struct EncodeContext<'a> {
     pub secondary: Option<&'a MonoBitmap>,
     /// Optional full-color PNG for inkjet / color graphic registration.
     ///
-    /// When [`PrinterCapabilities::supports_color`] is set, the pipeline may
+    /// When [`DeviceCapabilities::supports_color`] is set, the pipeline may
     /// attach the rendered label as PNG bytes. Drivers that only speak 1-bit
     /// rasters ignore this field and encode the mono `bitmap` instead.
     pub color_png: Option<&'a [u8]>,
@@ -51,7 +51,7 @@ pub struct EncodeContext<'a> {
 
 impl<'a> EncodeContext<'a> {
     /// Create a new mono encode context.
-    pub fn new(job: &'a JobSpec, capabilities: &'a PrinterCapabilities) -> Self {
+    pub fn new(job: &'a JobSpec, capabilities: &'a DeviceCapabilities) -> Self {
         Self {
             job,
             capabilities,

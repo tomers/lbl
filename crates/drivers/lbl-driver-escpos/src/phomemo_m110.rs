@@ -105,13 +105,13 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_m110_header_raster_and_footer() {
         let bmp = MonoBitmap::new(16, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(40.0, 30.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = PhomemoM110Driver::new().encode(&bmp, &ctx).unwrap();
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn continuous_media_sets_continuous_type() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(50.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = PhomemoM110Driver::new().encode(&bmp, &ctx).unwrap();
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn density_maps_from_job() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let mut job = JobSpec::new(Media::fixed(40.0, 30.0, Dpi(203.0)));
         job.density = Some(2);
         let ctx = EncodeContext::new(&job, &caps);

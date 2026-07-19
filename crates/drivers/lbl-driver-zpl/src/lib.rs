@@ -80,14 +80,14 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn wraps_in_xa_xz_with_gfa() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true); // 0x80
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = String::from_utf8(ZplDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn continuous_emits_mnn() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(104.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = String::from_utf8(ZplDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();
@@ -116,7 +116,7 @@ mod tests {
             b.set(1, 0, true);
             b
         };
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             ..Default::default()
         };

@@ -166,7 +166,7 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn checker(w: u32, h: u32) -> MonoBitmap {
@@ -250,7 +250,7 @@ mod tests {
     fn driver_encodes_plain_art() {
         let bmp = checker(8, 4);
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = ConsoleDriver::new().encode(&bmp, &ctx).unwrap();
         let text = String::from_utf8(bytes).unwrap();
@@ -266,7 +266,7 @@ mod tests {
             data: vec![],
         };
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let ctx = EncodeContext::new(&job, &caps);
         assert!(ConsoleDriver::new().encode(&bmp, &ctx).is_err());
     }

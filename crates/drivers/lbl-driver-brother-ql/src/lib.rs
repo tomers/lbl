@@ -7,15 +7,15 @@
 //! The print head is horizontal and consumes one raster line per row of a
 //! row-major [`MonoBitmap`].
 //!
-//! Head geometry is selected from [`PrinterCapabilities::max_width_mm`]: printers
+//! Head geometry is selected from [`DeviceCapabilities::max_width_mm`]: printers
 //! wider than 70 mm use the QL-11xx / QL-1050-class 1296-dot / 162-byte row
 //! layout (350-byte invalidate per Brother's QL-500-series command reference).
 //!
 //! Cut / expanded / mode-switch opcodes are gated by
-//! [`PrinterCapabilities::supports_cut`],
-//! [`PrinterCapabilities::supports_cut_every`],
-//! [`PrinterCapabilities::supports_expanded_mode`], and
-//! [`PrinterCapabilities::emit_raster_mode_switch`] so QL-500-class bodies do
+//! [`DeviceCapabilities::supports_cut`],
+//! [`DeviceCapabilities::supports_cut_every`],
+//! [`DeviceCapabilities::supports_expanded_mode`], and
+//! [`DeviceCapabilities::emit_raster_mode_switch`] so QL-500-class bodies do
 //! not receive unsupported commands (Brother Raster Command Reference v6.0).
 //!
 //! ## Print job structure
@@ -643,7 +643,7 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_job(
@@ -651,11 +651,11 @@ mod tests {
         copies: u32,
         cut_mode: CutMode,
         max_width_mm: f64,
-    ) -> (JobSpec, PrinterCapabilities) {
+    ) -> (JobSpec, DeviceCapabilities) {
         let mut job = JobSpec::new(media);
         job.copies = copies;
         job.cut_mode = cut_mode;
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             dpi: Dpi(300.0),
             max_width_mm,
@@ -751,7 +751,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
         job.cut_mode = CutMode::Every;
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: false,
             supports_expanded_mode: false,
             supports_cut_every: false,
@@ -779,7 +779,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
         job.cut_mode = CutMode::Every;
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             supports_expanded_mode: false,
             supports_cut_every: false,
@@ -803,7 +803,7 @@ mod tests {
         let bmp = MonoBitmap::new(8, 1);
         let mut job = JobSpec::new(Media::continuous(62.0, Dpi(300.0)));
         job.cut_mode = CutMode::Every;
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             supports_expanded_mode: true,
             supports_cut_every: true,

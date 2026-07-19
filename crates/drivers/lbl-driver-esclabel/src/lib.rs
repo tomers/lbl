@@ -162,7 +162,7 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     /// Minimal valid 1×1 red PNG (RGB).
@@ -180,7 +180,7 @@ mod tests {
     fn emits_media_layout_and_gfa() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true); // 0x80
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(50.0, 25.0, Dpi(600.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = String::from_utf8(EscLabelDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn continuous_emits_mnn_without_gap_layout() {
         let bmp = MonoBitmap::new(8, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(108.0, Dpi(600.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = String::from_utf8(EscLabelDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();
@@ -214,7 +214,7 @@ mod tests {
             b.set(1, 0, true);
             b
         };
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             ..Default::default()
         };
@@ -230,7 +230,7 @@ mod tests {
     fn color_emits_dy_im_and_skips_gfa() {
         let bmp = MonoBitmap::new(8, 1);
         let png = tiny_png();
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_color: true,
             ..Default::default()
         };
@@ -262,7 +262,7 @@ mod tests {
             b
         };
         let png = tiny_png();
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(50.0, 25.0, Dpi(600.0)));
         let ctx = EncodeContext::new(&job, &caps).with_color_png(&png);
         let out = String::from_utf8(EscLabelDriver::new().encode(&bmp, &ctx).unwrap()).unwrap();

@@ -84,9 +84,9 @@ fn main() -> Result<()> {
         }
         Command::Compatible { printer } => {
             let printer = catalog
-                .require_printer(&printer)
+                .require_device(&printer)
                 .map_err(|e| anyhow::anyhow!(e))?;
-            for e in catalog.media_for_printer(printer) {
+            for e in catalog.media_for_device(printer) {
                 println!("{:<12} {}", e.canonical_key(), e.name);
             }
         }
@@ -94,19 +94,19 @@ fn main() -> Result<()> {
             for e in catalog.search(&query) {
                 println!("media  {:<12} {}", e.canonical_key(), e.name);
             }
-            for p in catalog.search_printers(&query) {
+            for p in catalog.search_devices(&query) {
                 println!("printer {:<20} {}", p.canonical_key(), p.name);
             }
         }
         Command::Printers { command } => match command {
             PrinterCommand::List => {
-                for p in catalog.printers() {
+                for p in catalog.devices() {
                     println!("{:<20} {}", p.canonical_key(), p.name);
                 }
             }
             PrinterCommand::Show { key } => {
                 let printer = catalog
-                    .require_printer(&key)
+                    .require_device(&key)
                     .map_err(|e| anyhow::anyhow!(e))?;
                 println!("{}", serde_json::to_string_pretty(printer)?);
             }

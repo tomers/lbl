@@ -8,8 +8,8 @@ binary depends on this crate for a common vocabulary:
 - `geometry` — `Size<T>` and `Margins`.
 - `media` — `Media` profiles (width, fixed/continuous length, material,
   adhesive, color).
-- `printer` — `PrinterModel`, `Transport` (USB/network), `PrinterCapabilities`,
-  and the persisted `PrinterProfile`.
+- `printer` — `DeviceModel`, `Transport` (USB/network), `DeviceCapabilities`,
+  and the persisted `DeviceProfile`.
 - `job` — `JobSpec` and `OutputMode` (print vs preview).
 
 This crate is dependency-light (only `serde` + `thiserror`) so it can sit at the

@@ -4,7 +4,7 @@
 # resolve to the entry (the first is canonical). Dimensions are physical
 # (millimeters); device resolution comes from the target printer.
 #
-# [[printers]] describe known printer models: protocol, maturity, native DPI,
+# [[devices]] describe known device models (printers and cutters): protocol, role, maturity, native DPI,
 # head width, `supported_media`, and `connections` (USB, serial, Bluetooth,
 # network). Maturity is `verified` (on-hand hardware), `supported` (same
 # protocol as a verified model), or `experimental` (protocol not yet
@@ -1912,7 +1912,7 @@ media        = { width_mm = 70.0, length = { kind = "fixed", mm = 40.0 }, materi
 # Prefer product_url (model-specific drivers/manuals/FAQs); brand_url is the
 # brand support hub used when no stable per-model page exists.
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 550", "LW550"]
 name = "DYMO LabelWriter 550"
@@ -1964,7 +1964,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0028 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 550 Turbo"]
 name = "DYMO LabelWriter 550 Turbo"
@@ -2016,7 +2016,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0029 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 5XL"]
 name = "DYMO LabelWriter 5XL"
@@ -2070,7 +2070,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x002A }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 450"]
 name = "DYMO LabelWriter 450"
@@ -2119,7 +2119,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0020 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 450 Turbo"]
 name = "DYMO LabelWriter 450 Turbo"
@@ -2168,7 +2168,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0021 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 450 Twin Turbo"]
 name = "DYMO LabelWriter 450 Twin Turbo"
@@ -2217,7 +2217,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0022 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter 4XL"]
 name = "DYMO LabelWriter 4XL"
@@ -2247,7 +2247,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001F }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter"]
 name = "DYMO LabelWriter (legacy)"
@@ -2297,7 +2297,7 @@ supported_media = [
 connections = [{ kind = "usb", vendor_id = 0x0922 }]
 
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelWriter Duo", "LW Duo", "LabelWriter 450 Duo"]
 name = "DYMO LabelWriter Duo"
@@ -2336,7 +2336,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0023 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelManager PnP", "LabelManager"]
 name = "DYMO LabelManager PnP"
@@ -2382,7 +2382,7 @@ connections = [
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1002 },
 ]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelManager 280", "LM280"]
 name = "DYMO LabelManager 280"
@@ -2427,7 +2427,7 @@ connections = [
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1006 },
 ]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelManager 420P", "LM420P"]
 name = "DYMO LabelManager 420P"
@@ -2491,7 +2491,7 @@ connections = [
 # USB PID still unknown: public usb.ids / linux-hardware have no 0922:… row.
 # Windows HWID is USBPRINT\DYMOLABELMANAGER_5002B5B only (not a USB product ID).
 # Pair by model until a field lsusb capture.
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelManager 500TS", "LM500TS"]
 name = "DYMO LabelManager 500TS"
@@ -2562,7 +2562,7 @@ connections = []
 # Older 64-dot @ 180 dpi D1 tape heads (dymoprint / thermal-label).
 # LM 160 / 210D / 360D are keyboard-only (no host USB) — not catalogued.
 
-[[printers]]
+[[devices]]
 
 brand = "DYMO"
 keys = ["LabelManager PC", "LM PC", "LMPC"]
@@ -2605,7 +2605,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0011 }]
 
-[[printers]]
+[[devices]]
 
 brand = "DYMO"
 keys = ["LabelManager PC II", "LM PC II", "LMPCII"]
@@ -2648,7 +2648,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x001c }]
 
-[[printers]]
+[[devices]]
 
 brand = "DYMO"
 keys = ["LabelManager 400", "LM400"]
@@ -2691,7 +2691,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0013 }]
 
-[[printers]]
+[[devices]]
 
 brand = "DYMO"
 keys = ["LabelPoint 350", "LP350"]
@@ -2749,7 +2749,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x0015 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LabelManager Wireless PnP", "LM Wireless PnP", "LMWirelessPnP"]
 name = "DYMO LabelManager Wireless PnP"
@@ -2791,7 +2791,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0922, product_id = 0x1008 }]
 
-[[printers]]
+[[devices]]
 brand = "DYMO"
 keys = ["LT-200B", "LetraTag LT-200B", "LT200B"]
 name = "DYMO LetraTag LT-200B"
@@ -2817,7 +2817,7 @@ connections = [
 # and the same media SKUs, but advertise distinct BLE name prefixes and report
 # distinct numeric model ids — keep them as separate catalog entries so pairing
 # does not collapse D11 into D110 (or the reverse).
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D110"]
 name = "NIIMBOT D110"
@@ -2860,7 +2860,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "D110" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D11"]
 name = "NIIMBOT D11"
@@ -2903,7 +2903,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "D11" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D11S"]
 name = "NIIMBOT D11S"
@@ -2949,7 +2949,7 @@ connections = [{ kind = "ble", name = "D11S" }]
 # Thermal-transfer pocket / mid-size: ribbon + label required. Encode uses `b1`
 # task (niimbluelib modelPrintTasks: N1 + M2_H; B18/B18S geometric siblings of N1).
 
-[[printers]]
+[[devices]]
 
 brand = "NIIMBOT"
 keys = ["B18", "B18S"]
@@ -2993,7 +2993,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "B18" }, { kind = "ble", name = "B18S" }]
 
-[[printers]]
+[[devices]]
 
 brand = "NIIMBOT"
 keys = ["N1"]
@@ -3037,7 +3037,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "N1" }]
 
-[[printers]]
+[[devices]]
 
 brand = "NIIMBOT"
 keys = ["M2_H", "M2H"]
@@ -3062,7 +3062,7 @@ supported_media = [
 connections = [{ kind = "ble", name = "M2_H" }, { kind = "ble", name = "M2H" }, { kind = "serial" }]
 reports_media = true
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D101"]
 name = "NIIMBOT D101"
@@ -3124,7 +3124,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "D101" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B1", "B1_SE", "B1SE"]
 name = "NIIMBOT B1"
@@ -3148,7 +3148,7 @@ supported_media = [
 connections = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
 reports_media = true
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B2"]
 name = "NIIMBOT B2"
@@ -3172,7 +3172,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "B2" }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B21", "B21S", "B21_C2B", "B21C2B", "B21_L2B", "B21L2B"]
 name = "NIIMBOT B21"
@@ -3196,7 +3196,7 @@ supported_media = [
 ]
 connections = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B203", "A203"]
 name = "NIIMBOT B203"
@@ -3220,7 +3220,7 @@ supported_media = [
 ]
 connections = [{ kind = "serial" }, { kind = "ble", name = "B203" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B3S", "B3S_P"]
 name = "NIIMBOT B3S"
@@ -3246,7 +3246,7 @@ supported_media = [
 ]
 connections = [{ kind = "serial" }, { kind = "ble", name = "B3S" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B1 Pro", "B1Pro", "B1_PRO"]
 name = "NIIMBOT B1 Pro"
@@ -3270,7 +3270,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "B1" }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B21 Pro", "B21Pro", "B21_PRO"]
 name = "NIIMBOT B21 Pro"
@@ -3294,7 +3294,7 @@ supported_media = [
 ]
 connections = [{ kind = "serial" }, { kind = "ble", name = "B21" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D11_H", "D11H", "D11_PRO", "D11Pro"]
 name = "NIIMBOT D11_H"
@@ -3337,7 +3337,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "D11" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["D110_M", "D110M"]
 name = "NIIMBOT D110_M"
@@ -3380,7 +3380,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "D110" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B31"]
 name = "NIIMBOT B31"
@@ -3407,7 +3407,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "B31" }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["B4"]
 name = "NIIMBOT B4"
@@ -3444,7 +3444,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "B4" }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["K3", "K3_W", "K3W"]
 name = "NIIMBOT K3"
@@ -3471,7 +3471,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "K3" }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "NIIMBOT"
 keys = ["K4"]
 name = "NIIMBOT K4"
@@ -3516,7 +3516,7 @@ connections = [{ kind = "ble", name = "K4" }, { kind = "serial" }]
 #   QL-580N/650TD — + ESC i a mode-switch; 650TD has no cut-every
 # USB PIDs from §7 of the same ref. Maturity experimental until hardware smoke.
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-500", "QL500"]
 name = "Brother QL-500"
@@ -3558,7 +3558,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2015 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-550", "QL550"]
 name = "Brother QL-550"
@@ -3600,7 +3600,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2016 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-560", "QL560"]
 name = "Brother QL-560"
@@ -3642,7 +3642,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2027 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-570", "QL570"]
 name = "Brother QL-570"
@@ -3684,7 +3684,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2028 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-580N", "QL580N"]
 name = "Brother QL-580N"
@@ -3726,7 +3726,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2029 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-650TD", "QL650TD"]
 name = "Brother QL-650TD"
@@ -3770,7 +3770,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x201b }]
 
 # Brother QL-800 family shares the same 720-dot / 300 dpi raster dialect (≤ 62 mm DK).
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-800", "QL800"]
 name = "Brother QL-800"
@@ -3810,7 +3810,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209b }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-810W", "QL810W"]
 name = "Brother QL-810W"
@@ -3850,7 +3850,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209c }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-820NWBc", "QL-820NWB", "QL820NWBc", "QL820NWB"]
 name = "Brother QL-820NWBc"
@@ -3890,7 +3890,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x209d }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-700", "QL700"]
 name = "Brother QL-700"
@@ -3929,7 +3929,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2042 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-710W", "QL710W"]
 name = "Brother QL-710W"
@@ -3968,7 +3968,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2043 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-720NW", "QL720NW"]
 name = "Brother QL-720NW"
@@ -4010,7 +4010,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2044 }]
 # QL-600: 720-dot / 300 dpi narrow head (linux-usb.org + lsusb `04f9:20c0`).
 # `04f9:2100` is a Brother card reader — do not alias.
 
-[[printers]]
+[[devices]]
 
 brand = "Brother"
 keys = ["QL-600", "QL600"]
@@ -4050,7 +4050,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c0 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-1100", "QL1100"]
 name = "Brother QL-1100"
@@ -4102,7 +4102,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a7 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-1110NWB", "QL-1110NWBc", "QL1110NWB"]
 name = "Brother QL-1110NWB"
@@ -4154,7 +4154,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20a8 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["QL-1115NWB", "QL1115NWB"]
 name = "Brother QL-1115NWB"
@@ -4210,7 +4210,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20ab }]
 # QL-11xx (`max_width_mm > 70`). Brother Raster Command Reference (QL-500 series
 # v6.0) lists PIDs `2020` / `202a` and n=162; not an alias of QL-1100 SKUs.
 
-[[printers]]
+[[devices]]
 
 brand = "Brother"
 keys = ["QL-1050", "QL1050"]
@@ -4263,7 +4263,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2020 }]
 
-[[printers]]
+[[devices]]
 
 brand = "Brother"
 keys = ["QL-1060N", "QL1060N"]
@@ -4316,7 +4316,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x202a }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZD220", "ZD220d"]
 name = "Zebra ZD220"
@@ -4350,7 +4350,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0164 }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZD410", "ZD410d"]
 name = "Zebra ZD410"
@@ -4374,7 +4374,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x011c }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["GK420d", "GK420"]
 name = "Zebra GK420d"
@@ -4411,7 +4411,7 @@ connections = [
   { kind = "usb", vendor_id = 0x0a5f, product_id = 0x0062 },
 ]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZD620", "ZD620d"]
 name = "Zebra ZD620"
@@ -4445,7 +4445,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0141 }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZD420", "ZD420d"]
 name = "Zebra ZD420"
@@ -4479,7 +4479,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0120 }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZD421", "ZD421d"]
 name = "Zebra ZD421"
@@ -4513,7 +4513,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x0185 }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["GC420d", "GC420"]
 name = "Zebra GC420d"
@@ -4547,7 +4547,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x00d1 }]
 
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZP450", "ZP 450", "ZP-450"]
 name = "Zebra ZP450"
@@ -4583,7 +4583,7 @@ connections = [{ kind = "usb", vendor_id = 0x0a5f, product_id = 0x008c }]
 
 # USB product ID not in usb.ids / DeviceHunt (sibling ZT411 = 0a5f:0172 only).
 # Typical deployment is Ethernet :9100; pair by model until field lsusb.
-[[printers]]
+[[devices]]
 brand = "Zebra"
 keys = ["ZT231", "ZT231d"]
 name = "Zebra ZT231"
@@ -4617,7 +4617,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["TE200"]
 name = "TSC TE200"
@@ -4651,7 +4651,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["TE210"]
 name = "TSC TE210"
@@ -4685,7 +4685,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["TE300"]
 name = "TSC TE300"
@@ -4719,7 +4719,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["TE310"]
 name = "TSC TE310"
@@ -4753,7 +4753,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["DA210"]
 name = "TSC DA210"
@@ -4787,7 +4787,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["DA220"]
 name = "TSC DA220"
@@ -4821,7 +4821,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["DA310"]
 name = "TSC DA310"
@@ -4855,7 +4855,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["DA320"]
 name = "TSC DA320"
@@ -4891,7 +4891,7 @@ connections = [{ kind = "usb", vendor_id = 0x1203, product_id = 0x0160 }]
 
 # TTP-244 Pro — native TSPL-EZ (datasheet); 203 dpi / 108 mm head.
 # Exact USB PID not in usb.ids (Windows HWID USBPRINT\TSCTTP-244_PRO3535 only).
-[[printers]]
+[[devices]]
 brand = "TSC"
 keys = ["TTP-244 Pro", "TTP244Pro", "TTP-244PRO"]
 name = "TSC TTP-244 Pro"
@@ -4927,7 +4927,7 @@ connections = []
 
 # Xprinter 4″ shippers — vendor lists TSPL/EPL/ZPL/DPL; catalog native TSPL.
 # USB PIDs not published — pair by model / :9100. Set firmware language to TSPL.
-[[printers]]
+[[devices]]
 brand = "Xprinter"
 keys = ["XP-420B", "XP420B"]
 name = "Xprinter XP-420B"
@@ -4961,7 +4961,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Xprinter"
 keys = ["XP-460B", "XP460B"]
 name = "Xprinter XP-460B"
@@ -4995,7 +4995,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M02"]
 name = "Phomemo M02"
@@ -5021,7 +5021,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M02" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M02S"]
 name = "Phomemo M02S"
@@ -5049,7 +5049,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M02S" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M02 Pro", "M02Pro"]
 name = "Phomemo M02 Pro"
@@ -5077,7 +5077,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M02 Pro" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["T02"]
 name = "Phomemo T02"
@@ -5103,7 +5103,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "T02" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M02X"]
 name = "Phomemo M02X"
@@ -5129,7 +5129,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M02X" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M110"]
 name = "Phomemo M110"
@@ -5158,7 +5158,7 @@ supported_media = [
 connections = [{ kind = "ble", name = "M110" }]
 
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M120"]
 name = "Phomemo M120"
@@ -5190,7 +5190,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M120" }]
 
-[[printers]]
+[[devices]]
 brand = "Phomemo"
 keys = ["M220"]
 name = "Phomemo M220"
@@ -5225,7 +5225,7 @@ supported_media = [
 ]
 connections = [{ kind = "ble", name = "M220" }]
 
-[[printers]]
+[[devices]]
 brand           = "Phomemo"
 keys            = ["D30"]
 name            = "Phomemo D30"
@@ -5239,7 +5239,7 @@ supported_media = ["phomemo-12x40", "phomemo-14x40", "phomemo-15x40", "phomemo-1
 connections     = [{ kind = "ble", name = "D30" }]
 
 # Same ≤15 mm head / Print Master media as D30 (phomemo.com D30 vs D35 compare).
-[[printers]]
+[[devices]]
 brand           = "Phomemo"
 keys            = ["D35"]
 name            = "Phomemo D35"
@@ -5252,7 +5252,7 @@ default_media   = "phomemo-12x40"
 supported_media = ["phomemo-12x40", "phomemo-14x40", "phomemo-15x40", "phomemo-15-cont", "12x40"]
 connections     = [{ kind = "ble", name = "D35" }]
 
-[[printers]]
+[[devices]]
 brand           = "Phomemo"
 keys            = ["Q30"]
 name            = "Phomemo Q30"
@@ -5266,7 +5266,7 @@ supported_media = ["phomemo-12x40", "phomemo-14x40", "phomemo-15x40", "phomemo-1
 connections     = [{ kind = "ble", name = "Q30" }]
 
 # Q30S shares D30/Q30 rotated ≤15 mm dialect (community printer tables).
-[[printers]]
+[[devices]]
 brand           = "Phomemo"
 keys            = ["Q30S"]
 name            = "Phomemo Q30S"
@@ -5281,7 +5281,7 @@ connections     = [{ kind = "ble", name = "Q30S" }]
 
 # LPrint tests native TSPL via IEEE1284 device ID string, not a published USB VID:PID.
 # Windows HWID USBPRINT\PrinterThermalPrinte8903 is not a USB product ID — leave empty.
-[[printers]]
+[[devices]]
 brand = "Rollo"
 keys = ["X1038", "Rollo X1038"]
 name = "Rollo X1038"
@@ -5315,7 +5315,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Rollo"
 keys = ["X1040", "Rollo Wireless", "Rollo X1040"]
 name = "Rollo Wireless"
@@ -5353,7 +5353,7 @@ connections = []
 # older portables). USB PIDs beyond ITPP941/941B are unpublished; pair by model.
 # Wi-Fi / AirPrint 941 SKUs share the USB-only language path (alias keys below).
 
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["ITPP941", "941", "RW941", "ITPP941-WiFi", "941 WiFi", "941 AirPrint"]
 name = "Munbyn ITPP941"
@@ -5387,7 +5387,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["ITPP941B", "941B", "RW941B"]
 name = "Munbyn ITPP941B"
@@ -5422,7 +5422,7 @@ supported_media = [
 connections = [{ kind = "usb", vendor_id = 0x09c6, product_id = 0x0426 }]
 
 # 300 dpi Bluetooth 941 sibling (RW941BP / ITPP941BP). USB PID unpublished.
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["ITPP941BP", "941BP", "RW941BP"]
 name = "Munbyn ITPP941BP"
@@ -5457,7 +5457,7 @@ supported_media = [
 connections = []
 
 # USB PID unconfirmed in public ID DBs — pair by model / network :9100.
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["RW130B", "ITPP130", "ITPP130B", "130B", "P130B"]
 name = "Munbyn RW130B"
@@ -5492,7 +5492,7 @@ supported_media = [
 connections = []
 
 # Older portable (ITPP129 / RW129B). Vendor lists TSPL / TSPL2 (+ EPL2); we emit TSPL BITMAP.
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["ITPP129", "RW129B", "129B", "P129"]
 name = "Munbyn ITPP129"
@@ -5527,7 +5527,7 @@ supported_media = [
 connections = []
 
 # RealWriter current-gen desktop shippers (USB + Bluetooth). PID unpublished.
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["RW402B", "402B"]
 name = "Munbyn RW402B"
@@ -5561,7 +5561,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["RW403B", "403B"]
 name = "Munbyn RW403B"
@@ -5596,7 +5596,7 @@ supported_media = [
 connections = []
 
 # Dual-color capable hardware; catalog encodes mono TSPL BITMAP only.
-[[printers]]
+[[devices]]
 brand = "Munbyn"
 keys = ["RW405B", "405B"]
 name = "Munbyn RW405B"
@@ -5632,7 +5632,7 @@ connections = []
 
 # Brother P-touch PT family — 128-dot / 180 dpi TZe raster (≤ 24 mm).
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P700", "PTP700", "P700"]
 name = "Brother PT-P700"
@@ -5672,7 +5672,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2061 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P750W", "PTP750W", "P750W"]
 name = "Brother PT-P750W"
@@ -5712,7 +5712,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2062 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-H500", "PTH500", "H500"]
 name = "Brother PT-H500"
@@ -5752,7 +5752,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205e }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-E500", "PTE500", "E500"]
 name = "Brother PT-E500"
@@ -5794,7 +5794,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205f }]
 
 # PT-E550W — same ≤24 mm / 180 dpi TZe head as E500; USB 04f9:2060
 # (ptouch docs + field lsusb). PT-D400 deferred (keyboard-first; no host PID).
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-E550W", "PTE550W", "E550W"]
 name = "Brother PT-E550W"
@@ -5834,7 +5834,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2060 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-D600", "PTD600", "D600"]
 name = "Brother PT-D600"
@@ -5874,7 +5874,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2074 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-D450", "PTD450", "D450"]
 name = "Brother PT-D450"
@@ -5909,7 +5909,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2073 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P710BT", "PTP710BT", "P710BT", "Cube"]
 name = "Brother PT-P710BT (P-touch Cube Plus)"
@@ -5951,7 +5951,7 @@ supported_media = [
 # after OS pairing (not Web Bluetooth / BLE).
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20af }, { kind = "serial" }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P300BT", "PTP300BT", "P300BT"]
 name = "Brother PT-P300BT (P-touch Cube)"
@@ -5985,7 +5985,7 @@ connections = [{ kind = "serial" }]
 
 # Brother PT-P900 family — 560-dot / 360 dpi TZe raster (≤ 36 mm).
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P900", "PTP900", "P900"]
 name = "Brother PT-P900"
@@ -6026,7 +6026,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2083 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P900W", "PTP900W", "P900W"]
 name = "Brother PT-P900W"
@@ -6067,7 +6067,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2085 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P950NW", "PTP950NW", "P950NW"]
 name = "Brother PT-P950NW"
@@ -6108,7 +6108,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2086 }]
 
-[[printers]]
+[[devices]]
 brand = "Brother"
 keys = ["PT-P910BT", "PTP910BT", "P910BT"]
 name = "Brother PT-P910BT"
@@ -6155,7 +6155,7 @@ connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c7 }, { kind
 # because they match any Seiko Epson USB device. Pair by model or use :9100
 # until PIDs are captured on hardware.
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C4000", "CWC4000", "ColorWorks C4000", "CW-C4000u", "CW-C4000e"]
 name = "Epson ColorWorks CW-C4000"
@@ -6187,7 +6187,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C6000A", "CWC6000A", "ColorWorks C6000A", "CW-C6000Au", "CW-C6000Ae"]
 name = "Epson ColorWorks CW-C6000A"
@@ -6219,7 +6219,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C6000P", "CWC6000P", "ColorWorks C6000P", "CW-C6000Pu", "CW-C6000Pe"]
 name = "Epson ColorWorks CW-C6000P"
@@ -6251,7 +6251,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C6500A", "CWC6500A", "ColorWorks C6500A", "CW-C6500Au", "CW-C6500Ae"]
 name = "Epson ColorWorks CW-C6500A"
@@ -6284,7 +6284,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C6500P", "CWC6500P", "ColorWorks C6500P", "CW-C6500Pu", "CW-C6500Pe"]
 name = "Epson ColorWorks CW-C6500P"
@@ -6317,7 +6317,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Epson"
 keys = ["CW-C3500", "CWC3500", "ColorWorks C3500", "TM-C3500"]
 name = "Epson ColorWorks CW-C3500"
@@ -6352,7 +6352,7 @@ connections = []
 # public ID databases. Other PIDs vary by SKU — pair by model / network :9100
 # until field-captured. Shared industrial media with Zebra/TSC.
 
-[[printers]]
+[[devices]]
 brand           = "Bixolon"
 keys            = ["SLP-DX220", "SLPDX220", "DX220"]
 name            = "Bixolon SLP-DX220"
@@ -6366,7 +6366,7 @@ default_media   = "50x25"
 supported_media = ["50x25", "tsc-50x25", "z-perform-1000d-2x1", "cont-54", "102x152", "100x150"]
 connections     = [{ kind = "usb", vendor_id = 0x1504 }]
 
-[[printers]]
+[[devices]]
 brand = "Bixolon"
 keys = ["SLP-DX420", "SLPDX420", "DX420"]
 name = "Bixolon SLP-DX420"
@@ -6394,7 +6394,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1504 }]
 
-[[printers]]
+[[devices]]
 brand = "Bixolon"
 keys = ["SLP-TX400", "SLPTX400", "TX400"]
 name = "Bixolon SLP-TX400"
@@ -6422,7 +6422,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1504 }]
 
-[[printers]]
+[[devices]]
 brand = "Bixolon"
 keys = ["SLP-TX420", "SLPTX420", "TX420"]
 name = "Bixolon SLP-TX420"
@@ -6450,7 +6450,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1504 }]
 
-[[printers]]
+[[devices]]
 brand = "Bixolon"
 keys = ["SLP-T400", "SLPT400", "T400"]
 name = "Bixolon SLP-T400"
@@ -6478,7 +6478,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1504, product_id = 0x0008 }]
 
-[[printers]]
+[[devices]]
 brand = "Bixolon"
 keys = ["XD3-40d", "XD340d", "XD3-40D"]
 name = "Bixolon XD3-40d"
@@ -6509,7 +6509,7 @@ connections = [{ kind = "usb", vendor_id = 0x1504 }]
 # Godex EZPL desktops. USB vendor 0x6495 (GoDEX International); product IDs
 # unconfirmed in public DBs — pair by model / network :9100 until field-captured.
 
-[[printers]]
+[[devices]]
 brand = "Godex"
 keys = ["DT4x", "DT4X", "DT4"]
 name = "Godex DT4x"
@@ -6537,7 +6537,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x6495 }]
 
-[[printers]]
+[[devices]]
 brand           = "Godex"
 keys            = ["DT2x", "DT2X", "DT2"]
 name            = "Godex DT2x"
@@ -6551,7 +6551,7 @@ default_media   = "50x25"
 supported_media = ["50x25", "tsc-50x25", "z-perform-1000d-2x1", "cont-54"]
 connections     = [{ kind = "usb", vendor_id = 0x6495 }]
 
-[[printers]]
+[[devices]]
 brand = "Godex"
 keys = ["G500", "G-500"]
 name = "Godex G500"
@@ -6579,7 +6579,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x6495 }]
 
-[[printers]]
+[[devices]]
 brand = "Godex"
 keys = ["G530", "G-530"]
 name = "Godex G530"
@@ -6607,7 +6607,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x6495 }]
 
-[[printers]]
+[[devices]]
 brand = "Godex"
 keys = ["RT700", "RT-700"]
 name = "Godex RT700"
@@ -6635,7 +6635,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x6495 }]
 
-[[printers]]
+[[devices]]
 brand = "Godex"
 keys = ["RT730", "RT-730"]
 name = "Godex RT730"
@@ -6666,7 +6666,7 @@ connections = [{ kind = "usb", vendor_id = 0x6495 }]
 # model / network :9100 until field-captured. Shared industrial media with
 # Zebra/TSC/Bixolon.
 
-[[printers]]
+[[devices]]
 brand = "SATO"
 keys = ["CL4NX", "CL4NX-Plus", "CL4NXPlus"]
 name = "SATO CL4NX"
@@ -6694,7 +6694,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0828 }]
 
-[[printers]]
+[[devices]]
 brand = "SATO"
 keys = ["CL6NX", "CL6NX-Plus", "CL6NXPlus"]
 name = "SATO CL6NX"
@@ -6722,7 +6722,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0828 }]
 
-[[printers]]
+[[devices]]
 brand = "SATO"
 keys = ["CT4-LX", "CT4LX"]
 name = "SATO CT4-LX"
@@ -6750,7 +6750,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0828 }]
 
-[[printers]]
+[[devices]]
 brand           = "SATO"
 keys            = ["WWCW4", "WWCW-4", "WCW4"]
 name            = "SATO WWCW4"
@@ -6768,7 +6768,7 @@ connections     = [{ kind = "usb", vendor_id = 0x0828 }]
 # IDs unconfirmed in public DBs — pair by model / network :9100 until
 # field-captured. ZPL-mode SKUs can stay on `zpl` when firmware is in ZPL mode.
 
-[[printers]]
+[[devices]]
 brand = "Honeywell"
 keys = ["PC42d", "PC42D", "PC42"]
 name = "Honeywell PC42d"
@@ -6796,7 +6796,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 
-[[printers]]
+[[devices]]
 brand = "Honeywell"
 keys = ["PC42t", "PC42T"]
 name = "Honeywell PC42t"
@@ -6824,7 +6824,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 
-[[printers]]
+[[devices]]
 brand = "Honeywell"
 keys = ["PM42", "PM-42"]
 name = "Honeywell PM42"
@@ -6852,7 +6852,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 
-[[printers]]
+[[devices]]
 brand = "Honeywell"
 keys = ["PX45", "PX-45"]
 name = "Honeywell PX45"
@@ -6880,7 +6880,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 
-[[printers]]
+[[devices]]
 brand = "Honeywell"
 keys = ["PX65", "PX-65"]
 name = "Honeywell PX65"
@@ -6914,7 +6914,7 @@ connections = [{ kind = "usb", vendor_id = 0x0b0b }]
 # USB: exact VID:PID only (no VID wildcards). Pair by model / :9100 otherwise.
 # See docs/research-tpcl-citizen.md.
 
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-E321", "CLE321"]
 name = "Citizen CL-E321"
@@ -6942,7 +6942,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-S521", "CLS521", "CLP-521", "CLP521"]
 name = "Citizen CL-S521"
@@ -6971,7 +6971,7 @@ supported_media = [
 # usb.ids: Citizen Watch CLP-521 = 08bd:0208 (CL-S521 family alias).
 connections = [{ kind = "usb", vendor_id = 0x08bd, product_id = 0x0208 }]
 
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-S631", "CLS631", "CLP-631", "CLP631"]
 name = "Citizen CL-S631"
@@ -6999,7 +6999,7 @@ supported_media = [
 ]
 connections = [{ kind = "usb", vendor_id = 0x1d90, product_id = 0x2037 }]
 
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-S700", "CLS700"]
 name = "Citizen CL-S700"
@@ -7029,7 +7029,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 
 # CL-S621 — same 203 dpi / 104 mm Datamax path as CL-S521/700.
 # usb.ids 2730:0fff lists CLP-521/621/631/CL-S700 Series.
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-S621", "CLS621", "CLP-621", "CLP621"]
 name = "Citizen CL-S621"
@@ -7059,7 +7059,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 
 # CL-E720 — industrial CL-E family; catalog as ZPL II Cross-Emulation (set on printer).
 # USB PID not in public DBs — pair by model / :9100.
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-E720", "CLE720"]
 name = "Citizen CL-E720"
@@ -7089,7 +7089,7 @@ connections = []
 
 # CL-S700DT — direct-thermal sibling of CL-S700; Datamax emulation.
 # usb.ids bundles CL-S700 Series under 2730:0fff.
-[[printers]]
+[[devices]]
 brand = "Citizen"
 keys = ["CL-S700DT", "CLS700DT", "CL-S700DTII"]
 name = "Citizen CL-S700DT"
@@ -7123,7 +7123,7 @@ connections = [{ kind = "usb", vendor_id = 0x2730, product_id = 0x0fff }]
 # B-SV4 = 08a6:0051 (linux-hardware.org / DeviceHunt). Others pair by model / :9100.
 # See docs/research-tpcl-citizen.md.
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-EV4D", "BEV4D", "B-EV4"]
 name = "Toshiba TEC B-EV4D"
@@ -7151,7 +7151,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-EV4T", "BEV4T"]
 name = "Toshiba TEC B-EV4T"
@@ -7179,7 +7179,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-FV4D", "BFV4D", "B-FV4"]
 name = "Toshiba TEC B-FV4D"
@@ -7207,7 +7207,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-FV4T", "BFV4T"]
 name = "Toshiba TEC B-FV4T"
@@ -7235,7 +7235,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-SV4", "BSV4", "B-SV4D", "B-SV4T"]
 name = "Toshiba TEC B-SV4"
@@ -7264,7 +7264,7 @@ supported_media = [
 # linux-hardware.org / DeviceHunt: Toshiba TEC B-SV4 = 08a6:0051.
 connections = [{ kind = "usb", vendor_id = 0x08a6, product_id = 0x0051 }]
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-SX4", "BSX4", "B-SX4T"]
 name = "Toshiba TEC B-SX4"
@@ -7292,7 +7292,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-SX5", "BSX5", "B-SX5T"]
 name = "Toshiba TEC B-SX5"
@@ -7320,7 +7320,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["B-SA4TM", "BSA4TM", "B-SA4", "BSA4"]
 name = "Toshiba TEC B-SA4TM"
@@ -7348,7 +7348,7 @@ supported_media = [
 ]
 connections = []
 
-[[printers]]
+[[devices]]
 brand = "Toshiba TEC"
 keys = ["BV420D", "BV420", "BX410", "BX420"]
 name = "Toshiba TEC BV420D"
@@ -7375,3 +7375,336 @@ supported_media = [
   "tsc-50x25",
 ]
 connections = []
+
+# --- Silhouette cutting mats (vinyl/paper sheets & roll, no adhesive) -------
+
+[[entries]]
+brand = "Silhouette"
+keys  = ["silhouette-mat-none"]
+name  = "Silhouette no cutting mat (roll / loaded media)"
+media = { width_mm = 304.8, length = { kind = "continuous" }, material = "vinyl", adhesive = "none", color = "white" }
+
+[[entries]]
+brand = "Silhouette"
+keys  = ["silhouette-mat-12x12"]
+name  = "Silhouette cutting mat 12×12 in"
+media = { width_mm = 304.8, length = { kind = "fixed", mm = 304.8 }, material = "vinyl", adhesive = "none", color = "white" }
+
+[[entries]]
+brand = "Silhouette"
+keys  = ["silhouette-mat-12x24"]
+name  = "Silhouette cutting mat 12×24 in"
+media = { width_mm = 304.8, length = { kind = "fixed", mm = 609.6 }, material = "vinyl", adhesive = "none", color = "white" }
+
+[[entries]]
+brand = "Silhouette"
+keys  = ["silhouette-mat-15x15"]
+name  = "Silhouette cutting mat 15×15 in (Plus)"
+media = { width_mm = 381.0, length = { kind = "fixed", mm = 381.0 }, material = "vinyl", adhesive = "none", color = "white" }
+
+[[entries]]
+brand = "Silhouette"
+keys  = ["silhouette-mat-24x24"]
+name  = "Silhouette cutting mat 24×24 in (Pro)"
+media = { width_mm = 609.6, length = { kind = "fixed", mm = 609.6 }, material = "vinyl", adhesive = "none", color = "white" }
+
+# --- Silhouette / Graphtec GPGL cutters ------------------------------------
+# USB IDs and cuttable widths from inkscape-silhouette DEVICE table.
+# dpi is a placeholder (vector GPGL; unused for raster encode).
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo4", "Silhouette Cameo 4"]
+name            = "Silhouette Cameo 4"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "supported"
+dpi             = 96.0
+max_width_mm    = 304.8
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1137 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo4-plus", "Silhouette Cameo 4 Plus"]
+name            = "Silhouette Cameo 4 Plus"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 372.0
+supports_cut    = true
+default_media   = "silhouette-mat-15x15"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24", "silhouette-mat-15x15"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1138 }]
+
+[[devices]]
+brand = "Silhouette"
+keys = ["cameo4-pro", "Silhouette Cameo 4 Pro"]
+name = "Silhouette Cameo 4 Pro"
+role = "cutter"
+support = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol = "gpgl"
+maturity = "experimental"
+dpi = 96.0
+max_width_mm = 600.0
+supports_cut = true
+default_media = "silhouette-mat-24x24"
+supported_media = [
+  "silhouette-mat-none",
+  "silhouette-mat-12x12",
+  "silhouette-mat-12x24",
+  "silhouette-mat-15x15",
+  "silhouette-mat-24x24",
+]
+connections = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1139 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo5", "Silhouette Cameo 5"]
+name            = "Silhouette Cameo 5"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 330.2
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1140 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo5-plus", "Silhouette Cameo 5 Plus"]
+name            = "Silhouette Cameo 5 Plus"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 372.0
+supports_cut    = true
+default_media   = "silhouette-mat-15x15"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24", "silhouette-mat-15x15"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1141 }]
+
+[[devices]]
+brand = "Silhouette"
+keys = ["cameo-pro-mk-ii", "Silhouette Cameo Pro Mk II", "Cameo Pro Mk II"]
+name = "Silhouette Cameo Pro Mk II"
+role = "cutter"
+support = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol = "gpgl"
+maturity = "experimental"
+dpi = 96.0
+max_width_mm = 609.0
+supports_cut = true
+default_media = "silhouette-mat-24x24"
+supported_media = [
+  "silhouette-mat-none",
+  "silhouette-mat-12x12",
+  "silhouette-mat-12x24",
+  "silhouette-mat-15x15",
+  "silhouette-mat-24x24",
+]
+connections = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1146 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo5-alpha", "Silhouette Cameo 5 Alpha"]
+name            = "Silhouette Cameo 5 Alpha"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 330.2
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x3844, product_id = 0x0001 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo5-alpha-plus", "Silhouette Cameo 5 Alpha Plus"]
+name            = "Silhouette Cameo 5 Alpha Plus"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 372.0
+supports_cut    = true
+default_media   = "silhouette-mat-15x15"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24", "silhouette-mat-15x15"]
+connections     = [{ kind = "usb", vendor_id = 0x3844, product_id = 0x0002 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo1", "Silhouette Cameo", "Silhouette Cameo 1"]
+name            = "Silhouette Cameo 1"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 304.0
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1121 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo2", "Silhouette Cameo 2"]
+name            = "Silhouette Cameo 2"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 304.0
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x112B }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["cameo3", "Silhouette Cameo 3"]
+name            = "Silhouette Cameo 3"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 304.8
+supports_cut    = true
+default_media   = "silhouette-mat-12x12"
+supported_media = ["silhouette-mat-none", "silhouette-mat-12x12", "silhouette-mat-12x24"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x112F }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["portrait1", "Silhouette Portrait", "Silhouette Portrait 1"]
+name            = "Silhouette Portrait 1"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 206.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1123 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["portrait2", "Silhouette Portrait 2"]
+name            = "Silhouette Portrait 2"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 203.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x1132 }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["portrait3", "Silhouette Portrait 3"]
+name            = "Silhouette Portrait 3"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 203.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x113A }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["portrait4", "Silhouette Portrait 4"]
+name            = "Silhouette Portrait 4"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 216.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x113F }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["craft-robo-cc200", "Craft Robo CC200", "CC200-20"]
+name            = "Craft Robo CC200 (deferred)"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 200.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x110A }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["craft-robo-cc300", "Craft Robo CC300", "CC300-20"]
+name            = "Craft Robo CC300 (deferred)"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 200.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x111A }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["silhouette-sd-1", "Silhouette SD 1", "SD 1"]
+name            = "Silhouette SD 1 (deferred)"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 200.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x111C }]
+
+[[devices]]
+brand           = "Silhouette"
+keys            = ["silhouette-sd-2", "Silhouette SD 2", "SD 2"]
+name            = "Silhouette SD 2 (deferred)"
+role            = "cutter"
+support         = { brand_url = "https://www.silhouetteamerica.com/support" }
+protocol        = "gpgl"
+maturity        = "experimental"
+dpi             = 96.0
+max_width_mm    = 200.0
+supports_cut    = true
+default_media   = "silhouette-mat-none"
+supported_media = ["silhouette-mat-none"]
+connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x111D }]

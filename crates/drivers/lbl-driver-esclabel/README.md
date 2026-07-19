@@ -14,7 +14,7 @@ emits:
 
 - `^GFA` — graphic field (set bits = black, matching `MonoBitmap`)
 
-**Full color** (when `PrinterCapabilities::supports_color` and
+**Full color** (when `DeviceCapabilities::supports_color` and
 `EncodeContext::color_png` are set — the pipeline attaches the rendered RGBA
 as PNG for ColorWorks catalog models):
 

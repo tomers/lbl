@@ -5,7 +5,7 @@
 //! clamps (`max_width_mm`, `head_printable_height_mm`) narrow the inkable band
 //! at encode/preview time.
 
-use crate::{Catalog, CatalogEntry, PrinterEntry};
+use crate::{Catalog, CatalogEntry, DeviceEntry};
 use lbl_core::media::MediaLength;
 
 const DIM_TOLERANCE_MM: f64 = 0.05;
@@ -31,7 +31,7 @@ pub fn validate_catalog_geometry(catalog: &Catalog) -> Result<(), Vec<CatalogGeo
     for entry in catalog.entries() {
         validate_entry_dimensions(entry, &mut errors);
     }
-    for printer in catalog.printers() {
+    for printer in catalog.devices() {
         validate_printer_printable_band(printer, &mut errors);
     }
     if errors.is_empty() {
@@ -82,7 +82,7 @@ fn looks_like_inch_dimensions(key_w: f64, key_l: f64, entry: &CatalogEntry) -> b
     }
 }
 
-fn validate_printer_printable_band(printer: &PrinterEntry, errors: &mut Vec<CatalogGeometryError>) {
+fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<CatalogGeometryError>) {
     if !(printer.max_width_mm.is_finite() && printer.max_width_mm > 0.0) {
         errors.push(CatalogGeometryError {
             message: format!(

@@ -103,13 +103,13 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_m02x_bringup_and_full_height_raster() {
         let bmp = MonoBitmap::new(16, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(53.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = PhomemoM02xDriver::new().encode(&bmp, &ctx).unwrap();
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn density_maps_from_job() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let mut job = JobSpec::new(Media::continuous(53.0, Dpi(203.0)));
         job.density = Some(4);
         let ctx = EncodeContext::new(&job, &caps);

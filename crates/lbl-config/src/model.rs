@@ -24,7 +24,7 @@ pub struct Config {
 #[serde(default)]
 #[derive(Default)]
 pub struct GeneralConfig {
-    /// Id of the default printer (matches a persisted `PrinterProfile.id`).
+    /// Id of the default printer (matches a persisted `DeviceProfile.id`).
     pub default_printer: Option<String>,
     /// Override for the cache directory (catalog images, render scratch).
     pub cache_dir: Option<String>,

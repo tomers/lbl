@@ -18,7 +18,7 @@ pub struct AppState {
     /// Configuration loader (paths + figment).
     pub loader: Arc<Loader>,
     /// When false, local device enumeration is skipped and host profile routes
-    /// (`/api/printers/profiles*`) are not mounted.
+    /// (`/api/devices/profiles*`) are not mounted.
     pub host_discovery_enabled: bool,
     /// Shared headless-Chromium renderer reused across all preview/print
     /// requests, with a bound on how many renders run concurrently.

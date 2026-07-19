@@ -86,13 +86,13 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_init_and_raster_header() {
         let bmp = MonoBitmap::new(16, 2); // stride 2
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(58.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = EscPosDriver::new().encode(&bmp, &ctx).unwrap();
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn cut_only_when_supported_and_requested() {
         let bmp = MonoBitmap::new(8, 1);
-        let mut caps = PrinterCapabilities::default();
+        let mut caps = DeviceCapabilities::default();
         let mut job = JobSpec::new(Media::continuous(58.0, Dpi(203.0)));
         job.cut_mode = CutMode::Every;
 

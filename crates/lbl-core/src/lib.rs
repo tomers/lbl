@@ -10,6 +10,7 @@
 //! types connect the stages together.
 
 pub mod bitmap;
+pub mod cut;
 pub mod error;
 pub mod geometry;
 pub mod job;
@@ -19,12 +20,11 @@ pub mod printer;
 pub mod units;
 
 pub use bitmap::MonoBitmap;
+pub use cut::{CutJobSpec, CutPath, CutPointMm, SilhouetteOptions};
 pub use error::{CoreError, Result};
 pub use geometry::{Margins, Size};
 pub use job::{CutMode, DriverOptions, DymoLwOptions, JobSpec, LwOutputMode, LwSpeed, OutputMode};
 pub use media::{Adhesive, Material, Media, MediaColor, MediaLength, MediaSense};
 pub use orientation::{Orientation, Rotation};
-pub use printer::{
-    PrinterCapabilities, PrinterId, PrinterModel, PrinterProfile, Protocol, Transport,
-};
+pub use printer::{DeviceCapabilities, DeviceId, DeviceModel, DeviceProfile, Protocol, Transport};
 pub use units::{Dots, Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
