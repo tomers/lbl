@@ -1,0 +1,16 @@
+[package]
+name                   = "lbl-driver-gpgl"
+description            = "GPGL (Graphtec / Silhouette) vector cut encoder for lbl."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core  = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

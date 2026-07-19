@@ -27,6 +27,7 @@
 - [Media Catalog](./reference/catalog.md)
 - [Crates](./reference/crates.md)
 - [DYMO LW5 command coverage](./reference/dymo-lw5-commands.md)
+- [GPGL cut commands](./reference/gpgl-commands.md)
 
 # Extending lbl
 

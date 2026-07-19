@@ -24,6 +24,8 @@ pub mod brother_ql;
 pub mod discovery;
 #[cfg(feature = "usb")]
 pub mod dymo_lw;
+#[cfg(feature = "usb")]
+pub mod gpgl;
 pub mod media;
 pub mod status;
 pub mod transport;
@@ -57,6 +59,8 @@ pub use dymo_lw::{
     Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage, Lw550PrintStatus,
     Lw550SkuInfo, ENGINE_VERSION_REPLY_LEN, SKU_INFO_REPLY_LEN, STATUS_REPLY_LEN,
 };
+#[cfg(feature = "usb")]
+pub use gpgl::{send_cut_job, wait_until_ready, CAMEO4_PID, CAMEO4_VID};
 #[cfg(feature = "usb")]
 pub use status::{
     query_loaded_media_sku, query_print_status, soft_reboot_print_engine, soft_reboot_supported,

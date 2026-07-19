@@ -1501,6 +1501,7 @@ dependencies = [
  "lbl-driver-api",
  "lbl-driver-console",
  "lbl-driver-file",
+ "lbl-driver-gpgl",
  "lbl-driver-letratag",
  "lbl-driver-niimbot",
  "lbl-encode",
@@ -1578,6 +1579,7 @@ dependencies = [
  "lbl-catalog",
  "lbl-cli",
  "lbl-core",
+ "lbl-driver-gpgl",
  "nusb",
  "serde",
  "serde_json",
@@ -1679,6 +1681,15 @@ dependencies = [
  "image",
  "lbl-core",
  "lbl-driver-api",
+]
+
+[[package]]
+name = "lbl-driver-gpgl"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

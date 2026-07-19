@@ -75,6 +75,45 @@ enum Command {
     Config(ConfigArgs),
     /// Discover connected printers.
     Device(DeviceArgs),
+    /// Encode vector paths (or SVG) to GPGL and optionally send to a USB cutter.
+    Cut(CutArgs),
+}
+
+#[derive(Args)]
+struct CutArgs {
+    /// Path to a JSON array of CutPath objects, or a single CutJob+paths object.
+    #[arg(long, conflicts_with = "svg")]
+    paths: Option<std::path::PathBuf>,
+    /// SVG file to convert to cut paths.
+    #[arg(long, conflicts_with = "paths")]
+    svg: Option<std::path::PathBuf>,
+    /// Cuttable width in millimeters.
+    #[arg(long, default_value_t = 304.8)]
+    width_mm: f64,
+    /// Cuttable height in millimeters.
+    #[arg(long, default_value_t = 304.8)]
+    height_mm: f64,
+    /// Force (`FX`), typically 1–33.
+    #[arg(long, default_value_t = 10)]
+    force: u8,
+    /// Speed (`!`), typically 1–10.
+    #[arg(long, default_value_t = 5)]
+    speed: u8,
+    /// Mat preset (`TG`): 0 none, 1 = 12×12, …
+    #[arg(long, default_value_t = 1)]
+    mat: u8,
+    /// Write encoded GPGL bytes to this file instead of USB.
+    #[arg(long)]
+    output: Option<std::path::PathBuf>,
+    /// USB vendor id (default Cameo 4).
+    #[arg(long, default_value_t = 0x0b4d)]
+    vendor_id: u16,
+    /// USB product id (default Cameo 4).
+    #[arg(long, default_value_t = 0x1137)]
+    product_id: u16,
+    /// Dry-run: encode only; print byte length to stderr.
+    #[arg(long, default_value_t = false)]
+    dry_run: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -1873,5 +1912,56 @@ fn main() -> Result<()> {
         Command::Catalog(a) => run_catalog(a),
         Command::Config(a) => run_config(a),
         Command::Device(a) => run_device(a),
+        Command::Cut(a) => run_cut(a),
     }
+}
+
+fn run_cut(args: CutArgs) -> Result<()> {
+    use lbl_core::{CutJobSpec, CutPath, SilhouetteOptions};
+    use lbl_driver_gpgl::{encode_cut, svg::cut_paths_from_svg};
+
+    let paths: Vec<CutPath> = if let Some(svg_path) = &args.svg {
+        let text = std::fs::read_to_string(svg_path)
+            .with_context(|| format!("reading {}", svg_path.display()))?;
+        cut_paths_from_svg(&text).map_err(|e| anyhow!("{e}"))?
+    } else if let Some(paths_file) = &args.paths {
+        let text = std::fs::read_to_string(paths_file)
+            .with_context(|| format!("reading {}", paths_file.display()))?;
+        serde_json::from_str(&text).context("parsing cut paths JSON")?
+    } else {
+        bail!("provide --svg or --paths");
+    };
+
+    let job = CutJobSpec {
+        width_mm: args.width_mm,
+        height_mm: args.height_mm,
+        copies: 1,
+        device_key: None,
+        silhouette: SilhouetteOptions {
+            speed: args.speed,
+            force: args.force,
+            mat: args.mat,
+            tool_offset: 18,
+            landscape: false,
+        },
+    };
+    let bytes = encode_cut(&paths, &job).map_err(|e| anyhow!("{e}"))?;
+    eprintln!("encoded {} GPGL bytes ({} paths)", bytes.len(), paths.len());
+
+    if let Some(out) = &args.output {
+        std::fs::write(out, &bytes).with_context(|| format!("writing {}", out.display()))?;
+        return Ok(());
+    }
+    if args.dry_run {
+        return Ok(());
+    }
+
+    use lbl_device::transport::UsbTransport;
+    let usb = UsbTransport::new(args.vendor_id, args.product_id, None);
+    lbl_device::send_cut_job(&usb, &bytes).map_err(|e| anyhow!("{e}"))?;
+    eprintln!(
+        "cut job sent to {:04x}:{:04x}",
+        args.vendor_id, args.product_id
+    );
+    Ok(())
 }

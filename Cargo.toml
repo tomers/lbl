@@ -34,6 +34,7 @@ members = [
   "crates/drivers/lbl-driver-brother-pt",
   "crates/drivers/lbl-driver-file",
   "crates/drivers/lbl-driver-console",
+  "crates/drivers/lbl-driver-gpgl",
 ]
 
 [workspace.package]
@@ -74,6 +75,7 @@ lbl-driver-brother-ql = { path = "crates/drivers/lbl-driver-brother-ql" }
 lbl-driver-brother-pt = { path = "crates/drivers/lbl-driver-brother-pt" }
 lbl-driver-file       = { path = "crates/drivers/lbl-driver-file" }
 lbl-driver-console    = { path = "crates/drivers/lbl-driver-console" }
+lbl-driver-gpgl       = { path = "crates/drivers/lbl-driver-gpgl" }
 lbl-encode            = { path = "crates/lbl-encode" }
 lbl-device            = { path = "crates/lbl-device" }
 lbl-spool             = { path = "crates/lbl-spool" }
