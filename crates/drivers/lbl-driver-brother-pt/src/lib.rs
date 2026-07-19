@@ -5,7 +5,7 @@
 //! - PT-H500 / PT-P700 / PT-E500 / PT-P710BT family (128-dot head @ 180 dpi)
 //! - PT-P900 / P900W / P950NW / P910BT family (560-dot head @ 360 dpi)
 //!
-//! Head geometry is selected from [`PrinterCapabilities::max_width_mm`]: printers
+//! Head geometry is selected from [`DeviceCapabilities::max_width_mm`]: printers
 //! wider than 24 mm use the P900-class 560-dot / 70-byte row layout.
 //!
 //! ## Print job structure
@@ -379,7 +379,7 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_job(
@@ -388,16 +388,16 @@ mod tests {
         cut_mode: CutMode,
         dpi: f64,
         max_width_mm: f64,
-    ) -> (JobSpec, PrinterCapabilities) {
+    ) -> (JobSpec, DeviceCapabilities) {
         let media = Media::continuous(width_mm, Dpi(dpi));
         let mut job = JobSpec::new(media);
         job.copies = copies;
         job.cut_mode = cut_mode;
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(dpi),
             max_width_mm,
             supports_cut: true,
-            ..PrinterCapabilities::default()
+            ..DeviceCapabilities::default()
         };
         (job, caps)
     }

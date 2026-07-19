@@ -102,7 +102,7 @@ impl LabelWriter550Driver {
 
     /// Physical head width in dots for the target chassis.
     ///
-    /// [`PrinterCapabilities::max_width_mm`] often carries the loaded media width
+    /// [`DeviceCapabilities::max_width_mm`] often carries the loaded media width
     /// rather than the printer head; treat anything below the 5XL span as the
     /// 672-dot head.
     fn head_dots(ctx: &EncodeContext<'_>) -> u32 {
@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use lbl_core::job::{DriverOptions, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_job(media: Media, copies: u32) -> JobSpec {
@@ -249,7 +249,7 @@ mod tests {
         // 8 dots across head (1 byte/line), 2 lines.
         let mut bmp = MonoBitmap::new(8, 2);
         bmp.set(0, 0, true); // first line, MSB set
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
         let ctx = EncodeContext::new(&job, &caps);
 
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn graphics_mode_emits_esc_i() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
         job.driver = DriverOptions::from_dymo(Some(LwOutputMode::Graphics), None);
         let ctx = EncodeContext::new(&job, &caps);
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn high_speed_emits_esc_t() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let mut job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
         job.driver = DriverOptions::from_dymo(None, Some(LwSpeed::High));
         let ctx = EncodeContext::new(&job, &caps);
@@ -301,10 +301,10 @@ mod tests {
     #[test]
     fn five_xl_clamps_high_speed_to_normal() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             max_width_mm: 104.0,
             dpi: Dpi(300.0),
-            ..PrinterCapabilities::default()
+            ..DeviceCapabilities::default()
         };
         let mut job = ctx_job(Media::fixed(104.0, 159.0, Dpi(300.0)), 1);
         job.driver = DriverOptions::from_dymo(None, Some(LwSpeed::High));
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn continuous_media_sets_length() {
         let bmp = MonoBitmap::new(8, 3);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::continuous(57.0, Dpi(300.0)), 1);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn copies_use_short_feed_between_and_tear_at_end() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 3);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = LabelWriter550Driver::new().encode(&bmp, &ctx).unwrap();

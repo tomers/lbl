@@ -345,12 +345,12 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
     use lbl_driver_api::EncodeContext;
 
-    fn caps_cut() -> PrinterCapabilities {
-        PrinterCapabilities {
+    fn caps_cut() -> DeviceCapabilities {
+        DeviceCapabilities {
             supports_cut: true,
             dpi: Dpi(203.0),
             max_width_mm: 12.0,

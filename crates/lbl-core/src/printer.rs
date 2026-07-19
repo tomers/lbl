@@ -54,6 +54,9 @@ pub enum Protocol {
     BrotherQl,
     /// Brother P-touch / TZe tape raster protocol (PT-P700 / H500 / E500 family).
     BrotherPt,
+    /// Graphtec / Silhouette GPGL plotter language (craft cutters).
+    #[serde(rename = "gpgl")]
+    Gpgl,
     /// A virtual printer that "prints" to an image file instead of hardware.
     ///
     /// The concrete output format (PNG, BMP, ...) is the printer's selected
@@ -82,7 +85,10 @@ impl Protocol {
     /// target a human instead, so they show the label in its reading
     /// orientation rather than the head's.
     pub fn targets_print_head(self) -> bool {
-        !matches!(self, Protocol::Virtual | Protocol::Console | Protocol::Html)
+        !matches!(
+            self,
+            Protocol::Virtual | Protocol::Console | Protocol::Html | Protocol::Gpgl
+        )
     }
 
     /// Whether [`MonoBitmap::width`] runs along the feed direction.
@@ -167,11 +173,11 @@ fn default_serial_baud() -> u32 {
 /// configuration persists across disconnects.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PrinterId(pub String);
+pub struct DeviceId(pub String);
 
 /// A known printer model definition (independent of any physical instance).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrinterModel {
+pub struct DeviceModel {
     /// Manufacturer, e.g. "DYMO".
     pub brand: String,
     /// Model name, e.g. "LabelWriter 550".
@@ -179,7 +185,7 @@ pub struct PrinterModel {
     /// Protocol the model speaks.
     pub protocol: Protocol,
     /// Static capabilities of the model.
-    pub capabilities: PrinterCapabilities,
+    pub capabilities: DeviceCapabilities,
 }
 
 fn default_true() -> bool {
@@ -188,7 +194,7 @@ fn default_true() -> bool {
 
 /// What a printer can do; used by drivers and the spooler.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrinterCapabilities {
+pub struct DeviceCapabilities {
     /// Native print resolution.
     pub dpi: Dpi,
     /// Maximum printable width across the head, in millimeters.
@@ -243,7 +249,7 @@ pub struct PrinterCapabilities {
     pub invalidate_bytes: Option<u32>,
 }
 
-impl Default for PrinterCapabilities {
+impl Default for DeviceCapabilities {
     fn default() -> Self {
         Self {
             dpi: Dpi(300.0),
@@ -268,13 +274,13 @@ impl Default for PrinterCapabilities {
 /// This is what `lbl-config` stores so that a disconnected printer keeps its
 /// settings and is restored on reconnect.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrinterProfile {
+pub struct DeviceProfile {
     /// Stable identifier (config key).
-    pub id: PrinterId,
+    pub id: DeviceId,
     /// Human-friendly name.
     pub name: String,
     /// Which known model this instance is.
-    pub model: PrinterModel,
+    pub model: DeviceModel,
     /// How to reach it.
     pub transport: Transport,
     /// Whether this is the user's default printer.
@@ -318,6 +324,7 @@ mod tests {
         assert!(!Protocol::Virtual.targets_print_head());
         assert!(!Protocol::Console.targets_print_head());
         assert!(!Protocol::Html.targets_print_head());
+        assert!(!Protocol::Gpgl.targets_print_head());
     }
 
     #[test]

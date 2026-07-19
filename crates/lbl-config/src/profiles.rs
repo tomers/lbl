@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lbl_core::printer::{PrinterId, PrinterProfile};
+use lbl_core::printer::{DeviceId, DeviceProfile};
 use serde::{Deserialize, Serialize};
 
 use crate::{ConfigError, Result};
@@ -14,10 +14,10 @@ use crate::{ConfigError, Result};
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct ProfilesFile {
     #[serde(default)]
-    printers: Vec<PrinterProfile>,
+    printers: Vec<DeviceProfile>,
 }
 
-/// A read/write store of persisted [`PrinterProfile`]s backed by a TOML file.
+/// A read/write store of persisted [`DeviceProfile`]s backed by a TOML file.
 #[derive(Debug, Clone)]
 pub struct ProfileStore {
     path: PathBuf,
@@ -36,7 +36,7 @@ impl ProfileStore {
 
     /// Load all persisted profiles. Returns an empty list if the file does not
     /// exist yet.
-    pub fn load(&self) -> Result<Vec<PrinterProfile>> {
+    pub fn load(&self) -> Result<Vec<DeviceProfile>> {
         if !self.path.exists() {
             return Ok(Vec::new());
         }
@@ -50,7 +50,7 @@ impl ProfileStore {
     }
 
     /// Persist the full list of profiles, creating parent directories.
-    pub fn save_all(&self, profiles: &[PrinterProfile]) -> Result<()> {
+    pub fn save_all(&self, profiles: &[DeviceProfile]) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
                 path: parent.display().to_string(),
@@ -68,7 +68,7 @@ impl ProfileStore {
     }
 
     /// Insert or update a profile (matched by id), then persist.
-    pub fn upsert(&self, profile: PrinterProfile) -> Result<()> {
+    pub fn upsert(&self, profile: DeviceProfile) -> Result<()> {
         let mut profiles = self.load()?;
         match profiles.iter_mut().find(|p| p.id == profile.id) {
             Some(existing) => *existing = profile,
@@ -78,7 +78,7 @@ impl ProfileStore {
     }
 
     /// Remove a profile by id (no-op if absent), then persist.
-    pub fn remove(&self, id: &PrinterId) -> Result<()> {
+    pub fn remove(&self, id: &DeviceId) -> Result<()> {
         let mut profiles = self.load()?;
         profiles.retain(|p| &p.id != id);
         self.save_all(&profiles)
@@ -88,18 +88,18 @@ impl ProfileStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::printer::{PrinterCapabilities, PrinterModel, Protocol, Transport};
+    use lbl_core::printer::{DeviceCapabilities, DeviceModel, Protocol, Transport};
     use lbl_core::units::Dpi;
 
-    fn sample(id: &str) -> PrinterProfile {
-        PrinterProfile {
-            id: PrinterId(id.to_string()),
+    fn sample(id: &str) -> DeviceProfile {
+        DeviceProfile {
+            id: DeviceId(id.to_string()),
             name: format!("Printer {id}"),
-            model: PrinterModel {
+            model: DeviceModel {
                 brand: "DYMO".into(),
                 model: "LabelWriter 550".into(),
                 protocol: Protocol::Dymo,
-                capabilities: PrinterCapabilities {
+                capabilities: DeviceCapabilities {
                     dpi: Dpi(300.0),
                     max_width_mm: 56.0,
                     supports_cut: false,
@@ -138,7 +138,7 @@ mod tests {
             "Renamed"
         );
 
-        store.remove(&PrinterId("a".into())).unwrap();
+        store.remove(&DeviceId("a".into())).unwrap();
         assert_eq!(store.load().unwrap().len(), 1);
 
         let _ = std::fs::remove_dir_all(&dir);

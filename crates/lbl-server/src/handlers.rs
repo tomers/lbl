@@ -26,11 +26,11 @@ use lbl::pipeline::{
 use lbl::pipeline::{
     inked_content_bounds, pad_preview_encode_feed, pad_preview_head_tape, render_label_raster,
 };
-use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, PrinterEntry};
+use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
 use lbl_core::job::CutMode;
 use lbl_core::media::Media;
-use lbl_core::printer::{PrinterCapabilities, PrinterProfile, Protocol};
+use lbl_core::printer::{DeviceCapabilities, DeviceProfile, Protocol};
 use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_encode::Registry;
@@ -191,15 +191,15 @@ pub async fn list_fonts(State(state): State<AppState>) -> ApiResult {
     .into_response())
 }
 
-pub async fn list_catalog_printers(State(state): State<AppState>) -> ApiResult {
-    Ok(Json(state.catalog.printers()).into_response())
+pub async fn list_catalog_devices(State(state): State<AppState>) -> ApiResult {
+    Ok(Json(state.catalog.devices()).into_response())
 }
 
 pub async fn show_catalog_printer(
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> ApiResult {
-    match state.catalog.require_printer(&key) {
+    match state.catalog.require_device(&key) {
         Ok(p) => Ok(Json(p).into_response()),
         Err(message) => Err(ApiError(StatusCode::BAD_REQUEST, message)),
     }
@@ -225,9 +225,9 @@ pub async fn compatible_catalog(
     Ok(Json(entries).into_response())
 }
 
-pub async fn list_printers(State(state): State<AppState>) -> ApiResult {
+pub async fn list_devices(State(state): State<AppState>) -> ApiResult {
     if !state.host_discovery_enabled {
-        return Ok(Json(Vec::<lbl_device::DiscoveredPrinter>::new()).into_response());
+        return Ok(Json(Vec::<lbl_device::DiscoveredDevice>::new()).into_response());
     }
     let discovered = lbl_device::discover();
     Ok(Json(discovered).into_response())
@@ -240,14 +240,14 @@ pub async fn list_profiles(State(state): State<AppState>) -> ApiResult {
 
 pub async fn upsert_profile(
     State(state): State<AppState>,
-    Json(profile): Json<PrinterProfile>,
+    Json(profile): Json<DeviceProfile>,
 ) -> ApiResult {
     state.profiles.upsert(profile)?;
     Ok((StatusCode::OK, Json(json!({ "ok": true }))).into_response())
 }
 
 pub async fn delete_profile(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
-    state.profiles.remove(&lbl_core::printer::PrinterId(id))?;
+    state.profiles.remove(&lbl_core::printer::DeviceId(id))?;
     Ok((StatusCode::OK, Json(json!({ "ok": true }))).into_response())
 }
 
@@ -343,7 +343,7 @@ pub async fn profile_soft_reboot(
     Ok(Json(json!({ "ok": true })).into_response())
 }
 
-fn soft_reboot_profile(profile: &PrinterProfile) -> Result<(), String> {
+fn soft_reboot_profile(profile: &DeviceProfile) -> Result<(), String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
             vendor_id,
@@ -358,7 +358,7 @@ fn soft_reboot_profile(profile: &PrinterProfile) -> Result<(), String> {
     }
 }
 
-fn query_profile_print_status(profile: &PrinterProfile) -> Result<lbl_device::PrintStatus, String> {
+fn query_profile_print_status(profile: &DeviceProfile) -> Result<lbl_device::PrintStatus, String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
             vendor_id,
@@ -372,7 +372,7 @@ fn query_profile_print_status(profile: &PrinterProfile) -> Result<lbl_device::Pr
     }
 }
 
-fn detect_loaded_media_sku(profile: &PrinterProfile) -> Option<String> {
+fn detect_loaded_media_sku(profile: &DeviceProfile) -> Option<String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
             vendor_id,
@@ -396,7 +396,7 @@ fn detected_media_from_catalog(catalog: &Catalog, sku: &str) -> Option<serde_jso
     }))
 }
 
-fn profile_is_connected(profile: &PrinterProfile, host_discovery_enabled: bool) -> bool {
+fn profile_is_connected(profile: &DeviceProfile, host_discovery_enabled: bool) -> bool {
     if !host_discovery_enabled {
         return false;
     }
@@ -1047,8 +1047,8 @@ fn resolve_encode_caps(
     printer_key: Option<&str>,
     media: &Media,
     supports_cut: bool,
-) -> PrinterCapabilities {
-    let printer = printer_key.and_then(|k| catalog.lookup_printer(k));
+) -> DeviceCapabilities {
+    let printer = printer_key.and_then(|k| catalog.lookup_device(k));
     encode_capabilities_for(printer, media, supports_cut)
 }
 
@@ -1096,8 +1096,8 @@ fn resolve_request_dpi(
     protocol: Option<Protocol>,
     req_dpi: f64,
 ) -> f64 {
-    let protocol = protocol
-        .or_else(|| printer_key.and_then(|k| catalog.lookup_printer(k).map(|p| p.protocol)));
+    let protocol =
+        protocol.or_else(|| printer_key.and_then(|k| catalog.lookup_device(k).map(|p| p.protocol)));
     match protocol {
         Some(p) => catalog.resolve_dpi(printer_key, p, req_dpi),
         None => catalog.resolve_dpi(printer_key, Protocol::Virtual, req_dpi),
@@ -1673,11 +1673,11 @@ fn resolve_catalog_printer<'a>(
     catalog: &'a Catalog,
     printer_key: Option<&str>,
     protocol: Protocol,
-) -> Option<&'a PrinterEntry> {
+) -> Option<&'a DeviceEntry> {
     if let Some(key) = printer_key {
-        return catalog.lookup_printer(key);
+        return catalog.lookup_device(key);
     }
-    catalog.printers().iter().find(|p| p.protocol == protocol)
+    catalog.devices().iter().find(|p| p.protocol == protocol)
 }
 
 /// Build browser transport hints from catalog connection entries.

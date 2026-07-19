@@ -1,7 +1,7 @@
 //! Data model for catalog entries.
 
 use lbl_core::media::{Adhesive, Material, Media, MediaColor, MediaLength, MediaSense};
-use lbl_core::printer::{PrinterCapabilities, PrinterModel, Protocol};
+use lbl_core::printer::{DeviceCapabilities, DeviceModel, Protocol};
 use lbl_core::units::Dpi;
 use serde::{Deserialize, Serialize};
 
@@ -232,7 +232,7 @@ impl Maturity {
 /// time; fall back to [`brand_url`] (brand support hub) when the manufacturer
 /// has no stable per-model support page.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct PrinterSupport {
+pub struct DeviceSupport {
     /// Model-specific support page (drivers, manuals, FAQs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub product_url: Option<String>,
@@ -241,7 +241,7 @@ pub struct PrinterSupport {
     pub brand_url: Option<String>,
 }
 
-impl PrinterSupport {
+impl DeviceSupport {
     /// Whether both URL fields are unset.
     pub fn is_empty(&self) -> bool {
         self.product_url.is_none() && self.brand_url.is_none()
@@ -253,13 +253,24 @@ impl PrinterSupport {
     }
 }
 
-fn support_is_empty(support: &PrinterSupport) -> bool {
+fn support_is_empty(support: &DeviceSupport) -> bool {
     support.is_empty()
 }
 
-/// A known printer model in the catalog.
+/// Whether a catalog device is a label printer or a craft cutter/plotter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DeviceRole {
+    /// Thermal / inkjet label printer (default for existing catalog rows).
+    #[default]
+    Printer,
+    /// Desktop cutting machine (vector GPGL / similar).
+    Cutter,
+}
+
+/// A known device model in the catalog (printer or cutter).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrinterEntry {
+pub struct DeviceEntry {
     /// Manufacturer brand, e.g. "DYMO".
     pub brand: String,
     /// One or more keys/aliases that resolve to this entry (the first is
@@ -269,6 +280,9 @@ pub struct PrinterEntry {
     pub name: String,
     /// Protocol the model speaks.
     pub protocol: Protocol,
+    /// Printer vs cutter. Defaults to printer for thermal catalog rows.
+    #[serde(default)]
+    pub role: DeviceRole,
     /// How thoroughly this model has been validated.
     #[serde(default)]
     pub maturity: Maturity,
@@ -330,10 +344,10 @@ pub struct PrinterEntry {
     pub head_printable_height_mm: Option<f64>,
     /// Optional manufacturer support links (product page and/or brand hub).
     #[serde(default, skip_serializing_if = "support_is_empty")]
-    pub support: PrinterSupport,
+    pub support: DeviceSupport,
 }
 
-impl PrinterEntry {
+impl DeviceEntry {
     /// The canonical key (first in `keys`).
     pub fn canonical_key(&self) -> &str {
         self.keys.first().map(String::as_str).unwrap_or("")
@@ -373,9 +387,9 @@ impl PrinterEntry {
         self.match_score(printer_model).is_some()
     }
 
-    /// Convert to a [`PrinterModel`] for profiles and drivers.
-    pub fn to_printer_model(&self) -> PrinterModel {
-        PrinterModel {
+    /// Convert to a [`DeviceModel`] for profiles and drivers.
+    pub fn to_printer_model(&self) -> DeviceModel {
+        DeviceModel {
             brand: self.brand.clone(),
             model: self.canonical_key().to_string(),
             protocol: self.protocol,
@@ -384,8 +398,8 @@ impl PrinterEntry {
     }
 
     /// Static capabilities for encode/dispatch (protocol padding, DPI, etc.).
-    pub fn encode_capabilities(&self) -> PrinterCapabilities {
-        PrinterCapabilities {
+    pub fn encode_capabilities(&self) -> DeviceCapabilities {
+        DeviceCapabilities {
             dpi: Dpi(self.dpi),
             max_width_mm: self.max_width_mm,
             supports_cut: self.supports_cut,
@@ -417,22 +431,22 @@ pub(crate) struct CatalogFile {
     #[serde(default)]
     pub entries: Vec<CatalogEntry>,
     #[serde(default)]
-    pub printers: Vec<PrinterEntry>,
+    pub devices: Vec<DeviceEntry>,
 }
 
 /// Resolve encode-time capabilities from an optional catalog printer and media.
 pub fn encode_capabilities_for(
-    printer: Option<&PrinterEntry>,
+    printer: Option<&DeviceEntry>,
     media: &Media,
     supports_cut: bool,
-) -> PrinterCapabilities {
+) -> DeviceCapabilities {
     match printer {
         Some(entry) => {
             let mut caps = entry.encode_capabilities();
             caps.supports_cut |= supports_cut;
             caps
         }
-        None => PrinterCapabilities {
+        None => DeviceCapabilities {
             dpi: media.dpi,
             max_width_mm: media.width_mm,
             supports_cut,

@@ -79,6 +79,7 @@ pub fn protocol_cli_name(protocol: Protocol) -> &'static str {
         Protocol::Virtual => "virtual",
         Protocol::Console => "console",
         Protocol::Html => "html",
+        Protocol::Gpgl => "gpgl",
     }
 }
 

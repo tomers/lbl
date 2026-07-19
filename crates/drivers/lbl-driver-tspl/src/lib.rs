@@ -104,14 +104,14 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_size_bitmap_print() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn continuous_emits_zero_gap() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(104.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();
@@ -137,7 +137,7 @@ mod tests {
     fn black_mark_emits_bline() {
         use lbl_core::media::MediaSense;
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let mut media = Media::fixed(102.0, 152.0, Dpi(203.0));
         media.sense = Some(MediaSense::BlackMark {
             mark_mm: 4.0,
@@ -155,7 +155,7 @@ mod tests {
     fn inverts_ink_bits() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true); // our byte: 0x80
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = TsplDriver::new().encode(&bmp, &ctx).unwrap();

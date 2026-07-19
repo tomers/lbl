@@ -7,14 +7,14 @@
 //!
 //! ```
 //! use lbl_encode::Registry;
-//! use lbl_core::{bitmap::MonoBitmap, job::JobSpec, media::Media, printer::{PrinterCapabilities, Protocol}, units::Dpi};
+//! use lbl_core::{bitmap::MonoBitmap, job::JobSpec, media::Media, printer::{DeviceCapabilities, Protocol}, units::Dpi};
 //! use lbl_driver_api::EncodeContext;
 //!
 //! let registry = Registry::with_builtin_drivers();
 //! let driver = registry.get(Protocol::EscPos).unwrap();
 //! let bmp = MonoBitmap::new(8, 1);
 //! let job = JobSpec::new(Media::continuous(58.0, Dpi(203.0)));
-//! let caps = PrinterCapabilities::default();
+//! let caps = DeviceCapabilities::default();
 //! let bytes = driver.encode(&bmp, &EncodeContext::new(&job, &caps)).unwrap();
 //! assert!(!bytes.is_empty());
 //! ```

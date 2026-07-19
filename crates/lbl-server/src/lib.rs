@@ -63,22 +63,22 @@ async fn http_request_span(request: Request, next: Next) -> Response {
 /// keeps profiles in the client and must not share a host-global store.
 fn host_profile_routes() -> Router<AppState> {
     Router::new()
-        .route("/api/printers/profiles", get(handlers::list_profiles))
-        .route("/api/printers/profiles", put(handlers::upsert_profile))
+        .route("/api/devices/profiles", get(handlers::list_profiles))
+        .route("/api/devices/profiles", put(handlers::upsert_profile))
         .route(
-            "/api/printers/profiles/{id}",
+            "/api/devices/profiles/{id}",
             delete(handlers::delete_profile),
         )
         .route(
-            "/api/printers/profiles/{id}/media",
+            "/api/devices/profiles/{id}/media",
             get(handlers::profile_detected_media),
         )
         .route(
-            "/api/printers/profiles/{id}/status",
+            "/api/devices/profiles/{id}/status",
             get(handlers::profile_printer_status),
         )
         .route(
-            "/api/printers/profiles/{id}/soft-reboot",
+            "/api/devices/profiles/{id}/soft-reboot",
             post(handlers::profile_soft_reboot),
         )
 }
@@ -91,17 +91,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/config/sources", get(handlers::get_config_sources))
         .route("/api/catalog", get(handlers::list_catalog))
         .route("/api/fonts", get(handlers::list_fonts))
+        .route("/api/catalog/devices", get(handlers::list_catalog_devices))
         .route(
-            "/api/catalog/printers",
-            get(handlers::list_catalog_printers),
-        )
-        .route(
-            "/api/catalog/printers/{key}",
+            "/api/catalog/devices/{key}",
             get(handlers::show_catalog_printer),
         )
         .route("/api/catalog/compatible", get(handlers::compatible_catalog))
         .route("/api/catalog/{key}", get(handlers::show_catalog))
-        .route("/api/printers", get(handlers::list_printers))
+        .route("/api/devices", get(handlers::list_devices))
         .route("/api/preview", post(handlers::preview))
         .route("/api/preview/html", post(handlers::preview_html))
         .route("/api/print", post(handlers::print))
@@ -500,7 +497,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_printers_empty_when_host_discovery_disabled() {
+    async fn list_devices_empty_when_host_discovery_disabled() {
         let state = AppState {
             host_discovery_enabled: false,
             ..test_state()
@@ -509,7 +506,7 @@ mod tests {
         let resp = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/printers")
+                    .uri("/api/devices")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -552,7 +549,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("PUT")
-                    .uri("/api/printers/profiles")
+                    .uri("/api/devices/profiles")
                     .header("content-type", "application/json")
                     .body(Body::from(profile.to_string()))
                     .unwrap(),
@@ -570,12 +567,12 @@ mod tests {
         };
         let app = router(state);
         for (method, uri) in [
-            ("GET", "/api/printers/profiles"),
-            ("PUT", "/api/printers/profiles"),
-            ("DELETE", "/api/printers/profiles/x"),
-            ("GET", "/api/printers/profiles/x/media"),
-            ("GET", "/api/printers/profiles/x/status"),
-            ("POST", "/api/printers/profiles/x/soft-reboot"),
+            ("GET", "/api/devices/profiles"),
+            ("PUT", "/api/devices/profiles"),
+            ("DELETE", "/api/devices/profiles/x"),
+            ("GET", "/api/devices/profiles/x/media"),
+            ("GET", "/api/devices/profiles/x/status"),
+            ("POST", "/api/devices/profiles/x/soft-reboot"),
         ] {
             let mut builder = Request::builder().method(method).uri(uri);
             let body = if method == "PUT" {

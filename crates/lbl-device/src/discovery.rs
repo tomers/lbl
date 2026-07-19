@@ -9,7 +9,7 @@ use nusb::MaybeFuture;
 
 /// A printer discovered on the system.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DiscoveredPrinter {
+pub struct DiscoveredDevice {
     /// USB vendor id (USB devices only).
     pub vendor_id: Option<u16>,
     /// USB product id (USB devices only).
@@ -37,7 +37,7 @@ pub struct DiscoveredPrinter {
 /// Returns an empty list when the `usb` feature is disabled or no devices are
 /// present.
 #[cfg(feature = "usb")]
-pub fn discover_usb() -> Vec<DiscoveredPrinter> {
+pub fn discover_usb() -> Vec<DiscoveredDevice> {
     let catalog = match Catalog::bundled() {
         Ok(c) => c,
         Err(e) => {
@@ -59,7 +59,7 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
             let vid = d.vendor_id();
             let pid = d.product_id();
             let known = catalog.match_usb(vid, pid)?;
-            Some(DiscoveredPrinter {
+            Some(DiscoveredDevice {
                 vendor_id: Some(vid),
                 product_id: Some(pid),
                 serial: d.serial_number().map(|s| s.to_string()),
@@ -75,7 +75,7 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
 
 /// Stub when USB support is compiled out.
 #[cfg(not(feature = "usb"))]
-pub fn discover_usb() -> Vec<DiscoveredPrinter> {
+pub fn discover_usb() -> Vec<DiscoveredDevice> {
     Vec::new()
 }
 
@@ -92,7 +92,7 @@ pub fn discover_usb() -> Vec<DiscoveredPrinter> {
 /// Returns an empty list when the `serial` feature is disabled or enumeration
 /// fails.
 #[cfg(feature = "serial")]
-pub fn discover_serial() -> Vec<DiscoveredPrinter> {
+pub fn discover_serial() -> Vec<DiscoveredDevice> {
     let ports = match serialport::available_ports() {
         Ok(p) => p,
         Err(e) => {
@@ -130,7 +130,7 @@ pub fn discover_serial() -> Vec<DiscoveredPrinter> {
                 (None, None, None)
             };
 
-            Some(DiscoveredPrinter {
+            Some(DiscoveredDevice {
                 vendor_id: Some(usb.vid),
                 product_id: Some(usb.pid),
                 serial: usb.serial_number,
@@ -146,7 +146,7 @@ pub fn discover_serial() -> Vec<DiscoveredPrinter> {
 
 /// Stub when serial support is compiled out.
 #[cfg(not(feature = "serial"))]
-pub fn discover_serial() -> Vec<DiscoveredPrinter> {
+pub fn discover_serial() -> Vec<DiscoveredDevice> {
     Vec::new()
 }
 
@@ -165,7 +165,7 @@ const BLE_DISCOVERY_SCAN_SECS: u64 = 10;
 /// Returns an empty list when the `ble` feature is disabled, no adapter is
 /// present, or the scan fails.
 #[cfg(feature = "ble")]
-pub fn discover_ble() -> Vec<DiscoveredPrinter> {
+pub fn discover_ble() -> Vec<DiscoveredDevice> {
     use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
     use btleplug::platform::Manager;
     use std::time::Duration;
@@ -218,7 +218,7 @@ pub fn discover_ble() -> Vec<DiscoveredPrinter> {
                 .unwrap_or_else(|| addr.clone());
 
             if crate::ble::props_look_like_letratag(&props, &addr) {
-                out.push(DiscoveredPrinter {
+                out.push(DiscoveredDevice {
                     vendor_id: None,
                     product_id: None,
                     serial: None,
@@ -231,7 +231,7 @@ pub fn discover_ble() -> Vec<DiscoveredPrinter> {
                 continue;
             }
             if crate::ble::props_look_like_niimbot(&props, &addr) {
-                out.push(DiscoveredPrinter {
+                out.push(DiscoveredDevice {
                     vendor_id: None,
                     product_id: None,
                     serial: None,
@@ -249,7 +249,7 @@ pub fn discover_ble() -> Vec<DiscoveredPrinter> {
 
 /// Stub when BLE support is compiled out.
 #[cfg(not(feature = "ble"))]
-pub fn discover_ble() -> Vec<DiscoveredPrinter> {
+pub fn discover_ble() -> Vec<DiscoveredDevice> {
     Vec::new()
 }
 
@@ -262,7 +262,7 @@ pub fn discover_ble() -> Vec<DiscoveredPrinter> {
 ///
 /// Note: with the `ble` feature enabled this performs a short Bluetooth scan
 /// (a few seconds) on each call.
-pub fn discover() -> Vec<DiscoveredPrinter> {
+pub fn discover() -> Vec<DiscoveredDevice> {
     let mut all = discover_usb();
     all.extend(discover_serial());
     all.extend(discover_ble());
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn serial_printer_serializes_path_and_omits_it_for_usb() {
-        let serial = DiscoveredPrinter {
+        let serial = DiscoveredDevice {
             vendor_id: Some(0x1a86),
             product_id: Some(0x7523),
             serial: None,
@@ -291,7 +291,7 @@ mod tests {
         assert!(json.contains("\"connection\":\"serial\""));
 
         // USB bulk devices carry no serial path, which is omitted from the JSON.
-        let usb = DiscoveredPrinter {
+        let usb = DiscoveredDevice {
             path: None,
             connection: "usb".to_string(),
             ..serial

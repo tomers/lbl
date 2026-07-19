@@ -85,13 +85,13 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_d30_bringup_and_raster() {
         let bmp = MonoBitmap::new(16, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(12.0, 40.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = PhomemoD30Driver::new().encode(&bmp, &ctx).unwrap();

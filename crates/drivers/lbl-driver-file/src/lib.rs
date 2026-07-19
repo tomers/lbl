@@ -230,7 +230,7 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_bitmap() -> MonoBitmap {
@@ -244,7 +244,7 @@ mod tests {
     fn png_has_signature() {
         let bmp = ctx_bitmap();
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = FileDriver::new(MediaType::Png).encode(&bmp, &ctx).unwrap();
         assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
@@ -294,7 +294,7 @@ mod tests {
             data: vec![],
         };
         let job = JobSpec::new(Media::fixed(25.0, 54.0, Dpi(300.0)));
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let ctx = EncodeContext::new(&job, &caps);
         assert!(FileDriver::new(MediaType::Png).encode(&bmp, &ctx).is_err());
     }

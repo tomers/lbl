@@ -680,7 +680,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     let catalog = Catalog::bundled()?;
     let printer_entry = match args.printer.as_deref() {
-        Some(key) => Some(catalog.require_printer(key).map_err(|e| anyhow!(e))?),
+        Some(key) => Some(catalog.require_device(key).map_err(|e| anyhow!(e))?),
         None => None,
     };
 
@@ -1562,12 +1562,12 @@ enum CatalogCommand {
     },
     Printers {
         #[command(subcommand)]
-        command: CatalogPrinterCommand,
+        command: CatalogDeviceCommand,
     },
 }
 
 #[derive(Subcommand)]
-enum CatalogPrinterCommand {
+enum CatalogDeviceCommand {
     List,
     Show { key: String },
 }
@@ -1587,8 +1587,8 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(e)?);
         }
         CatalogCommand::Compatible { printer } => {
-            let printer = catalog.require_printer(&printer).map_err(|e| anyhow!(e))?;
-            for e in catalog.media_for_printer(printer) {
+            let printer = catalog.require_device(&printer).map_err(|e| anyhow!(e))?;
+            for e in catalog.media_for_device(printer) {
                 println!("{:<12} {}", e.canonical_key(), e.name);
             }
         }
@@ -1596,18 +1596,18 @@ fn run_catalog(args: CatalogArgs) -> Result<()> {
             for e in catalog.search(&query) {
                 println!("media  {:<12} {}", e.canonical_key(), e.name);
             }
-            for p in catalog.search_printers(&query) {
+            for p in catalog.search_devices(&query) {
                 println!("printer {:<20} {}", p.canonical_key(), p.name);
             }
         }
         CatalogCommand::Printers { command } => match command {
-            CatalogPrinterCommand::List => {
-                for p in catalog.printers() {
+            CatalogDeviceCommand::List => {
+                for p in catalog.devices() {
                     println!("{:<20} {}", p.canonical_key(), p.name);
                 }
             }
-            CatalogPrinterCommand::Show { key } => {
-                let p = catalog.require_printer(&key).map_err(|e| anyhow!(e))?;
+            CatalogDeviceCommand::Show { key } => {
+                let p = catalog.require_device(&key).map_err(|e| anyhow!(e))?;
                 println!("{}", serde_json::to_string_pretty(p)?);
             }
         },
@@ -1748,7 +1748,7 @@ fn run_device_soft_reboot(args: StatusArgs) -> Result<()> {
 
     if let Some(key) = args.printer.as_deref() {
         let entry = catalog
-            .printers()
+            .devices()
             .iter()
             .find(|p| p.matches_key(key))
             .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;

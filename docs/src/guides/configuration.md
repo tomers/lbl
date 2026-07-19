@@ -193,4 +193,4 @@ nested `[print.driver.*]` / `LBL_PRINT__DRIVER__*` (currently `dymo.output_mode`
 
 User-owned printers are persisted separately (in `printers.toml`) so a
 disconnected printer keeps its desired configuration. Manage them via the API
-(`/api/printers/profiles`).
+(`/api/devices/profiles`).

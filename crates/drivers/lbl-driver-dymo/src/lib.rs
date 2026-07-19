@@ -11,7 +11,7 @@
 //!   `SYN`-prefixed line per column, then `ESC E` (cut, when present) and
 //!   `ESC A` (status — host must read IN; reply arrives after cut/feed).
 //!   Column order matches a `ROTATE_270` transpose when
-//!   [`PrinterCapabilities::feed_reverse`] is set.
+//!   [`DeviceCapabilities::feed_reverse`] is set.
 //! - [`LabelWriter550Driver`] — the **LabelWriter 550 series** raster protocol
 //!   (see [`lw550`]), per DYMO's LW 550 Technical Reference.
 //!
@@ -227,7 +227,7 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_job(copies: u32) -> JobSpec {
@@ -241,7 +241,7 @@ mod tests {
         let mut bmp = MonoBitmap::new(3, 8);
         bmp.set(0, 0, true);
         bmp.set(2, 7, true);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(1);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn copies_repeat_stream() {
         let bmp = MonoBitmap::new(2, 8);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(3);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
@@ -270,7 +270,7 @@ mod tests {
     fn feed_trail_adds_blank_columns() {
         let mut bmp = MonoBitmap::new(1, 8);
         bmp.set(0, 0, true);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
             feed_trail_mm: Some(12.7), // gap; driver feeds 2× → 25.4 mm ≈ 180 dots
             ..Default::default()
@@ -287,7 +287,7 @@ mod tests {
         let mut bmp = MonoBitmap::new(2, 8);
         bmp.set(0, 0, true);
         bmp.set(1, 7, true);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             feed_reverse: true,
             ..Default::default()
         };
@@ -305,7 +305,7 @@ mod tests {
     fn twelve_mm_encode_uses_protocol_column_height() {
         let mut bmp = MonoBitmap::new(1, 58);
         bmp.set(0, 29, true);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
             head_printable_height_mm: Some(8.2),
             ..Default::default()

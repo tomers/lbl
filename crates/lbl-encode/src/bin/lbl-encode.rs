@@ -7,7 +7,7 @@ use clap::Parser;
 use lbl_core::bitmap::MonoBitmap;
 use lbl_core::job::{CutMode, JobSpec};
 use lbl_core::media::Media;
-use lbl_core::printer::{PrinterCapabilities, Protocol};
+use lbl_core::printer::{DeviceCapabilities, Protocol};
 use lbl_core::units::Dpi;
 use lbl_driver_api::EncodeContext;
 use lbl_encode::Registry;
@@ -119,7 +119,7 @@ fn main() -> Result<()> {
     job.copies = cli.copies;
     job.density = cli.density;
 
-    let caps = PrinterCapabilities {
+    let caps = DeviceCapabilities {
         dpi,
         max_width_mm: cli.width_mm,
         supports_cut: cli.supports_cut,

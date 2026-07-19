@@ -89,13 +89,13 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_phomemo_framing_around_gs_v0() {
         let bmp = MonoBitmap::new(16, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(48.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = PhomemoDriver::new().encode(&bmp, &ctx).unwrap();

@@ -34,7 +34,7 @@ use lbl_catalog::Catalog;
 
 let catalog = Catalog::bundled().unwrap();
 let media = catalog.lookup("11352").unwrap();
-let printer = catalog.lookup_printer("LabelWriter 550").unwrap();
+let printer = catalog.lookup_device("LabelWriter 550").unwrap();
 let compatible = catalog.compatible_with("LabelWriter 550");
 let dpi = catalog.resolve_dpi(Some("D110"), lbl_core::printer::Protocol::Niimbot, 300.0);
 ```

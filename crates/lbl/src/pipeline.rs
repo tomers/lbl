@@ -4,10 +4,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
 use image::RgbaImage;
-use lbl_catalog::{Catalog, ConnectionHint, PrinterEntry};
+use lbl_catalog::{Catalog, ConnectionHint, DeviceEntry};
 use lbl_core::job::{CutMode, JobSpec, OutputMode};
 use lbl_core::media::Media;
-use lbl_core::printer::{PrinterCapabilities, Protocol};
+use lbl_core::printer::{DeviceCapabilities, Protocol};
 use lbl_core::units::{Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
 use lbl_core::MonoBitmap;
 use lbl_core::Rotation;
@@ -225,7 +225,7 @@ pub fn resolve_media(
 /// caller did not pass explicit `--network`, `--usb`, `--serial`, or
 /// `--bluetooth` flags.
 pub fn resolve_print_transport(
-    printer: Option<&PrinterEntry>,
+    printer: Option<&DeviceEntry>,
     network: Option<String>,
     usb: Option<String>,
     serial: Option<String>,
@@ -298,7 +298,7 @@ pub fn resolve_status_target(
     }
 
     let printer_entry = match printer_key {
-        Some(key) => Some(catalog.require_printer(key).map_err(|e| anyhow!(e))?),
+        Some(key) => Some(catalog.require_device(key).map_err(|e| anyhow!(e))?),
         None => None,
     };
 
@@ -436,7 +436,7 @@ fn discover_status_usb_target(expected: Option<Protocol>) -> Result<StatusTarget
     }
 }
 
-fn discover_serial_port(printer: &PrinterEntry) -> Option<String> {
+fn discover_serial_port(printer: &DeviceEntry) -> Option<String> {
     lbl_device::discover_serial()
         .into_iter()
         .find(|d| {
@@ -503,7 +503,7 @@ pub struct PipelineOptions {
     /// row-oriented heads; feed-oriented DYMO drivers invert portrait/landscape.
     pub head_rotation: Rotation,
     /// Flip the reading-frame raster left↔right before head rotation (Mirror print).
-    /// Independent of catalog [`PrinterCapabilities::feed_reverse`].
+    /// Independent of catalog [`DeviceCapabilities::feed_reverse`].
     pub mirror: bool,
     /// Supersample factor.
     pub supersample: u32,
@@ -532,7 +532,7 @@ pub struct PipelineOptions {
     /// Inset from the physical media edge (resolved from config/CLI).
     pub media_inset: MediaInsetPx,
     /// Printer encode capabilities (feed padding, DPI, cut support).
-    pub encode_caps: PrinterCapabilities,
+    pub encode_caps: DeviceCapabilities,
 }
 
 /// Options for [`encode_labels`].
@@ -682,7 +682,7 @@ pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
 /// Order: physical stock → printer `max_width_mm` → optional laminate
 /// `head_printable_height_mm`. Preview pads any leftover side gaps so the
 /// gallery shows physical stock, not only the printable raster.
-pub fn effective_printable_width_mm(media: &Media, caps: &PrinterCapabilities) -> f64 {
+pub fn effective_printable_width_mm(media: &Media, caps: &DeviceCapabilities) -> f64 {
     let mut width = media.width_mm.min(caps.max_width_mm);
     if let Some(printable) = caps.head_printable_height_mm {
         width = width.min(printable);
@@ -691,7 +691,7 @@ pub fn effective_printable_width_mm(media: &Media, caps: &PrinterCapabilities) -
 }
 
 /// Head-axis dots used for layout and rasterize after printable-band clamps.
-pub fn effective_render_head_dots(media: &Media, caps: &PrinterCapabilities) -> u32 {
+pub fn effective_render_head_dots(media: &Media, caps: &DeviceCapabilities) -> u32 {
     Millimeters(effective_printable_width_mm(media, caps))
         .to_dots(media.dpi)
         .0
@@ -702,7 +702,7 @@ pub fn render_viewport_px(
     media: &Media,
     supersample: u32,
     rotation: Rotation,
-    encode_caps: Option<&PrinterCapabilities>,
+    encode_caps: Option<&DeviceCapabilities>,
 ) -> ViewportPx {
     let factor = supersample.max(1) as f64;
     let head_dots = encode_caps
@@ -789,7 +789,7 @@ fn is_inked_preview_pixel([r, g, b, a]: [u8; 4]) -> bool {
 pub fn pad_preview_head_tape(
     image: RgbaImage,
     media: &Media,
-    caps: &PrinterCapabilities,
+    caps: &DeviceCapabilities,
     head_along_height: bool,
 ) -> HeadTapePad {
     use image::{imageops, Rgba};
@@ -847,7 +847,7 @@ pub fn pad_preview_head_tape(
 pub fn render_viewport_vector(
     media: &Media,
     rotation: Rotation,
-    encode_caps: Option<&PrinterCapabilities>,
+    encode_caps: Option<&DeviceCapabilities>,
 ) -> ViewportPx {
     let px_per_mm = CSS_LAYOUT_REFERENCE_DPI / 25.4;
     let head_mm = encode_caps
@@ -896,13 +896,13 @@ fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
 /// A non-positive content size on the feed axis means continuous / content-sized
 /// media: that axis stays `0` in the returned frame (Studio sizes it from the
 /// viewport / `--lbl-feed-px`). Head-to-cutter lead/end margins from
-/// [`PrinterCapabilities`] are still applied as stock padding so the preview
+/// [`DeviceCapabilities`] are still applied as stock padding so the preview
 /// matches real cut gaps (same DX rule as [`pad_preview_encode_feed`]).
 pub fn preview_stock_frame(
     content_width_px: f64,
     content_height_px: f64,
     media: &Media,
-    caps: &PrinterCapabilities,
+    caps: &DeviceCapabilities,
     head_along_height: bool,
     layout_dpi: f64,
 ) -> PreviewStockFrame {
@@ -1186,10 +1186,10 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
 
 /// Lead / end / cutter-gap along feed for preview (matches [`pad_preview_encode_feed`]).
 ///
-/// When only [`PrinterCapabilities::feed_trail_mm`] is set, the head-to-cutter
+/// When only [`DeviceCapabilities::feed_trail_mm`] is set, the head-to-cutter
 /// distance is used as both lead and end so the preview shows the same blank
 /// tape drawn for DX on each side of the payload.
-fn preview_feed_margins(caps: &PrinterCapabilities, dpi: f64) -> (u32, u32, u32) {
+fn preview_feed_margins(caps: &DeviceCapabilities, dpi: f64) -> (u32, u32, u32) {
     let dx = feed_margin_px(caps.feed_trail_mm, dpi);
     let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
     if explicit_lead > 0 {
@@ -1217,14 +1217,14 @@ pub struct PreviewFeedPad {
 
 /// Extend a preview raster with encode feed margins for tape printers.
 ///
-/// When [`PrinterCapabilities::feed_trail_mm`] is set and [`PrinterCapabilities::feed_lead_mm`]
+/// When [`DeviceCapabilities::feed_trail_mm`] is set and [`DeviceCapabilities::feed_lead_mm`]
 /// is not, the head-to-cutter distance is also used as the implicit lead: the print
 /// head often already sits that far past the last cut when printing starts. Preview
 /// shows symmetric white margins on both sides of the content, with dashed markers
 /// between lead/content and content/right padding.
 pub fn pad_preview_encode_feed(
     image: RgbaImage,
-    caps: &PrinterCapabilities,
+    caps: &DeviceCapabilities,
     feed_along_width: bool,
 ) -> PreviewFeedPad {
     use image::{imageops, Rgba};
@@ -1683,7 +1683,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
-            encode_caps: PrinterCapabilities::default(),
+            encode_caps: DeviceCapabilities::default(),
         }
     }
 
@@ -1735,7 +1735,7 @@ mod tests {
         use lbl_core::units::Dpi;
 
         let media = Media::fixed(15.0, 30.0, Dpi(203.0));
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(203.0),
             max_width_mm: 12.0,
             ..Default::default()
@@ -1761,7 +1761,7 @@ mod tests {
         use lbl_core::units::Dpi;
 
         let media = Media::fixed(12.0, 40.0, Dpi(180.0));
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
             max_width_mm: 12.0,
             head_printable_height_mm: Some(8.2),
@@ -1775,7 +1775,7 @@ mod tests {
         use lbl_core::units::Dpi;
 
         let media = Media::fixed(15.0, 30.0, Dpi(203.0));
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(203.0),
             max_width_mm: 12.0,
             ..Default::default()
@@ -1806,7 +1806,7 @@ mod tests {
 
         // LabelManager-style: continuous D1 with feed trail + laminate band.
         let media = Media::continuous(12.0, Dpi(180.0));
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
             max_width_mm: 12.0,
             feed_trail_mm: Some(8.1),
@@ -1866,7 +1866,7 @@ mod tests {
         use image::Rgba;
 
         let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
             feed_trail_mm: Some(8.1),
             ..Default::default()
@@ -1946,7 +1946,7 @@ mod tests {
         // LabelWriter550Driver::pad_to_head rejects it (> 672 dots).
         let mut opts = landscape_opts(Protocol::DymoLw);
         opts.media = Media::fixed(54.0, 101.0, Dpi(300.0));
-        opts.encode_caps = PrinterCapabilities {
+        opts.encode_caps = DeviceCapabilities {
             dpi: Dpi(300.0),
             max_width_mm: 57.0,
             ..Default::default()
@@ -2150,7 +2150,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
-            encode_caps: PrinterCapabilities::default(),
+            encode_caps: DeviceCapabilities::default(),
         };
         let img = RgbaImage::from_pixel(64, 32, image::Rgba([0, 0, 0, 255]));
         let result = encode_label_from_rgba(&registry, &img, &opts).unwrap();
@@ -2187,7 +2187,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
-            encode_caps: PrinterCapabilities::default(),
+            encode_caps: DeviceCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 64, &opts).unwrap();
         assert_eq!(trace.dithered.height, 64);
@@ -2224,7 +2224,7 @@ mod tests {
             label_fit_scale: 1.0,
             font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
-            encode_caps: PrinterCapabilities::default(),
+            encode_caps: DeviceCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 96, &opts).unwrap();
         assert_eq!(trace.dithered.width, 96);

@@ -1,7 +1,7 @@
 //! Build [`HtmlPreviewInput`] from a print run.
 
 use anyhow::Result;
-use lbl_catalog::{Catalog, PrinterEntry};
+use lbl_catalog::{Catalog, DeviceEntry};
 use lbl_core::media::Media;
 use lbl_core::printer::Protocol;
 use lbl_template::resolve_batch;
@@ -26,7 +26,7 @@ pub struct PreviewTransport<'a> {
 /// Resolved printer and media context for a preview run.
 pub struct PreviewRunContext<'a> {
     pub catalog: &'a Catalog,
-    pub printer_entry: Option<&'a PrinterEntry>,
+    pub printer_entry: Option<&'a DeviceEntry>,
     pub printer_key: Option<&'a str>,
     pub protocol: Protocol,
     pub dpi: f64,

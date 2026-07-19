@@ -10,7 +10,7 @@
 //! use lbl_catalog::Catalog;
 //!
 //! let catalog = Catalog::bundled().unwrap();
-//! let printer = catalog.lookup_printer("LabelWriter 550").unwrap();
+//! let printer = catalog.lookup_device("LabelWriter 550").unwrap();
 //! assert_eq!(printer.dpi, 300.0);
 //! let media = catalog.compatible_with("LabelWriter 550");
 //! assert!(media.iter().any(|e| e.matches_key("11352")));
@@ -20,8 +20,8 @@ mod model;
 mod validate;
 
 pub use model::{
-    encode_capabilities_for, CatalogEntry, ConnectionHint, ImageInfo, Maturity, MediaSpec,
-    PrinterEntry, PrinterSupport, ResolvedTransport,
+    encode_capabilities_for, CatalogEntry, ConnectionHint, DeviceEntry, DeviceRole, DeviceSupport,
+    ImageInfo, Maturity, MediaSpec, ResolvedTransport,
 };
 pub use validate::{validate_catalog_geometry, CatalogGeometryError};
 
@@ -52,18 +52,18 @@ pub const CLI_DEFAULT_DPI: f64 = 300.0;
 
 /// Result of resolving a free-form printer query against the catalog.
 #[derive(Debug, Clone, PartialEq)]
-pub enum PrinterLookup<'a> {
+pub enum DeviceLookup<'a> {
     /// Exactly one catalog entry matches.
-    Found(&'a PrinterEntry),
+    Found(&'a DeviceEntry),
     /// No catalog entry matches.
     NotFound,
     /// More than one entry matches the query.
-    Ambiguous(Vec<&'a PrinterEntry>),
+    Ambiguous(Vec<&'a DeviceEntry>),
 }
 
 const BUNDLED: &str = include_str!("../data/catalog.toml");
 
-fn split_printer_tokens(s: &str) -> Vec<String> {
+fn split_device_tokens(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
     for c in s.chars() {
@@ -83,7 +83,7 @@ fn split_printer_tokens(s: &str) -> Vec<String> {
 #[derive(Debug, Clone, Default)]
 pub struct Catalog {
     entries: Vec<CatalogEntry>,
-    printers: Vec<PrinterEntry>,
+    devices: Vec<DeviceEntry>,
 }
 
 impl Catalog {
@@ -113,10 +113,15 @@ impl Catalog {
     }
 
     fn merge_toml(&mut self, text: &str) -> Result<()> {
+        if text.contains("[[printers]]") {
+            return Err(CatalogError::Parse(
+                "catalog uses obsolete [[printers]] tables; rename them to [[devices]]".into(),
+            ));
+        }
         let file: CatalogFile =
             toml::from_str(text).map_err(|e| CatalogError::Parse(e.to_string()))?;
         self.merge_entries(file.entries);
-        self.merge_printers(file.printers);
+        self.merge_devices(file.devices);
         Ok(())
     }
 
@@ -124,7 +129,7 @@ impl Catalog {
         let file: CatalogFile =
             serde_json::from_str(text).map_err(|e| CatalogError::Parse(e.to_string()))?;
         self.merge_entries(file.entries);
-        self.merge_printers(file.printers);
+        self.merge_devices(file.devices);
         Ok(())
     }
 
@@ -136,11 +141,11 @@ impl Catalog {
         }
     }
 
-    fn merge_printers(&mut self, printers: Vec<PrinterEntry>) {
-        for printer in printers {
-            self.printers
-                .retain(|p| !printer.keys.iter().any(|k| p.matches_key(k)));
-            self.printers.push(printer);
+    fn merge_devices(&mut self, devices: Vec<DeviceEntry>) {
+        for device in devices {
+            self.devices
+                .retain(|p| !device.keys.iter().any(|k| p.matches_key(k)));
+            self.devices.push(device);
         }
     }
 
@@ -149,9 +154,9 @@ impl Catalog {
         &self.entries
     }
 
-    /// All printer entries, in insertion order.
-    pub fn printers(&self) -> &[PrinterEntry] {
-        &self.printers
+    /// All device entries, in insertion order.
+    pub fn devices(&self) -> &[DeviceEntry] {
+        &self.devices
     }
 
     /// Resolve a media entry by any of its keys/aliases (case-insensitive).
@@ -165,28 +170,28 @@ impl Catalog {
     }
 
     /// Resolve a printer entry by any of its keys/aliases (case-insensitive).
-    pub fn lookup_printer(&self, key: &str) -> Option<&PrinterEntry> {
-        self.printers.iter().find(|p| p.matches_key(key))
+    pub fn lookup_device(&self, key: &str) -> Option<&DeviceEntry> {
+        self.devices.iter().find(|p| p.matches_key(key))
     }
 
     /// Resolve a printer entry by key/alias, falling back to a free-form
     /// model-string match when it identifies exactly one catalog entry.
-    pub fn resolve_printer(&self, key: &str) -> Option<&PrinterEntry> {
-        match self.lookup_printer_query(key) {
-            PrinterLookup::Found(printer) => Some(printer),
-            PrinterLookup::NotFound | PrinterLookup::Ambiguous(_) => None,
+    pub fn resolve_device(&self, key: &str) -> Option<&DeviceEntry> {
+        match self.lookup_device_query(key) {
+            DeviceLookup::Found(printer) => Some(printer),
+            DeviceLookup::NotFound | DeviceLookup::Ambiguous(_) => None,
         }
     }
 
     /// Resolve a printer query, distinguishing not-found from ambiguous matches.
-    pub fn lookup_printer_query(&self, query: &str) -> PrinterLookup<'_> {
-        if let Some(printer) = self.lookup_printer(query) {
-            return PrinterLookup::Found(printer);
+    pub fn lookup_device_query(&self, query: &str) -> DeviceLookup<'_> {
+        if let Some(printer) = self.lookup_device(query) {
+            return DeviceLookup::Found(printer);
         }
-        let matches = self.matching_printers(query);
+        let matches = self.matching_devices(query);
         match matches.len() {
-            0 => PrinterLookup::NotFound,
-            1 => PrinterLookup::Found(matches[0]),
+            0 => DeviceLookup::NotFound,
+            1 => DeviceLookup::Found(matches[0]),
             _ => {
                 let max_score = matches
                     .iter()
@@ -199,24 +204,24 @@ impl Catalog {
                     .copied()
                     .collect();
                 if best.len() == 1 {
-                    PrinterLookup::Found(best[0])
+                    DeviceLookup::Found(best[0])
                 } else {
-                    PrinterLookup::Ambiguous(matches)
+                    DeviceLookup::Ambiguous(matches)
                 }
             }
         }
     }
 
     /// All catalog printers matching a free-form model string.
-    pub fn matching_printers(&self, printer_model: &str) -> Vec<&PrinterEntry> {
-        self.printers
+    pub fn matching_devices(&self, printer_model: &str) -> Vec<&DeviceEntry> {
+        self.devices
             .iter()
             .filter(|p| p.matches_model(printer_model))
             .collect()
     }
 
     /// Shortest `--printer` term that matches only this entry in the catalog.
-    pub fn suggest_unique_printer_term(&self, printer: &PrinterEntry) -> String {
+    pub fn suggest_unique_device_term(&self, printer: &DeviceEntry) -> String {
         let mut candidates: Vec<(u8, String)> = Vec::new();
 
         let mut keys: Vec<String> = printer.keys.clone();
@@ -226,7 +231,7 @@ impl Catalog {
         }
 
         for source in printer.keys.iter().chain(std::iter::once(&printer.name)) {
-            let words = split_printer_tokens(source);
+            let words = split_device_tokens(source);
             for token in &words {
                 if token.len() >= 2 {
                     candidates.push((1, token.clone()));
@@ -262,7 +267,7 @@ impl Catalog {
             if !seen.insert(norm) {
                 continue;
             }
-            if self.is_unique_printer_term(printer, &term) {
+            if self.is_unique_device_term(printer, &term) {
                 return term;
             }
         }
@@ -270,18 +275,18 @@ impl Catalog {
         printer.canonical_key().to_string()
     }
 
-    fn is_unique_printer_term(&self, printer: &PrinterEntry, term: &str) -> bool {
-        let matches = self.matching_printers(term);
+    fn is_unique_device_term(&self, printer: &DeviceEntry, term: &str) -> bool {
+        let matches = self.matching_devices(term);
         matches.len() == 1 && matches[0].canonical_key() == printer.canonical_key()
     }
 
     /// Human-readable error for an ambiguous printer query.
-    pub fn ambiguous_printer_message(&self, query: &str, matches: &[&PrinterEntry]) -> String {
+    pub fn ambiguous_device_message(&self, query: &str, matches: &[&DeviceEntry]) -> String {
         let mut lines = vec![format!(
             "ambiguous printer '{query}': multiple catalog entries match:"
         )];
         for printer in matches {
-            let suggest = self.suggest_unique_printer_term(printer);
+            let suggest = self.suggest_unique_device_term(printer);
             lines.push(format!(
                 "  {} ({}) — try: --printer {suggest}",
                 printer.name,
@@ -292,27 +297,25 @@ impl Catalog {
     }
 
     /// Resolve a printer query or return a user-facing error message.
-    pub fn require_printer(&self, query: &str) -> std::result::Result<&PrinterEntry, String> {
-        match self.lookup_printer_query(query) {
-            PrinterLookup::Found(printer) => Ok(printer),
-            PrinterLookup::NotFound => Err(format!("unknown printer '{query}'")),
-            PrinterLookup::Ambiguous(matches) => {
-                Err(self.ambiguous_printer_message(query, &matches))
-            }
+    pub fn require_device(&self, query: &str) -> std::result::Result<&DeviceEntry, String> {
+        match self.lookup_device_query(query) {
+            DeviceLookup::Found(printer) => Ok(printer),
+            DeviceLookup::NotFound => Err(format!("unknown printer '{query}'")),
+            DeviceLookup::Ambiguous(matches) => Err(self.ambiguous_device_message(query, &matches)),
         }
     }
 
     /// Find a printer entry matching a free-form model string when the match
     /// is unambiguous.
-    pub fn match_printer(&self, printer_model: &str) -> Option<&PrinterEntry> {
-        self.resolve_printer(printer_model)
+    pub fn match_printer(&self, printer_model: &str) -> Option<&DeviceEntry> {
+        self.resolve_device(printer_model)
     }
 
     /// Find a printer entry that matches a USB vendor/product id.
     ///
     /// Prefers an exact product match, then a vendor-wildcard match.
-    pub fn match_usb(&self, vendor_id: u16, product_id: u16) -> Option<&PrinterEntry> {
-        self.printers
+    pub fn match_usb(&self, vendor_id: u16, product_id: u16) -> Option<&DeviceEntry> {
+        self.devices
             .iter()
             .find(|p| {
                 p.connections
@@ -320,7 +323,7 @@ impl Catalog {
                     .any(|c| c.is_exact_usb_match(vendor_id, product_id))
             })
             .or_else(|| {
-                self.printers.iter().find(|p| {
+                self.devices.iter().find(|p| {
                     p.connections.iter().any(|c| {
                         matches!(
                             c,
@@ -339,11 +342,11 @@ impl Catalog {
         let Some(printer) = self.match_printer(printer_model) else {
             return Vec::new();
         };
-        self.media_for_printer(printer)
+        self.media_for_device(printer)
     }
 
     /// Media entries listed in a printer's `supported_media`.
-    pub fn media_for_printer(&self, printer: &PrinterEntry) -> Vec<&CatalogEntry> {
+    pub fn media_for_device(&self, printer: &DeviceEntry) -> Vec<&CatalogEntry> {
         printer
             .supported_media
             .iter()
@@ -380,7 +383,7 @@ impl Catalog {
             return cli_dpi;
         }
         if let Some(key) = printer_key {
-            if let Some(printer) = self.resolve_printer(key) {
+            if let Some(printer) = self.resolve_device(key) {
                 return printer.dpi;
             }
         }
@@ -389,7 +392,7 @@ impl Catalog {
 
     fn dpi_for_protocol(&self, protocol: Protocol) -> Option<f64> {
         let dpis: Vec<f64> = self
-            .printers
+            .devices
             .iter()
             .filter(|p| p.protocol == protocol)
             .map(|p| p.dpi)
@@ -417,9 +420,9 @@ impl Catalog {
     }
 
     /// Free-text search over printer keys, name, and brand (case-insensitive).
-    pub fn search_printers(&self, query: &str) -> Vec<&PrinterEntry> {
+    pub fn search_devices(&self, query: &str) -> Vec<&DeviceEntry> {
         let q = query.to_ascii_lowercase();
-        self.printers
+        self.devices
             .iter()
             .filter(|p| {
                 p.name.to_ascii_lowercase().contains(&q)
@@ -439,7 +442,7 @@ mod tests {
     fn bundled_loads_and_resolves_aliases() {
         let catalog = Catalog::bundled().unwrap();
         assert!(!catalog.entries().is_empty());
-        assert!(!catalog.printers().is_empty());
+        assert!(!catalog.devices().is_empty());
         let by_sku = catalog.lookup("11352").unwrap();
         let by_alias = catalog.lookup("s0722520").unwrap();
         assert_eq!(by_sku.canonical_key(), by_alias.canonical_key());
@@ -453,7 +456,7 @@ mod tests {
     #[test]
     fn brother_ql820_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let printer = catalog.lookup_printer("QL-820NWBc").unwrap();
+        let printer = catalog.lookup_device("QL-820NWBc").unwrap();
         assert_eq!(printer.protocol, Protocol::BrotherQl);
         assert_eq!(printer.dpi, 300.0);
         assert!(printer.supports_cut);
@@ -467,7 +470,7 @@ mod tests {
     fn brother_ql500_family_dialect_caps() {
         let catalog = Catalog::bundled().unwrap();
 
-        let ql500 = catalog.lookup_printer("QL-500").unwrap();
+        let ql500 = catalog.lookup_device("QL-500").unwrap();
         assert_eq!(ql500.protocol, Protocol::BrotherQl);
         assert_eq!(ql500.maturity, Maturity::Experimental);
         assert!(!ql500.supports_cut);
@@ -480,22 +483,22 @@ mod tests {
             "QL-500"
         );
 
-        let ql550 = catalog.lookup_printer("QL-550").unwrap();
+        let ql550 = catalog.lookup_device("QL-550").unwrap();
         assert!(ql550.supports_cut);
         assert!(!ql550.supports_expanded_mode);
         assert!(!ql550.supports_cut_every);
         assert!(!ql550.emit_raster_mode_switch);
 
-        let ql560 = catalog.lookup_printer("QL-560").unwrap();
+        let ql560 = catalog.lookup_device("QL-560").unwrap();
         assert!(ql560.supports_cut_every);
         assert!(ql560.supports_expanded_mode);
         assert!(!ql560.emit_raster_mode_switch);
 
-        let ql580 = catalog.lookup_printer("QL-580N").unwrap();
+        let ql580 = catalog.lookup_device("QL-580N").unwrap();
         assert!(ql580.emit_raster_mode_switch);
         assert!(ql580.supports_cut_every);
 
-        let ql650 = catalog.lookup_printer("QL-650TD").unwrap();
+        let ql650 = catalog.lookup_device("QL-650TD").unwrap();
         assert!(ql650.supports_expanded_mode);
         assert!(!ql650.supports_cut_every);
         assert!(ql650.emit_raster_mode_switch);
@@ -536,7 +539,7 @@ mod tests {
         assert!(lm280.iter().any(|e| e.matches_key("45013")));
         assert!(lm280.iter().any(|e| e.matches_key("45013S")));
         assert!(lm280.iter().any(|e| e.matches_key("S0720530S")));
-        let printer = catalog.lookup_printer("LM280").unwrap();
+        let printer = catalog.lookup_device("LM280").unwrap();
         assert_eq!(printer.feed_trail_mm, Some(8.1));
         assert_eq!(printer.head_printable_height_mm, Some(8.2));
         assert!(printer.feed_reverse);
@@ -558,7 +561,7 @@ mod tests {
         let d110 = catalog.compatible_with("NIIMBOT D110");
         assert!(d110.iter().any(|e| e.matches_key("12x40")));
         assert!(d110.iter().any(|e| e.matches_key("15x30")));
-        let printer = catalog.lookup_printer("D110").unwrap();
+        let printer = catalog.lookup_device("D110").unwrap();
         assert_eq!(printer.dpi, 203.0);
         assert_eq!(printer.max_width_mm, 12.0);
         assert!(printer.reports_media);
@@ -569,7 +572,7 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let label = catalog.lookup("50x30").unwrap();
         assert_eq!(label.media.width_mm, 50.0);
-        let printer = catalog.lookup_printer("B1").unwrap();
+        let printer = catalog.lookup_device("B1").unwrap();
         assert_eq!(printer.max_width_mm, 48.0);
     }
 
@@ -590,7 +593,7 @@ mod tests {
     fn niimbot_printers_report_media() {
         let catalog = Catalog::bundled().unwrap();
         let missing: Vec<_> = catalog
-            .printers()
+            .devices()
             .iter()
             .filter(|p| p.protocol == Protocol::Niimbot && !p.reports_media)
             .map(|p| p.canonical_key())
@@ -607,7 +610,7 @@ mod tests {
         let tape = catalog.lookup("lt-12-white-paper").unwrap();
         assert_eq!(tape.brand, "DYMO");
         assert_eq!(tape.media.width_mm, 12.0);
-        let printer = catalog.lookup_printer("LT-200B").unwrap();
+        let printer = catalog.lookup_device("LT-200B").unwrap();
         assert_eq!(printer.protocol, Protocol::LetraTag);
         assert_eq!(printer.maturity, Maturity::Experimental);
         assert!(printer.supports_cut);
@@ -649,20 +652,20 @@ mod tests {
             "LabelWriter 550 Turbo",
             "LabelWriter 5XL",
         ] {
-            let printer = catalog.lookup_printer(key).unwrap();
+            let printer = catalog.lookup_device(key).unwrap();
             assert!(
                 printer.supports_soft_reboot,
                 "{key} should advertise soft reboot"
             );
         }
-        let classic = catalog.lookup_printer("LabelWriter 450").unwrap();
+        let classic = catalog.lookup_device("LabelWriter 450").unwrap();
         assert!(!classic.supports_soft_reboot);
     }
 
     #[test]
     fn printer_support_urls_prefer_product_over_brand() {
         let catalog = Catalog::bundled().unwrap();
-        let dymo = catalog.lookup_printer("LabelWriter 550").unwrap();
+        let dymo = catalog.lookup_device("LabelWriter 550").unwrap();
         assert_eq!(
             dymo.support.brand_url.as_deref(),
             Some("https://www.dymo.com/support")
@@ -673,7 +676,7 @@ mod tests {
             Some("https://www.dymo.com/support")
         );
 
-        let brother = catalog.lookup_printer("QL-820NWBc").unwrap();
+        let brother = catalog.lookup_device("QL-820NWBc").unwrap();
         assert!(brother
             .support
             .product_url
@@ -684,7 +687,7 @@ mod tests {
             brother.support.product_url.as_deref()
         );
 
-        for printer in catalog.printers() {
+        for printer in catalog.devices() {
             assert!(
                 !printer.support.is_empty(),
                 "{} missing support links",
@@ -753,32 +756,32 @@ mod tests {
     #[test]
     fn niimbot_wide_heads_and_d110m_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let b31 = catalog.lookup_printer("B31").unwrap();
+        let b31 = catalog.lookup_device("B31").unwrap();
         assert_eq!(b31.max_width_mm, 75.0);
         assert_eq!(b31.dpi, 203.0);
         assert!(catalog.supports_media("B31", "70x40"));
-        let b4 = catalog.lookup_printer("B4").unwrap();
+        let b4 = catalog.lookup_device("B4").unwrap();
         assert_eq!(b4.max_width_mm, 104.0);
         assert!(catalog.supports_media("B4", "102x152"));
-        let k3 = catalog.lookup_printer("K3").unwrap();
+        let k3 = catalog.lookup_device("K3").unwrap();
         assert_eq!(k3.max_width_mm, 80.0);
         assert!(k3.matches_key("K3_W"));
-        let k4 = catalog.lookup_printer("K4").unwrap();
+        let k4 = catalog.lookup_device("K4").unwrap();
         assert_eq!(k4.max_width_mm, 104.0);
-        let b1 = catalog.lookup_printer("B1_SE").unwrap();
+        let b1 = catalog.lookup_device("B1_SE").unwrap();
         assert!(b1.matches_key("B1"));
-        let b21 = catalog.lookup_printer("B21_C2B").unwrap();
+        let b21 = catalog.lookup_device("B21_C2B").unwrap();
         assert!(b21.matches_key("B21"));
-        let d110m = catalog.lookup_printer("D110_M").unwrap();
+        let d110m = catalog.lookup_device("D110_M").unwrap();
         assert_eq!(d110m.max_width_mm, 12.0);
         assert!(d110m.matches_key("D110M"));
-        let d11 = catalog.lookup_printer("D11").unwrap();
+        let d11 = catalog.lookup_device("D11").unwrap();
         assert_eq!(d11.name, "NIIMBOT D11");
         assert!(!d11.matches_key("D110"));
-        let d11s = catalog.lookup_printer("D11S").unwrap();
+        let d11s = catalog.lookup_device("D11S").unwrap();
         assert_eq!(d11s.name, "NIIMBOT D11S");
         assert!(!d11s.matches_key("D110"));
-        let d110 = catalog.lookup_printer("D110").unwrap();
+        let d110 = catalog.lookup_device("D110").unwrap();
         assert_eq!(d110.name, "NIIMBOT D110");
         assert!(!d110.matches_key("D11"));
     }
@@ -788,72 +791,77 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         // Hardware-exercised on hand: LW 550, LM 280, B1, D110.
         assert_eq!(
-            catalog.lookup_printer("LabelWriter 550").unwrap().maturity,
+            catalog.lookup_device("LabelWriter 550").unwrap().maturity,
             Maturity::Verified
         );
         assert_eq!(
-            catalog.lookup_printer("LabelManager 280").unwrap().maturity,
+            catalog.lookup_device("LabelManager 280").unwrap().maturity,
             Maturity::Verified
         );
         assert_eq!(
-            catalog.lookup_printer("B1").unwrap().maturity,
+            catalog.lookup_device("B1").unwrap().maturity,
             Maturity::Verified
         );
         assert_eq!(
-            catalog.lookup_printer("D110").unwrap().maturity,
+            catalog.lookup_device("D110").unwrap().maturity,
             Maturity::Verified
         );
         // Same protocol as on-hand hardware → supported.
         assert_eq!(
             catalog
-                .lookup_printer("LabelWriter 550 Turbo")
+                .lookup_device("LabelWriter 550 Turbo")
                 .unwrap()
                 .maturity,
             Maturity::Supported
         );
         assert_eq!(
-            catalog.lookup_printer("B1 Pro").unwrap().maturity,
+            catalog.lookup_device("B1 Pro").unwrap().maturity,
             Maturity::Supported
         );
         assert_eq!(
-            catalog.lookup_printer("LM500TS").unwrap().maturity,
+            catalog.lookup_device("LM500TS").unwrap().maturity,
+            Maturity::Supported
+        );
+        // GPGL cut path ready; hardware checklist tracked separately.
+        assert_eq!(
+            catalog.lookup_device("cameo4").unwrap().maturity,
             Maturity::Supported
         );
         // Protocols never exercised on hand → experimental.
         assert_eq!(
-            catalog.lookup_printer("LabelWriter 450").unwrap().maturity,
+            catalog.lookup_device("LabelWriter 450").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("QL-800").unwrap().maturity,
+            catalog.lookup_device("QL-800").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("ZT231").unwrap().maturity,
+            catalog.lookup_device("ZT231").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("M110").unwrap().maturity,
+            catalog.lookup_device("M110").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("D30").unwrap().maturity,
+            catalog.lookup_device("D30").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("Q30").unwrap().maturity,
+            catalog.lookup_device("Q30").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("X1038").unwrap().maturity,
+            catalog.lookup_device("X1038").unwrap().maturity,
             Maturity::Experimental
         );
         assert_eq!(
-            catalog.lookup_printer("ITPP941").unwrap().maturity,
+            catalog.lookup_device("ITPP941").unwrap().maturity,
             Maturity::Experimental
         );
         let verified: Vec<_> = catalog
-            .printers()
+            .devices()
             .iter()
             .filter(|p| p.maturity == Maturity::Verified)
             .map(|p| p.keys[0].as_str())
@@ -863,26 +871,50 @@ mod tests {
             vec!["LabelWriter 550", "LabelManager 280", "D110", "D11", "B1",]
         );
         assert!(catalog
-            .printers()
+            .devices()
             .iter()
             .filter(|p| p.maturity == Maturity::Supported)
             .all(|p| matches!(
                 p.protocol,
-                Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot
+                Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot | Protocol::Gpgl
             )));
-        assert!(catalog.printers().iter().any(|p| {
+        assert!(catalog.devices().iter().any(|p| {
             p.maturity == Maturity::Experimental
                 && !matches!(
                     p.protocol,
-                    Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot
+                    Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot | Protocol::Gpgl
                 )
         }));
     }
 
     #[test]
+    fn silhouette_cameo4_cutter_is_catalogued() {
+        use crate::DeviceRole;
+        let catalog = Catalog::bundled().unwrap();
+        let cameo = catalog.lookup_device("cameo4").unwrap();
+        assert_eq!(cameo.role, DeviceRole::Cutter);
+        assert_eq!(cameo.protocol, Protocol::Gpgl);
+        assert_eq!(cameo.maturity, Maturity::Supported);
+        assert!(cameo
+            .connections
+            .iter()
+            .any(|c| c.is_exact_usb_match(0x0b4d, 0x1137)));
+        assert!(catalog.lookup("silhouette-mat-12x12").is_some());
+        let cutters = catalog
+            .devices()
+            .iter()
+            .filter(|d| d.role == DeviceRole::Cutter)
+            .count();
+        assert!(
+            cutters >= 19,
+            "expected full Silhouette matrix, got {cutters}"
+        );
+    }
+
+    #[test]
     fn tsc_da_series_and_d1_19mm_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let da210 = catalog.lookup_printer("DA210").unwrap();
+        let da210 = catalog.lookup_device("DA210").unwrap();
         assert_eq!(da210.protocol, Protocol::Tspl);
         assert_eq!(da210.max_width_mm, 108.0);
         assert!(da210
@@ -910,20 +942,20 @@ mod tests {
         let lm420p = catalog.compatible_with("LabelManager 420P");
         assert!(lm420p.iter().any(|e| e.matches_key("45803")));
         assert!(lm420p.iter().any(|e| e.matches_key("45808")));
-        let lm500ts = catalog.lookup_printer("LM500TS").unwrap();
+        let lm500ts = catalog.lookup_device("LM500TS").unwrap();
         assert_eq!(lm500ts.max_width_mm, 24.0);
         assert!(catalog.supports_media("LM500TS", "53713"));
         assert!(lm500ts.connections.is_empty());
-        let b18 = catalog.lookup_printer("B18").unwrap();
+        let b18 = catalog.lookup_device("B18").unwrap();
         assert_eq!(b18.protocol, Protocol::Niimbot);
         assert_eq!(b18.max_width_mm, 12.0);
         assert_eq!(b18.maturity, Maturity::Experimental);
-        let n1 = catalog.lookup_printer("N1").unwrap();
+        let n1 = catalog.lookup_device("N1").unwrap();
         assert_eq!(n1.max_width_mm, 12.0);
-        let m2h = catalog.lookup_printer("M2_H").unwrap();
+        let m2h = catalog.lookup_device("M2_H").unwrap();
         assert_eq!(m2h.dpi, 300.0);
         assert_eq!(m2h.max_width_mm, 48.0);
-        let zt231 = catalog.lookup_printer("ZT231").unwrap();
+        let zt231 = catalog.lookup_device("ZT231").unwrap();
         assert_eq!(zt231.protocol, Protocol::Zpl);
         assert_eq!(zt231.max_width_mm, 104.0);
     }
@@ -931,17 +963,17 @@ mod tests {
     #[test]
     fn phomemo_m02x_and_branded_media_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let m02x = catalog.lookup_printer("M02X").unwrap();
+        let m02x = catalog.lookup_device("M02X").unwrap();
         assert_eq!(m02x.protocol, Protocol::PhomemoM02x);
         assert_eq!(m02x.dpi, 203.0);
         assert_eq!(m02x.max_width_mm, 53.0);
         assert!(catalog.supports_media("M02X", "phomemo-53-cont"));
         assert!(catalog.supports_media("M02X", "phomemo-53-sticker"));
-        let m02s = catalog.lookup_printer("M02S").unwrap();
+        let m02s = catalog.lookup_device("M02S").unwrap();
         assert_eq!(m02s.protocol, Protocol::Phomemo);
         assert_eq!(m02s.dpi, 300.0);
         assert!(catalog.supports_media("M02S", "phomemo-15-cont"));
-        let t02 = catalog.lookup_printer("T02").unwrap();
+        let t02 = catalog.lookup_device("T02").unwrap();
         assert_eq!(t02.protocol, Protocol::Phomemo);
         let roll = catalog.lookup("phomemo-53-cont").unwrap();
         assert_eq!(roll.media.width_mm, 53.0);
@@ -950,28 +982,28 @@ mod tests {
     #[test]
     fn rollo_munbyn_and_phomemo_labelers_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let rollo = catalog.lookup_printer("X1038").unwrap();
+        let rollo = catalog.lookup_device("X1038").unwrap();
         assert_eq!(rollo.protocol, Protocol::Tspl);
         assert_eq!(rollo.max_width_mm, 104.0);
         assert!(catalog.supports_media("X1038", "102x152"));
-        let wireless = catalog.lookup_printer("X1040").unwrap();
+        let wireless = catalog.lookup_device("X1040").unwrap();
         assert_eq!(wireless.protocol, Protocol::Tspl);
-        let munbyn = catalog.lookup_printer("ITPP941").unwrap();
+        let munbyn = catalog.lookup_device("ITPP941").unwrap();
         assert_eq!(munbyn.protocol, Protocol::Tspl);
         assert!(munbyn
             .connections
             .iter()
             .any(|c| c.is_exact_usb_match(0x09c6, 0x0426)));
-        let m110 = catalog.lookup_printer("M110").unwrap();
+        let m110 = catalog.lookup_device("M110").unwrap();
         assert_eq!(m110.protocol, Protocol::PhomemoM110);
         assert_eq!(m110.max_width_mm, 50.0);
         assert!(catalog.supports_media("M110", "phomemo-50x30"));
         assert!(catalog.supports_media("M110", "phomemo-40x30"));
-        let d30 = catalog.lookup_printer("D30").unwrap();
+        let d30 = catalog.lookup_device("D30").unwrap();
         assert_eq!(d30.protocol, Protocol::PhomemoD30);
         assert_eq!(d30.max_width_mm, 15.0);
         assert!(catalog.supports_media("D30", "phomemo-12x40"));
-        let q30 = catalog.lookup_printer("Q30").unwrap();
+        let q30 = catalog.lookup_device("Q30").unwrap();
         assert_eq!(q30.protocol, Protocol::PhomemoD30);
         assert!(catalog.supports_media("Q30", "phomemo-14x40"));
         let tape12 = catalog.lookup("phomemo-12x40").unwrap();
@@ -981,7 +1013,7 @@ mod tests {
     #[test]
     fn epson_colorworks_esclabel_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let c4000 = catalog.lookup_printer("CW-C4000").unwrap();
+        let c4000 = catalog.lookup_device("CW-C4000").unwrap();
         assert_eq!(c4000.protocol, Protocol::EscLabel);
         assert_eq!(c4000.dpi, 600.0);
         assert_eq!(c4000.max_width_mm, 108.0);
@@ -995,7 +1027,7 @@ mod tests {
         assert!(catalog.supports_media("CW-C4000", "epson-matte-4x3"));
         assert!(catalog.supports_media("CW-C4000", "epson-premium-matte-4x6"));
         assert!(catalog.supports_media("CW-C4000", "epson-cont-108"));
-        let c6500 = catalog.lookup_printer("CW-C6500A").unwrap();
+        let c6500 = catalog.lookup_device("CW-C6500A").unwrap();
         assert_eq!(c6500.max_width_mm, 215.9);
         assert!(c6500.connections.is_empty());
         assert!(catalog.supports_media("CW-C6500A", "epson-cont-215"));
@@ -1011,13 +1043,13 @@ mod tests {
     #[test]
     fn bixolon_slcs_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let dx420 = catalog.lookup_printer("SLP-DX420").unwrap();
+        let dx420 = catalog.lookup_device("SLP-DX420").unwrap();
         assert_eq!(dx420.protocol, Protocol::Slcs);
         assert_eq!(dx420.dpi, 203.0);
         assert!(dx420.supports_cut);
         assert_eq!(dx420.maturity, Maturity::Experimental);
         assert!(catalog.supports_media("SLP-DX420", "102x152"));
-        let t400 = catalog.lookup_printer("SLP-T400").unwrap();
+        let t400 = catalog.lookup_device("SLP-T400").unwrap();
         assert_eq!(t400.protocol, Protocol::Slcs);
         assert!(t400.connections.iter().any(|c| matches!(
             c,
@@ -1031,13 +1063,13 @@ mod tests {
     #[test]
     fn godex_ezpl_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let dt4x = catalog.lookup_printer("DT4x").unwrap();
+        let dt4x = catalog.lookup_device("DT4x").unwrap();
         assert_eq!(dt4x.protocol, Protocol::Ezpl);
         assert_eq!(dt4x.dpi, 203.0);
         assert_eq!(dt4x.max_width_mm, 108.0);
         assert!(dt4x.supports_cut);
         assert!(catalog.supports_media("DT4x", "102x152"));
-        let g530 = catalog.lookup_printer("G530").unwrap();
+        let g530 = catalog.lookup_device("G530").unwrap();
         assert_eq!(g530.protocol, Protocol::Ezpl);
         assert_eq!(g530.dpi, 300.0);
     }
@@ -1045,7 +1077,7 @@ mod tests {
     #[test]
     fn sato_sbpl_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let cl4 = catalog.lookup_printer("CL4NX").unwrap();
+        let cl4 = catalog.lookup_device("CL4NX").unwrap();
         assert_eq!(cl4.protocol, Protocol::Sbpl);
         assert_eq!(cl4.dpi, 203.0);
         assert!(cl4.supports_cut);
@@ -1063,12 +1095,12 @@ mod tests {
     #[test]
     fn honeywell_dpl_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let pc42 = catalog.lookup_printer("PC42d").unwrap();
+        let pc42 = catalog.lookup_device("PC42d").unwrap();
         assert_eq!(pc42.protocol, Protocol::Dpl);
         assert_eq!(pc42.dpi, 203.0);
         assert!(pc42.supports_cut);
         assert!(catalog.supports_media("PC42d", "102x152"));
-        let px65 = catalog.lookup_printer("PX65").unwrap();
+        let px65 = catalog.lookup_device("PX65").unwrap();
         assert_eq!(px65.protocol, Protocol::Dpl);
         assert_eq!(px65.dpi, 300.0);
         assert!(px65.connections.iter().any(|c| matches!(
@@ -1083,13 +1115,13 @@ mod tests {
     #[test]
     fn citizen_zpl_and_dpl_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let e321 = catalog.lookup_printer("CL-E321").unwrap();
+        let e321 = catalog.lookup_device("CL-E321").unwrap();
         assert_eq!(e321.protocol, Protocol::Zpl);
         assert_eq!(e321.maturity, Maturity::Experimental);
         assert!(e321.connections.is_empty());
         assert!(catalog.supports_media("CL-E321", "102x152"));
 
-        let s521 = catalog.lookup_printer("CL-S521").unwrap();
+        let s521 = catalog.lookup_device("CL-S521").unwrap();
         assert_eq!(s521.protocol, Protocol::Dpl);
         assert!(s521.connections.iter().any(|c| matches!(
             c,
@@ -1098,7 +1130,7 @@ mod tests {
                 product_id: Some(0x0208)
             }
         )));
-        let s631 = catalog.lookup_printer("CL-S631").unwrap();
+        let s631 = catalog.lookup_device("CL-S631").unwrap();
         assert_eq!(s631.protocol, Protocol::Dpl);
         assert_eq!(s631.dpi, 300.0);
         assert!(s631.connections.iter().any(|c| matches!(
@@ -1108,7 +1140,7 @@ mod tests {
                 product_id: Some(0x2037)
             }
         )));
-        let s700 = catalog.lookup_printer("CL-S700").unwrap();
+        let s700 = catalog.lookup_device("CL-S700").unwrap();
         assert!(s700.connections.iter().any(|c| matches!(
             c,
             ConnectionHint::Usb {
@@ -1116,7 +1148,7 @@ mod tests {
                 product_id: Some(0x0fff)
             }
         )));
-        let s621 = catalog.lookup_printer("CL-S621").unwrap();
+        let s621 = catalog.lookup_device("CL-S621").unwrap();
         assert_eq!(s621.protocol, Protocol::Dpl);
         assert!(s621.connections.iter().any(|c| matches!(
             c,
@@ -1125,30 +1157,30 @@ mod tests {
                 product_id: Some(0x0fff)
             }
         )));
-        let e720 = catalog.lookup_printer("CL-E720").unwrap();
+        let e720 = catalog.lookup_device("CL-E720").unwrap();
         assert_eq!(e720.protocol, Protocol::Zpl);
         assert!(e720.connections.is_empty());
-        let s700dt = catalog.lookup_printer("CL-S700DT").unwrap();
+        let s700dt = catalog.lookup_device("CL-S700DT").unwrap();
         assert_eq!(s700dt.protocol, Protocol::Dpl);
     }
 
     #[test]
     fn toshiba_tpcl_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        let ev4 = catalog.lookup_printer("B-EV4D").unwrap();
+        let ev4 = catalog.lookup_device("B-EV4D").unwrap();
         assert_eq!(ev4.protocol, Protocol::Tpcl);
         assert_eq!(ev4.dpi, 203.0);
         assert!(ev4.supports_cut);
         assert_eq!(ev4.maturity, Maturity::Experimental);
         assert!(catalog.supports_media("B-EV4D", "102x152"));
         assert!(ev4.connections.is_empty());
-        let sx5 = catalog.lookup_printer("B-SX5").unwrap();
+        let sx5 = catalog.lookup_device("B-SX5").unwrap();
         assert_eq!(sx5.protocol, Protocol::Tpcl);
         assert_eq!(sx5.max_width_mm, 128.0);
-        let bv = catalog.lookup_printer("BV420D").unwrap();
+        let bv = catalog.lookup_device("BV420D").unwrap();
         assert_eq!(bv.protocol, Protocol::Tpcl);
         assert!(bv.connections.is_empty());
-        let sv4 = catalog.lookup_printer("B-SV4").unwrap();
+        let sv4 = catalog.lookup_device("B-SV4").unwrap();
         assert!(sv4.connections.iter().any(|c| matches!(
             c,
             ConnectionHint::Usb {
@@ -1159,7 +1191,7 @@ mod tests {
         // Shared encode: desktop + industrial families on `tpcl`.
         for key in ["B-FV4D", "B-SV4", "B-SX4", "B-SA4TM", "B-EV4T"] {
             assert_eq!(
-                catalog.lookup_printer(key).unwrap().protocol,
+                catalog.lookup_device(key).unwrap().protocol,
                 Protocol::Tpcl,
                 "{key}"
             );
@@ -1169,19 +1201,19 @@ mod tests {
     #[test]
     fn catalog_depth_clones_and_usb_are_present() {
         let catalog = Catalog::bundled().unwrap();
-        let d35 = catalog.lookup_printer("D35").unwrap();
+        let d35 = catalog.lookup_device("D35").unwrap();
         assert_eq!(d35.protocol, Protocol::PhomemoD30);
         assert_eq!(d35.max_width_mm, 15.0);
-        let q30s = catalog.lookup_printer("Q30S").unwrap();
+        let q30s = catalog.lookup_device("Q30S").unwrap();
         assert_eq!(q30s.protocol, Protocol::PhomemoD30);
-        let ttp = catalog.lookup_printer("TTP-244 Pro").unwrap();
+        let ttp = catalog.lookup_device("TTP-244 Pro").unwrap();
         assert_eq!(ttp.protocol, Protocol::Tspl);
         assert_eq!(ttp.max_width_mm, 108.0);
         assert!(ttp.connections.is_empty());
-        let xp = catalog.lookup_printer("XP-420B").unwrap();
+        let xp = catalog.lookup_device("XP-420B").unwrap();
         assert_eq!(xp.protocol, Protocol::Tspl);
         assert_eq!(xp.brand, "Xprinter");
-        let e550 = catalog.lookup_printer("PT-E550W").unwrap();
+        let e550 = catalog.lookup_device("PT-E550W").unwrap();
         assert_eq!(e550.protocol, Protocol::BrotherPt);
         assert!(e550.connections.iter().any(|c| matches!(
             c,
@@ -1192,22 +1224,22 @@ mod tests {
         )));
         // Documented unknowns — still empty (no guessed PIDs).
         assert!(catalog
-            .lookup_printer("ZT231")
+            .lookup_device("ZT231")
             .unwrap()
             .connections
             .is_empty());
         assert!(catalog
-            .lookup_printer("LM500TS")
+            .lookup_device("LM500TS")
             .unwrap()
             .connections
             .is_empty());
         assert!(catalog
-            .lookup_printer("X1038")
+            .lookup_device("X1038")
             .unwrap()
             .connections
             .is_empty());
         assert!(catalog
-            .lookup_printer("CW-C4000")
+            .lookup_device("CW-C4000")
             .unwrap()
             .connections
             .is_empty());
@@ -1216,24 +1248,24 @@ mod tests {
     #[test]
     fn d110_defaults_to_bluetooth() {
         let catalog = Catalog::bundled().unwrap();
-        let d110 = catalog.lookup_printer("D110").unwrap();
+        let d110 = catalog.lookup_device("D110").unwrap();
         let transport = d110.default_transport();
         assert_eq!(transport.bluetooth.as_deref(), Some("D110"));
         assert!(transport.serial.is_none());
     }
 
     #[test]
-    fn resolve_printer_falls_back_to_match() {
+    fn resolve_device_falls_back_to_match() {
         let catalog = Catalog::bundled().unwrap();
-        assert!(catalog.lookup_printer("LW550").is_some());
-        let printer = catalog.resolve_printer("LW550").unwrap();
+        assert!(catalog.lookup_device("LW550").is_some());
+        let printer = catalog.resolve_device("LW550").unwrap();
         assert!(printer.matches_key("LabelWriter 550"));
     }
 
     #[test]
-    fn resolve_printer_prefers_specific_labelwriter_key() {
+    fn resolve_device_prefers_specific_labelwriter_key() {
         let catalog = Catalog::bundled().unwrap();
-        let printer = catalog.resolve_printer("DYMO LabelWriter 550").unwrap();
+        let printer = catalog.resolve_device("DYMO LabelWriter 550").unwrap();
         assert!(printer.matches_key("LabelWriter 550"));
         assert!(!printer.matches_key("LabelWriter"));
     }
@@ -1242,11 +1274,11 @@ mod tests {
     fn ambiguous_printer_query_fails() {
         let catalog = Catalog::bundled().unwrap();
         assert!(matches!(
-            catalog.lookup_printer_query("550"),
-            PrinterLookup::Ambiguous(_)
+            catalog.lookup_device_query("550"),
+            DeviceLookup::Ambiguous(_)
         ));
-        assert!(catalog.resolve_printer("550").is_none());
-        let err = catalog.require_printer("550").unwrap_err();
+        assert!(catalog.resolve_device("550").is_none());
+        let err = catalog.require_device("550").unwrap_err();
         assert!(err.contains("ambiguous printer '550'"));
         assert!(err.contains("DYMO LabelWriter 550"));
         assert!(err.contains("DYMO LabelWriter 550 Turbo"));
@@ -1258,14 +1290,14 @@ mod tests {
     }
 
     #[test]
-    fn suggest_unique_printer_terms_for_550_family() {
+    fn suggest_unique_device_terms_for_550_family() {
         let catalog = Catalog::bundled().unwrap();
-        let base = catalog.lookup_printer("LabelWriter 550").unwrap();
-        let turbo = catalog.lookup_printer("LabelWriter 550 Turbo").unwrap();
-        let base_term = catalog.suggest_unique_printer_term(base);
-        let turbo_term = catalog.suggest_unique_printer_term(turbo);
-        assert_eq!(catalog.matching_printers(&base_term).len(), 1);
-        assert_eq!(catalog.matching_printers(&turbo_term).len(), 1);
+        let base = catalog.lookup_device("LabelWriter 550").unwrap();
+        let turbo = catalog.lookup_device("LabelWriter 550 Turbo").unwrap();
+        let base_term = catalog.suggest_unique_device_term(base);
+        let turbo_term = catalog.suggest_unique_device_term(turbo);
+        assert_eq!(catalog.matching_devices(&base_term).len(), 1);
+        assert_eq!(catalog.matching_devices(&turbo_term).len(), 1);
         assert!(base.matches_model(&base_term));
         assert!(turbo.matches_model(&turbo_term));
         assert_ne!(
@@ -1343,13 +1375,27 @@ mod tests {
             .unwrap()
             .matches_key("50x30-pro"));
         assert_eq!(catalog.lookup("phomemo-60x40").unwrap().brand, "Phomemo");
-        let duo = catalog.lookup_printer("LabelWriter Duo").unwrap();
+        let duo = catalog.lookup_device("LabelWriter Duo").unwrap();
         assert_eq!(duo.protocol, Protocol::DymoLwClassic);
         assert!(catalog.supports_media("LabelWriter Duo", "99014-duo"));
-        let m220 = catalog.lookup_printer("M220").unwrap();
+        let m220 = catalog.lookup_device("M220").unwrap();
         assert_eq!(m220.protocol, Protocol::PhomemoM110);
         assert!(catalog.supports_media("M220", "phomemo-80x60"));
         assert!(catalog.supports_media("QL-820NWB", "DK-11218"));
+    }
+
+    #[test]
+    fn obsolete_printers_table_is_rejected() {
+        let mut catalog = Catalog::default();
+        let err = catalog
+            .merge_toml(
+                "[[printers]]\nbrand = \"X\"\nkeys = [\"x\"]\nname = \"X\"\nprotocol = \"virtual\"\ndpi = 300.0\nmax_width_mm = 10.0\n",
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("obsolete [[printers]]"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -1364,7 +1410,7 @@ mod tests {
                 name = "Custom override"
                 media = { width_mm = 25.0, length = { kind = "fixed", mm = 54.0 } }
 
-                [[printers]]
+                [[devices]]
                 brand = "DYMO"
                 keys = ["LabelWriter 550"]
                 name = "Custom printer"
@@ -1377,7 +1423,7 @@ mod tests {
             .unwrap();
         assert_eq!(catalog.lookup("11352").unwrap().name, "Custom override");
         assert_eq!(
-            catalog.lookup_printer("LabelWriter 550").unwrap().name,
+            catalog.lookup_device("LabelWriter 550").unwrap().name,
             "Custom printer"
         );
     }

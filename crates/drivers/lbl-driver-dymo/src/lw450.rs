@@ -138,7 +138,7 @@ mod tests {
     use super::*;
     use lbl_core::job::JobSpec;
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     fn ctx_job(media: Media, copies: u32) -> JobSpec {
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn emits_reset_and_mode_header() {
         let bmp = MonoBitmap::new(8, 2);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
         let bytes = LabelWriter450Driver::new()
             .encode(&bmp, &EncodeContext::new(&job, &caps))
@@ -166,7 +166,7 @@ mod tests {
     fn syn_row_per_line() {
         let mut bmp = MonoBitmap::new(8, 2);
         bmp.set(0, 0, true);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 1);
         let bytes = LabelWriter450Driver::new()
             .encode(&bmp, &EncodeContext::new(&job, &caps))
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn copies_use_short_feed_between_and_tear_at_end() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(25.0, 54.0, Dpi(300.0)), 3);
         let bytes = LabelWriter450Driver::new()
             .encode(&bmp, &EncodeContext::new(&job, &caps))
@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn wide_media_uses_4xl_head() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             dpi: Dpi(300.0),
             max_width_mm: 104.0,
             ..Default::default()
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn rejects_bitmap_wider_than_head() {
         let bmp = MonoBitmap::new(700, 1); // > 672 dots
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = ctx_job(Media::fixed(57.0, 25.0, Dpi(300.0)), 1);
         let err = LabelWriter450Driver::new().encode(&bmp, &EncodeContext::new(&job, &caps));
         assert!(matches!(err, Err(DriverError::Unsupported(_))));

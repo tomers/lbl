@@ -35,8 +35,8 @@ Recognized printers (those with a `protocol`) are listed first. Serial ports
 whose USB descriptor doesn't identify the vendor are still listed (with `brand`,
 `model`, and `protocol` left `null`) so you can spot the candidate `path`.
 
-The `lbl-server` API exposes the same discovery (`/api/printers`) and lets you
-adopt a discovered device as a saved profile (`/api/printers/profiles`).
+The `lbl-server` API exposes the same discovery (`/api/devices`) and lets you
+adopt a discovered device as a saved profile (`/api/devices/profiles`).
 
 ## Profiles
 
@@ -44,7 +44,7 @@ Profiles persist a printer's desired configuration (name, model, protocol,
 capabilities, transport, default media) so it survives disconnects. They're
 stored in `printers.toml` next to your config.
 
-Manage them via the API (`/api/printers/profiles`).
+Manage them via the API (`/api/devices/profiles`).
 
 ## Media
 

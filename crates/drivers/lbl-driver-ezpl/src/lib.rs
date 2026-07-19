@@ -156,14 +156,14 @@ mod tests {
     use super::*;
     use lbl_core::job::{CutMode, JobSpec};
     use lbl_core::media::Media;
-    use lbl_core::printer::PrinterCapabilities;
+    use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
 
     #[test]
     fn emits_qw_download_place_print() {
         let mut bmp = MonoBitmap::new(8, 1);
         bmp.set(0, 0, true);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::fixed(50.0, 25.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = EzplDriver::new().encode(&bmp, &ctx).unwrap();
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn continuous_uses_plain_paper_q() {
         let bmp = MonoBitmap::new(8, 203);
-        let caps = PrinterCapabilities::default();
+        let caps = DeviceCapabilities::default();
         let job = JobSpec::new(Media::continuous(104.0, Dpi(203.0)));
         let ctx = EncodeContext::new(&job, &caps);
         let out = EzplDriver::new().encode(&bmp, &ctx).unwrap();
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn cut_every_emits_d1() {
         let bmp = MonoBitmap::new(8, 1);
-        let caps = PrinterCapabilities {
+        let caps = DeviceCapabilities {
             supports_cut: true,
             ..Default::default()
         };

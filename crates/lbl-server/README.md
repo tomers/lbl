@@ -12,12 +12,12 @@ The HTTP API (axum) for programmatic access to the `lbl` pipeline.
 | GET | `/api/catalog` | List media entries |
 | GET | `/api/catalog/:key` | Resolve a media SKU/alias |
 | GET | `/api/catalog/compatible?printer=` | Media compatible with a printer |
-| GET | `/api/printers` | Discovered printers (USB bulk, serial, BLE when enabled) |
-| GET | `/api/printers/profiles` | Persisted printer profiles (host discovery only) |
-| PUT | `/api/printers/profiles` | Upsert a printer profile (host discovery only) |
-| DELETE | `/api/printers/profiles/:id` | Remove a printer profile (host discovery only) |
-| GET | `/api/printers/profiles/:id/media` | Detected media SKU when connected (host discovery only) |
-| GET | `/api/printers/profiles/:id/status` | Print-engine status when connected (host discovery only) |
+| GET | `/api/devices` | Discovered printers (USB bulk, serial, BLE when enabled) |
+| GET | `/api/devices/profiles` | Persisted printer profiles (host discovery only) |
+| PUT | `/api/devices/profiles` | Upsert a printer profile (host discovery only) |
+| DELETE | `/api/devices/profiles/:id` | Remove a printer profile (host discovery only) |
+| GET | `/api/devices/profiles/:id/media` | Detected media SKU when connected (host discovery only) |
+| GET | `/api/devices/profiles/:id/status` | Print-engine status when connected (host discovery only) |
 
 Host profile routes are mounted only when `LBL_HOST_DISCOVERY` is enabled
 (server print mode). With discovery off (browser print mode), those paths
@@ -91,6 +91,6 @@ lbl-server --bind 127.0.0.1:8787
 ```
 
 Set `LBL_HOST_DISCOVERY=0` (or `false` / `off`) to disable local device
-enumeration on `GET /api/printers`. Host discovery is enabled by default.
+enumeration on `GET /api/devices`. Host discovery is enabled by default.
 
 CORS is permissive for local development and browser clients.
