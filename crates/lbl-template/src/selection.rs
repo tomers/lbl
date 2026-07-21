@@ -1,21 +1,27 @@
 //! Batch label selection: filter, skip, take, and index picking.
 
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::TemplateError;
 
 /// Which labels to render from a batch.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct BatchSelection {
     /// Case-insensitive substring match against any value in the record.
+    #[serde(default)]
     pub filter: Option<String>,
     /// Skip this many labels after prior selection steps.
+    #[serde(default)]
     pub skip: usize,
     /// Keep at most this many labels.
+    #[serde(default)]
     pub take: Option<usize>,
     /// Keep only the last label after prior selection steps.
+    #[serde(default)]
     pub last: bool,
     /// Restrict to these zero-based batch indices before filter/skip/take.
+    #[serde(default)]
     pub indices: Option<Vec<usize>>,
 }
 
@@ -189,5 +195,22 @@ mod tests {
             ..Default::default()
         };
         assert!(select_batch_indices(&records, &sel).is_err());
+    }
+
+    #[test]
+    fn deserializes_indices_from_json() {
+        let sel: BatchSelection =
+            serde_json::from_value(json!({"indices": [0, 2], "skip": 0})).unwrap();
+        assert_eq!(sel.indices, Some(vec![0, 2]));
+        assert_eq!(sel.skip, 0);
+        assert!(!sel.last);
+        assert!(sel.filter.is_none());
+        assert!(sel.take.is_none());
+    }
+
+    #[test]
+    fn deserializes_empty_object_as_default() {
+        let sel: BatchSelection = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(sel, BatchSelection::default());
     }
 }
