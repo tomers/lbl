@@ -27,7 +27,8 @@ Batch printing renders one template against many records.
 ```
 
 A top-level array produces one label per element. Within the template you have
-the record's fields, plus `index`, `count`, `it`, and `data`.
+the record's fields, plus `index`, `count`, `it`, and `data`. When a record
+defines a field with one of those names, the record's value wins.
 
 Templates default to plain **text** for inline templates and unknown
 extensions. HTML layouts like `card.html` or `combined.lbl` are detected

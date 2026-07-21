@@ -17,7 +17,8 @@ name = "Alice"
 
 - Batch: a top-level data array (or `--each /items`) expands into N labels.
   Each render exposes object fields at the top level plus `it`, `index`,
-  `count`, and `data`.
+  `count`, and `data`. Record fields take precedence over those bindings
+  (a record's own `index` wins; the record is always reachable via `it`).
 - Resources: `--inline-resources` fetches `<img src>` (local path or URL) and
   inlines them as `data:` URIs so the renderer gets a self-contained document.
 
