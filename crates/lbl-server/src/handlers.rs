@@ -517,8 +517,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     use std::io::Cursor;
 
     let source = req.source.into_source()?;
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(authoring_error)?;
+    let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
     let supersample = req.supersample;
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
@@ -688,8 +687,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
 
 pub async fn preview_html(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
     let source = req.source.into_source()?;
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(authoring_error)?;
+    let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
     let style_cfg = load_style_cfg(&state, &req.style);
@@ -965,6 +963,9 @@ pub struct PreviewReq {
     /// `vector` (default) or `print` geometry for `/api/preview/html`.
     #[serde(default)]
     geometry: PreviewGeometry,
+    /// Optional batch subset (same fields as the CLI selection flags).
+    #[serde(default)]
+    selection: lbl_template::BatchSelection,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
 }
@@ -1037,6 +1038,9 @@ pub struct PrintReq {
     /// Flip left↔right in the reading frame (Mirror print).
     #[serde(default)]
     mirror: bool,
+    /// Optional batch subset (same fields as the CLI selection flags).
+    #[serde(default)]
+    selection: lbl_template::BatchSelection,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
     /// Also build the HTML pipeline debug report.
@@ -1247,8 +1251,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         &media,
         req.supports_cut,
     );
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(authoring_error)?;
+    let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
         protocol,
@@ -1466,8 +1469,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         &media,
         req.supports_cut,
     );
-    let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(authoring_error)?;
+    let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
     let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
@@ -1786,6 +1788,58 @@ fn build_client_print_response(
         "driver_variant": driver_variant,
         "labels": labels,
     }))
+}
+
+#[cfg(test)]
+mod selection_req_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn preview_req_deserializes_selection_indices() {
+        let req: PreviewReq = serde_json::from_value(json!({
+            "template": "<div>{{ name }}</div>",
+            "data": [{"name": "A"}, {"name": "B"}, {"name": "C"}],
+            "selection": { "indices": [0, 2] }
+        }))
+        .unwrap();
+        assert_eq!(req.selection.indices, Some(vec![0, 2]));
+    }
+
+    #[test]
+    fn print_req_defaults_selection_to_all() {
+        let req: PrintReq = serde_json::from_value(json!({
+            "text": "hello",
+            "protocol": "console"
+        }))
+        .unwrap();
+        assert_eq!(req.selection, lbl_template::BatchSelection::default());
+    }
+
+    #[test]
+    fn selection_applied_to_authoring_labels() {
+        let req: PreviewReq = serde_json::from_value(json!({
+            "template": "<div>{{ name }}</div>",
+            "template_format": "html",
+            "data": [
+                {"name": "Alice"},
+                {"name": "Bob"},
+                {"name": "Carol"}
+            ],
+            "selection": { "indices": [1, 2] }
+        }))
+        .unwrap();
+        let source = match req.source.into_source() {
+            Ok(source) => source,
+            Err(e) => panic!("into_source failed: {}", e.1),
+        };
+        let labels = authoring_labels(source, &req.selection).expect("authoring_labels");
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].index, 1);
+        assert_eq!(labels[1].index, 2);
+        assert!(labels[0].html.contains("Bob"));
+        assert!(labels[1].html.contains("Carol"));
+    }
 }
 
 #[cfg(test)]

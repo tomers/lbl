@@ -71,6 +71,23 @@ lbl print --template card.html --data people.json --index 0 --index 2 ...
 Selection order: `--index` (if any) → `--filter` → `--skip` → `--take` /
 `--first` / `--last`.
 
+The HTTP API accepts the same selection as an optional `selection` object on
+`/api/preview`, `/api/preview/html`, `/api/print`, and `/api/print/file`:
+
+```json
+{
+  "template": "<div>{{ name }}</div>",
+  "data": [{"name": "Alice"}, {"name": "Bob"}, {"name": "Carol"}],
+  "selection": { "indices": [0, 2] }
+}
+```
+
+Fields match the CLI: `filter` (string), `skip` (number), `take` (number),
+`last` (boolean), and `indices` (array of zero-based batch indices). Omitted
+`selection` means the full batch. Original batch indices are preserved on each
+label, so template fields like `{{ index }}` stay correct for the selected
+subset.
+
 ## Shell iteration (`seq` and `xargs`)
 
 When values come from the shell instead of a JSON file, run `lbl print` once per
