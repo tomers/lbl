@@ -35,6 +35,7 @@ use lbl_core::Rotation;
 use lbl_dither::Algorithm;
 use lbl_encode::Registry;
 use lbl_render::{RenderBackend, SidecarBackend};
+use lbl_template::TemplateError;
 use lbl_text::{catalog, font_asset_url};
 use lbl_transpile_html::{
     injected_fit_font_px, injected_label_min_width_px, AssetsBase, FontDelivery, LabelFitSetting,
@@ -120,6 +121,21 @@ fn reject_bad_request(err: impl Display) -> ApiError {
     let msg = err.to_string();
     warn!(error = %msg, "request rejected");
     ApiError(StatusCode::BAD_REQUEST, msg)
+}
+
+/// Map an `authoring_labels` failure to an API error.
+///
+/// Template data/render failures come from request-supplied template or data
+/// (e.g. a syntax error in the template body), so they are client errors, not
+/// server faults. Resource/IO template errors and everything else stay 500.
+fn authoring_error(err: anyhow::Error) -> ApiError {
+    match err.downcast_ref::<TemplateError>() {
+        Some(TemplateError::Data(_) | TemplateError::Render(_)) => {
+            // Alternate Display keeps the cause chain ("rendering template: …").
+            reject_bad_request(format!("{err:#}"))
+        }
+        _ => fail_internal(err),
+    }
 }
 
 type ApiResult = Result<axum::response::Response, ApiError>;
@@ -502,7 +518,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
 
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
+        .map_err(authoring_error)?;
     let count = labels.len();
     let supersample = req.supersample;
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
@@ -673,7 +689,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
 pub async fn preview_html(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
+        .map_err(authoring_error)?;
     let count = labels.len();
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
     let style_cfg = load_style_cfg(&state, &req.style);
@@ -1232,7 +1248,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         req.supports_cut,
     );
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
+        .map_err(authoring_error)?;
     let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
         protocol,
@@ -1451,7 +1467,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         req.supports_cut,
     );
     let labels = authoring_labels(source, &lbl_template::BatchSelection::default())
-        .map_err(ApiError::from)?;
+        .map_err(authoring_error)?;
     // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
     let font_delivery = inline_font_delivery_for_labels(&state, &labels)?;
     let opts = PipelineOptions {
