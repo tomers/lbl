@@ -12,7 +12,7 @@ use lbl_text::Document;
     about = "Convert plain text and directives into lbl authoring HTML",
     long_about = "Reads text from positional arguments (joined with spaces) or, if none are given, \
 from stdin. Emits authoring HTML on stdout for the rest of the pipeline.\n\n\
-Inline mini-syntax (default): {{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}.",
+Inline mini-syntax (default): [[qr:...]], [[barcode:[SYMBOLOGY:]data]], [[image:URI]].",
     color = clap::ColorChoice::Auto,
     styles = lbl_cli::CLAP_STYLING,
 )]
@@ -21,7 +21,7 @@ struct Cli {
     #[arg(value_name = "TEXT")]
     text: Vec<String>,
 
-    /// Treat input literally; do not parse inline {{...}} directives.
+    /// Treat input literally; do not parse inline [[...]] directives.
     #[arg(long)]
     raw: bool,
 

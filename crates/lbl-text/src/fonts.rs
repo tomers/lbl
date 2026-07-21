@@ -21,7 +21,7 @@ pub struct FontFaceFile {
     pub unicode_range: String,
 }
 
-/// A font available for inline `{{font:…}}` directives.
+/// A font available for inline `[[font:…]]` directives.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FontEntry {

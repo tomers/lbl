@@ -263,9 +263,9 @@ mod tests {
                     .uri("/api/preview/html")
                     .header("content-type", "application/json")
                     .body(Body::from(
-                        // `{{qr:…}}` is not valid template syntax: request-supplied
-                        // template errors must be client errors, not 500s.
-                        r#"{"template":"{{qr:https://example.com}}","template_format":"text","data":[{"n":1}],"width_mm":50,"dpi":203}"#,
+                        // Request-supplied template syntax errors must be
+                        // client errors, not 500s.
+                        r#"{"template":"{{ name }","template_format":"text","data":[{"n":1}],"width_mm":50,"dpi":203}"#,
                     ))
                     .unwrap(),
             )
@@ -279,6 +279,32 @@ mod tests {
             error.contains("template render error"),
             "error should surface the engine message, got: {error}"
         );
+    }
+
+    #[tokio::test]
+    async fn preview_html_renders_directive_inside_template() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        // Directives (`[[…]]`) pass through the templating layer
+                        // untouched, so per-record QR payloads compose with data.
+                        r#"{"template":"{{ name }} [[qr:https://x/{{ name }}]]","template_format":"text","data":[{"name":"A"},{"name":"B"}],"width_mm":50,"dpi":203}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["count"], 2);
+        let html = json["labels"][0]["html"].as_str().unwrap();
+        assert!(html.contains("https://x/A"), "{html}");
     }
 
     #[tokio::test]
@@ -430,7 +456,7 @@ mod tests {
                     .method("POST")
                     .uri("/api/preview")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"text":"hi {{qr:x}}"}"#))
+                    .body(Body::from(r#"{"text":"hi [[qr:x]]"}"#))
                     .unwrap(),
             )
             .await

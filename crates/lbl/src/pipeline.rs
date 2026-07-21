@@ -1977,7 +1977,7 @@ mod tests {
     fn text_source_makes_one_label() {
         let labels = authoring_labels(
             Source::Text {
-                text: "hi {{qr:x}}".into(),
+                text: "hi [[qr:x]]".into(),
                 raw: false,
             },
             &BatchSelection::default(),
@@ -1991,7 +1991,7 @@ mod tests {
     fn stamp_directives_resolve_in_authoring_labels() {
         let labels = authoring_labels(
             Source::Text {
-                text: "Prep {{date:%Y-%m-%d}}".into(),
+                text: "Prep [[date:%Y-%m-%d]]".into(),
                 raw: false,
             },
             &BatchSelection::default(),
@@ -2090,6 +2090,41 @@ mod tests {
         assert!(labels[0].html.contains("User #1"));
         assert!(labels[1].html.contains("User #2"));
         assert!(labels[0].html.contains("lbl-label"));
+    }
+
+    #[test]
+    fn template_interpolation_composes_with_directives() {
+        // `[[…]]` directives pass through minijinja untouched, so template
+        // data can feed per-label directive payloads.
+        let labels = authoring_labels(
+            Source::Template {
+                template: "[[size:1.4:{{ name }}]]\n[[qr:https://x/{{ id }}]]".into(),
+                data: Some(serde_json::json!([
+                    {"name":"Alpha","id":1},
+                    {"name":"Beta","id":2}
+                ])),
+                each: None,
+                format: TemplateFormat::Text,
+            },
+            &BatchSelection::default(),
+        )
+        .unwrap();
+        assert_eq!(labels.len(), 2);
+        assert!(
+            labels[0].html.contains(">Alpha</span>"),
+            "{}",
+            labels[0].html
+        );
+        assert!(
+            labels[0].html.contains("<qr>https://x/1</qr>"),
+            "{}",
+            labels[0].html
+        );
+        assert!(
+            labels[1].html.contains("<qr>https://x/2</qr>"),
+            "{}",
+            labels[1].html
+        );
     }
 
     #[test]

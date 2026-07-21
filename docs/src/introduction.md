@@ -17,13 +17,13 @@ top-level `lbl` command. Each stage is:
 This means you can run the whole flow with one command:
 
 ```bash
-lbl print --text "Hello {{qr:https://example.com}}" --media 11352 --protocol dymo --usb 0922:1001
+lbl print --text "Hello [[qr:https://example.com]]" --media 11352 --protocol dymo --usb 0922:1001
 ```
 
 …or drive each stage yourself and pipe between them:
 
 ```bash
-lbl-text "Hello {{qr:https://example.com}}" \
+lbl-text "Hello [[qr:https://example.com]]" \
   | lbl-transpile-html --mode print \
   | lbl-render --width-dots 672 \
   | lbl-dither --algorithm auto \

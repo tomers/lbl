@@ -7,7 +7,7 @@ use pulldown_cmark::{html, Options, Parser};
 /// any directive blocks appended from CLI flags.
 #[derive(Debug, Clone, Default)]
 pub struct MarkdownDocument {
-    /// Markdown rendered to HTML, with `{{...}}` directives substituted for
+    /// Markdown rendered to HTML, with `[[...]]` directives substituted for
     /// their authoring elements (`<qr>`, `<barcode>`, `<img>`).
     body: String,
     /// Directives appended after the body (e.g. from `--qr`/`--barcode` flags).
@@ -17,7 +17,7 @@ pub struct MarkdownDocument {
 impl MarkdownDocument {
     /// Parse a Markdown `input` into an authoring document.
     ///
-    /// Inline `{{...}}` directives are recognized anywhere in the source (even
+    /// Inline `[[...]]` directives are recognized anywhere in the source (even
     /// inside headings or list items) and rendered as the corresponding
     /// authoring element; everything else is converted from Markdown to HTML.
     pub fn parse(input: &str) -> Self {
@@ -85,15 +85,15 @@ fn placeholder(n: usize) -> String {
 
 /// Strip markdown link tails that rich-text editors append after lbl directives.
 ///
-/// TipTap autolink can turn `{{qr:https://example.com}}` into
-/// `{{qr:https://example.com}}](https://example.com}}`, leaving stray link
+/// TipTap autolink can turn `[[qr:https://example.com]]` into
+/// `[[qr:https://example.com]]](https://example.com]]`, leaving stray link
 /// syntax outside the directive.
 fn normalize_editor_artifacts(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
 
     while i < input.len() {
-        if input[i..].starts_with("{{") {
+        if input[i..].starts_with("[[") {
             if let Some((_, end)) = scan_directive_at(input, i) {
                 out.push_str(&input[i..end]);
                 i = skip_link_artifact_suffix(input, end);
@@ -108,7 +108,7 @@ fn normalize_editor_artifacts(input: &str) -> String {
     out
 }
 
-/// After a closing `}}`, skip a spurious `](url…)` tail from editor autolink.
+/// After a closing `]]`, skip a spurious `](url…)` tail from editor autolink.
 fn skip_link_artifact_suffix(input: &str, pos: usize) -> usize {
     if input.as_bytes().get(pos) != Some(&b']') {
         return pos;
@@ -129,23 +129,23 @@ fn skip_link_artifact_suffix(input: &str, pos: usize) -> usize {
         }
     }
 
-    while input.as_bytes().get(i) == Some(&b'}') {
+    while input.as_bytes().get(i) == Some(&b']') {
         i += 1;
     }
 
     i
 }
 
-/// Scan `input` for `{{type:...}}` directives, replacing each recognized one
+/// Scan `input` for `[[type:...]]` directives, replacing each recognized one
 /// with a placeholder and returning the rewritten source plus the ordered list
-/// of `(placeholder, block)` pairs. Unrecognized `{{...}}` is left untouched.
+/// of `(placeholder, block)` pairs. Unrecognized `[[...]]` is left untouched.
 fn extract_directives(input: &str) -> (String, Vec<(String, Block)>) {
     let mut out = String::with_capacity(input.len());
     let mut directives = Vec::new();
     let mut i = 0;
 
     while i < input.len() {
-        if input[i..].starts_with("{{") {
+        if input[i..].starts_with("[[") {
             if let Some((block, end)) = scan_directive_at(input, i) {
                 let ph = placeholder(directives.len());
                 out.push_str(&ph);
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn inline_qr_directive_with_options() {
-        let doc = MarkdownDocument::parse("**Hello** {{qr ec=low}}hi{{/qr}}");
+        let doc = MarkdownDocument::parse("**Hello** [[qr ec=low]]hi[[/qr]]");
         let html = doc.to_authoring_html();
         assert!(html.contains("<strong>Hello</strong>"), "{html}");
         assert!(html.contains(r#"<qr ec="L">hi</qr>"#), "{html}");
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn inline_qr_directive_is_applied() {
-        let doc = MarkdownDocument::parse("ship to {{qr:https://x.y}}");
+        let doc = MarkdownDocument::parse("ship to [[qr:https://x.y]]");
         let html = doc.to_authoring_html();
         assert!(html.contains("<qr>https://x.y</qr>"), "{html}");
         assert!(
@@ -251,12 +251,12 @@ mod tests {
     #[test]
     fn editor_link_artifact_after_qr_directive_is_stripped() {
         let doc = MarkdownDocument::parse(
-            "# Order\n\nShip **fast**\n\n{{qr:https://example.com}}](https://example.com}}",
+            "# Order\n\nShip **fast**\n\n[[qr:https://example.com]]](https://example.com]]",
         );
         let html = doc.to_authoring_html();
         assert!(html.contains("<qr>https://example.com</qr>"), "{html}");
         assert!(
-            !html.contains("example.com}}"),
+            !html.contains("example.com]]"),
             "link artifact leaked: {html}"
         );
         assert!(!html.contains("]("), "link artifact leaked: {html}");
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn directive_inside_heading() {
-        let doc = MarkdownDocument::parse("# Ship {{qr:abc}}");
+        let doc = MarkdownDocument::parse("# Ship [[qr:abc]]");
         let html = doc.to_authoring_html();
         assert!(html.contains("<qr>abc</qr>"), "{html}");
         assert!(html.contains("<h1>"), "{html}");
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn color_directive_renders_inline() {
-        let doc = MarkdownDocument::parse("Hello, {{color:#ff0000:World}}!");
+        let doc = MarkdownDocument::parse("Hello, [[color:#ff0000:World]]!");
         let html = doc.to_authoring_html();
         assert!(
             html.contains(
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn font_directive_renders_inline() {
-        let doc = MarkdownDocument::parse("Hello, {{font:roboto:World}}!");
+        let doc = MarkdownDocument::parse("Hello, [[font:roboto:World]]!");
         let html = doc.to_authoring_html();
         assert!(
             html.contains("Hello, <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span data-lbl-font=\"roboto\">World</span></span></span>!"),
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn size_directive_renders_inline() {
-        let doc = MarkdownDocument::parse("Hello, {{size:1.5:World}}!");
+        let doc = MarkdownDocument::parse("Hello, [[size:1.5:World]]!");
         let html = doc.to_authoring_html();
         // The sized span stays inline within the paragraph alongside the text.
         assert!(
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn size_directive_inside_heading() {
-        let doc = MarkdownDocument::parse("# Order {{size:2:#42}}");
+        let doc = MarkdownDocument::parse("# Order [[size:2:#42]]");
         let html = doc.to_authoring_html();
         assert!(html.contains("<h1>Order <span"), "{html}");
         assert!(
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn barcode_with_and_without_symbology() {
-        let doc = MarkdownDocument::parse("{{barcode:EAN13:123}} {{barcode:456}}");
+        let doc = MarkdownDocument::parse("[[barcode:EAN13:123]] [[barcode:456]]");
         let html = doc.to_authoring_html();
         assert!(
             html.contains("<barcode type=\"EAN13\">123</barcode>"),
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn image_directive_and_flag() {
-        let mut doc = MarkdownDocument::parse("{{image:./a.png}}");
+        let mut doc = MarkdownDocument::parse("[[image:./a.png]]");
         doc.push_image("https://x/y.png");
         let html = doc.to_authoring_html();
         assert!(html.contains("<img src=\"./a.png\" />"), "{html}");
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn date_stamp_directive() {
-        let doc = MarkdownDocument::parse("Prep **{{date:%Y-%m-%d}}**");
+        let doc = MarkdownDocument::parse("Prep **[[date:%Y-%m-%d]]**");
         let html = doc.to_authoring_html();
         assert!(
             html.contains(r#"<stamp kind="date" format="%Y-%m-%d"></stamp>"#),
@@ -351,9 +351,9 @@ mod tests {
 
     #[test]
     fn unrecognized_directive_kept_literal() {
-        let doc = MarkdownDocument::parse("a {{unknown:y}} b");
+        let doc = MarkdownDocument::parse("a [[unknown:y]] b");
         let html = doc.to_authoring_html();
-        assert!(html.contains("{{unknown:y}}"), "{html}");
+        assert!(html.contains("[[unknown:y]]"), "{html}");
     }
 
     #[test]

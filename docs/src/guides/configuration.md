@@ -167,7 +167,7 @@ Environment (same keys, nested with `__`):
 ```bash
 export LBL_PRINT__PROTOCOL=virtual
 export LBL_PRINT__EXPORT_MODE=vector
-lbl print --text "Hello {{qr:https://x}}" --media 30252 --file hello.pdf
+lbl print --text "Hello [[qr:https://x]]" --media 30252 --file hello.pdf
 
 export LBL_PRINT__PROTOCOL=niimbot
 export LBL_PRINT__BLUETOOTH=D110

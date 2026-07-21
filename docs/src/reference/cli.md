@@ -123,10 +123,10 @@ Save labels to disk without hardware. Two export modes:
 
 ```bash
 # Vector PDF — sharp text/QR/barcode at any zoom; page size = media mm
-lbl print --text "Hello {{qr:https://x}}" --media 30252 --protocol virtual --export-mode vector --file label.pdf
+lbl print --text "Hello [[qr:https://x]]" --media 30252 --protocol virtual --export-mode vector --file label.pdf
 
 # Raster PNG — emulates how ink looks after 1-bit dithering on a print head
-lbl print --text "Hello {{qr:https://x}}" --media 30252 --protocol virtual --file label.png
+lbl print --text "Hello [[qr:https://x]]" --media 30252 --protocol virtual --file label.png
 
 # Raster TIFF
 lbl print --text "Hello" --width-mm 25 --length-mm 54 --protocol virtual --media-type tiff --file label.tiff

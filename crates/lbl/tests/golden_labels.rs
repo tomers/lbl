@@ -82,7 +82,7 @@ fn golden_labels() {
         &backend,
         "text_raw",
         Source::Text {
-            text: "Keep {{qr:x}} literal".into(),
+            text: "Keep [[qr:x]] literal".into(),
             raw: true,
         },
         &small,
@@ -110,7 +110,7 @@ fn golden_labels() {
         &backend,
         "text_size",
         Source::Text {
-            text: "Order {{size:2:#44}} now".into(),
+            text: "Order [[size:2:#44]] now".into(),
             raw: false,
         },
         &small,
@@ -124,7 +124,7 @@ fn golden_labels() {
     failures.extend(run_case(
         &backend,
         "markdown",
-        Source::Markdown("# Order 44\n\nShip **fast**\n\n{{qr:https://track/42}}".into()),
+        Source::Markdown("# Order 44\n\nShip **fast**\n\n[[qr:https://track/42]]".into()),
         &strip,
         &style,
         Algorithm::Auto,
@@ -182,7 +182,7 @@ fn golden_labels() {
         &backend,
         "qr",
         Source::Text {
-            text: "{{qr:https://lbl.example/42}}".into(),
+            text: "[[qr:https://lbl.example/42]]".into(),
             raw: false,
         },
         &small,
@@ -196,7 +196,7 @@ fn golden_labels() {
         &backend,
         "barcode_code128",
         Source::Text {
-            text: "{{barcode:LBL-128}}".into(),
+            text: "[[barcode:LBL-128]]".into(),
             raw: false,
         },
         &wide,
@@ -210,7 +210,7 @@ fn golden_labels() {
         &backend,
         "barcode_ean13",
         Source::Text {
-            text: "{{barcode:EAN13:0123456789012}}".into(),
+            text: "[[barcode:EAN13:0123456789012]]".into(),
             raw: false,
         },
         &wide,
@@ -225,7 +225,7 @@ fn golden_labels() {
         &backend,
         "image",
         Source::Text {
-            text: format!("Logo {{{{image:{}}}}}", checkerboard_data_uri()),
+            text: format!("Logo [[image:{}]]", checkerboard_data_uri()),
             raw: false,
         },
         &strip,
@@ -462,7 +462,7 @@ fn golden_labels() {
         &backend,
         "vector_qr",
         Source::Text {
-            text: "{{qr:https://lbl.example/42}}".into(),
+            text: "[[qr:https://lbl.example/42]]".into(),
             raw: false,
         },
         &small,
@@ -472,7 +472,7 @@ fn golden_labels() {
         &backend,
         "vector_barcode_code128",
         Source::Text {
-            text: "{{barcode:LBL-128}}".into(),
+            text: "[[barcode:LBL-128]]".into(),
             raw: false,
         },
         &wide,

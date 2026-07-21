@@ -6,26 +6,28 @@
 //!
 //! # Inline mini-syntax (default)
 //!
-//! Directives are written inline with double braces:
+//! Directives are written inline with double square brackets, so they never
+//! collide with `{{ … }}` template interpolation (`lbl-template`) run before
+//! this front-end:
 //!
-//! - `{{qr:https://example.com}}` -> a QR code (payload only; use
-//!   `{{qr ec=low}}payload{{/qr}}` when options are needed)
-//! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
-//!   CODE128, so `{{barcode:12345}}` also works)
-//! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
-//! - `{{date:%Y-%m-%d}}` / `{{time:%H:%M}}` / `{{datetime:%Y-%m-%d %H:%M}}` ->
+//! - `[[qr:https://example.com]]` -> a QR code (payload only; use
+//!   `[[qr ec=low]]payload[[/qr]]` when options are needed)
+//! - `[[barcode:CODE128:12345]]` -> a barcode (symbology optional; defaults to
+//!   CODE128, so `[[barcode:12345]]` also works)
+//! - `[[image:./photo.jpg]]` -> an image by local path or remote URL
+//! - `[[date:%Y-%m-%d]]` / `[[time:%H:%M]]` / `[[datetime:%Y-%m-%d %H:%M]]` ->
 //!   a date/time stamp (`<stamp>`); resolved to local wall-clock text once per
 //!   preview/print job via [`resolve_stamps_at`]
-//! - `{{size:1.5:World}}` -> text at 1.5x the base font size (aliases:
+//! - `[[size:1.5:World]]` -> text at 1.5x the base font size (aliases:
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
-//! - `{{font:roboto:Hello}}` -> text in a named font (aliases: `font-family`,
+//! - `[[font:roboto:Hello]]` -> text in a named font (aliases: `font-family`,
 //!   `ff`; see [`fonts::catalog`] for supported slugs)
-//! - `{{color:#ff0000:Hello}}` -> colored text (aliases: `fg`, `foreground`,
+//! - `[[color:#ff0000:Hello]]` -> colored text (aliases: `fg`, `foreground`,
 //!   `text-color`, `tc`; hex `#rgb` or `#rrggbb`)
 //!
 //! ```
 //! use lbl_text::Document;
-//! let doc = Document::parse("ship to {{qr:https://x.y}}", false);
+//! let doc = Document::parse("ship to [[qr:https://x.y]]", false);
 //! let html = doc.to_authoring_html();
 //! assert!(html.contains("<qr>https://x.y</qr>"));
 //! ```
@@ -33,7 +35,7 @@
 //! # Raw mode
 //!
 //! With raw mode enabled, inline syntax is **not** parsed; the text is treated
-//! literally (so a label can contain the characters `{{...}}`). Flag-based
+//! literally (so a label can contain the characters `[[...]]`). Flag-based
 //! directives still apply and are appended after the text.
 
 mod fonts;

@@ -37,7 +37,7 @@ show_dpi              = false
 hide_media_in_command = true
 single_line           = true
 render_args           = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "8", "--barcode-height-mm", "7"]
-args                  = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
+args                  = ["--text", "Text [[size:2.5:Title]][[barcode:Barcode]][[qr:QR]]"]
 
 [[example]]
 id = "element-gap"
@@ -58,7 +58,7 @@ hide_media_in_command = true
 separate_images = true
 single_line = true
 render_args = ["--orientation", "portrait", "--padding-mm", "0", "--qr-size-mm", "10", "--barcode-height-mm", "9"]
-args = ["--text", "Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}"]
+args = ["--text", "Text [[size:2.5:Title]][[barcode:Barcode]][[qr:QR]]"]
 compare = [{ label = "default element gap" }, { label = "element gap 10 mm", args = ["--element-gap-mm", "10"] }]
 
 [[example]]
@@ -86,7 +86,7 @@ args = ["--markdown", """# Order #1234
 
 ⚠️ Caution **fragile**
 
-{{qr:https://track/1234}}"""]
+[[qr:https://track/1234]]"""]
 
 [[example]]
 id = "label-align"
@@ -224,7 +224,7 @@ hide_cd     = true
 single_line = true
 render_args = ["--qr-size-mm", "10"]
 files       = [{ path = "lbl.toml", lang = "toml" }]
-args        = ["--text", "Hello {{qr:https://x/p}}"]
+args        = ["--text", "Hello [[qr:https://x/p]]"]
 
 [[example]]
 id = "supersample"
