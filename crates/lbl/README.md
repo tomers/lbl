@@ -8,7 +8,7 @@ library — so a single command can take you from content to a printed label.
 
 ```bash
 # Print plain text (text -> transpile -> render -> dither -> encode -> spool)
-lbl print --text "Hello {{qr:https://example.com}}" --media 11352 --protocol dymo --usb 0922:1001
+lbl print --text "Hello [[qr:https://example.com]]" --media 11352 --protocol dymo --usb 0922:1001
 
 # Batch print from a template + data
 lbl print --template card.html --data people.json \
@@ -24,7 +24,7 @@ lbl preview --template card.html --data people.json --out-dir preview/ --render
 ## Stage subcommands
 
 ```bash
-lbl text "ship to {{qr:...}}"          # text -> authoring HTML
+lbl text "ship to [[qr:...]]"          # text -> authoring HTML
 lbl transpile label.html --mode preview
 lbl catalog show 11352
 lbl device list

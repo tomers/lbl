@@ -70,7 +70,7 @@ Set `"protocol": "virtual"`. Optional fields:
 
 ```json
 {
-  "text": "Hello {{qr:https://x}}",
+  "text": "Hello [[qr:https://x]]",
   "media": "30252",
   "protocol": "virtual",
   "export_mode": "vector",

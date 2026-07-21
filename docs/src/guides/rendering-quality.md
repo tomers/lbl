@@ -159,12 +159,12 @@ The virtual printer (`--protocol virtual`) supports two export modes:
 
 ```bash
 # Vector PDF on catalog media
-lbl print --markdown "# Invite\n\n{{qr:https://example.com/invite}}" \
+lbl print --markdown "# Invite\n\n[[qr:https://example.com/invite]]" \
   --printer LW550 --media 30252 --orientation portrait \
   --protocol virtual --export-mode vector --file invite.pdf
 
 # Raster PNG for comparison (same label, dithered)
-lbl print --markdown "# Invite\n\n{{qr:https://example.com/invite}}" \
+lbl print --markdown "# Invite\n\n[[qr:https://example.com/invite]]" \
   --printer LW550 --media 30252 --orientation portrait \
   --protocol virtual --file invite.png
 ```
@@ -172,7 +172,7 @@ lbl print --markdown "# Invite\n\n{{qr:https://example.com/invite}}" \
 **Layout reference DPI:** vector export converts millimetre style sizes to CSS
 pixels at **300 dpi** (`CSS_LAYOUT_REFERENCE_DPI` in `lbl-core`). This affects
 browser layout math only — text, QR, and barcodes remain **vectors** in the PDF
-and scale cleanly for professional print. Embedded `<img>` / `{{image:…}}`
+and scale cleanly for professional print. Embedded `<img>` / `[[image:…]]`
 content is still raster inside the PDF.
 
 QR codes and barcodes are drawn as **SVG** in the transpiled HTML (then either

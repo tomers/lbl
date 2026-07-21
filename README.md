@@ -183,7 +183,7 @@ Text mini-syntax embeds QR codes, barcodes, and relative font scaling in one str
 *80×20 mm* · [Printing text →](docs/src/guides/printing-text.md#inline-mini-syntax-default)
 
 ```console
-$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+$ lbl print --text 'Text [[size:2.5:Title]][[barcode:Barcode]][[qr:QR]]'
 ```
 
 ---
@@ -202,10 +202,10 @@ Override with `--element-gap-mm`, `LBL_STYLE__ELEMENT_GAP_MM`, or config
 
 ```console
 # default element gap
-$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}'
+$ lbl print --text 'Text [[size:2.5:Title]][[barcode:Barcode]][[qr:QR]]'
 
 # element gap 10 mm
-$ lbl print --text 'Text {{size:2.5:Title}}{{barcode:Barcode}}{{qr:QR}}' --element-gap-mm 10
+$ lbl print --text 'Text [[size:2.5:Title]][[barcode:Barcode]][[qr:QR]]' --element-gap-mm 10
 ```
 
 ---
@@ -219,7 +219,7 @@ Headings, emphasis, and inline directives compose via `--markdown`.
 *NIIMBOT 12×40 mm @ 203 dpi* · [Printing text →](docs/src/guides/printing-text.md)
 
 ```console
-$ lbl print --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n{{qr:https://track/1234}}'
+$ lbl print --markdown $'# Order #1234\n\n⚠️ Caution **fragile**\n\n[[qr:https://track/1234]]'
 ```
 
 ---
@@ -292,7 +292,7 @@ orientation = "landscape"
 ```
 
 ```console
-$ lbl print --text 'Hello {{qr:https://x/p}}'
+$ lbl print --text 'Hello [[qr:https://x/p]]'
 ```
 
 ---
@@ -409,9 +409,9 @@ Data and template in one file — frontmatter plus a text body with inline mini-
   { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
 ]
 ---
-{{ "{{size:1.4:" ~ name ~ "}}" }}
+[[size:1.4:{{ name }}]]
 {{ title }}
-{{ "{{qr:" ~ url ~ "}}" }}
+[[qr:{{ url }}]]
 ```
 
 ```console
@@ -441,7 +441,7 @@ Same frontmatter pattern with a Markdown body (`.md` extension).
 
 *{{ title }}*
 
-{{ "{{qr:" ~ url ~ "}}" }}
+[[qr:{{ url }}]]
 ```
 
 ```console

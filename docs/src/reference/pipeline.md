@@ -14,7 +14,7 @@ order is:
 ## Composing by hand
 
 ```bash
-lbl-text "Order {{barcode:CODE128:4006381333931}}" \
+lbl-text "Order [[barcode:CODE128:4006381333931]]" \
   | lbl-transpile-html --mode print \
   | lbl-render --width-dots 672 --supersample 3 \
   | lbl-dither --algorithm auto \

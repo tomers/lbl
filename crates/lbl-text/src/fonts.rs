@@ -1,6 +1,6 @@
 //! Supported label fonts and helpers for CSS / web-font loading.
 
-/// A font available for inline `{{font:…}}` directives.
+/// A font available for inline `[[font:…]]` directives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FontDef {
     /// Slug used in directives (e.g. `roboto`, `bebas-neue`).

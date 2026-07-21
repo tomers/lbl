@@ -8,11 +8,11 @@
 //! links, ...), but the same inline mini-syntax as `lbl-text` is **still
 //! applied** anywhere in the document:
 //!
-//! - `{{qr:https://example.com}}` -> a QR code (`{{qr ec=low}}…{{/qr}}` for options)
-//! - `{{barcode:CODE128:12345}}` -> a barcode (symbology optional; defaults to
-//!   CODE128, so `{{barcode:12345}}` also works)
-//! - `{{image:./photo.jpg}}` -> an image by local path or remote URL
-//! - `{{date:%Y-%m-%d}}` / `{{time:%H:%M}}` / `{{datetime:…}}` -> date/time
+//! - `[[qr:https://example.com]]` -> a QR code (`[[qr ec=low]]…[[/qr]]` for options)
+//! - `[[barcode:CODE128:12345]]` -> a barcode (symbology optional; defaults to
+//!   CODE128, so `[[barcode:12345]]` also works)
+//! - `[[image:./photo.jpg]]` -> an image by local path or remote URL
+//! - `[[date:%Y-%m-%d]]` / `[[time:%H:%M]]` / `[[datetime:…]]` -> date/time
 //!   stamp (`<stamp>`; resolved at preview/print by the orchestrator)
 //!
 //! Underline uses `++text++` (converted to `<u>` before parsing; same marker
@@ -20,7 +20,7 @@
 //!
 //! ```
 //! use lbl_markdown::MarkdownDocument;
-//! let doc = MarkdownDocument::parse("# Ship to\n\n{{qr:https://x.y}}");
+//! let doc = MarkdownDocument::parse("# Ship to\n\n[[qr:https://x.y]]");
 //! let html = doc.to_authoring_html();
 //! assert!(html.contains("<h1>Ship to</h1>"));
 //! assert!(html.contains("<qr>https://x.y</qr>"));

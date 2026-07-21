@@ -1,6 +1,6 @@
 //! Date/time stamp authoring elements and resolution.
 //!
-//! Mustache `{{date|time|datetime:FORMAT}}` and HTML `<stamp kind="…" format="…">`
+//! Inline `[[date|time|datetime:FORMAT]]` and HTML `<stamp kind="…" format="…">`
 //! become wall-clock text once per job via [`resolve_stamps_at`].
 
 use chrono::{DateTime, Local};

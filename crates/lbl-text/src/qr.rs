@@ -73,7 +73,7 @@ impl QrOptions {
     }
 }
 
-/// Parse attributes on a block directive opening tag (`{{qr ec=low margin=2}}`).
+/// Parse attributes on a block directive opening tag (`[[qr ec=low margin=2]]`).
 pub fn parse_qr_attrs(attrs: &str) -> QrOptions {
     let mut options = QrOptions::default();
     for token in tokenize_attrs(attrs) {

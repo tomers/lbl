@@ -14,7 +14,7 @@ use lbl_markdown::MarkdownDocument;
 Emits authoring HTML on stdout for the rest of the pipeline.\n\n\
 Standard Markdown (headings, lists, emphasis, tables, ...) is supported, and the \
 lbl inline mini-syntax is still applied anywhere in the document: \
-{{qr:...}}, {{barcode:[SYMBOLOGY:]data}}, {{image:URI}}.",
+[[qr:...]], [[barcode:[SYMBOLOGY:]data]], [[image:URI]].",
     color = clap::ColorChoice::Auto,
     styles = lbl_cli::CLAP_STYLING,
 )]

@@ -4,6 +4,6 @@
   { "name": "Bob", "title": "Designer", "url": "https://example.com/bob" }
 ]
 ---
-{{ "{{size:1.4:" ~ name ~ "}}" }}
+[[size:1.4:{{ name }}]]
 {{ title }}
-{{ "{{qr:" ~ url ~ "}}" }}
+[[qr:{{ url }}]]

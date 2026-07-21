@@ -45,7 +45,7 @@ and `preview` flows, and also exposes the individual stages as subcommands.
 
 | Stage | Crate | Responsibility |
 | ----- | ----- | -------------- |
-| Text front-end | `lbl-text` | Plain text/CLI → authoring HTML (inline `{{…}}` directives, `--raw`) |
+| Text front-end | `lbl-text` | Plain text/CLI → authoring HTML (inline `[[…]]` directives, `--raw`) |
 | Preprocessor | `lbl-template` | Render data through a template → N authoring HTML labels; fetch/inline resources |
 | Transpiler | `lbl-transpile-html` | Expand `<qr>`/`<barcode>`/flex into browser-ready HTML; print vs preview |
 | Rasterizer | `lbl-render` | HTML → raster image, two-pass (supersample then downscale) |
