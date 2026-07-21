@@ -212,6 +212,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preview_html_template_syntax_error_is_bad_request() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/preview/html")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        // `{{qr:…}}` is not valid template syntax: request-supplied
+                        // template errors must be client errors, not 500s.
+                        r#"{"template":"{{qr:https://example.com}}","template_format":"text","data":[{"n":1}],"width_mm":50,"dpi":203}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let error = json["error"].as_str().unwrap();
+        assert!(
+            error.contains("template render error"),
+            "error should surface the engine message, got: {error}"
+        );
+    }
+
+    #[tokio::test]
     async fn preview_html_print_geometry_pins_continuous_d1_feed_width() {
         let app = router(test_state());
         let resp = app
