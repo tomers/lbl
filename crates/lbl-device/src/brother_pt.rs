@@ -88,14 +88,21 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, DeviceError> {
         (b'p', "PT-P950NW"),
         (b'x', "PT-P910BT"),
     ];
-    // Raster Command Reference — Error information 1 / 2 (PT-H500 / P700 / E500).
+    // Raster Command Reference — Error information 1 / 2 (PT-H500 / P700 / E500 / P710BT).
     const ERROR1: &[(u8, &str)] = &[
         (0, "No media"),
         (2, "Cutter jam"),
         (3, "Weak batteries"),
         (6, "High-voltage adapter"),
     ];
-    const ERROR2: &[(u8, &str)] = &[(0, "Replace media"), (4, "Cover open"), (5, "Overheating")];
+    const ERROR2: &[(u8, &str)] = &[
+        (0, "Replace media"),
+        (2, "Communication error"),
+        (3, "Communication buffer full"),
+        (4, "Cover open"),
+        (5, "Overheating"),
+        (7, "System error"),
+    ];
 
     let error1 = status[8];
     let error2 = status[9];
