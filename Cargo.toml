@@ -14,6 +14,8 @@ members = [
   "crates/lbl-pattern",
   "crates/lbl-encode",
   "crates/lbl-device",
+  "crates/lbl-status",
+  "crates/lbl-client-delivery",
   "crates/lbl-spool",
   "crates/lbl",
   "crates/lbl-server",
@@ -78,6 +80,8 @@ lbl-driver-console    = { path = "crates/drivers/lbl-driver-console" }
 lbl-driver-gpgl       = { path = "crates/drivers/lbl-driver-gpgl" }
 lbl-encode            = { path = "crates/lbl-encode" }
 lbl-device            = { path = "crates/lbl-device" }
+lbl-status            = { path = "crates/lbl-status" }
+lbl-client-delivery   = { path = "crates/lbl-client-delivery" }
 lbl-spool             = { path = "crates/lbl-spool" }
 
 # Shared third-party dependencies

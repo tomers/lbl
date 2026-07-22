@@ -26,7 +26,7 @@ use lbl::pipeline::{
 use lbl::pipeline::{
     inked_content_bounds, pad_preview_encode_feed, pad_preview_head_tape, render_label_raster,
 };
-use lbl_catalog::{encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
+use lbl_catalog::{driver_settings, encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
 use lbl_core::job::CutMode;
 use lbl_core::media::Media;
@@ -207,8 +207,30 @@ pub async fn list_fonts(State(state): State<AppState>) -> ApiResult {
     .into_response())
 }
 
+/// Serialize a catalog device for the API, enriched with UI-facing fields that
+/// are derived from the device (JSON Schema for driver options and capability
+/// hints) rather than stored in the catalog data. This keeps the catalog TOML
+/// model untouched while giving front-ends everything needed to render a
+/// settings form generically.
+fn device_api_json(device: &DeviceEntry) -> serde_json::Value {
+    let mut value = serde_json::to_value(device).expect("DeviceEntry serializes");
+    if let Some(schema) = driver_settings::schema_for(device) {
+        value["driver_settings_schema"] = schema;
+    }
+    value["media_noun"] = json!(driver_settings::media_noun(device));
+    value["supports_orientation"] = json!(driver_settings::supports_orientation(device));
+    value["supports_high_speed"] = json!(driver_settings::supports_high_speed(device));
+    value
+}
+
 pub async fn list_catalog_devices(State(state): State<AppState>) -> ApiResult {
-    Ok(Json(state.catalog.devices()).into_response())
+    let devices: Vec<serde_json::Value> = state
+        .catalog
+        .devices()
+        .iter()
+        .map(device_api_json)
+        .collect();
+    Ok(Json(devices).into_response())
 }
 
 pub async fn show_catalog_printer(
@@ -216,7 +238,7 @@ pub async fn show_catalog_printer(
     Path(key): Path<String>,
 ) -> ApiResult {
     match state.catalog.require_device(&key) {
-        Ok(p) => Ok(Json(p).into_response()),
+        Ok(p) => Ok(Json(device_api_json(p)).into_response()),
         Err(message) => Err(ApiError(StatusCode::BAD_REQUEST, message)),
     }
 }
@@ -2098,5 +2120,54 @@ mod browser_hints_tests {
         let detected = detected_media_from_catalog(&catalog, "11352").unwrap();
         assert_eq!(detected["sku"], "11352");
         assert!(detected["name"].as_str().unwrap().contains("11352"));
+    }
+}
+
+#[cfg(test)]
+mod device_api_json_tests {
+    use super::*;
+    use lbl_catalog::Catalog;
+
+    #[test]
+    fn dymo_lw_enriched_with_schema_and_capabilities() {
+        let catalog = Catalog::bundled().unwrap();
+        let device = catalog.lookup_device("LabelWriter 550").unwrap();
+        let value = device_api_json(device);
+        // Base DeviceEntry fields survive serialization.
+        assert_eq!(value["protocol"], "dymolw");
+        // Enriched capability hints.
+        assert_eq!(value["media_noun"], "media");
+        assert_eq!(value["supports_orientation"], true);
+        assert_eq!(value["supports_high_speed"], true);
+        // Driver options schema is inlined.
+        let speed = &value["driver_settings_schema"]["properties"]["dymo"]["properties"]["speed"];
+        assert_eq!(speed["enum"], json!(["normal", "high"]));
+    }
+
+    #[test]
+    fn dymo_lw_5xl_omits_high_speed() {
+        let catalog = Catalog::bundled().unwrap();
+        let value = device_api_json(catalog.lookup_device("LabelWriter 5XL").unwrap());
+        assert_eq!(value["supports_high_speed"], false);
+        let speed = &value["driver_settings_schema"]["properties"]["dymo"]["properties"]["speed"];
+        assert_eq!(speed["enum"], json!(["normal"]));
+    }
+
+    #[test]
+    fn brother_media_nouns_and_no_schema() {
+        let catalog = Catalog::bundled().unwrap();
+        let ql = device_api_json(catalog.lookup_device("QL-820NWBc").unwrap());
+        assert_eq!(ql["media_noun"], "paper type");
+        assert!(ql.get("driver_settings_schema").is_none());
+        let pt = device_api_json(catalog.lookup_device("PT-E550W").unwrap());
+        assert_eq!(pt["media_noun"], "tape");
+        assert_eq!(pt["supports_orientation"], false);
+    }
+
+    #[test]
+    fn cutter_exposes_silhouette_schema() {
+        let catalog = Catalog::bundled().unwrap();
+        let value = device_api_json(catalog.lookup_device("cameo4").unwrap());
+        assert!(value["driver_settings_schema"]["properties"]["silhouette"].is_object());
     }
 }

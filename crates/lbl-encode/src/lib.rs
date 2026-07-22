@@ -137,8 +137,17 @@ impl Registry {
     }
 
     /// Resolve `id` against the builtin driver set.
+    ///
+    /// Also recognizes cutter protocols that have no raster [`Driver`] (today:
+    /// [`Protocol::Gpgl`]), so callers such as handshake lookup can resolve the
+    /// same wire ids the catalog uses.
     pub fn resolve_protocol(id: &str) -> Result<Protocol, ResolveProtocolError> {
-        Self::with_builtin_drivers().resolve(id)
+        match Self::with_builtin_drivers().resolve(id) {
+            Err(ResolveProtocolError::Unknown(_)) if id.trim().eq_ignore_ascii_case("gpgl") => {
+                Ok(Protocol::Gpgl)
+            }
+            other => other,
+        }
     }
 
     /// Returns an error if two different protocols claim the same alias.
@@ -195,8 +204,15 @@ impl Registry {
 
     /// Client delivery handshake for `protocol` ([`Driver::handshake`]).
     ///
-    /// Returns [`ClientHandshake::FireAndForget`] when no driver is registered.
+    /// [`Protocol::Gpgl`] is a vector cutter with no raster [`Driver`], so its
+    /// handshake cannot come from the registry; it is mapped directly to
+    /// [`ClientHandshake::Gpgl`] (the status-paced cut delivery). Any other
+    /// protocol without a registered driver falls back to
+    /// [`ClientHandshake::FireAndForget`].
     pub fn handshake_for(protocol: Protocol) -> ClientHandshake {
+        if protocol == Protocol::Gpgl {
+            return ClientHandshake::Gpgl;
+        }
         Self::with_builtin_drivers()
             .get(protocol)
             .map(|d| d.handshake())
@@ -278,6 +294,7 @@ mod tests {
             Protocol::EscLabel
         );
         assert_eq!(Registry::resolve_protocol("html").unwrap(), Protocol::Html);
+        assert_eq!(Registry::resolve_protocol("gpgl").unwrap(), Protocol::Gpgl);
         assert!(matches!(
             Registry::resolve_protocol("b1"),
             Err(ResolveProtocolError::Unknown(_))
@@ -361,6 +378,11 @@ mod tests {
         assert_eq!(
             Registry::handshake_for(Protocol::EscPos),
             ClientHandshake::FireAndForget
+        );
+        // GPGL has no raster driver but maps to the paced cut handshake.
+        assert_eq!(
+            Registry::handshake_for(Protocol::Gpgl),
+            ClientHandshake::Gpgl
         );
     }
 

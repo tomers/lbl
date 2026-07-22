@@ -26,6 +26,7 @@ ble = ["dep:btleplug", "dep:tokio", "dep:futures", "dep:uuid", "dep:dbus"]
 [dependencies]
 lbl-core        = { workspace = true }
 lbl-catalog     = { workspace = true }
+lbl-status      = { workspace = true }
 lbl-driver-gpgl = { workspace = true }
 serde           = { workspace = true }
 serde_json      = { workspace = true }

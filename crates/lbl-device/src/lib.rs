@@ -92,3 +92,11 @@ pub enum DeviceError {
     #[error("transport error: {0}")]
     Transport(String),
 }
+
+impl From<lbl_status::StatusError> for DeviceError {
+    /// Status parsing runs behind a transport; a parse failure surfaces as a
+    /// transport-level error to the caller.
+    fn from(err: lbl_status::StatusError) -> Self {
+        DeviceError::Transport(err.to_string())
+    }
+}
