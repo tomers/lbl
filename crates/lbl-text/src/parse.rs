@@ -411,7 +411,27 @@ fn parse_inline(input: &str) -> Vec<Block> {
     }
 
     flush_text(&mut text_buf, &mut blocks);
+    trim_edge_whitespace_text_blocks(&mut blocks);
     blocks
+}
+
+/// Drop leading/trailing text blocks that are only whitespace.
+///
+/// A trailing space after a widget (`Hello [[qr:…]] `) would otherwise become
+/// its own `Block::Text(" ")` and render as an empty `.lbl-text` flex sibling.
+/// Whitespace *between* widgets (e.g. `[[qr:a]] [[qr:b]]`) is kept so gaps
+/// remain intentional.
+fn trim_edge_whitespace_text_blocks(blocks: &mut Vec<Block>) {
+    while is_whitespace_only_text(blocks.first()) {
+        blocks.remove(0);
+    }
+    while is_whitespace_only_text(blocks.last()) {
+        blocks.pop();
+    }
+}
+
+fn is_whitespace_only_text(block: Option<&Block>) -> bool {
+    matches!(block, Some(Block::Text(t)) if t.chars().all(char::is_whitespace))
 }
 
 /// HTML-like block QR: `[[qr ec=low]]payload[[/qr]]`.
@@ -997,6 +1017,60 @@ mod tests {
                 "<div class=\"lbl-row lbl-center\"><span class=\"lbl-text\"><span class=\"lbl-text-inlines\">aa </span></span><barcode type=\"CODE128\">12346</barcode><span class=\"lbl-text\"><span class=\"lbl-text-inlines\"> bb</span></span></div>"
             ),
             "{html}"
+        );
+    }
+
+    #[test]
+    fn trailing_space_after_qr_is_not_an_empty_text_element() {
+        let doc = Document::parse("Hello [[qr:https://example.com]] ", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Hello ".to_string()),
+                Block::Qr {
+                    payload: "https://example.com".to_string(),
+                    options: QrOptions::default(),
+                },
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert_eq!(
+            html,
+            "<div class=\"lbl-label\"><div class=\"lbl-row lbl-center\"><span class=\"lbl-text\"><span class=\"lbl-text-inlines\">Hello </span></span><qr>https://example.com</qr></div></div>"
+        );
+    }
+
+    #[test]
+    fn leading_space_before_qr_is_not_an_empty_text_element() {
+        let doc = Document::parse(" [[qr:https://example.com]]Hello", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Qr {
+                    payload: "https://example.com".to_string(),
+                    options: QrOptions::default(),
+                },
+                Block::Text("Hello".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn whitespace_between_widgets_is_preserved() {
+        let doc = Document::parse("[[qr:https://a]] [[qr:https://b]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Qr {
+                    payload: "https://a".to_string(),
+                    options: QrOptions::default(),
+                },
+                Block::Text(" ".to_string()),
+                Block::Qr {
+                    payload: "https://b".to_string(),
+                    options: QrOptions::default(),
+                },
+            ]
         );
     }
 
