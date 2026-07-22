@@ -17,6 +17,7 @@
 //!
 //! `lbl` is not affiliated with DYMO; see the repository disclaimer.
 
+pub mod d1;
 pub mod lw450;
 pub mod lw550;
 

@@ -521,6 +521,86 @@ pub fn b1_handshake_packets() -> Vec<Vec<u8>> {
     out
 }
 
+/// Pause between unacknowledged B1 writes over BLE (~10 ms).
+///
+/// Write-without-response has no flow control; the B1 firmware drops packets
+/// that arrive back to back. Transports pace bundled writes by this interval.
+pub const B1_PACE_MS: u32 = 10;
+
+/// Max bytes per bundled B1 BLE write ([`bundle_frames`]).
+pub const B1_BUNDLE_MAX: usize = 240;
+
+/// Split a NIIMBOT job byte stream into individual framed packets.
+///
+/// Scans for the `55 55` header and validates the `AA AA` tail so callers that
+/// pace or bundle writes (BLE) can operate on whole packets. Bytes that are not
+/// a well-formed frame are returned as a single passthrough chunk.
+pub fn frames(data: &[u8]) -> Vec<&[u8]> {
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i + 4 <= data.len() {
+        if data[i] != 0x55 || data[i + 1] != 0x55 {
+            i += 1;
+            continue;
+        }
+        let len = data[i + 3] as usize;
+        let end = i + 4 + len + 3;
+        if end > data.len() {
+            break;
+        }
+        if data[end - 2] == 0xAA && data[end - 1] == 0xAA {
+            out.push(&data[i..end]);
+        }
+        i = end;
+    }
+    if out.is_empty() && !data.is_empty() {
+        out.push(data);
+    }
+    out
+}
+
+/// Bundle framed packets into fewer writes of at most `max_bytes` each.
+///
+/// A B1 throughput optimization: many tiny row packets over BLE are slow, so
+/// consecutive frames are concatenated up to `max_bytes`. Frames are never
+/// split, so a single frame larger than `max_bytes` becomes its own bundle.
+pub fn bundle_frames(frames: &[&[u8]], max_bytes: usize) -> Vec<Vec<u8>> {
+    let mut bundles = Vec::new();
+    let mut current: Vec<u8> = Vec::new();
+    for frame in frames {
+        if !current.is_empty() && current.len() + frame.len() > max_bytes {
+            bundles.push(std::mem::take(&mut current));
+        }
+        current.extend_from_slice(frame);
+    }
+    if !current.is_empty() {
+        bundles.push(current);
+    }
+    bundles
+}
+
+/// Peel a trailing `EndPrint` (`0xF3`) frame off an encoded B1 job.
+///
+/// The B1 task defers `EndPrint` until after status polling confirms the page
+/// finished; sending it inline makes the printer report "done" immediately.
+/// Returns the job without the trailing frame plus the peeled `EndPrint`, or
+/// the input unchanged and `None` when the last frame is not `EndPrint`.
+pub fn split_deferred_print_end(data: &[u8]) -> (Vec<u8>, Option<Vec<u8>>) {
+    let parts = frames(data);
+    if parts.is_empty() {
+        return (data.to_vec(), None);
+    }
+    let last = parts[parts.len() - 1];
+    if last.len() >= 4 && last[2] == END_PRINT {
+        let mut job = Vec::new();
+        for frame in &parts[..parts.len() - 1] {
+            job.extend_from_slice(frame);
+        }
+        return (job, Some(last.to_vec()));
+    }
+    (data.to_vec(), None)
+}
+
 /// A decoded print-status reply from the printer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PrintStatus {
@@ -873,5 +953,57 @@ mod tests {
         assert_eq!(NiimbotDriver::task_for_printer_key("D110"), None);
         assert_eq!(NiimbotDriver::task_for_printer_key("D101"), None);
         assert_eq!(NiimbotDriver::task_for_printer_key("unknown"), None);
+    }
+
+    #[test]
+    fn frames_split_and_passthrough() {
+        let a = frame_packet(START_PRINT, &[0x01]);
+        let b = frame_packet(END_PRINT, &[0x01]);
+        let mut stream = a.clone();
+        stream.extend_from_slice(&b);
+        let parts = frames(&stream);
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0], a.as_slice());
+        assert_eq!(parts[1], b.as_slice());
+
+        // Non-framed bytes pass through as a single chunk.
+        let raw = [0x01, 0x02, 0x03];
+        assert_eq!(frames(&raw), vec![&raw[..]]);
+    }
+
+    #[test]
+    fn bundle_frames_respects_max_bytes() {
+        let f1 = frame_packet(SET_DENSITY, &[3]); // 8 bytes
+        let f2 = frame_packet(SET_LABEL_TYPE, &[1]); // 8 bytes
+        let refs = [f1.as_slice(), f2.as_slice()];
+        // Fits in one bundle.
+        assert_eq!(bundle_frames(&refs, 240).len(), 1);
+        // Forces a split (each frame is 8 bytes).
+        let bundles = bundle_frames(&refs, 8);
+        assert_eq!(bundles.len(), 2);
+        assert_eq!(bundles[0], f1);
+        assert_eq!(bundles[1], f2);
+    }
+
+    #[test]
+    fn split_deferred_print_end_peels_trailing_end_print() {
+        let bmp = MonoBitmap::new(384, 2);
+        let caps = DeviceCapabilities::default();
+        let job = ctx_job(1);
+        let bytes = NiimbotDriver::b1()
+            .encode(&bmp, &EncodeContext::new(&job, &caps))
+            .unwrap();
+        let (rest, end) = split_deferred_print_end(&bytes);
+        let end = end.expect("B1 job ends with EndPrint");
+        assert_eq!(end[2], END_PRINT);
+        assert!(find_packet(&rest, END_PRINT).is_none());
+        // Rest still carries the page teardown up to EndPagePrint.
+        assert!(find_packet(&rest, END_PAGE_PRINT).is_some());
+
+        // A stream without a trailing EndPrint is returned unchanged.
+        let status = status_query();
+        let (rest2, none) = split_deferred_print_end(&status);
+        assert!(none.is_none());
+        assert_eq!(rest2, status);
     }
 }

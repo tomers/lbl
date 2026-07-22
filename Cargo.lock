@@ -1543,6 +1543,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "lbl-client-delivery"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-api",
+ "lbl-driver-dymo",
+ "lbl-driver-gpgl",
+ "lbl-driver-letratag",
+ "lbl-driver-niimbot",
+ "lbl-status",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "lbl-config"
 version = "0.1.0"
 dependencies = [
@@ -1580,6 +1596,7 @@ dependencies = [
  "lbl-cli",
  "lbl-core",
  "lbl-driver-gpgl",
+ "lbl-status",
  "nusb",
  "serde",
  "serde_json",
@@ -1864,6 +1881,18 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tracing",
+]
+
+[[package]]
+name = "lbl-status"
+version = "0.1.0"
+dependencies = [
+ "lbl-core",
+ "lbl-driver-gpgl",
+ "lbl-driver-niimbot",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

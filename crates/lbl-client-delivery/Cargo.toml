@@ -1,0 +1,23 @@
+[package]
+name                   = "lbl-client-delivery"
+description            = "Transport-agnostic client delivery sessions: drive bidirectional printer handshakes from browser/host clients."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-driver-api      = { workspace = true }
+lbl-status          = { workspace = true }
+lbl-driver-dymo     = { workspace = true }
+lbl-driver-niimbot  = { workspace = true }
+lbl-driver-gpgl     = { workspace = true }
+lbl-driver-letratag = { workspace = true }
+serde               = { workspace = true }
+thiserror           = { workspace = true }
+
+[dev-dependencies]
+lbl-core   = { workspace = true }
+serde_json = { workspace = true }

@@ -124,6 +124,12 @@ pub enum ClientHandshake {
     NiimbotPoll,
     /// LetraTag GATT notify completion.
     LetraTagNotify,
+    /// Graphtec / Silhouette GPGL cutter status-paced delivery.
+    ///
+    /// The cutter is a vector plotter, not a raster print head, so no builtin
+    /// [`Driver`] reports this handshake; cut-delivery callers select it
+    /// explicitly for a GPGL byte stream.
+    Gpgl,
 }
 
 impl ClientHandshake {
@@ -135,6 +141,20 @@ impl ClientHandshake {
             Self::DymoLw => "dymo_lw",
             Self::NiimbotPoll => "niimbot_poll",
             Self::LetraTagNotify => "letratag_notify",
+            Self::Gpgl => "gpgl",
+        }
+    }
+
+    /// Parse a [`Self::as_str`] id back into a handshake (case-insensitive).
+    pub fn from_id(id: &str) -> Option<Self> {
+        match id.trim().to_ascii_lowercase().as_str() {
+            "fire_and_forget" => Some(Self::FireAndForget),
+            "dymo_d1" => Some(Self::DymoD1),
+            "dymo_lw" => Some(Self::DymoLw),
+            "niimbot_poll" => Some(Self::NiimbotPoll),
+            "letratag_notify" => Some(Self::LetraTagNotify),
+            "gpgl" => Some(Self::Gpgl),
+            _ => None,
         }
     }
 }

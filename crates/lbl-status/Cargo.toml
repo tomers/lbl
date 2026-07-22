@@ -1,0 +1,19 @@
+[package]
+name                   = "lbl-status"
+description            = "Wasm-safe print-engine status: query bytes, reply parsing, and soft-reboot commands for lbl."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core           = { workspace = true }
+lbl-driver-niimbot = { workspace = true }
+lbl-driver-gpgl    = { workspace = true }
+serde              = { workspace = true }
+thiserror          = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

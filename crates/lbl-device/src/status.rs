@@ -1,52 +1,26 @@
-//! Protocol-specific print-engine status queries.
+//! Protocol-specific print-engine status queries over USB.
+//!
+//! The tagged [`PrintStatus`] type and the `status_supported` /
+//! `soft_reboot_supported` predicates live in [`lbl_status`]; this module adds
+//! the USB transport wrappers for the protocols with a bulk-transfer query.
 
+pub use lbl_status::{soft_reboot_supported, status_supported, PrintStatus};
+
+#[cfg(feature = "usb")]
 use lbl_core::printer::Protocol;
 
-use crate::DeviceError;
-
-#[cfg(feature = "usb")]
-use crate::brother_pt::{self, BrotherPtStatus};
-#[cfg(feature = "usb")]
-use crate::brother_ql::{self, BrotherQlStatus};
-#[cfg(feature = "usb")]
-use crate::dymo_lw::{self, Lw550PrintStatusView};
 #[cfg(feature = "usb")]
 use crate::transport::UsbTransport;
 #[cfg(feature = "usb")]
-use crate::zpl::{self, ZplHostStatus};
-
-/// Whether `protocol` supports print-engine status queries.
-pub fn status_supported(protocol: Protocol) -> bool {
-    matches!(
-        protocol,
-        Protocol::DymoLw | Protocol::BrotherQl | Protocol::BrotherPt | Protocol::Zpl
-    )
-}
-
-/// Whether `protocol` supports a host soft-reboot of the print engine.
-pub fn soft_reboot_supported(protocol: Protocol) -> bool {
-    matches!(protocol, Protocol::DymoLw)
-}
-
-/// Print-engine status from a connected printer.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-#[serde(tag = "protocol", rename_all = "kebab-case")]
-pub enum PrintStatus {
-    /// DYMO LabelWriter 550-series (`dymo-lw`).
-    #[serde(rename = "dymo-lw")]
-    DymoLw(Lw550PrintStatusView),
-    /// Brother QL-series (`brother-ql`).
-    #[serde(rename = "brother-ql")]
-    BrotherQl(BrotherQlStatus),
-    /// Brother P-touch / TZe (`brother-pt`).
-    #[serde(rename = "brother-pt")]
-    BrotherPt(BrotherPtStatus),
-    /// Zebra ZPL (`zpl`).
-    #[serde(rename = "zpl")]
-    Zpl(ZplHostStatus),
-}
+use crate::DeviceError;
+#[cfg(feature = "usb")]
+use crate::{brother_pt, brother_ql, dymo_lw, zpl};
 
 /// Query print-engine status for `protocol` over USB.
+///
+/// Only the protocols with a USB bulk-transfer status query are handled here;
+/// serial/BLE-only protocols (e.g. NIIMBOT, GPGL) report `status_supported`
+/// but are queried through their own transports.
 #[cfg(feature = "usb")]
 pub fn query_print_status(
     protocol: Protocol,
@@ -70,7 +44,7 @@ pub fn query_print_status(
             Ok(PrintStatus::Zpl(status))
         }
         other => Err(DeviceError::Transport(format!(
-            "print-engine status not supported for protocol {other:?}"
+            "print-engine status over USB not supported for protocol {other:?}"
         ))),
     }
 }

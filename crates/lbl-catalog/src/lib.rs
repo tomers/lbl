@@ -16,6 +16,7 @@
 //! assert!(media.iter().any(|e| e.matches_key("11352")));
 //! ```
 
+pub mod driver_settings;
 mod model;
 mod validate;
 
