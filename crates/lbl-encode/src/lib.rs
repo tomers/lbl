@@ -24,12 +24,24 @@ use std::fmt::Write as _;
 
 use lbl_driver_api::{ClientHandshake, Driver, Protocol};
 
+pub mod cut_now;
+
+pub use cut_now::{cut_now_feed_dots, cut_now_supported, encode_cut_now};
+
 /// Errors produced by the encode stage.
 #[derive(Debug, thiserror::Error)]
 pub enum EncodeError {
     /// No driver is registered for the requested protocol.
     #[error("no driver registered for protocol {0:?}")]
     NoDriver(Protocol),
+
+    /// Host cut-now is not implemented for this protocol.
+    #[error("cut now is not supported for protocol {0:?}")]
+    UnsupportedCutNow(Protocol),
+
+    /// Catalog/profile capabilities do not include a cutter.
+    #[error("printer does not support cutting")]
+    CutNotSupported,
 
     /// A driver failed to encode.
     #[error(transparent)]

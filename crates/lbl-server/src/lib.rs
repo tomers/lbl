@@ -80,6 +80,10 @@ fn host_profile_routes() -> Router<AppState> {
             "/api/devices/profiles/{id}/soft-reboot",
             post(handlers::profile_soft_reboot),
         )
+        .route(
+            "/api/devices/profiles/{id}/cut-now",
+            post(handlers::profile_cut_now),
+        )
 }
 
 /// Build the application router with all routes mounted under `/api`.
@@ -100,7 +104,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/preview", post(handlers::preview))
         .route("/api/preview/html", post(handlers::preview_html))
         .route("/api/print", post(handlers::print))
-        .route("/api/print/file", post(handlers::print_file));
+        .route("/api/print/file", post(handlers::print_file))
+        .route("/api/cut-now", post(handlers::cut_now));
 
     if state.host_discovery_enabled {
         app = app.merge(host_profile_routes());
@@ -585,6 +590,7 @@ mod tests {
             ("GET", "/api/devices/profiles/x/media"),
             ("GET", "/api/devices/profiles/x/status"),
             ("POST", "/api/devices/profiles/x/soft-reboot"),
+            ("POST", "/api/devices/profiles/x/cut-now"),
         ] {
             let mut builder = Request::builder().method(method).uri(uri);
             let body = if method == "PUT" {
@@ -604,5 +610,88 @@ mod tests {
                 "{method} {uri} should be unmounted when host discovery is off"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn cut_now_encodes_client_payload() {
+        use base64::engine::general_purpose::STANDARD;
+        use base64::Engine as _;
+
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/cut-now")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "protocol": "escpos",
+                            "width_mm": 58.0,
+                            "dpi": 203.0,
+                            "supports_cut": true,
+                            "dispatch_mode": "client"
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["dispatch_mode"], "client");
+        assert!(json["labels"][0]["data_base64"].is_string());
+        let b64 = json["labels"][0]["data_base64"].as_str().unwrap();
+        let bytes = STANDARD.decode(b64).unwrap();
+        assert!(bytes.windows(3).any(|w| w == [0x1D, b'V', 0x00]));
+    }
+
+    #[tokio::test]
+    async fn cut_now_rejects_without_supports_cut() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/cut-now")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "protocol": "escpos",
+                            "width_mm": 58.0,
+                            "supports_cut": false,
+                            "dispatch_mode": "client"
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn cut_now_rejects_unsupported_protocol() {
+        let app = router(test_state());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/cut-now")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "protocol": "niimbot",
+                            "width_mm": 15.0,
+                            "supports_cut": true,
+                            "dispatch_mode": "client"
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }
