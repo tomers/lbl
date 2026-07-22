@@ -21,9 +21,15 @@
 //!   ESC i d …             margin / feed amount
 //!   M 0x00                compression off
 //!   per row:
-//!     g 0x00 n <n B>      raster graphics transfer (row mirrored)
+//!     G n_lo n_hi <n B>   raster graphics transfer (row mirrored)
 //!   0x1A / 0x0C           print with feed (last) / print (more pages follow)
 //! ```
+//!
+//! Brother's PDF lists the row opcode as ASCII `G` / hex `47` in the command
+//! panel (some editions misprint `g` / `67`). On the wire PT jobs use `G` with
+//! a little-endian payload length — the same framing as brother_ql / ptouch
+//! drivers. Emitting QL-style `g 00 n` desynchronizes the parser and typically
+//! ends in a red-LED communication / media error on Cube-class devices.
 //!
 //! Bit polarity matches [`MonoBitmap`]: `1` = ink. Each row is mirrored
 //! left-to-right before packing, matching Brother's own driver wiring.
@@ -305,7 +311,12 @@ impl BrotherPtDriver {
 
         for y in 0..bitmap.height {
             let row = Self::pack_mirrored_row(bitmap, y, head);
-            out.extend_from_slice(&[b'g', 0x00, head.bytes_per_row as u8]);
+            // PT framing: `G` + little-endian u16 length + payload (not QL's
+            // `g 00 <u8 length>`). Length must be head.bytes_per_row when
+            // compression is off (`M 00`).
+            let n = row.len() as u16;
+            out.push(b'G');
+            out.extend_from_slice(&n.to_le_bytes());
             out.extend_from_slice(&row);
         }
 
@@ -339,9 +350,13 @@ impl Driver for BrotherPtDriver {
         let (head, geom) = Self::resolve_media(ctx);
         let bitmap = Self::pad_to_head(bitmap, head, geom)?;
         let copies = ctx.copies();
+        // P710BT has no `ESC i A` (cut-each-N). Auto-cut alone leaves chain
+        // mode on, and Brother then skips feed/cut after the last page — so a
+        // single label never gets cut. Match working PT drivers (ptouch /
+        // brother_ql): "cut every" sets both auto-cut and no-chain.
         let (auto_cut, cut_at_end) = match ctx.cut_mode() {
             CutMode::None => (false, false),
-            CutMode::Every => (true, false),
+            CutMode::Every => (true, true),
             CutMode::End => (false, true),
         };
 
@@ -411,7 +426,7 @@ mod tests {
 
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'a', 0x01]));
         assert!(bytes.windows(3).any(|w| w == [ESC, b'i', b'z']));
-        assert!(bytes.windows(3).any(|w| w == [b'g', 0x00, 16]));
+        assert!(bytes.windows(3).any(|w| w == [b'G', 16, 0x00]));
         assert_eq!(*bytes.last().unwrap(), 0x1A);
     }
 
@@ -438,17 +453,18 @@ mod tests {
 
         let bmp = MonoBitmap::new(454, 1);
         let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
-        assert!(bytes.windows(3).any(|w| w == [b'g', 0x00, 70]));
+        assert!(bytes.windows(3).any(|w| w == [b'G', 70, 0x00]));
         assert!(bytes.starts_with(&[0u8; 200]));
     }
 
     #[test]
-    fn cut_every_sets_auto_cut_bit() {
+    fn cut_every_sets_auto_cut_and_no_chain() {
         let (job, caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
         let ctx = EncodeContext::new(&job, &caps);
         let bmp = MonoBitmap::new(8, 1);
         let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
     }
 
     #[test]
