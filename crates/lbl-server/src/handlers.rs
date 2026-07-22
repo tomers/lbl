@@ -885,6 +885,7 @@ pub struct StyleReqOverrides {
     padding_mm: Option<f64>,
     element_gap_mm: Option<f64>,
     border_width_mm: Option<f64>,
+    corner_radius_mm: Option<f64>,
     font_size_mm: Option<f64>,
     font_fit_scale: Option<f64>,
     label_fit: Option<String>,
@@ -902,6 +903,9 @@ fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config
     }
     if let Some(v) = overrides.border_width_mm {
         style.border_width_mm = v;
+    }
+    if let Some(v) = overrides.corner_radius_mm {
+        style.corner_radius_mm = v;
     }
     if let Some(v) = overrides.font_size_mm {
         style.font_size_mm = v;
