@@ -38,6 +38,8 @@
 
 use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
+pub mod live_status;
+
 // Packet framing.
 const HEAD: [u8; 2] = [0x55, 0x55];
 const TAIL: [u8; 2] = [0xAA, 0xAA];
@@ -602,7 +604,7 @@ pub fn split_deferred_print_end(data: &[u8]) -> (Vec<u8>, Option<Vec<u8>>) {
 }
 
 /// A decoded print-status reply from the printer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PrintStatus {
     /// The page (label) currently being printed.
     pub page: u16,

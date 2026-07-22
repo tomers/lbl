@@ -11,3 +11,7 @@ rust-version.workspace = true
 [dependencies]
 lbl-core       = { workspace = true }
 lbl-driver-api = { workspace = true }
+serde          = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

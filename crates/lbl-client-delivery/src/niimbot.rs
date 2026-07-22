@@ -12,7 +12,7 @@ use lbl_driver_niimbot::{
     bundle_frames, frames, parse_status, split_deferred_print_end, status_query, NiimbotDriver,
     B1_BUNDLE_MAX,
 };
-use lbl_status::{NiimbotHostStatus, PrintStatus};
+use lbl_status::{NiimbotLiveStatus, PrintStatus};
 
 use crate::{DeliveryAction, DeliveryError, Event, Handshake};
 
@@ -136,7 +136,7 @@ impl Handshake for NiimbotPoll {
                         let complete =
                             status.progress1 >= 100 && status.progress2 >= 100 && self.saw_activity;
                         let note = DeliveryAction::status(PrintStatus::Niimbot(
-                            NiimbotHostStatus::from(status),
+                            NiimbotLiveStatus::from(status),
                         ));
                         if complete {
                             self.finish(vec![note])
