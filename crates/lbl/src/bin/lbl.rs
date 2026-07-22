@@ -1719,6 +1719,8 @@ enum DeviceCommand {
     Status(StatusArgs),
     /// Soft-reboot the print engine when supported (`ESC @` on LabelWriter 550).
     SoftReboot(StatusArgs),
+    /// Cut the loaded tape/labels now (blank strip + auto-cut). Requires a cutter.
+    Cut(DeviceCutArgs),
 }
 
 #[derive(Args)]
@@ -1738,6 +1740,37 @@ struct StatusArgs {
     profile: Option<String>,
 }
 
+#[derive(Args)]
+struct DeviceCutArgs {
+    /// Printer model key from the catalog (must have `supports_cut`).
+    #[arg(long)]
+    printer: Option<String>,
+
+    /// USB target `vid:pid` in hex.
+    #[arg(long)]
+    usb: Option<String>,
+
+    /// Printer profile id from `printers.toml`.
+    #[arg(long)]
+    profile: Option<String>,
+
+    /// Media SKU (catalog). Defaults to the profile's default media when set.
+    #[arg(long)]
+    media: Option<String>,
+
+    /// Continuous tape / label width in mm when `--media` is omitted.
+    #[arg(long)]
+    width_mm: Option<f64>,
+
+    /// Fixed label length in mm (omit for continuous).
+    #[arg(long)]
+    length_mm: Option<f64>,
+
+    /// Override DPI (otherwise catalog printer DPI).
+    #[arg(long)]
+    dpi: Option<f64>,
+}
+
 fn run_device(args: DeviceArgs) -> Result<()> {
     match args.command {
         DeviceCommand::List => {
@@ -1746,6 +1779,7 @@ fn run_device(args: DeviceArgs) -> Result<()> {
         }
         DeviceCommand::Status(status) => run_device_status(status)?,
         DeviceCommand::SoftReboot(args) => run_device_soft_reboot(args)?,
+        DeviceCommand::Cut(args) => run_device_cut(args)?,
     }
     Ok(())
 }
@@ -1821,6 +1855,94 @@ fn run_device_soft_reboot(args: StatusArgs) -> Result<()> {
     lbl_device::soft_reboot_print_engine(target.protocol, &transport)
         .map_err(|e| anyhow!("{e}"))?;
     eprintln!("soft-rebooted print engine at USB {}", target.usb);
+    Ok(())
+}
+
+fn run_device_cut(args: DeviceCutArgs) -> Result<()> {
+    let loader = lbl_config::Loader::new();
+    let config = loader
+        .load()
+        .unwrap_or_else(|_| lbl_config::Config::default());
+    let catalog = Catalog::bundled()?;
+
+    if let Some(key) = args.printer.as_deref() {
+        let entry = catalog
+            .devices()
+            .iter()
+            .find(|p| p.matches_key(key))
+            .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;
+        if !entry.supports_cut {
+            bail!("catalog printer '{key}' does not support cutting");
+        }
+    }
+
+    let target = resolve_status_target(
+        &catalog,
+        &config,
+        args.printer.as_deref(),
+        args.profile.as_deref(),
+        args.usb,
+    )?;
+
+    if !lbl_encode::cut_now_supported(target.protocol) {
+        bail!(
+            "cut now is not supported for protocol {:?}",
+            target.protocol
+        );
+    }
+
+    let media_sku = args.media.clone();
+    let mut width_mm = args.width_mm;
+    if media_sku.is_none() && width_mm.is_none() {
+        if let Some(key) = args.printer.as_deref() {
+            let entry = catalog
+                .devices()
+                .iter()
+                .find(|p| p.matches_key(key))
+                .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;
+            width_mm = Some(entry.max_width_mm);
+        }
+    }
+    if media_sku.is_none() && width_mm.is_none() {
+        bail!("pass --media SKU or --width-mm for cut now");
+    }
+
+    let dpi = args.dpi.unwrap_or_else(|| {
+        args.printer
+            .as_deref()
+            .and_then(|k| catalog.lookup_device(k))
+            .map(|e| e.dpi)
+            .unwrap_or(180.0)
+    });
+    let media = resolve_media(
+        &catalog,
+        media_sku.as_deref(),
+        width_mm,
+        args.length_mm,
+        dpi,
+    )?;
+    let caps = encode_capabilities_for(
+        args.printer
+            .as_deref()
+            .and_then(|k| catalog.lookup_device(k)),
+        &media,
+        true,
+    );
+
+    let registry = Registry::with_builtin_drivers();
+    let bytes = lbl_encode::encode_cut_now(&registry, target.protocol, &media, &caps)
+        .map_err(|e| anyhow!("{e}"))?;
+
+    let (vid, pid) = target
+        .usb
+        .split_once(':')
+        .ok_or_else(|| anyhow!("usb target must be vid:pid (hex)"))?;
+    let vendor_id = u16::from_str_radix(vid, 16)?;
+    let product_id = u16::from_str_radix(pid, 16)?;
+    let mut transport = lbl_device::UsbTransport::new(vendor_id, product_id, target.serial);
+    use lbl_device::Transport as _;
+    transport.send(&bytes).map_err(|e| anyhow!("{e}"))?;
+    eprintln!("cut now sent to USB {}", target.usb);
     Ok(())
 }
 

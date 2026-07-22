@@ -374,6 +374,183 @@ fn soft_reboot_profile(profile: &DeviceProfile) -> Result<(), String> {
     }
 }
 
+/// Request body for [`cut_now`] / profile cut-now (media + optional host dispatch).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct CutNowReq {
+    /// Protocol id (e.g. `brother-pt`). Required for `/api/cut-now`.
+    #[serde(default)]
+    protocol: Option<String>,
+    /// Catalog device key for encode caps / handshake hints.
+    #[serde(default)]
+    printer: Option<String>,
+    #[serde(default)]
+    media: Option<String>,
+    #[serde(default)]
+    width_mm: Option<f64>,
+    #[serde(default)]
+    length_mm: Option<f64>,
+    #[serde(default)]
+    dpi: Option<f64>,
+    /// Must be true (catalog/profile cutter). Defaults false.
+    #[serde(default)]
+    supports_cut: bool,
+    #[serde(default)]
+    dispatch_mode: DispatchMode,
+    #[serde(default)]
+    network: Option<String>,
+    #[serde(default)]
+    usb: Option<String>,
+    #[serde(default)]
+    serial: Option<String>,
+    #[serde(default)]
+    bluetooth: Option<String>,
+}
+
+/// Encode a blank cut-now job and either return client bytes or dispatch on the host.
+#[tracing::instrument(skip(state, req), fields(protocol = ?req.protocol, printer = ?req.printer))]
+pub async fn cut_now(State(state): State<AppState>, Json(req): Json<CutNowReq>) -> ApiResult {
+    let protocol_str = req
+        .protocol
+        .as_deref()
+        .ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "protocol is required".into()))?;
+    let protocol = parse_protocol(protocol_str)?;
+    run_cut_now(&state, protocol, &req).await
+}
+
+/// Cut now using a host device profile's protocol, media, and USB transport.
+pub async fn profile_cut_now(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<CutNowReq>,
+) -> ApiResult {
+    let profiles = state.profiles.load()?;
+    let profile = profiles
+        .iter()
+        .find(|p| p.id.0 == id)
+        .ok_or_else(|| ApiError(StatusCode::NOT_FOUND, format!("no profile '{id}'")))?
+        .clone();
+
+    if !profile.model.capabilities.supports_cut && !req.supports_cut {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "printer does not support cutting".into(),
+        ));
+    }
+
+    let mut req = req;
+    if req.protocol.is_none() {
+        req.protocol = Some(opts_protocol_name(profile.model.protocol).to_string());
+    }
+    if req.media.is_none() && req.width_mm.is_none() {
+        req.media = profile.default_media.clone();
+    }
+    if req.media.is_none() && req.width_mm.is_none() {
+        let w = profile.model.capabilities.max_width_mm;
+        if w > 0.0 {
+            req.width_mm = Some(w);
+        }
+    }
+    if req.printer.is_none() {
+        // Prefer catalog key from model name when present.
+        req.printer = Some(profile.model.model.clone());
+    }
+    req.supports_cut = true;
+
+    // Host USB profile: default to server dispatch with profile USB target.
+    if matches!(req.dispatch_mode, DispatchMode::Server) {
+        if let lbl_core::printer::Transport::Usb {
+            vendor_id,
+            product_id,
+            ..
+        } = &profile.transport
+        {
+            if req.usb.is_none() {
+                req.usb = Some(format!("{vendor_id:04x}:{product_id:04x}"));
+            }
+            let connected = profile_is_connected(&profile, state.host_discovery_enabled);
+            if !connected {
+                return Err(ApiError(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "printer is not connected".into(),
+                ));
+            }
+        } else if matches!(
+            profile.transport,
+            lbl_core::printer::Transport::Browser { .. }
+        ) {
+            req.dispatch_mode = DispatchMode::Client;
+        }
+    }
+
+    run_cut_now(&state, profile.model.protocol, &req).await
+}
+
+async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> ApiResult {
+    if !lbl_encode::cut_now_supported(protocol) {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            format!("cut now is not supported for protocol {protocol:?}"),
+        ));
+    }
+    if !req.supports_cut {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "printer does not support cutting (supports_cut=false)".into(),
+        ));
+    }
+
+    let dpi = resolve_request_dpi(
+        &state.catalog,
+        req.printer.as_deref(),
+        Some(protocol),
+        req.dpi.unwrap_or(0.0),
+    );
+    let media = resolve_media(
+        &state.catalog,
+        req.media.as_deref(),
+        req.width_mm,
+        req.length_mm,
+        dpi,
+    )
+    .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, true);
+
+    let catalog = state.catalog.clone();
+    let printer_key = req.printer.clone();
+    let dispatch_mode = req.dispatch_mode;
+    let network = req.network.clone();
+    let usb = req.usb.clone();
+    let serial = req.serial.clone();
+    let bluetooth = req.bluetooth.clone();
+
+    let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
+        let registry =
+            Registry::with_builtin_drivers().with_printer_key(protocol, printer_key.as_deref());
+        let bytes = lbl_encode::encode_cut_now(&registry, protocol, &media, &encode_caps)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let encoded = vec![("cut-now.bin".to_string(), bytes)];
+        if dispatch_mode == DispatchMode::Client {
+            build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
+        } else {
+            dispatch(encoded, protocol, network, usb, serial, bluetooth)
+        }
+    })
+    .await
+    .map_err(fail_internal)?
+    .map_err(|e| {
+        let msg = format!("{e:#}");
+        if msg.contains("no print target") || msg.contains("cut now is not supported") {
+            bad_request(msg)
+        } else {
+            warn!(error = %msg, "cut-now failed");
+            bad_request(msg)
+        }
+    })?;
+
+    Ok(Json(report).into_response())
+}
+
 fn query_profile_print_status(profile: &DeviceProfile) -> Result<lbl_device::PrintStatus, String> {
     match &profile.transport {
         lbl_core::printer::Transport::Usb {
