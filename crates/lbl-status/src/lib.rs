@@ -37,6 +37,12 @@ pub use dymo_lw::{
 pub use error::StatusError;
 pub use zpl::{parse_host_status as parse_zpl_host_status, ZplHostStatus, HOST_STATUS_CMD};
 
+/// NIIMBOT live-status protocol module (query builders + payload parsers +
+/// assembly/merge), re-exported from the driver so WASM/host callers reach it
+/// through the unified status facade.
+pub use lbl_driver_niimbot::live_status as niimbot;
+pub use lbl_driver_niimbot::live_status::NiimbotLiveStatus;
+
 /// Unified, protocol-tagged print-engine status for APIs and WASM JSON.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "protocol", rename_all = "kebab-case")]
@@ -53,33 +59,13 @@ pub enum PrintStatus {
     /// Zebra ZPL (`zpl`).
     #[serde(rename = "zpl")]
     Zpl(ZplHostStatus),
-    /// NIIMBOT print-progress (`niimbot`).
+    /// NIIMBOT live status (`niimbot`): RFID, heartbeat, print progress, media,
+    /// and device info.
     #[serde(rename = "niimbot")]
-    Niimbot(NiimbotHostStatus),
+    Niimbot(NiimbotLiveStatus),
     /// Graphtec / Silhouette GPGL cutter (`gpgl`).
     #[serde(rename = "gpgl")]
     Gpgl(GpglStatusView),
-}
-
-/// NIIMBOT print-progress snapshot from a `GetPrintStatus` reply.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct NiimbotHostStatus {
-    /// The page (label) currently being printed.
-    pub page: u16,
-    /// Primary progress percentage (0–100).
-    pub progress1: u8,
-    /// Secondary progress percentage (0–100).
-    pub progress2: u8,
-}
-
-impl From<lbl_driver_niimbot::PrintStatus> for NiimbotHostStatus {
-    fn from(status: lbl_driver_niimbot::PrintStatus) -> Self {
-        Self {
-            page: status.page,
-            progress1: status.progress1,
-            progress2: status.progress2,
-        }
-    }
 }
 
 /// GPGL cutter status snapshot.
@@ -186,7 +172,7 @@ pub fn parse_status(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, Sta
         Protocol::BrotherPt => Ok(PrintStatus::BrotherPt(parse_brother_pt_status(bytes)?)),
         Protocol::Zpl => Ok(PrintStatus::Zpl(parse_zpl_host_status(bytes)?)),
         Protocol::Niimbot => lbl_driver_niimbot::parse_status(bytes)
-            .map(|s| PrintStatus::Niimbot(s.into()))
+            .map(|s| PrintStatus::Niimbot(NiimbotLiveStatus::from(s)))
             .ok_or_else(|| StatusError::Parse("no NIIMBOT print-status reply in buffer".into())),
         Protocol::Gpgl => lbl_driver_gpgl::parse_status(bytes)
             .map(|s| PrintStatus::Gpgl(GpglHostStatus::from(s).into()))
@@ -213,13 +199,92 @@ pub fn media_key_hint(status: &PrintStatus) -> Option<String> {
         PrintStatus::BrotherQl(s) => brother_ql_media_key_hint(s),
         PrintStatus::BrotherPt(s) => brother_pt_media_key_hint(s),
         PrintStatus::DymoLw(s) => s.sku.clone(),
-        PrintStatus::Zpl(_) | PrintStatus::Niimbot(_) | PrintStatus::Gpgl(_) => None,
+        PrintStatus::Niimbot(s) => niimbot_media_key_hint(s),
+        PrintStatus::Zpl(_) | PrintStatus::Gpgl(_) => None,
+    }
+}
+
+/// Media key hint for a NIIMBOT live status.
+///
+/// Prefers the RFID barcode (a catalog `product_ids` lookup key), falling back
+/// to a `WIDTHxLENGTH` string when only physical dimensions are known.
+fn niimbot_media_key_hint(status: &NiimbotLiveStatus) -> Option<String> {
+    if let Some(barcode) = status.media_barcode.as_deref() {
+        let barcode = barcode.trim();
+        if !barcode.is_empty() {
+            return Some(barcode.to_string());
+        }
+    }
+    match (status.media_width_mm, status.media_length_mm) {
+        (Some(w), Some(l)) => Some(format!("{w}x{l}")),
+        _ => None,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn niimbot_status_serializes_with_protocol_tag_and_fields() {
+        let live = niimbot::assemble_live_status(
+            Some(niimbot::NiimbotRfidInfo {
+                uuid: "aa".into(),
+                barcode: "T50X30".into(),
+                serial: "R1".into(),
+                total_len: 100,
+                used_len: 10,
+                label_type: 1,
+            }),
+            Some(niimbot::NiimbotHeartbeat {
+                lid_closed: Some(true),
+                paper_inserted: Some(true),
+                rfid_ok: Some(true),
+                battery_level: Some(3),
+            }),
+            None,
+            None,
+        );
+        let value = serde_json::to_value(PrintStatus::Niimbot(live)).unwrap();
+        assert_eq!(value["protocol"], "niimbot");
+        assert_eq!(value["media_width_mm"], 50);
+        assert_eq!(value["media_length_mm"], 30);
+        assert_eq!(value["rfid"]["total_len"], 100);
+        assert_eq!(value["heartbeat"]["battery_level"], 3);
+        assert!(value["print_status"].is_null());
+        assert!(value["device_info"].is_null());
+    }
+
+    #[test]
+    fn niimbot_media_key_hint_prefers_barcode_then_dimensions() {
+        let with_barcode = niimbot::assemble_live_status(
+            Some(niimbot::NiimbotRfidInfo {
+                uuid: "aa".into(),
+                barcode: "02282280".into(),
+                serial: "R1".into(),
+                total_len: 100,
+                used_len: 10,
+                label_type: 1,
+            }),
+            None,
+            None,
+            None,
+        );
+        assert_eq!(
+            media_key_hint(&PrintStatus::Niimbot(with_barcode)).as_deref(),
+            Some("02282280")
+        );
+
+        let dims_only = NiimbotLiveStatus {
+            media_width_mm: Some(50),
+            media_length_mm: Some(30),
+            ..Default::default()
+        };
+        assert_eq!(
+            media_key_hint(&PrintStatus::Niimbot(dims_only)).as_deref(),
+            Some("50x30")
+        );
+    }
 
     #[test]
     fn gpgl_status_serializes_with_protocol_tag() {
