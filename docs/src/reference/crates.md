@@ -29,6 +29,8 @@ makes sense.
 | `lbl-driver-file` | `crates/drivers/lbl-driver-file` | — | Virtual printer → file (raster: png/bmp/tiff/gif/pbm; vector: pdf via orchestrator) |
 | `lbl-driver-console` | `crates/drivers/lbl-driver-console` | — | Console preview → terminal art (`console`) |
 | `lbl-device` | `crates/lbl-device` | `lbl-device` | USB/network discovery + transport |
+| `lbl-client-delivery` | `crates/lbl-client-delivery` | — | Transport-agnostic delivery Action state machine |
+| `lbl-status` | `crates/lbl-status` | — | Status query bytes + parsers (no USB) |
 | `lbl-spool` | `crates/lbl-spool` | `lbl-spool` | Internal print spooler |
 | `lbl` | `crates/lbl` | `lbl` | Orchestrator |
 | `lbl-server` | `crates/lbl-server` | `lbl-server` | HTTP API for programmatic access |
