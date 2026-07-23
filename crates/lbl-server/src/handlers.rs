@@ -18,14 +18,14 @@ use tracing::{error, info, warn};
 use lbl::debug::protocol_cli_name;
 use lbl::pipeline::{
     authoring_labels, effective_printable_width_mm, encode_label, frame_html_preview_stock,
-    preview_stock_frame, resolve_font_fit_scale, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel, PipelineOptions,
-    Source, TemplateFormat, VECTOR_CSS_DPI,
+    preview_feed_plan, preview_stock_frame, resolve_font_fit_scale, resolve_label_align,
+    resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
+    resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
+    PipelineOptions, PreviewFeedOverrides, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 #[cfg(feature = "chromium")]
 use lbl::pipeline::{
-    inked_content_bounds, pad_preview_encode_feed, pad_preview_head_tape, render_label_raster,
+    inked_content_bounds, pad_preview_encode_feed_plan, pad_preview_head_tape, render_label_raster,
 };
 use lbl_catalog::{driver_settings, encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
@@ -642,6 +642,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     use lbl_driver_file::VirtualExportMode;
     use std::io::Cursor;
 
+    let feed_overrides = preview_feed_overrides(&req)?;
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
@@ -684,15 +685,19 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     let printable_width_mm = effective_printable_width_mm(&media, &encode_caps);
     let feed_along_width = rotation.swaps_axes();
+    let feed_plan = preview_feed_plan(&encode_caps, &feed_overrides);
     let opts = PipelineOptions {
         protocol,
         media: media.clone(),
         supports_cut: false,
-        cut_mode: CutMode::None,
+        cut_mode: feed_overrides.cut_mode,
         copies: 1,
         batch_index: 0,
         batch_total: 1,
         density: None,
+        feed_lead_mm: feed_overrides.feed_lead_mm,
+        feed_end_mm: feed_overrides.feed_end_mm,
+        precut: feed_overrides.precut,
         driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
         rotation,
@@ -730,8 +735,12 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     &encode_caps,
                     feed_along_width,
                 );
-                let padded =
-                    pad_preview_encode_feed(head_pad.image, &encode_caps, feed_along_width);
+                let padded = pad_preview_encode_feed_plan(
+                    head_pad.image,
+                    &feed_plan,
+                    encode_caps.dpi.0,
+                    feed_along_width,
+                );
                 let image = padded.image;
                 let content_bounds = inked_content_bounds(&image);
                 let mut png = Vec::new();
@@ -761,7 +770,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                         serde_json::Value::from(head_pad.pad_after_px);
                     label_json["head_along_height"] = serde_json::Value::from(feed_along_width);
                 }
-                if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 {
+                if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 || padded.precut {
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(padded.content_feed_end_px);
                     label_json["feed_trail_px"] = serde_json::Value::from(padded.trail_feed_px);
@@ -771,6 +780,9 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     }
                     if padded.lead_feed_px > 0 {
                         label_json["feed_lead_px"] = serde_json::Value::from(padded.lead_feed_px);
+                    }
+                    if padded.precut {
+                        label_json["precut"] = serde_json::Value::Bool(true);
                     }
                 }
                 if let Some(mm) = computed_font_size_mm {
@@ -812,6 +824,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
 }
 
 pub async fn preview_html(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
+    let feed_overrides = preview_feed_overrides(&req)?;
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
@@ -858,11 +871,14 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         protocol: Protocol::Virtual,
         media: media.clone(),
         supports_cut: false,
-        cut_mode: CutMode::None,
+        cut_mode: feed_overrides.cut_mode,
         copies: 1,
         batch_index: 0,
         batch_total: 1,
         density: None,
+        feed_lead_mm: feed_overrides.feed_lead_mm,
+        feed_end_mm: feed_overrides.feed_end_mm,
+        precut: feed_overrides.precut,
         driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
         rotation,
@@ -917,6 +933,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 &encode_caps,
                 feed_along_width,
                 layout_dpi,
+                &feed_overrides,
             );
             let html = frame_html_preview_stock(&transpiled.html, &stock);
             // Continuous feed: content head-fit pins `.lbl-label{--lbl-feed-px}` so
@@ -952,7 +969,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 label_json["head_pad_after_px"] = serde_json::Value::from(stock.head_pad_after_px);
                 label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
             }
-            if stock.lead_feed_px > 0 || stock.trail_feed_px > 0 {
+            if stock.lead_feed_px > 0 || stock.trail_feed_px > 0 || stock.precut {
                 if content_feed_end_px > 0 {
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(content_feed_end_px);
@@ -964,6 +981,9 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 }
                 if stock.lead_feed_px > 0 {
                     label_json["feed_lead_px"] = serde_json::Value::from(stock.lead_feed_px);
+                }
+                if stock.precut {
+                    label_json["precut"] = serde_json::Value::Bool(true);
                 }
             }
         }
@@ -1097,6 +1117,18 @@ pub struct PreviewReq {
     /// Optional batch subset (same fields as the CLI selection flags).
     #[serde(default)]
     selection: lbl_template::BatchSelection,
+    /// Cut preference (affects whether pre-cut can apply in the stock frame).
+    #[serde(default)]
+    cut_mode: Option<String>,
+    /// Requested feed lead padding (mm). Unset → cutter gap when known.
+    #[serde(default)]
+    feed_lead_mm: Option<f64>,
+    /// Requested feed end padding (mm).
+    #[serde(default)]
+    feed_end_mm: Option<f64>,
+    /// Opt-in pre-cut preference for preview scrap / lead layout.
+    #[serde(default)]
+    precut: Option<bool>,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
 }
@@ -1137,6 +1169,15 @@ pub struct PrintReq {
     /// Optional print density / heat (driver-specific; typically 1–5).
     #[serde(default)]
     density: Option<u8>,
+    /// Requested feed lead padding (mm). Unset → cutter gap when known.
+    #[serde(default)]
+    feed_lead_mm: Option<f64>,
+    /// Requested feed end padding (mm).
+    #[serde(default)]
+    feed_end_mm: Option<f64>,
+    /// Opt-in pre-cut preference.
+    #[serde(default)]
+    precut: Option<bool>,
     /// Protocol-specific options (each driver reads only its own bag).
     #[serde(default)]
     driver: DriverOptionsReq,
@@ -1280,6 +1321,15 @@ fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiErr
     Ok(if cut { CutMode::Every } else { CutMode::None })
 }
 
+fn preview_feed_overrides(req: &PreviewReq) -> Result<PreviewFeedOverrides, ApiError> {
+    Ok(PreviewFeedOverrides {
+        cut_mode: resolve_cut_mode(false, req.cut_mode.as_deref())?,
+        feed_lead_mm: req.feed_lead_mm,
+        feed_end_mm: req.feed_end_mm,
+        precut: req.precut,
+    })
+}
+
 /// Protocol-specific options on print / encode requests.
 #[derive(Debug, Clone, Default, Deserialize)]
 struct DriverOptionsReq {
@@ -1392,6 +1442,9 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         batch_index: 0,
         batch_total: 1,
         density: req.density,
+        feed_lead_mm: req.feed_lead_mm,
+        feed_end_mm: req.feed_end_mm,
+        precut: req.precut,
         driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
@@ -1611,6 +1664,9 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         batch_index: 0,
         batch_total: 1,
         density: req.density,
+        feed_lead_mm: req.feed_lead_mm,
+        feed_end_mm: req.feed_end_mm,
+        precut: req.precut,
         driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,

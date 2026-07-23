@@ -16,12 +16,13 @@ pub mod terminal;
 pub use pipeline::{
     authoring_labels, encode_label, encode_label_from_rgba, encode_label_traced, encode_labels,
     encode_sample_pattern, encode_sample_pattern_traced, frame_html_preview_stock,
-    pad_preview_encode_feed, page_size_mm, preview_stock_frame, render_label_raster,
-    render_viewport_px, render_viewport_vector, resolve_label_align, resolve_label_fit,
-    resolve_label_fit_scale, resolve_label_valign, resolve_media, resolve_media_inset,
-    resolve_print_transport, resolve_style_vector, resolve_template_format, transpile_label_html,
-    AuthoringLabel, BatchSelection, EncodeFromRgbaResult, EncodeLabelsOptions, EncodeLabelsResult,
-    LabelRaster, PipelineOptions, PreviewFeedPad, PreviewStockFrame, Source, TemplateFormat,
+    pad_preview_encode_feed, pad_preview_encode_feed_plan, page_size_mm, preview_feed_plan,
+    preview_stock_frame, render_label_raster, render_viewport_px, render_viewport_vector,
+    resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
+    resolve_media, resolve_media_inset, resolve_print_transport, resolve_style_vector,
+    resolve_template_format, transpile_label_html, AuthoringLabel, BatchSelection,
+    EncodeFromRgbaResult, EncodeLabelsOptions, EncodeLabelsResult, LabelRaster, PipelineOptions,
+    PreviewFeedOverrides, PreviewFeedPad, PreviewStockFrame, Source, TemplateFormat,
     TranspiledLabelHtml, VECTOR_CSS_DPI,
 };
 pub use preprocess::{

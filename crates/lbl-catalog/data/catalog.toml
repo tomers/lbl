@@ -5947,11 +5947,12 @@ reports_media     = true
 dpi               = 180.0
 max_width_mm      = 24.0
 supports_cut      = true
-# ESC i d default (14 dots @ 180 dpi ≈ 2 mm) — drawn lead on the kept label.
-# Head-to-cutter (~24 mm) is ejected (firmware / pre-cut), not blank on the sticker;
-# do not leave feed_lead unset or preview will paint DX as attached gaps.
+# Suggested small lead (~ESC i d). Unset job lead uses feed_trail_mm (Dx).
+# Opt-in supports_precut ejects Dx as scrap when lead < Dx.
 feed_lead_mm = 2.0
 feed_trail_mm = 24.0
+supports_precut = true
+precut_default = true
 default_media = "TZe-231"
 supported_media = [
   "TZe-N201",

@@ -254,6 +254,18 @@ pub struct DeviceCapabilities {
     /// Brother QL/PT: high-resolution feed mode (`ESC i K` bit 4 on QL, bit 6 on PT).
     #[serde(default)]
     pub supports_high_resolution: bool,
+    /// Device can emit a zero-content pre-cut prologue (eject ≈ [`Self::feed_trail_mm`]).
+    ///
+    /// Capability only — preference defaults via [`Self::precut_default`].
+    #[serde(default)]
+    pub supports_precut: bool,
+    /// Initial job preference when `JobSpec::precut` is unset.
+    /// Catalog devices that support pre-cut typically set this `true`.
+    #[serde(default)]
+    pub precut_default: bool,
+    /// Minimum lead the chassis can honor after a pre-cut (protocol clamp), mm.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_lead_min_mm: Option<f64>,
 }
 
 impl Default for DeviceCapabilities {
@@ -274,6 +286,9 @@ impl Default for DeviceCapabilities {
             invalidate_bytes: None,
             supports_packbits: false,
             supports_high_resolution: false,
+            supports_precut: false,
+            precut_default: false,
+            feed_lead_min_mm: None,
         }
     }
 }

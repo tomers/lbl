@@ -36,23 +36,30 @@ cut before each real label (head-to-cutter scrap).
 The print head sits roughly one inch **before** the cutter so TZe can laminate.
 Brother documents this as unavoidable waste on a fully cut job:
 
-- **Typical single cut:** either ~24 mm of blank **on** the label (leading
-  margin), or a separate empty scrap of that length, then the printed label.
-  Official Windows drivers often **precut** (zero-raster feed + cut) so the
-  real label starts at a fresh edge; community tools expose that as an optional
-  `--precut`.
-- **This encoder** uses a small `ESC i d` feed (~14 dots ≈ 2 mm at 180 dpi) on
-  the kept label. Cube-class auto-cut effectively ejects the head-to-cutter gap
-  (scrap or equivalent); preview must not paint that gap as sticker padding.
-  Catalog: `feed_lead_mm` ≈ protocol margin, `feed_trail_mm` ≈ ejected DX.
-- **Multi-label batches:** do **not** end every page with no-chain/`0x1A` as its
-  own job — that repeats the leader scrap before every label. Use one job,
-  `0x0C` between pages, no-chain only on the last page (see above).
-- **Amortize waste:** chain-print (no-chain clear) across a batch and cut only
-  at the end.
+- **Large lead** (\(p \ge D_x\)): blank nose stays **on** the kept label; no pre-cut.
+- **Small lead** + **opt-in pre-cut** (`FeedPlan.precut`): encoder emits a
+  zero-raster page with auto-cut + no-chain + `0x1A` (nbuchwitz/ptouch-style)
+  before the first content page, ejecting ≈ \(D_x\) as scrap; content uses
+  `ESC i d` from `feed_plan.lead_mm`.
+- **Small lead** without pre-cut: encode rejects (`lead_padding_below_cutter_gap`).
+- **Multi-label batches:** one pre-cut for the job (`batch_first` only); do **not**
+  end every page with no-chain/`0x1A` as its own job.
+- Unset job lead defaults to \(D_x\) (no surprise scrap). See
+  [padding-driven pre-cut](../plans/precut-feed-padding.md).
 
-Proposed product/engine behavior (opt-in pre-cut from padding): see
-[padding-driven pre-cut](../plans/precut-feed-padding.md).
+## Pre-cut prologue (when `feed_plan.precut`)
+
+```text
+(after invalidate + ESC @ + ESC i a)
+ESC i z …   raster line count = 0
+ESC i M …   auto-cut
+ESC i A 01
+ESC i K …   no-chain
+ESC i d …   margin (same dots as content lead)
+M …
+0x1A        print-and-feed → eject scrap
+(then normal content page(s))
+```
 
 ## `ESC i z` media type (`n2`)
 

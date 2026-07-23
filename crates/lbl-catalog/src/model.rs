@@ -333,14 +333,22 @@ pub struct DeviceEntry {
     /// How to connect to this model (and, for USB, how to recognize it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionHint>,
-    /// Blank feed before raster content when encoding. Some tape printers omit
-    /// this because the head already sits past the last cut; preview may still
-    /// show that offset using [`feed_trail_mm`] when lead is unset.
+    /// Suggested / protocol reference lead (mm). Unset job lead uses \(D_x\) when
+    /// [`feed_trail_mm`] is set — see `resolve_feed_plan`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_lead_mm: Option<f64>,
     /// Head-to-cutter distance along the feed (e.g. ~8.1 mm on DYMO LabelManager).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_trail_mm: Option<f64>,
+    /// Device can emit a pre-cut prologue. Requires [`feed_trail_mm`] > 0.
+    #[serde(default)]
+    pub supports_precut: bool,
+    /// Initial job preference when precut is unset (true on capable devices).
+    #[serde(default)]
+    pub precut_default: bool,
+    /// Minimum lead after pre-cut (protocol clamp), mm.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_lead_min_mm: Option<f64>,
     /// Mirror content along the feed axis when encoding (mechanical/orientation).
     #[serde(default)]
     pub feed_reverse: bool,
@@ -421,6 +429,9 @@ impl DeviceEntry {
             invalidate_bytes: self.invalidate_bytes,
             supports_packbits: self.supports_packbits,
             supports_high_resolution: self.supports_high_resolution,
+            supports_precut: self.supports_precut,
+            precut_default: self.precut_default,
+            feed_lead_min_mm: self.feed_lead_min_mm,
         }
     }
 

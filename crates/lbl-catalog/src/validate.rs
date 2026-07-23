@@ -91,6 +91,19 @@ fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<Catal
             ),
         });
     }
+    if printer.supports_precut {
+        let dx_ok = printer
+            .feed_trail_mm
+            .is_some_and(|d| d.is_finite() && d > 0.0);
+        if !dx_ok {
+            errors.push(CatalogGeometryError {
+                message: format!(
+                    "printer `{}`: supports_precut requires feed_trail_mm > 0 (head-to-cutter gap)",
+                    printer.canonical_key()
+                ),
+            });
+        }
+    }
     if let Some(band) = printer.head_printable_height_mm {
         if !(band.is_finite() && band > 0.0) {
             errors.push(CatalogGeometryError {

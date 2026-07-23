@@ -74,6 +74,26 @@ struct Cli {
     #[arg(long)]
     density: Option<u8>,
 
+    /// Feed lead padding (mm). Unset → cutter gap when caps include feed_trail_mm.
+    #[arg(long, value_name = "MM")]
+    feed_lead_mm: Option<f64>,
+
+    /// Feed end padding (mm).
+    #[arg(long, value_name = "MM")]
+    feed_end_mm: Option<f64>,
+
+    /// Allow pre-cut when lead is below the cutter gap.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    precut: bool,
+
+    /// Head-to-cutter gap (mm) for feed-plan validation / pre-cut.
+    #[arg(long, value_name = "MM")]
+    feed_trail_mm: Option<f64>,
+
+    /// Device supports a pre-cut prologue.
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    supports_precut: bool,
+
     /// Output file. If omitted, bytes are written to stdout.
     #[arg(long)]
     out: Option<std::path::PathBuf>,
@@ -118,12 +138,17 @@ fn main() -> Result<()> {
     };
     job.copies = cli.copies;
     job.density = cli.density;
+    job.feed_lead_mm = cli.feed_lead_mm;
+    job.feed_end_mm = cli.feed_end_mm;
+    job.precut = if cli.precut { Some(true) } else { None };
 
     let caps = DeviceCapabilities {
         dpi,
         max_width_mm: cli.width_mm,
         supports_cut: cli.supports_cut,
         reports_media: false,
+        feed_trail_mm: cli.feed_trail_mm,
+        supports_precut: cli.supports_precut,
         ..Default::default()
     };
 
@@ -144,7 +169,8 @@ fn main() -> Result<()> {
         None => bail!("no driver for protocol {protocol:?}"),
     };
 
-    let ctx = EncodeContext::new(&job, &caps);
+    let feed_plan = lbl_core::resolve_feed_plan(&caps, &job)?;
+    let ctx = EncodeContext::with_feed_plan(&job, &caps, feed_plan);
     let bytes = driver.encode(&bitmap, &ctx)?;
 
     match &cli.out {

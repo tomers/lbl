@@ -496,6 +496,12 @@ pub struct PipelineOptions {
     pub batch_total: u32,
     /// Optional print density / heat (driver-specific).
     pub density: Option<u8>,
+    /// Requested feed lead padding (mm). `None` → resolve uses \(D_x\) when known.
+    pub feed_lead_mm: Option<f64>,
+    /// Requested feed end padding (mm). `None` → 0.
+    pub feed_end_mm: Option<f64>,
+    /// Opt-in pre-cut. `None` → catalog `precut_default`.
+    pub precut: Option<bool>,
     /// Protocol-specific options (each driver reads only its own bag).
     pub driver: lbl_core::DriverOptions,
     /// Dithering algorithm.
@@ -888,10 +894,48 @@ pub struct PreviewStockFrame {
     pub feed_end_margin_px: u32,
     pub trail_feed_px: u32,
     pub content_feed_end_px: u32,
+    pub precut: bool,
 }
 
 fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
     (mm / 25.4) * layout_dpi
+}
+
+/// Optional job feed/cut fields for preview stock / raster padding.
+///
+/// Defaults match caps-only preview (`CutMode::None`, unset padding) so interactive
+/// gallery still works without print settings. When Studio passes print prefs,
+/// lead/end/precut follow the same [`resolve_feed_plan`] rules as encode.
+#[derive(Debug, Clone, Default)]
+pub struct PreviewFeedOverrides {
+    pub cut_mode: CutMode,
+    pub feed_lead_mm: Option<f64>,
+    pub feed_end_mm: Option<f64>,
+    pub precut: Option<bool>,
+}
+
+/// Resolve a feed plan for preview; on policy errors keep lead/end without pre-cut.
+pub fn preview_feed_plan(
+    caps: &DeviceCapabilities,
+    feed: &PreviewFeedOverrides,
+) -> lbl_core::FeedPlan {
+    match preview_resolve_feed_plan(
+        caps,
+        feed.cut_mode,
+        feed.feed_lead_mm,
+        feed.feed_end_mm,
+        feed.precut,
+    ) {
+        Ok(plan) => plan,
+        Err(_) => preview_resolve_feed_plan(
+            caps,
+            CutMode::None,
+            feed.feed_lead_mm,
+            feed.feed_end_mm,
+            Some(false),
+        )
+        .unwrap_or_default(),
+    }
 }
 
 /// Compute head + feed padding that expands printable HTML to physical stock.
@@ -908,6 +952,7 @@ pub fn preview_stock_frame(
     caps: &DeviceCapabilities,
     head_along_height: bool,
     layout_dpi: f64,
+    feed: &PreviewFeedOverrides,
 ) -> PreviewStockFrame {
     let tape_head_px = mm_to_layout_px(media.width_mm, layout_dpi).round().max(0.0);
     let content_head = if head_along_height {
@@ -929,7 +974,10 @@ pub fn preview_stock_frame(
     } else {
         content_height_px.round().max(0.0) as u32
     };
-    let (lead_feed, end_margin, cutter_gap) = preview_feed_margins(caps, layout_dpi);
+    let plan = preview_feed_plan(caps, feed);
+    let (lead_feed, end_margin, dx) = preview_feed_margins_from_plan(&plan, layout_dpi);
+    let trail_feed = if plan.precut || dx > 0 { dx } else { 0 };
+    let precut = plan.precut;
     // Unknown continuous length: leave feed axis open (0). Known length: bake
     // lead+end into the stock box. Margins themselves always come from caps.
     let content_feed_end = if content_feed > 0 {
@@ -967,8 +1015,9 @@ pub fn preview_stock_frame(
         head_along_height,
         lead_feed_px: lead_feed,
         feed_end_margin_px: end_margin,
-        trail_feed_px: cutter_gap,
+        trail_feed_px: trail_feed,
         content_feed_end_px: content_feed_end,
+        precut,
     }
 }
 
@@ -1186,23 +1235,40 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
         .unwrap_or(0)
 }
 
-/// Lead / end / cutter-gap along feed for preview (matches [`pad_preview_encode_feed`]).
-///
-/// - **Trail only** (`feed_trail_mm`, no `feed_lead_mm`): treat the head-to-cutter
-///   distance as **attached** blank on both sides of the content (LabelManager-style).
-/// - **Lead + trail**: drawn lead is `feed_lead_mm` (protocol content margin); trail
-///   is metadata only (ejected scrap / pre-cut gap), not painted onto the sticker.
-///   Brother PT with auto-cut belongs here: small `ESC i d` lead, large `feed_trail_mm`.
-fn preview_feed_margins(caps: &DeviceCapabilities, dpi: f64) -> (u32, u32, u32) {
-    let dx = feed_margin_px(caps.feed_trail_mm, dpi);
-    let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
-    if explicit_lead > 0 {
-        (explicit_lead, 0, dx)
-    } else if dx > 0 {
-        (dx, dx, dx)
+fn feed_mm_px(mm: f64, dpi: f64) -> u32 {
+    if mm > f64::EPSILON {
+        feed_margin_px(Some(mm), dpi)
     } else {
-        (0, 0, 0)
+        0
     }
+}
+
+/// Build a feed plan for preview from caps + optional job padding/cut fields.
+pub fn preview_resolve_feed_plan(
+    caps: &DeviceCapabilities,
+    cut_mode: CutMode,
+    feed_lead_mm: Option<f64>,
+    feed_end_mm: Option<f64>,
+    precut: Option<bool>,
+) -> Result<lbl_core::FeedPlan, lbl_core::FeedPlanError> {
+    let mut job = JobSpec::new(Media::continuous(caps.max_width_mm.max(1.0), caps.dpi));
+    job.cut_mode = cut_mode;
+    job.feed_lead_mm = feed_lead_mm;
+    job.feed_end_mm = feed_end_mm;
+    job.precut = precut;
+    lbl_core::resolve_feed_plan(caps, &job)
+}
+
+/// Lead / end / cutter-gap along feed for preview from a resolved [`FeedPlan`].
+///
+/// When `precut`, trail is scrap metadata only (not painted onto the sticker).
+/// When trail-only legacy caps are used via a plan with lead = \(D_x\) and end = 0,
+/// only the lead is drawn (unset end → 0).
+fn preview_feed_margins_from_plan(plan: &lbl_core::FeedPlan, dpi: f64) -> (u32, u32, u32) {
+    let lead = feed_mm_px(plan.lead_mm, dpi);
+    let end = feed_mm_px(plan.end_mm, dpi);
+    let dx = feed_mm_px(plan.cutter_gap_mm, dpi);
+    (lead, end, dx)
 }
 
 /// Feed-axis padding applied to a preview raster.
@@ -1213,26 +1279,35 @@ pub struct PreviewFeedPad {
     pub content_feed_end_px: u32,
     /// Right padding on the sticker face before the cutter gap.
     pub feed_end_margin_px: u32,
-    /// Cutter-gap width along the feed axis (metadata only; not drawn).
+    /// Cutter-gap / ejected scrap width along the feed (metadata; not drawn on sticker).
     pub trail_feed_px: u32,
-    /// Blank tape before content (head offset from the previous cut).
+    /// Blank tape before content on the kept label.
     pub lead_feed_px: u32,
+    /// Whether pre-cut ejects [`Self::trail_feed_px`] as scrap before the label.
+    pub precut: bool,
 }
 
 /// Extend a preview raster with encode feed margins for tape printers.
-///
-/// See [`preview_feed_margins`]: trail-only caps draw DX as attached lead/end;
-/// lead+trail caps draw only the lead (content margin) and keep DX as
-/// [`PreviewFeedPad::trail_feed_px`] metadata for ejected / pre-cut scrap.
 pub fn pad_preview_encode_feed(
     image: RgbaImage,
     caps: &DeviceCapabilities,
     feed_along_width: bool,
 ) -> PreviewFeedPad {
+    // Caps-only preview: no cut → allow any lead (including catalog small lead).
+    let plan = preview_resolve_feed_plan(caps, CutMode::None, None, None, None).unwrap_or_default();
+    pad_preview_encode_feed_plan(image, &plan, caps.dpi.0, feed_along_width)
+}
+
+/// Like [`pad_preview_encode_feed`] with an explicit [`lbl_core::FeedPlan`].
+pub fn pad_preview_encode_feed_plan(
+    image: RgbaImage,
+    plan: &lbl_core::FeedPlan,
+    dpi: f64,
+    feed_along_width: bool,
+) -> PreviewFeedPad {
     use image::{imageops, Rgba};
 
-    let dpi = caps.dpi.0;
-    let (preview_lead, end_margin, cutter_gap) = preview_feed_margins(caps, dpi);
+    let (preview_lead, end_margin, cutter_gap) = preview_feed_margins_from_plan(plan, dpi);
 
     let content_feed = if feed_along_width {
         image.width()
@@ -1245,13 +1320,19 @@ pub fn pad_preview_encode_feed(
             image,
             content_feed_end_px: content_feed,
             feed_end_margin_px: 0,
-            trail_feed_px: 0,
+            trail_feed_px: if plan.precut { cutter_gap } else { 0 },
             lead_feed_px: 0,
+            precut: plan.precut,
         };
     }
 
     let label_white = Rgba([255, 255, 255, 255]);
     let content_end = preview_lead + content_feed;
+    let trail_feed_px = if plan.precut || cutter_gap > 0 {
+        cutter_gap
+    } else {
+        0
+    };
 
     if feed_along_width {
         let (w, h) = image.dimensions();
@@ -1261,8 +1342,9 @@ pub fn pad_preview_encode_feed(
             image: out,
             content_feed_end_px: content_end,
             feed_end_margin_px: end_margin,
-            trail_feed_px: cutter_gap,
+            trail_feed_px,
             lead_feed_px: preview_lead,
+            precut: plan.precut,
         }
     } else {
         let (w, h) = image.dimensions();
@@ -1272,8 +1354,9 @@ pub fn pad_preview_encode_feed(
             image: out,
             content_feed_end_px: content_end,
             feed_end_margin_px: end_margin,
-            trail_feed_px: cutter_gap,
+            trail_feed_px,
             lead_feed_px: preview_lead,
+            precut: plan.precut,
         }
     }
 }
@@ -1408,12 +1491,16 @@ pub fn encode_label_from_rgba(
     job.batch_index = opts.batch_index;
     job.batch_total = opts.batch_total;
     job.density = opts.density;
+    job.feed_lead_mm = opts.feed_lead_mm;
+    job.feed_end_mm = opts.feed_end_mm;
+    job.precut = opts.precut;
     job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
         .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
-    let mut ctx = EncodeContext::new(&job, &caps);
+    let feed_plan = lbl_core::resolve_feed_plan(&caps, &job).map_err(|e| anyhow!(e))?;
+    let mut ctx = EncodeContext::with_feed_plan(&job, &caps, feed_plan);
     if let Some(secondary) = &secondary_plane {
         ctx = ctx.with_secondary(secondary);
     }
@@ -1582,12 +1669,16 @@ pub fn encode_sample_pattern_traced(
     job.batch_index = opts.batch_index;
     job.batch_total = opts.batch_total;
     job.density = opts.density;
+    job.feed_lead_mm = opts.feed_lead_mm;
+    job.feed_end_mm = opts.feed_end_mm;
+    job.precut = opts.precut;
     job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
         .ok_or_else(|| anyhow!("no driver for protocol {:?}", opts.protocol))?;
-    let ctx = EncodeContext::new(&job, &caps);
+    let feed_plan = lbl_core::resolve_feed_plan(&caps, &job).map_err(|e| anyhow!(e))?;
+    let ctx = EncodeContext::with_feed_plan(&job, &caps, feed_plan);
     let encoded = driver.encode(&bitmap, &ctx).context("encoding")?;
 
     Ok(crate::debug::LabelTrace {
@@ -1672,6 +1763,9 @@ mod tests {
             batch_index: 0,
             batch_total: 1,
             density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
             rotation,
@@ -1787,7 +1881,15 @@ mod tests {
         };
         let content_w = mm_to_layout_px(12.0, VECTOR_CSS_DPI);
         let content_h = mm_to_layout_px(30.0, VECTOR_CSS_DPI);
-        let frame = preview_stock_frame(content_w, content_h, &media, &caps, false, VECTOR_CSS_DPI);
+        let frame = preview_stock_frame(
+            content_w,
+            content_h,
+            &media,
+            &caps,
+            false,
+            VECTOR_CSS_DPI,
+            &PreviewFeedOverrides::default(),
+        );
         assert!(frame.head_pad_before_px > 0);
         assert!(frame.head_pad_after_px > 0);
         assert!(
@@ -1819,7 +1921,15 @@ mod tests {
             ..Default::default()
         };
         let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
-        let frame = preview_stock_frame(0.0, content_h, &media, &caps, true, VECTOR_CSS_DPI);
+        let frame = preview_stock_frame(
+            0.0,
+            content_h,
+            &media,
+            &caps,
+            true,
+            VECTOR_CSS_DPI,
+            &PreviewFeedOverrides::default(),
+        );
         let dx = feed_margin_px(caps.feed_trail_mm, VECTOR_CSS_DPI);
         assert_eq!(
             frame.width_px, 0.0,
@@ -1834,8 +1944,8 @@ mod tests {
             "open continuous feed still shows head-to-cutter lead"
         );
         assert_eq!(
-            frame.feed_end_margin_px, dx,
-            "open continuous feed still shows matching end margin"
+            frame.feed_end_margin_px, 0,
+            "unset end padding is 0 (lead absorbs Dx when precut is off)"
         );
         assert_eq!(frame.trail_feed_px, dx);
         assert_eq!(
@@ -1859,15 +1969,52 @@ mod tests {
         );
         assert!(
             framed.contains(&format!(
-                "padding:{}px {}px {}px {}px",
-                frame.head_pad_before_px, dx, frame.head_pad_after_px, dx
+                "padding:{}px 0px {}px {}px",
+                frame.head_pad_before_px, frame.head_pad_after_px, dx
             )),
-            "stock must pad head laminate and feed DX gaps, got: {framed}"
+            "stock must pad head laminate and feed lead, got: {framed}"
         );
     }
 
     #[test]
-    fn preview_shows_symmetric_head_offset_and_cutter_gap() {
+    fn preview_stock_frame_precut_uses_small_lead_and_scrap_flag() {
+        use lbl_core::units::Dpi;
+
+        let media = Media::continuous(12.0, Dpi(180.0));
+        let caps = DeviceCapabilities {
+            dpi: Dpi(180.0),
+            max_width_mm: 12.0,
+            supports_cut: true,
+            feed_trail_mm: Some(24.0),
+            feed_lead_mm: Some(2.0),
+            supports_precut: true,
+            head_printable_height_mm: Some(8.2),
+            ..Default::default()
+        };
+        let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
+        let frame = preview_stock_frame(
+            0.0,
+            content_h,
+            &media,
+            &caps,
+            true,
+            VECTOR_CSS_DPI,
+            &PreviewFeedOverrides {
+                cut_mode: CutMode::Every,
+                feed_lead_mm: Some(2.0),
+                feed_end_mm: None,
+                precut: Some(true),
+            },
+        );
+        let lead = feed_margin_px(Some(2.0), VECTOR_CSS_DPI);
+        let dx = feed_margin_px(Some(24.0), VECTOR_CSS_DPI);
+        assert_eq!(frame.lead_feed_px, lead);
+        assert_eq!(frame.trail_feed_px, dx);
+        assert!(frame.precut);
+    }
+
+    #[test]
+    fn preview_shows_lead_from_cutter_gap_when_unset() {
         use image::Rgba;
 
         let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
@@ -1881,40 +2028,53 @@ mod tests {
         assert_eq!(padded.lead_feed_px, dx);
         assert_eq!(padded.trail_feed_px, dx);
         assert_eq!(padded.content_feed_end_px, dx + 10);
-        assert_eq!(padded.feed_end_margin_px, dx);
-        assert_eq!(padded.trail_feed_px, dx);
-        assert_eq!(padded.image.width(), 10 + dx * 2);
-        assert_eq!(
-            padded.image.get_pixel(dx + 10 + dx - 1, 0).0,
-            [255, 255, 255, 255],
-            "sticker face ends with white margin, not a drawn gap zone"
-        );
+        assert_eq!(padded.feed_end_margin_px, 0);
+        assert_eq!(padded.image.width(), 10 + dx);
+        assert!(!padded.precut);
     }
 
     #[test]
-    fn preview_explicit_lead_keeps_cutter_gap_as_metadata_only() {
+    fn preview_precut_plan_keeps_scrap_as_metadata() {
         use image::Rgba;
 
-        // Brother PT-style: small protocol lead, large ejected DX.
         let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
-        let caps = DeviceCapabilities {
-            dpi: Dpi(180.0),
-            feed_lead_mm: Some(2.0),
-            feed_trail_mm: Some(24.0),
-            ..Default::default()
+        let plan = lbl_core::FeedPlan {
+            lead_mm: 2.0,
+            end_mm: 0.0,
+            precut: true,
+            cutter_gap_mm: 24.0,
         };
-        let padded = pad_preview_encode_feed(image, &caps, true);
-        let lead = feed_margin_px(caps.feed_lead_mm, caps.dpi.0);
-        let dx = feed_margin_px(caps.feed_trail_mm, caps.dpi.0);
+        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true);
+        let lead = feed_mm_px(2.0, 180.0);
+        let dx = feed_mm_px(24.0, 180.0);
+        assert_eq!(padded.lead_feed_px, lead);
+        assert_eq!(padded.feed_end_margin_px, 0);
+        assert_eq!(padded.trail_feed_px, dx);
+        assert!(padded.precut);
+        assert_eq!(padded.image.width(), 10 + lead);
+    }
+
+    #[test]
+    fn preview_explicit_lead_via_plan_without_precut() {
+        use image::Rgba;
+
+        // Caps-only path uses unset→Dx; explicit small lead needs a FeedPlan.
+        let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
+        let plan = lbl_core::FeedPlan {
+            lead_mm: 2.0,
+            end_mm: 0.0,
+            precut: false,
+            cutter_gap_mm: 24.0,
+        };
+        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true);
+        let lead = feed_mm_px(2.0, 180.0);
+        let dx = feed_mm_px(24.0, 180.0);
         assert_eq!(padded.lead_feed_px, lead);
         assert_eq!(padded.feed_end_margin_px, 0);
         assert_eq!(padded.trail_feed_px, dx);
         assert_eq!(padded.content_feed_end_px, lead + 10);
         assert_eq!(padded.image.width(), 10 + lead);
-        assert!(
-            lead < dx,
-            "kept-label lead must be smaller than ejected cutter gap"
-        );
+        assert!(!padded.precut);
     }
 
     #[test]
@@ -2201,6 +2361,9 @@ mod tests {
             batch_index: 0,
             batch_total: 1,
             density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
             rotation: Rotation::None,
@@ -2240,6 +2403,9 @@ mod tests {
             batch_index: 0,
             batch_total: 1,
             density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
@@ -2278,6 +2444,9 @@ mod tests {
             batch_index: 0,
             batch_total: 1,
             density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,

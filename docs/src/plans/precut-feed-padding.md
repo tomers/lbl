@@ -1,6 +1,6 @@
 # Plan: padding-driven pre-cut (opt-in)
 
-Status: **proposed** (not implemented).
+Status: **implemented**.
 Scope: generic engine capability in `lbl`; first concrete driver: Brother PT.
 Studio consumes catalog + job fields only — no vendor cut logic in the UI.
 
@@ -42,8 +42,9 @@ lead they did not ask for.
    when \(p < D_x\) and a cut will fire — no per-print confirmation beyond the
    standing preference.
 4. **`supports_precut`** is a catalog capability (device *can* do it). Default
-   **job/profile preference is off** (`precut_default = false`) so small-margin
-   prints require an explicit enable (after the user accepts the scrap tradeoff).
+   **job/profile preference is on** for capable devices (`precut_default = true`)
+   so small-margin prints work without an extra toggle; users can still turn it
+   off (and Studio surfaces a callout to re-enable when blocked).
 5. **Pre-cut off** (or unsupported) **rejects** \(p < D_x\) — see §5.1. Do not
    silently inflate padding or surprise-cut.
 6. **Generic across protocols**; **one pre-cut per job** when applicable, not
@@ -110,10 +111,11 @@ else:
 
 “Pre-cut enabled” = job/profile `precut: true`. Catalog
 `supports_precut` only means the control is offered; **`precut_default` is
-false** so new sessions do not eject scrap until the user opts in.
+true** on devices that support it so new sessions allow small lead (with scrap)
+unless the user turns pre-cut off.
 
 **Never:** set `precut: true` as a side effect of the user lowering padding.
-Only suggest.
+Only suggest (Studio shows an Enable pre-cut callout when print is blocked).
 
 ---
 
@@ -127,7 +129,7 @@ stable snake_case):
 | `feed_trail_mm` | `f64` (existing) | \(D_x\). **Required** if `supports_precut` is true. |
 | `supports_precut` | `bool`, default `false` | Device can emit a pre-cut prologue. **True** on PT Cube / P700-class once implemented; false when no safe empty feed-cut. |
 | `feed_lead_min_mm` | `Option<f64>` | Floor for \(p_{\mathrm{lead}}\) after pre-cut (protocol clamp). |
-| `precut_default` | `bool`, default **`false`** | Initial job/profile preference. User must enable to allow \(p < D_x\). |
+| `precut_default` | `bool`, default **`true`** on capable devices | Initial job/profile preference. |
 
 Validation at catalog load: `supports_precut => feed_trail_mm.is_some_and(|d| d > 0)`.
 
@@ -147,7 +149,7 @@ Prefer **padding as the user-facing knob**; pre-cut as an explicit preference:
 JobSpec / print options:
   feed_lead_mm: Option<f64>     # requested lead padding (content-side)
   feed_end_mm: Option<f64>      # optional trailing padding before cut
-  precut: Option<bool>          # None = use device precut_default (false)
+  precut: Option<bool>          # None = use device precut_default (true on capable devices)
   cut_mode: CutMode             # existing
 ```
 
@@ -274,10 +276,13 @@ Preview must not invent vendor opcodes.
 
 ## 9. Frontend / Studio (generic client)
 
-- Read `supports_precut`, `feed_trail_mm`, `precut_default` (false), min lead
-  from catalog / device capabilities JSON Schema (or existing caps DTO).
+- Read `supports_precut`, `feed_trail_mm`, `precut_default` (true on capable
+  devices), min lead from catalog / device capabilities JSON Schema (or existing
+  caps DTO).
 - Print settings: numeric **lead/end padding**; **“Allow pre-cut”** (or similar)
-  bound to `precut`, default off; help text states the empty-scrap tradeoff (§2.1).
+  bound to `precut`, default on; help text states the empty-scrap tradeoff (§2.1).
+  When print is blocked by lead \(< D_x\) with pre-cut off, show a warning
+  callout with an **Enable pre-cut** action (do not auto-flip from padding alone).
 - If user sets lead \(< D_x\) and pre-cut off → **disable Print** + hint that
   offers **increase padding to \(D_x\)** and, when supported, **enable pre-cut**
   (user must toggle — do not auto-enable) (§5.1); encode-path rejection as
@@ -296,10 +301,10 @@ Preview must not invent vendor opcodes.
    `feed_plan`; update PT raster doc.
 4. **Pipeline / CLI / server / WASM:** plumb job fields; reject path.
 5. **Preview** markers for ejected scrap.
-6. **Catalog:** `supports_precut = true`, `precut_default = false` on PT cutters
+6. **Catalog:** `supports_precut = true`, `precut_default = true` on PT cutters
    with known \(D_x\); leave others false.
-7. **Studio:** schema-driven padding + precut toggle (opt-in) + scrap copy;
-   hard-refresh wasm.
+7. **Studio:** schema-driven padding + precut toggle (default on) + scrap copy +
+   Enable pre-cut callout when blocked; hard-refresh wasm.
 
 ---
 
@@ -318,28 +323,27 @@ Done = all of the above green for PT; at least one non-PT driver documents
 
 ---
 
-## 12. Open questions (resolve before coding)
+## 12. Open questions (resolved)
 
-1. **Default lead when unset:** use \(D_x\) (no precut, “large margin” on the
-   label) or a small catalog default that requires opt-in precut? Proposal:
-   unset lead means \(D_x\) (no surprise scrap); explicit small lead + user
-   enables precut.
-2. **End padding vs cutter:** after pre-cut, is \(p_{\mathrm{end}}\) independent
-   of \(D_x\), or does no-chain still force \(\sim D_x\) trail on the last cut?
-   Measure on P710BT; encode trail accordingly.
-3. **Profile vs job:** does `printers.toml` store a `precut` override, or only
-   per-print? Proposal: catalog `precut_default = false`; optional profile
-   override; job wins.
-4. **Naming:** `feed_lead_mm` vs `padding_lead_mm` — prefer extending existing
-   feed_* vocabulary for consistency with preview.
+1. **Default lead when unset:** \(D_x\) when `feed_trail_mm` is set; else
+   `caps.feed_lead_mm`; else `0`. No surprise scrap by default.
+2. **End padding vs cutter:** Independent of \(D_x\). Unset end → `0`. Brother
+   PT maps lead → `ESC i d`; end → trailing blank raster rows. Last-job
+   no-chain / mechanical after-cut gap unchanged.
+3. **Profile vs job:** Catalog `precut_default = true` on capable devices. Studio
+   persists `precut` + padding in per-printer print settings (default on); job
+   JSON wins at encode.
+4. **Naming:** `feed_lead_mm` / `feed_end_mm` / `precut` (existing `feed_*`
+   vocabulary).
 
 ---
 
 ## 13. Summary decision
 
-**Padding is the user control; pre-cut is an opt-in preference.** Shrinking
-padding below \(D_x\) **suggests** enabling pre-cut (and mentions the empty
-scrap) or increasing padding — it does **not** turn pre-cut on by itself. Once
-enabled, the engine applies pre-cut when needed. Capability (`supports_precut`)
-is catalog; preference defaults **off**. All policy lives in `lbl`; drivers only
-emit the empty feed-and-cut their protocol defines.
+**Padding is the user control; pre-cut is a preference (default on for capable
+devices).** Shrinking padding below \(D_x\) **suggests** enabling pre-cut when
+it was turned off (and mentions the empty scrap) or increasing padding — it does
+**not** turn pre-cut on by itself. Once enabled, the engine applies pre-cut when
+needed. Capability (`supports_precut`) is catalog; preference defaults **on** for
+devices that support it. All policy lives in `lbl`; drivers only emit the empty
+feed-and-cut their protocol defines.

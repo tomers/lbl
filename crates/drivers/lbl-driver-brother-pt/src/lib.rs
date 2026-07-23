@@ -327,6 +327,69 @@ impl BrotherPtDriver {
         }
     }
 
+    /// Convert millimeters to feed-margin dots at the device DPI.
+    fn mm_to_feed_dots(mm: f64, dpi: f64) -> u16 {
+        if !(mm.is_finite() && mm > 0.0 && dpi.is_finite() && dpi > 0.0) {
+            return 0;
+        }
+
+        (mm * dpi / 25.4).round().clamp(0.0, u16::MAX as f64) as u16
+    }
+
+    /// `ESC i d` margin from [`EncodeContext::feed_plan`], falling back to geometry default.
+    fn feed_margin_dots(ctx: &EncodeContext<'_>, geom: MediaGeometry) -> u16 {
+        let dpi = ctx.capabilities.dpi.0;
+        let from_plan = Self::mm_to_feed_dots(ctx.feed_plan.lead_mm, dpi);
+        if from_plan > 0 {
+            return from_plan;
+        }
+        if let Some(min) = ctx.capabilities.feed_lead_min_mm {
+            let from_min = Self::mm_to_feed_dots(min, dpi);
+            if from_min > 0 {
+                return from_min;
+            }
+        }
+        geom.feed_margin
+    }
+
+    /// Trailing blank feed rows from [`FeedPlan::end_mm`] (base DPI; hi-res doubles in emit).
+    fn end_blank_rows(ctx: &EncodeContext<'_>) -> u32 {
+        Self::mm_to_feed_dots(ctx.feed_plan.end_mm, ctx.capabilities.dpi.0) as u32
+    }
+
+    /// Zero-raster page + auto-cut + no-chain + `0x1A` (eject head-to-cutter scrap).
+    ///
+    /// Matches nbuchwitz/ptouch `precut()` — only when [`FeedPlan::precut`] is set.
+    fn push_precut_page(
+        out: &mut Vec<u8>,
+        head: HeadProfile,
+        geom: MediaGeometry,
+        feed_margin: u16,
+        packbits: bool,
+    ) {
+        let media_type = if head.bytes_per_row > 16 {
+            MEDIA_LAM_NONLAM_P900
+        } else {
+            MEDIA_LAMINATED
+        };
+        // PI_RECOVER | PI_KIND | PI_WIDTH
+        let flags: u8 = 0x80 | 0x02 | 0x04;
+        out.extend_from_slice(&[ESC, b'i', b'z', flags]);
+        out.push(media_type);
+        out.push(geom.tape_width_mm);
+        out.push(0x00);
+        out.extend_from_slice(&0u32.to_le_bytes()); // zero raster lines
+        out.push(Self::page_index(true, true));
+        out.push(0x00);
+        out.extend_from_slice(&[ESC, b'i', b'M', 1 << 6]); // auto-cut
+        out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
+        out.extend_from_slice(&[ESC, b'i', b'K', 1 << 3]); // no-chain
+        out.extend_from_slice(&[ESC, b'i', b'd']);
+        out.extend_from_slice(&feed_margin.to_le_bytes());
+        out.extend_from_slice(&[b'M', if packbits { 0x02 } else { 0x00 }]);
+        out.push(0x1A);
+    }
+
     fn push_page(
         out: &mut Vec<u8>,
         bitmap: &MonoBitmap,
@@ -342,6 +405,8 @@ impl BrotherPtDriver {
             packbits,
             first_page,
             last_page,
+            feed_margin,
+            end_blank_rows,
         } = opts;
 
         let media_type = if high_res {
@@ -352,15 +417,21 @@ impl BrotherPtDriver {
             MEDIA_LAMINATED
         };
         let feed = if high_res {
-            geom.feed_margin.saturating_mul(2)
+            feed_margin.saturating_mul(2)
         } else {
-            geom.feed_margin
+            feed_margin
         };
-        let raster_lines = if high_res {
+        let content_lines = if high_res {
             bitmap.height.saturating_mul(2)
         } else {
             bitmap.height
         };
+        let end_lines = if high_res {
+            end_blank_rows.saturating_mul(2)
+        } else {
+            end_blank_rows
+        };
+        let raster_lines = content_lines.saturating_add(end_lines);
 
         // PI_RECOVER | PI_KIND | PI_WIDTH [| PI_QUALITY]
         let mut flags: u8 = 0x80 | 0x02 | 0x04;
@@ -400,6 +471,13 @@ impl BrotherPtDriver {
                 Self::emit_raster_row(out, &row, packbits);
             }
         }
+        let blank = vec![0u8; head.bytes_per_row];
+        for _ in 0..end_blank_rows {
+            Self::emit_raster_row(out, &blank, packbits);
+            if high_res {
+                Self::emit_raster_row(out, &blank, packbits);
+            }
+        }
 
         out.push(if last_page { 0x1A } else { 0x0C });
     }
@@ -415,6 +493,10 @@ struct PageEncodeOpts {
     packbits: bool,
     first_page: bool,
     last_page: bool,
+    /// `ESC i d` feed margin in base-DPI dots.
+    feed_margin: u16,
+    /// Blank raster rows after content (base DPI; doubled when hi-res).
+    end_blank_rows: u32,
 }
 
 impl Driver for BrotherPtDriver {
@@ -436,6 +518,8 @@ impl Driver for BrotherPtDriver {
         let copies = ctx.copies();
         let high_res = ctx.capabilities.supports_high_resolution;
         let packbits = ctx.capabilities.supports_packbits;
+        let feed_margin = Self::feed_margin_dots(ctx, geom);
+        let end_blank_rows = Self::end_blank_rows(ctx);
         let invalidate_bytes = ctx
             .capabilities
             .invalidate_bytes
@@ -460,10 +544,13 @@ impl Driver for BrotherPtDriver {
             out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
             out.extend_from_slice(&[ESC, b'@']);
             out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+            if ctx.feed_plan.precut {
+                Self::push_precut_page(&mut out, head, geom, feed_margin, packbits);
+            }
         }
 
         for index in 0..copies {
-            let first_page = ctx.batch_first() && index == 0;
+            let first_page = ctx.batch_first() && index == 0 && !ctx.feed_plan.precut;
             let last_page = ctx.batch_last() && index + 1 == copies;
             Self::push_page(
                 &mut out,
@@ -478,6 +565,8 @@ impl Driver for BrotherPtDriver {
                     packbits,
                     first_page,
                     last_page,
+                    feed_margin,
+                    end_blank_rows,
                 },
             );
         }
@@ -715,5 +804,91 @@ mod tests {
             i += 3 + n;
         }
         assert!(g_rows > 0);
+    }
+
+    #[test]
+    fn precut_emits_zero_raster_page_then_content() {
+        let (mut job, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job.feed_lead_mm = Some(2.0);
+        job.precut = Some(true);
+        caps.supports_precut = true;
+        caps.feed_trail_mm = Some(24.0);
+        let plan = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
+        assert!(plan.precut);
+        let ctx = EncodeContext::with_feed_plan(&job, &caps, plan);
+        let bmp = MonoBitmap::new(8, 2);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+
+        // Two print-info blocks: precut (0 lines) then content.
+        let z_positions: Vec<_> = bytes
+            .windows(3)
+            .enumerate()
+            .filter(|(_, w)| *w == [ESC, b'i', b'z'])
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(z_positions.len(), 2);
+        let z0 = z_positions[0];
+        // raster_lines LE u32 at z+7.. — zero for precut
+        assert_eq!(&bytes[z0 + 7..z0 + 11], &[0, 0, 0, 0]);
+        assert_eq!(bytes.iter().filter(|&&b| b == 0x1A).count(), 2);
+
+        // ESC i d follows lead ≈ 2 mm at 180 dpi → 14 dots
+        let expected_feed = BrotherPtDriver::mm_to_feed_dots(2.0, 180.0);
+        assert!(bytes.windows(5).any(|w| {
+            w[0..3] == [ESC, b'i', b'd'] && u16::from_le_bytes([w[3], w[4]]) == expected_feed
+        }));
+    }
+
+    #[test]
+    fn precut_only_on_batch_first() {
+        let (mut job0, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job0.feed_lead_mm = Some(2.0);
+        job0.precut = Some(true);
+        job0.batch_index = 0;
+        job0.batch_total = 2;
+        caps.supports_precut = true;
+        caps.feed_trail_mm = Some(24.0);
+        let plan = lbl_core::resolve_feed_plan(&caps, &job0).unwrap();
+
+        let (mut job1, _) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job1.feed_lead_mm = Some(2.0);
+        job1.precut = Some(true);
+        job1.batch_index = 1;
+        job1.batch_total = 2;
+
+        let bmp = MonoBitmap::new(8, 1);
+        let first = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::with_feed_plan(&job0, &caps, plan))
+            .unwrap();
+        let second = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::with_feed_plan(&job1, &caps, plan))
+            .unwrap();
+
+        // Precut page only on first segment (two ESC i z: precut + content).
+        assert_eq!(
+            first.windows(3).filter(|w| *w == [ESC, b'i', b'z']).count(),
+            2
+        );
+        assert_eq!(
+            second
+                .windows(3)
+                .filter(|w| *w == [ESC, b'i', b'z'])
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn without_precut_flag_no_zero_line_page() {
+        let (job, caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        let ctx = EncodeContext::new(&job, &caps);
+        assert!(!ctx.feed_plan.precut);
+        let bmp = MonoBitmap::new(8, 2);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        assert_eq!(
+            bytes.windows(3).filter(|w| *w == [ESC, b'i', b'z']).count(),
+            1
+        );
+        assert_eq!(bytes.iter().filter(|&&b| b == 0x1A).count(), 1);
     }
 }

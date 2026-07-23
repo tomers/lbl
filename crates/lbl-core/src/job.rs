@@ -239,6 +239,21 @@ pub struct JobSpec {
     /// omitted, each driver uses its own default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub density: Option<u8>,
+    /// Requested blank before content along feed (mm).
+    ///
+    /// When unset, [`crate::feed_plan::resolve_feed_plan`] uses the cutter gap
+    /// \(D_x\) when known (no surprise scrap).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_lead_mm: Option<f64>,
+    /// Requested blank after content before cut (mm). Unset → 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feed_end_mm: Option<f64>,
+    /// Opt-in pre-cut preference. `None` → device [`crate::printer::DeviceCapabilities::precut_default`].
+    ///
+    /// Never set automatically when the user lowers padding — only an explicit
+    /// preference enables ejecting the cutter-gap scrap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precut: Option<bool>,
     /// Protocol-specific options (each driver reads only its own bag).
     #[serde(default, skip_serializing_if = "DriverOptions::is_empty")]
     pub driver: DriverOptions,
@@ -259,6 +274,9 @@ impl JobSpec {
             batch_index: 0,
             batch_total: 1,
             density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
             driver: DriverOptions::default(),
         }
     }

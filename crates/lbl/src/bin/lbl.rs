@@ -606,6 +606,18 @@ struct PrintArgs {
     #[arg(long)]
     density: Option<u8>,
 
+    /// Feed lead padding before content (mm). Unset → cutter gap when known.
+    #[arg(long, value_name = "MM")]
+    feed_lead_mm: Option<f64>,
+
+    /// Feed end padding after content before cut (mm).
+    #[arg(long, value_name = "MM")]
+    feed_end_mm: Option<f64>,
+
+    /// Allow pre-cut when lead is below the head-to-cutter gap (ejects scrap).
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    precut: bool,
+
     /// Protocol-specific option override (`dymo.output_mode=graphics`).
     /// Repeatable. Overrides `[print.driver]` / `LBL_PRINT__DRIVER__*`.
     #[arg(long = "driver-opt", value_name = "KEY=VALUE")]
@@ -917,6 +929,9 @@ fn run_print(args: PrintArgs) -> Result<()> {
         batch_index: 0,
         batch_total: 1,
         density,
+        feed_lead_mm: args.feed_lead_mm,
+        feed_end_mm: args.feed_end_mm,
+        precut: if args.precut { Some(true) } else { None },
         driver,
         dither: Algorithm::parse(&dither)?,
         rotation,

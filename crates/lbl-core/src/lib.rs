@@ -12,6 +12,7 @@
 pub mod bitmap;
 pub mod cut;
 pub mod error;
+pub mod feed_plan;
 pub mod geometry;
 pub mod job;
 pub mod media;
@@ -22,6 +23,10 @@ pub mod units;
 pub use bitmap::MonoBitmap;
 pub use cut::{CutJobSpec, CutPath, CutPointMm, SilhouetteOptions};
 pub use error::{CoreError, Result};
+pub use feed_plan::{
+    resolve_feed_plan, FeedPlan, FeedPlanError, LEAD_PADDING_BELOW_CUTTER_GAP,
+    LEAD_PADDING_BELOW_MIN,
+};
 pub use geometry::{Margins, Size};
 pub use job::{CutMode, DriverOptions, DymoLwOptions, JobSpec, LwOutputMode, LwSpeed, OutputMode};
 pub use media::{Adhesive, Material, Media, MediaColor, MediaLength, MediaSense};

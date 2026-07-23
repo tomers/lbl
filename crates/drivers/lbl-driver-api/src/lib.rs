@@ -12,6 +12,7 @@
 pub mod packbits;
 
 pub use lbl_core::bitmap::MonoBitmap;
+pub use lbl_core::feed_plan::{resolve_feed_plan, FeedPlan};
 pub use lbl_core::job::{CutMode, JobSpec};
 pub use lbl_core::printer::{DeviceCapabilities, Protocol};
 pub use packbits::{compress as packbits_compress, encode as packbits_encode, is_blank_row};
@@ -36,6 +37,8 @@ pub struct EncodeContext<'a> {
     pub job: &'a JobSpec,
     /// Capabilities of the target printer.
     pub capabilities: &'a DeviceCapabilities,
+    /// Resolved feed / pre-cut policy (drivers honor [`FeedPlan::precut`] only).
+    pub feed_plan: FeedPlan,
     /// Optional secondary ink plane for dual-color media.
     ///
     /// The primary plane is the `bitmap` passed to [`Driver::encode`]. When
@@ -53,11 +56,26 @@ pub struct EncodeContext<'a> {
 }
 
 impl<'a> EncodeContext<'a> {
-    /// Create a new mono encode context.
+    /// Create a mono encode context, resolving [`FeedPlan`] from job + caps.
+    ///
+    /// On policy failure (e.g. lead below cutter gap without pre-cut), uses
+    /// [`FeedPlan::default`]. Production encode paths should call
+    /// [`resolve_feed_plan`] and [`Self::with_feed_plan`] so the error surfaces.
     pub fn new(job: &'a JobSpec, capabilities: &'a DeviceCapabilities) -> Self {
+        let feed_plan = resolve_feed_plan(capabilities, job).unwrap_or_default();
+        Self::with_feed_plan(job, capabilities, feed_plan)
+    }
+
+    /// Create a context with an already-resolved feed plan.
+    pub fn with_feed_plan(
+        job: &'a JobSpec,
+        capabilities: &'a DeviceCapabilities,
+        feed_plan: FeedPlan,
+    ) -> Self {
         Self {
             job,
             capabilities,
+            feed_plan,
             secondary: None,
             color_png: None,
         }
