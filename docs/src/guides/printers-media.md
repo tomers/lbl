@@ -215,4 +215,5 @@ lbl print --media TZe-261 --protocol brother-pt --usb 04f9:2083 --cut
 lbl print --media TZe-231 --protocol brother-pt --serial /dev/rfcomm0:9600 --cut
 ```
 
-See [Brother P-touch / TZe setup](./brother-pt.md).
+See [Brother P-touch / TZe setup](./brother-pt.md) and the wire reference
+[Brother PT raster protocol](../reference/brother-pt-raster.md).

@@ -12,6 +12,25 @@ use lbl_core::printer::Protocol;
 use lbl_device::{format_dispatch_failure, DeviceError, Transport, TransportTarget};
 use lbl_spool::{SpoolReport, Spooler};
 
+/// Brother PT/QL multi-label batches must be one continuous raster job. Sending
+/// each label as its own invalidate/init/`0x1A` job ejects the head-to-cutter
+/// gap as an empty leader scrap before every label.
+pub fn coalesce_encoded_batch(
+    protocol: Protocol,
+    encoded: Vec<(String, Vec<u8>)>,
+) -> Vec<(String, Vec<u8>)> {
+    match protocol {
+        Protocol::BrotherPt | Protocol::BrotherQl if encoded.len() > 1 => {
+            let mut combined = Vec::new();
+            for (_, bytes) in &encoded {
+                combined.extend_from_slice(bytes);
+            }
+            vec![("label-batch.bin".to_string(), combined)]
+        }
+        _ => encoded,
+    }
+}
+
 /// Enqueue every `(name, bytes)` label and dispatch it over `transport`,
 /// running the protocol-specific completion handshake after each job.
 pub fn dispatch_encoded<T: Transport>(
@@ -19,6 +38,7 @@ pub fn dispatch_encoded<T: Transport>(
     protocol: Protocol,
     transport: &mut T,
 ) -> SpoolReport {
+    let encoded = coalesce_encoded_batch(protocol, encoded);
     let mut spool = Spooler::new();
     for (name, bytes) in encoded {
         spool.enqueue(name, bytes, None);

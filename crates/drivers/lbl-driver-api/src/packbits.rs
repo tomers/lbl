@@ -1,25 +1,29 @@
 //! TIFF PackBits (Apple) run-length encoding for Brother raster rows.
 //!
-//! Used by QL/PT after `M 02`. If the compressed form is not shorter than the
-//! raw row, callers should fall back to an uncompressed transfer for that row.
+//! Used by QL/PT after `M 02`. Under compression mode the transfer payload must
+//! always be PackBits — never raw head bytes (raw under `M 02` desyncs firmware
+//! into blank or stalled jobs). Prefer [`compress`] when the encoded form is
+//! strictly shorter; otherwise use [`encode`] (literal-heavy PackBits that may
+//! be one byte longer than the raw row).
+//!
+//! PT opcode / framing context: `docs/src/reference/brother-pt-raster.md`.
 
 /// Whether every byte of `row` is zero (eligible for Brother `Z` blank opcode).
 pub fn is_blank_row(row: &[u8]) -> bool {
     row.iter().all(|&b| b == 0)
 }
 
-/// Encode `row` with TIFF PackBits.
+/// Encode `row` as TIFF PackBits (always valid under Brother `M 02`).
 ///
-/// Returns `None` when the compressed payload is not strictly shorter than
-/// `row` (or when `row` is empty). Header semantics:
+/// Header semantics:
 /// - `0..=127`: next `n + 1` bytes are literal
 /// - `-127..=-1` (as `u8`): next byte repeats `1 - n` times
 /// - `-128` is unused (no-op)
-pub fn compress(row: &[u8]) -> Option<Vec<u8>> {
+pub fn encode(row: &[u8]) -> Vec<u8> {
     if row.is_empty() {
-        return None;
+        return Vec::new();
     }
-    let mut out = Vec::with_capacity(row.len());
+    let mut out = Vec::with_capacity(row.len() + (row.len() / 128) + 1);
     let mut i = 0usize;
     while i < row.len() {
         // Prefer a repeat run of length ≥ 3 (or any leftover length ≥ 2 at end).
@@ -51,6 +55,18 @@ pub fn compress(row: &[u8]) -> Option<Vec<u8>> {
         out.push((lit.len() - 1) as u8);
         out.extend_from_slice(lit);
     }
+    out
+}
+
+/// Encode `row` with TIFF PackBits when the result is strictly shorter than `row`.
+///
+/// Returns `None` when empty or when PackBits does not shrink the row. Callers
+/// that already sent `M 02` must use [`encode`] instead of raw bytes.
+pub fn compress(row: &[u8]) -> Option<Vec<u8>> {
+    if row.is_empty() {
+        return None;
+    }
+    let out = encode(row);
     if out.len() < row.len() {
         Some(out)
     } else {
@@ -86,5 +102,8 @@ mod tests {
         // High-entropy 8 bytes rarely shrink under PackBits.
         let row = [0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF];
         assert!(compress(&row).is_none());
+        let enc = encode(&row);
+        assert_eq!(enc[0], (row.len() - 1) as u8);
+        assert_eq!(&enc[1..], &row);
     }
 }

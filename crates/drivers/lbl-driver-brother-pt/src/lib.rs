@@ -22,36 +22,52 @@
 //!   ESC i d …             margin / feed amount
 //!   M 0x00 | M 0x02       compression off or TIFF PackBits
 //!   per row:
-//!     g n_lo n_hi <n B>   raster graphics transfer (opcode 0x67 + u16 LE)
+//!     G n_lo n_hi <n B>   raster graphics transfer (opcode 0x47 + u16 LE)
 //!     or Z                blank row (PackBits mode only)
 //!   0x1A / 0x0C           print with feed (last) / print (more pages follow)
 //! ```
 //!
-//! On the wire the raster opcode is `0x67` (ASCII `'g'`) with a little-endian
-//! u16 payload length — not QL's `g 00 <u8 length>`, and not the PDF typo that
-//! lists hex `47`. High-resolution mode (capability-gated) duplicates each
-//! raster line and doubles the feed margin; laminated high-res jobs use print-
-//! info media type `0x09`.
+//! On the wire PT jobs use opcode `0x47` (ASCII `'G'`) with a little-endian
+//! u16 payload length — matching nbuchwitz/ptouch and verified on PT-P710BT.
+//! Brother's P900 PDF lists hex `47` next to ASCII `G`; the P700 manual lists
+//! `g`/`67`. Cube-class firmware accepts `0x47` and stalls on `0x67` with u16
+//! framing. Do not confuse this with QL's `g 00 <u8 length>` row shape.
+//! Under `M 0x02`, row payloads must be TIFF PackBits (or `Z`); never raw head
+//! bytes. High-resolution mode (capability-gated) duplicates each raster line
+//! and doubles the feed margin; laminated high-res jobs use print-info media
+//! type `0x09`.
 //!
 //! Bit polarity matches [`MonoBitmap`]: `1` = ink. Each row is mirrored
 //! left-to-right before packing, matching Brother's own driver wiring.
+//!
+//! Durable protocol notes (RE sources, failure modes, multi-page framing,
+//! head-to-cutter leader): `docs/src/reference/brother-pt-raster.md`.
 //!
 //! `lbl` is not affiliated with Brother; see the repository disclaimer.
 
 use lbl_core::job::CutMode;
 use lbl_driver_api::{
-    is_blank_row, packbits_compress, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
+    is_blank_row, packbits_encode, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
 };
 
 const ESC: u8 = 0x1B;
-/// Print-info media type for laminated / non-laminated TZe (`ESC i z` n2).
-const MEDIA_LAM_NONLAM: u8 = 0x00;
-/// Print-info media type required for high-res laminated tape.
+/// Print-info media type for laminated TZe on P700 / Cube-class (`ESC i z` n2).
+///
+/// The PT-E550W / P750W / P710BT raster reference uses `0x01` = laminated and
+/// `0x00` = no media. (P900-class manuals reuse `0x00` for lam/non-lam — see
+/// [`MEDIA_LAM_NONLAM_P900`].)
+const MEDIA_LAMINATED: u8 = 0x01;
+/// Print-info media type for laminated / non-laminated TZe on P900-class.
+const MEDIA_LAM_NONLAM_P900: u8 = 0x00;
+/// Print-info media type required for high-res laminated tape (P900-class).
 const MEDIA_HIGH_RES_LAM: u8 = 0x09;
 /// Default lead/trail feed (~1–2 mm depending on dpi), from Brother samples.
 const DEFAULT_FEED_MARGIN: u16 = 14;
-/// Raster graphics transfer opcode (ASCII `'g'` / 0x67) with u16 LE length.
-const RASTER_OPCODE: u8 = 0x67;
+/// Raster graphics transfer opcode (ASCII `'G'` / 0x47) with u16 LE length.
+///
+/// Verified on PT-P710BT: `0x67` + u16 LE stalls bulk OUT; `0x47` + u16 LE
+/// prints. Same byte as nbuchwitz/ptouch.
+const RASTER_OPCODE: u8 = 0x47;
 
 /// Print-head geometry for a Brother PT chassis family.
 #[derive(Debug, Clone, Copy)]
@@ -288,13 +304,13 @@ impl BrotherPtDriver {
                 out.push(b'Z');
                 return;
             }
-            if let Some(compressed) = packbits_compress(row) {
-                let n = compressed.len() as u16;
-                out.push(RASTER_OPCODE);
-                out.extend_from_slice(&n.to_le_bytes());
-                out.extend_from_slice(&compressed);
-                return;
-            }
+            // Under M 02 the payload must be PackBits, even when not shorter than raw.
+            let payload = packbits_encode(row);
+            let n = payload.len() as u16;
+            out.push(RASTER_OPCODE);
+            out.extend_from_slice(&n.to_le_bytes());
+            out.extend_from_slice(&payload);
+            return;
         }
         let n = row.len() as u16;
         out.push(RASTER_OPCODE);
@@ -320,7 +336,7 @@ impl BrotherPtDriver {
     ) {
         let PageEncodeOpts {
             auto_cut,
-            cut_at_end,
+            no_chain,
             quality,
             high_res,
             packbits,
@@ -330,8 +346,10 @@ impl BrotherPtDriver {
 
         let media_type = if high_res {
             MEDIA_HIGH_RES_LAM
+        } else if head.bytes_per_row > 16 {
+            MEDIA_LAM_NONLAM_P900
         } else {
-            MEDIA_LAM_NONLAM
+            MEDIA_LAMINATED
         };
         let feed = if high_res {
             geom.feed_margin.saturating_mul(2)
@@ -362,8 +380,11 @@ impl BrotherPtDriver {
         if auto_cut {
             out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
         }
-        // ESC i K: bit3 no-chain, bit6 high-res.
-        let mut advanced: u8 = if cut_at_end { 1 << 3 } else { 0 };
+        // ESC i K: bit3 no-chain (last page only), bit6 high-res.
+        // Setting no-chain on every page of a multi-label batch makes Cube-class
+        // devices feed/cut the head-to-cutter gap as an empty leader before each
+        // label when each page is sent as its own job.
+        let mut advanced: u8 = if no_chain { 1 << 3 } else { 0 };
         if high_res {
             advanced |= 1 << 6;
         }
@@ -387,7 +408,8 @@ impl BrotherPtDriver {
 #[derive(Debug, Clone, Copy)]
 struct PageEncodeOpts {
     auto_cut: bool,
-    cut_at_end: bool,
+    /// ESC i K bit 3 — only on the true last page of the job.
+    no_chain: bool,
     quality: bool,
     high_res: bool,
     packbits: bool,
@@ -419,9 +441,10 @@ impl Driver for BrotherPtDriver {
             .invalidate_bytes
             .map(|n| n as usize)
             .unwrap_or(head.invalidate_bytes);
-        // P710BT has no reliable cut-each-N alone; "cut every" sets auto-cut and
-        // no-chain so the last page feeds/cuts.
-        let (auto_cut, cut_at_end) = match ctx.cut_mode() {
+        // CutMode::Every: auto-cut (+ cut-each) on every page; no-chain only on
+        // the last page so multi-label batches do not eject a leader scrap per
+        // label. CutMode::End: no auto-cut; no-chain on the last page only.
+        let (auto_cut, want_no_chain) = match ctx.cut_mode() {
             CutMode::None => (false, false),
             CutMode::Every => (true, true),
             CutMode::End => (false, true),
@@ -433,11 +456,15 @@ impl Driver for BrotherPtDriver {
                 + copies as usize
                     * (bitmap.data.len() + bitmap.height as usize * (3 + head.bytes_per_row) + 48),
         );
-        out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
-        out.extend_from_slice(&[ESC, b'@']);
-        out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+        if ctx.batch_first() {
+            out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
+            out.extend_from_slice(&[ESC, b'@']);
+            out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+        }
 
         for index in 0..copies {
+            let first_page = ctx.batch_first() && index == 0;
+            let last_page = ctx.batch_last() && index + 1 == copies;
             Self::push_page(
                 &mut out,
                 &bitmap,
@@ -445,12 +472,12 @@ impl Driver for BrotherPtDriver {
                 geom,
                 PageEncodeOpts {
                     auto_cut,
-                    cut_at_end,
+                    no_chain: want_no_chain && last_page,
                     quality: self.quality_priority,
                     high_res,
                     packbits,
-                    first_page: index == 0,
-                    last_page: index + 1 == copies,
+                    first_page,
+                    last_page,
                 },
             );
         }
@@ -502,7 +529,7 @@ mod tests {
             .windows(3)
             .position(|w| w == [ESC, b'i', b'z'])
             .unwrap();
-        assert_eq!(bytes[z + 4], MEDIA_LAM_NONLAM);
+        assert_eq!(bytes[z + 4], MEDIA_LAMINATED);
         assert_eq!(bytes[z + 11], 2);
     }
 
@@ -550,7 +577,13 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bmp = MonoBitmap::new(8, 1);
         let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
-        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+        // No-chain only on the last copy.
+        let k_flags: Vec<u8> = bytes
+            .windows(4)
+            .filter(|w| w[..3] == [ESC, b'i', b'K'])
+            .map(|w| w[3])
+            .collect();
+        assert_eq!(k_flags, vec![0, 1 << 3]);
         assert_eq!(bytes.iter().filter(|&&b| b == 0x0C).count(), 1);
         assert_eq!(*bytes.last().unwrap(), 0x1A);
         let z_positions: Vec<_> = bytes
@@ -561,6 +594,39 @@ mod tests {
             .collect();
         assert_eq!(bytes[z_positions[0] + 11], 0); // first page
         assert_eq!(bytes[z_positions[1] + 11], 2); // last page
+    }
+
+    #[test]
+    fn batch_continuation_skips_prologue_and_defers_no_chain() {
+        let (mut job0, caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job0.batch_index = 0;
+        job0.batch_total = 2;
+        let (mut job1, _) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job1.batch_index = 1;
+        job1.batch_total = 2;
+        let bmp = MonoBitmap::new(8, 1);
+        let first = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job0, &caps))
+            .unwrap();
+        let second = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job1, &caps))
+            .unwrap();
+
+        assert!(first.starts_with(&[0u8; 200]));
+        assert!(first.windows(4).any(|w| w == [ESC, b'@', ESC, b'i']));
+        assert_eq!(*first.last().unwrap(), 0x0C);
+        assert!(first.windows(4).any(|w| w == [ESC, b'i', b'K', 0]));
+        assert!(!first.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+
+        assert!(!second.starts_with(&[0u8; 8]));
+        assert!(!second.windows(4).any(|w| w == [ESC, b'@', ESC, b'i']));
+        assert_eq!(*second.last().unwrap(), 0x1A);
+        assert!(second.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+
+        let mut combined = first.clone();
+        combined.extend_from_slice(&second);
+        assert_eq!(combined.iter().filter(|&&b| b == 0x1A).count(), 1);
+        assert_eq!(combined.iter().filter(|&&b| b == 0x0C).count(), 1);
     }
 
     #[test]
@@ -584,5 +650,70 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn packbits_mode_payloads_decode_to_head_width() {
+        let (job, mut caps) = ctx_job(24.0, 1, CutMode::Every, 180.0, 24.0);
+        caps.supports_packbits = true;
+        let ctx = EncodeContext::new(&job, &caps);
+        // High-entropy ink so PackBits often does not shrink — must still be PackBits,
+        // not raw head bytes (raw under M 02 desyncs the Cube into a blank job).
+        let mut bmp = MonoBitmap::new(128, 8);
+        for y in 0..8 {
+            for x in 0..128 {
+                if (x * 3 + y * 7) % 5 < 2 {
+                    bmp.set(x, y, true);
+                }
+            }
+        }
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        assert!(bytes.windows(2).any(|w| w == [b'M', 0x02]));
+
+        fn decode_packbits(payload: &[u8]) -> Option<Vec<u8>> {
+            let mut out = Vec::new();
+            let mut i = 0usize;
+            while i < payload.len() {
+                let n = payload[i] as i8;
+                i += 1;
+                if n >= 0 {
+                    let cnt = n as usize + 1;
+                    if i + cnt > payload.len() {
+                        return None;
+                    }
+                    out.extend_from_slice(&payload[i..i + cnt]);
+                    i += cnt;
+                } else if n != -128 {
+                    let cnt = (1i16 - i16::from(n)) as usize;
+                    if i >= payload.len() {
+                        return None;
+                    }
+                    out.extend(std::iter::repeat_n(payload[i], cnt));
+                    i += 1;
+                }
+            }
+            Some(out)
+        }
+
+        let mut i = bytes.windows(2).position(|w| w == [b'M', 0x02]).unwrap() + 2;
+        let mut g_rows = 0usize;
+        while i < bytes.len() && bytes[i] != 0x1A && bytes[i] != 0x0C {
+            if bytes[i] == b'Z' {
+                i += 1;
+                continue;
+            }
+            assert_eq!(
+                bytes[i], RASTER_OPCODE,
+                "unexpected byte {:#x} at {i}",
+                bytes[i]
+            );
+            let n = u16::from_le_bytes([bytes[i + 1], bytes[i + 2]]) as usize;
+            let payload = &bytes[i + 3..i + 3 + n];
+            let decoded = decode_packbits(payload).expect("PackBits payload under M 02");
+            assert_eq!(decoded.len(), 16);
+            g_rows += 1;
+            i += 3 + n;
+        }
+        assert!(g_rows > 0);
     }
 }

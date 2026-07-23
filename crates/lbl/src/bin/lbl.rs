@@ -914,6 +914,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
         supports_cut,
         cut_mode,
         copies,
+        batch_index: 0,
+        batch_total: 1,
         density,
         driver,
         dither: Algorithm::parse(&dither)?,

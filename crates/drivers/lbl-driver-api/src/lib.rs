@@ -14,7 +14,7 @@ pub mod packbits;
 pub use lbl_core::bitmap::MonoBitmap;
 pub use lbl_core::job::{CutMode, JobSpec};
 pub use lbl_core::printer::{DeviceCapabilities, Protocol};
-pub use packbits::{compress as packbits_compress, is_blank_row};
+pub use packbits::{compress as packbits_compress, encode as packbits_encode, is_blank_row};
 
 /// Errors a driver can produce while encoding.
 #[derive(Debug, thiserror::Error)]
@@ -107,6 +107,16 @@ impl<'a> EncodeContext<'a> {
     /// Number of copies (at least 1).
     pub fn copies(&self) -> u32 {
         self.job.copies.max(1)
+    }
+
+    /// Whether this encode should emit the job prologue (invalidate / init).
+    pub fn batch_first(&self) -> bool {
+        self.job.batch_first()
+    }
+
+    /// Whether this encode is the last label in a multi-label batch.
+    pub fn batch_last(&self) -> bool {
+        self.job.batch_last()
     }
 }
 

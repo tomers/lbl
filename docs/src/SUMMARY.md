@@ -27,7 +27,12 @@
 - [Media Catalog](./reference/catalog.md)
 - [Crates](./reference/crates.md)
 - [DYMO LW5 command coverage](./reference/dymo-lw5-commands.md)
+- [Brother PT raster protocol](./reference/brother-pt-raster.md)
 - [GPGL cut commands](./reference/gpgl-commands.md)
+
+# Plans
+
+- [padding-driven pre-cut (opt-in)](./plans/precut-feed-padding.md)
 
 # Extending lbl
 

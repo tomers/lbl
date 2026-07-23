@@ -690,6 +690,8 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         supports_cut: false,
         cut_mode: CutMode::None,
         copies: 1,
+        batch_index: 0,
+        batch_total: 1,
         density: None,
         driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
@@ -858,6 +860,8 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         supports_cut: false,
         cut_mode: CutMode::None,
         copies: 1,
+        batch_index: 0,
+        batch_total: 1,
         density: None,
         driver: lbl_core::DriverOptions::default(),
         dither: Algorithm::Auto,
@@ -1385,6 +1389,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         supports_cut: req.supports_cut,
         cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
+        batch_index: 0,
+        batch_total: 1,
         density: req.density,
         driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
@@ -1602,6 +1608,8 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         supports_cut: req.supports_cut,
         cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
         copies: req.copies,
+        batch_index: 0,
+        batch_total: 1,
         density: req.density,
         driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)
@@ -1914,6 +1922,7 @@ fn build_client_print_response(
     printer_key: Option<&str>,
     encoded: Vec<(String, Vec<u8>)>,
 ) -> anyhow::Result<serde_json::Value> {
+    let encoded = lbl::dispatch::coalesce_encoded_batch(protocol, encoded);
     let labels: Vec<serde_json::Value> = encoded
         .iter()
         .enumerate()

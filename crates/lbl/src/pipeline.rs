@@ -490,6 +490,10 @@ pub struct PipelineOptions {
     pub cut_mode: CutMode,
     /// Copies.
     pub copies: u32,
+    /// 0-based index within a multi-label batch encode.
+    pub batch_index: u32,
+    /// Total labels in the batch encode (`1` = standalone).
+    pub batch_total: u32,
     /// Optional print density / heat (driver-specific).
     pub density: Option<u8>,
     /// Protocol-specific options (each driver reads only its own bag).
@@ -599,6 +603,8 @@ pub fn encode_labels<B: RenderBackend>(
 
     for (position, label) in labels.iter().enumerate() {
         let mut label_opts = opts.clone();
+        label_opts.batch_index = position as u32;
+        label_opts.batch_total = labels.len() as u32;
         // Across a multi-label batch, "cut at end" applies only to the last label.
         if opts.cut_mode == CutMode::End && position != last_index {
             label_opts.cut_mode = CutMode::None;
@@ -1399,6 +1405,8 @@ pub fn encode_label_from_rgba(
     let mut job = JobSpec::new(opts.media.clone());
     job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;
+    job.batch_index = opts.batch_index;
+    job.batch_total = opts.batch_total;
     job.density = opts.density;
     job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
@@ -1571,6 +1579,8 @@ pub fn encode_sample_pattern_traced(
     let mut job = JobSpec::new(opts.media.clone());
     job.cut_mode = opts.cut_mode;
     job.copies = opts.copies;
+    job.batch_index = opts.batch_index;
+    job.batch_total = opts.batch_total;
     job.density = opts.density;
     job.driver = opts.driver.clone();
     let caps = opts.encode_caps.clone();
@@ -1659,6 +1669,8 @@ mod tests {
             supports_cut: false,
             cut_mode: CutMode::None,
             copies: 1,
+            batch_index: 0,
+            batch_total: 1,
             density: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
@@ -2160,6 +2172,8 @@ mod tests {
             supports_cut: false,
             cut_mode: CutMode::None,
             copies: 1,
+            batch_index: 0,
+            batch_total: 1,
             density: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Threshold(128),
@@ -2197,6 +2211,8 @@ mod tests {
             supports_cut: false,
             cut_mode: CutMode::None,
             copies: 1,
+            batch_index: 0,
+            batch_total: 1,
             density: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,
@@ -2233,6 +2249,8 @@ mod tests {
             supports_cut: false,
             cut_mode: CutMode::None,
             copies: 1,
+            batch_index: 0,
+            batch_total: 1,
             density: None,
             driver: lbl_core::DriverOptions::default(),
             dither: Algorithm::Auto,

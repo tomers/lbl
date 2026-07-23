@@ -5936,17 +5936,19 @@ supported_media = [
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2073 }]
 
 [[devices]]
-brand = "Brother"
-keys = ["PT-P710BT", "PTP710BT", "P710BT", "Cube"]
-name = "Brother PT-P710BT (P-touch Cube Plus)"
-support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p710bteus", brand_url = "https://support.brother.com/" }
-protocol = "brotherpt"
+brand             = "Brother"
+keys              = ["PT-P710BT", "PTP710BT", "P710BT", "Cube"]
+name              = "Brother PT-P710BT (P-touch Cube Plus)"
+support           = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p710bteus", brand_url = "https://support.brother.com/" }
+protocol          = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
-reports_media = true
-dpi = 180.0
-max_width_mm = 24.0
-supports_cut = true
+maturity          = "experimental"
+reports_media     = true
+dpi               = 180.0
+max_width_mm      = 24.0
+supports_cut      = true
+# ~24 mm head-to-cutter gap (Brother TZe lamination path); preview/feed UI.
+feed_trail_mm = 24.0
 default_media = "TZe-231"
 supported_media = [
   "TZe-N201",

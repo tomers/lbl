@@ -222,6 +222,17 @@ pub struct JobSpec {
     /// Number of copies.
     #[serde(default = "one")]
     pub copies: u32,
+    /// 0-based index of this label within a multi-label batch encode.
+    ///
+    /// Used by protocols that share one job stream across labels (Brother PT/QL
+    /// raster): only index 0 emits invalidate/init, and only the last label
+    /// terminates with print-and-feed (`0x1A`) / no-chain. Independent full
+    /// jobs per label force a head-to-cutter leader scrap before each print.
+    #[serde(default)]
+    pub batch_index: u32,
+    /// Total labels in the batch encode (`1` = standalone job).
+    #[serde(default = "one")]
+    pub batch_total: u32,
     /// Optional print density / heat level (driver-specific).
     ///
     /// Typical ranges: NIIMBOT 1–5, DYMO LabelWriter percent 1–200. When
@@ -245,9 +256,33 @@ impl JobSpec {
             mode: OutputMode::Print,
             cut_mode: CutMode::None,
             copies: 1,
+            batch_index: 0,
+            batch_total: 1,
             density: None,
             driver: DriverOptions::default(),
         }
+    }
+
+    /// Effective batch size (at least 1).
+    pub fn batch_total(&self) -> u32 {
+        self.batch_total.max(1)
+    }
+
+    /// Clamp [`Self::batch_index`] into `0..batch_total`.
+    pub fn batch_index(&self) -> u32 {
+        self.batch_index.min(self.batch_total().saturating_sub(1))
+    }
+
+    /// Whether this encode is the first page of a multi-label batch (or a
+    /// standalone job).
+    pub fn batch_first(&self) -> bool {
+        self.batch_index() == 0
+    }
+
+    /// Whether this encode is the last page of a multi-label batch (or a
+    /// standalone job).
+    pub fn batch_last(&self) -> bool {
+        self.batch_index() + 1 >= self.batch_total()
     }
 }
 

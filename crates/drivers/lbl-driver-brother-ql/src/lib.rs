@@ -35,6 +35,8 @@
 //!   per row (mono):
 //!     g 0x00 n <n bytes>  raster graphics transfer (row mirrored)
 //!     or Z                blank row (PackBits mode only)
+//!                         Under M 02, `<n bytes>` must be PackBits — never raw
+//!                         head bytes (see packbits_encode / PT raster notes).
 //!   per row (two-color / DK-22251):
 //!     w 0x01 n <black>    high-energy (black) plane
 //!     w 0x02 n <red>      low-energy (red) plane
@@ -55,7 +57,7 @@
 use lbl_core::job::CutMode;
 use lbl_core::media::MediaLength;
 use lbl_driver_api::{
-    is_blank_row, packbits_compress, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
+    is_blank_row, packbits_encode, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
 };
 
 const ESC: u8 = 0x1B;
@@ -473,11 +475,11 @@ impl BrotherQlDriver {
                 out.push(b'Z');
                 return;
             }
-            if let Some(compressed) = packbits_compress(row) {
-                out.extend_from_slice(&[b'g', 0x00, compressed.len() as u8]);
-                out.extend_from_slice(&compressed);
-                return;
-            }
+            // Under M 02 the payload must be PackBits, even when not shorter than raw.
+            let payload = packbits_encode(row);
+            out.extend_from_slice(&[b'g', 0x00, payload.len() as u8]);
+            out.extend_from_slice(&payload);
+            return;
         }
         out.extend_from_slice(&[b'g', 0x00, row.len() as u8]);
         out.extend_from_slice(row);
@@ -527,7 +529,8 @@ impl BrotherQlDriver {
             }
         }
         if supports_expanded_mode {
-            let mut expanded: u8 = if cut_at_end { 1 << 3 } else { 0 };
+            // No-chain (bit 3) only on the last page — same leader-scrap trap as PT.
+            let mut expanded: u8 = if cut_at_end && last_page { 1 << 3 } else { 0 };
             if two_color {
                 expanded |= 1 << 0;
             }
@@ -641,13 +644,17 @@ impl Driver for BrotherQlDriver {
                 + 64
                 + copies as usize * (black.data.len() + black.height as usize * row_overhead + 48),
         );
-        out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
-        if caps.emit_raster_mode_switch {
-            out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+        if ctx.batch_first() {
+            out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
+            if caps.emit_raster_mode_switch {
+                out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
+            }
+            out.extend_from_slice(&[ESC, b'@']);
         }
-        out.extend_from_slice(&[ESC, b'@']);
 
         for index in 0..copies {
+            let first_page = ctx.batch_first() && index == 0;
+            let last_page = ctx.batch_last() && index + 1 == copies;
             Self::push_page(
                 &mut out,
                 &black,
@@ -661,8 +668,8 @@ impl Driver for BrotherQlDriver {
                     two_color,
                     high_res,
                     packbits,
-                    first_page: index == 0,
-                    last_page: index + 1 == copies,
+                    first_page,
+                    last_page,
                     supports_cut: caps.supports_cut,
                     supports_cut_every: caps.supports_cut_every,
                     supports_expanded_mode: caps.supports_expanded_mode,

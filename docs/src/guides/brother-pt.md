@@ -71,5 +71,7 @@ several SKUs share a width).
 
 ## Related
 
+- [Brother PT raster protocol](../reference/brother-pt-raster.md) — opcode
+  (`G`/`0x47`), PackBits under `M 02`, multi-page `0x0C`/`0x1A`, RE sources
 - [Brother QL setup](./brother-ql.md) (DK rolls — different protocol)
 - [Managing Printers & Media](./printers-media.md)
