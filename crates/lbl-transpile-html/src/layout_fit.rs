@@ -12,7 +12,8 @@ use lbl_text::BarcodeHeightMode;
 use crate::assets::ROW_TEXT_LINE_HEIGHT;
 use crate::text_fit::{
     fit_box_px, html_to_plain_text, is_fit_measurable_html, max_fit_font_px, scaled_fit_px,
-    text_advance_width_px, text_line_width_px, LINE_HEIGHT,
+    text_advance_width_px, text_feed_content_width_px, text_line_width_px, INK_SIDE_BEARING_EM,
+    LINE_HEIGHT,
 };
 use crate::transpile::TranspileOptions;
 
@@ -100,7 +101,7 @@ pub fn apply_layout_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
     let mut css = String::from(LABEL_FIT_ROW_CHILD_CSS);
 
     let result = if children.len() == 1 {
-        fit_lone(&children[0], body, box_w, box_h, opts)
+        fit_lone(&children[0], body, box_w, box_h, opts, false)
     } else if let [Child::Row {
         children: row_kids, ..
     }] = children.as_slice()
@@ -164,7 +165,7 @@ pub fn apply_content_head_text_fit(body: &str, opts: &TranspileOptions) -> Layou
         };
     }
 
-    fit_lone(&children[0], body, box_w, box_h, opts)
+    fit_lone(&children[0], body, box_w, box_h, opts, true)
 }
 
 fn fit_lone(
@@ -173,6 +174,9 @@ fn fit_lone(
     box_w: f64,
     box_h: f64,
     opts: &TranspileOptions,
+    // Continuous content-fit: claim inline space for glyph ink past advance so
+    // feed-end stock padding stays blank.
+    claim_ink_bearings: bool,
 ) -> LayoutFit {
     match child {
         Child::Text { inner } => {
@@ -184,25 +188,41 @@ fn fit_lone(
             }
             let text = html_to_plain_text(inner);
             let font_px = scaled_fit_px(max_fit_font_px(box_w, box_h, &text), opts);
-            // Advance width only — VISUAL_WIDTH_MARGIN is for fit checks inside a
-            // fixed box, not for sizing continuous stock around known text.
-            let content_w = text_advance_width_px(&text, font_px)
-                + opts.style.padding_x_px()
-                + 2.0 * opts.style.border_width_px.max(0.0);
+            let text_w = if claim_ink_bearings {
+                text_feed_content_width_px(&text, font_px)
+            } else {
+                // Fill/fixed: VISUAL_WIDTH_MARGIN already keeps ink inside the box.
+                text_advance_width_px(&text, font_px)
+            };
+            let content_w =
+                text_w + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
             // Match text_fit::LINE_HEIGHT (1.1). Base .lbl-label uses 1.3, which
             // would clip head-fitted glyphs. nowrap keeps continuous feed text on
             // one line so a narrow preview iframe cannot re-wrap and overflow.
-            // --lbl-feed-px is parsed by the preview API for initial iframe sizing;
-            // do not set min-width or the tape grows a hollow feed gap.
-            LayoutFit {
-                body: body.to_string(),
-                css: format!(
+            // --lbl-feed-px is for iframe sizing; do not set min-width or the tape
+            // grows a hollow feed gap.
+            let text_css = if claim_ink_bearings {
+                format!(
+                    ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};\
+                     white-space:nowrap;padding-inline:{bearing:.4}em}}\n\
+                     .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
+                    font_px = font_px,
+                    lh = LINE_HEIGHT,
+                    bearing = INK_SIDE_BEARING_EM,
+                    content_w = content_w,
+                )
+            } else {
+                format!(
                     ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};white-space:nowrap}}\n\
                      .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
                     font_px = font_px,
                     lh = LINE_HEIGHT,
                     content_w = content_w,
-                ),
+                )
+            };
+            LayoutFit {
+                body: body.to_string(),
+                css: text_css,
                 font_px: Some(font_px),
             }
         }
@@ -1104,6 +1124,11 @@ mod tests {
             "css={} font={:?}",
             fit.css,
             fit.font_px
+        );
+        assert!(
+            fit.css.contains("padding-inline:"),
+            "continuous text must claim ink side bearings: {}",
+            fit.css
         );
         let font = fit.font_px.unwrap_or(0.0);
         assert!(font > 60.0, "font={font}");

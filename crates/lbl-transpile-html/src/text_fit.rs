@@ -144,6 +144,11 @@ pub(crate) fn text_line_width_px(text: &str, font_px: f64) -> f64 {
     line_em_width(text) * font_px * VISUAL_WIDTH_MARGIN
 }
 
+/// Extra em padding on each inline side so continuous stock / end-margin guides
+/// sit past glyph ink. Advance width alone underestimates serifs and curves
+/// (e.g. trailing “c”), which then paint into feed-end blank tape.
+pub(crate) const INK_SIDE_BEARING_EM: f64 = 0.08;
+
 /// Nominal advance width (no fit-safety margin) for continuous stock sizing.
 pub(crate) fn text_advance_width_px(text: &str, font_px: f64) -> f64 {
     text.lines()
@@ -161,6 +166,11 @@ pub(crate) fn text_advance_width_px(text: &str, font_px: f64) -> f64 {
         })
         .fold(0.0_f64, f64::max)
         * font_px
+}
+
+/// Continuous feed content width: advance plus side bearings for ink overhang.
+pub(crate) fn text_feed_content_width_px(text: &str, font_px: f64) -> f64 {
+    text_advance_width_px(text, font_px) + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
 }
 
 pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
@@ -314,6 +324,18 @@ pub(crate) fn max_fit_font_px(width_px: f64, height_px: f64, text: &str) -> f64 
 mod tests {
     use super::*;
     use crate::transpile::{LabelFit, LabelStyle, MediaInsetPx};
+
+    #[test]
+    fn feed_content_width_includes_side_bearings() {
+        let font = 100.0;
+        let advance = text_advance_width_px("abc", font);
+        let feed = text_feed_content_width_px("abc", font);
+        assert!(
+            (feed - advance - 2.0 * INK_SIDE_BEARING_EM * font).abs() < 1e-9,
+            "feed={feed} advance={advance}"
+        );
+        assert!(feed > advance);
+    }
 
     #[test]
     fn short_text_fills_cross_head() {
