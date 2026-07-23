@@ -33,6 +33,7 @@ pub use qr::{QrElementOverrides, QrErrorCorrection};
 pub use symbology::{resolve_symbology, BarcodeRenderer, SymbologyInfo};
 pub use text_fit::{fitted_font_px, injected_fit_font_px, injected_label_min_width_px};
 pub use transpile::{
-    parse_fit_scale, transpile, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    MediaInset, MediaInsetPx, PageSizeMm, TranspileOptions, ViewportPx,
+    parse_fit_scale, transpile, CascadingInsetMm, LabelAlign, LabelFit, LabelFitSetting,
+    LabelStyle, LabelValign, MediaInset, MediaInsetPx, PageSizeMm, SidesMm, TranspileOptions,
+    ViewportPx,
 };

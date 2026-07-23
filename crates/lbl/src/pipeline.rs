@@ -30,8 +30,9 @@ type PrintTransportTargets = (
 pub use lbl_template::BatchSelection;
 use lbl_template::{select_batch_indices, Engine, RenderOptions};
 use lbl_transpile_html::{
-    transpile, AssetsBase, LabelAlign, LabelFit, LabelFitSetting, LabelStyle, LabelValign,
-    MediaInset, MediaInsetPx, PageSizeMm, QrErrorCorrection, TranspileOptions, ViewportPx,
+    transpile, AssetsBase, CascadingInsetMm, FontDelivery, LabelAlign, LabelFit, LabelFitSetting,
+    LabelStyle, LabelValign, MediaInset, MediaInsetPx, PageSizeMm, QrErrorCorrection,
+    TranspileOptions, ViewportPx,
 };
 
 /// CSS reference resolution for vector PDF export. Alias for
@@ -457,7 +458,7 @@ pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32
         style.qr_size_mm,
         style.barcode_height_mm,
         style.barcode_module_width_mm,
-        style.padding_mm,
+        resolve_label_padding(style),
         style.element_gap_mm,
         style.border_width_mm,
         style.corner_radius_mm,
@@ -518,6 +519,8 @@ pub struct PipelineOptions {
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
     pub assets_base: AssetsBase,
+    /// How catalog web fonts are injected into transpiled HTML.
+    pub font_delivery: FontDelivery,
     /// Font / QR / barcode sizing (already resolved to pixels for this run's
     /// DPI and supersample factor; see [`resolve_style`]).
     pub style: LabelStyle,
@@ -671,6 +674,19 @@ pub fn resolve_label_fit_scale(scale: f64) -> f64 {
 /// Resolve a configured auto-fit text scale (clamped to `(0.01, 5.0]`).
 pub fn resolve_font_fit_scale(scale: f64) -> f64 {
     scale.clamp(0.01, 5.0)
+}
+
+/// Build a [`CascadingInsetMm`] from the style configuration's padding fields.
+pub fn resolve_label_padding(style: &lbl_config::StyleConfig) -> CascadingInsetMm {
+    CascadingInsetMm {
+        all: style.padding_mm,
+        horizontal: style.padding_horizontal_mm,
+        vertical: style.padding_vertical_mm,
+        top: style.padding_top_mm,
+        right: style.padding_right_mm,
+        bottom: style.padding_bottom_mm,
+        left: style.padding_left_mm,
+    }
 }
 
 /// Build a [`MediaInset`] from the style configuration.
@@ -1191,6 +1207,7 @@ pub fn transpile_label_html(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -1387,6 +1404,7 @@ fn render_label_print<B: RenderBackend>(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -1588,6 +1606,7 @@ fn encode_label_vector_traced<B: RenderBackend>(
         &TranspileOptions {
             mode: OutputMode::Print,
             assets_base: opts.assets_base.clone(),
+            font_delivery: opts.font_delivery.clone(),
             index: None,
             count: None,
             style: opts.style.clone(),
@@ -1773,6 +1792,7 @@ mod tests {
             mirror: false,
             supersample: 1,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
@@ -2413,6 +2433,7 @@ mod tests {
             mirror: false,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
@@ -2454,6 +2475,7 @@ mod tests {
             mirror: false,
             supersample: 3,
             assets_base: AssetsBase::Cdn,
+            font_delivery: FontDelivery::default(),
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,

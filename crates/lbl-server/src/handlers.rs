@@ -1030,6 +1030,12 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct StyleReqOverrides {
     padding_mm: Option<f64>,
+    padding_horizontal_mm: Option<f64>,
+    padding_vertical_mm: Option<f64>,
+    padding_top_mm: Option<f64>,
+    padding_right_mm: Option<f64>,
+    padding_bottom_mm: Option<f64>,
+    padding_left_mm: Option<f64>,
     element_gap_mm: Option<f64>,
     border_width_mm: Option<f64>,
     corner_radius_mm: Option<f64>,
@@ -1044,6 +1050,24 @@ fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config
     let mut style = state.loader.load().map(|c| c.style).unwrap_or_default();
     if let Some(v) = overrides.padding_mm {
         style.padding_mm = v;
+    }
+    if let Some(v) = overrides.padding_horizontal_mm {
+        style.padding_horizontal_mm = Some(v);
+    }
+    if let Some(v) = overrides.padding_vertical_mm {
+        style.padding_vertical_mm = Some(v);
+    }
+    if let Some(v) = overrides.padding_top_mm {
+        style.padding_top_mm = Some(v);
+    }
+    if let Some(v) = overrides.padding_right_mm {
+        style.padding_right_mm = Some(v);
+    }
+    if let Some(v) = overrides.padding_bottom_mm {
+        style.padding_bottom_mm = Some(v);
+    }
+    if let Some(v) = overrides.padding_left_mm {
+        style.padding_left_mm = Some(v);
     }
     if let Some(v) = overrides.element_gap_mm {
         style.element_gap_mm = v;

@@ -292,6 +292,30 @@ struct StyleArgs {
     #[arg(long)]
     padding_mm: Option<f64>,
 
+    /// Padding on both horizontal sides (left + right), in mm.
+    #[arg(long)]
+    padding_horizontal_mm: Option<f64>,
+
+    /// Padding on both vertical sides (top + bottom), in mm.
+    #[arg(long)]
+    padding_vertical_mm: Option<f64>,
+
+    /// Top-side padding, in mm.
+    #[arg(long)]
+    padding_top_mm: Option<f64>,
+
+    /// Right-side padding, in mm.
+    #[arg(long)]
+    padding_right_mm: Option<f64>,
+
+    /// Bottom-side padding, in mm.
+    #[arg(long)]
+    padding_bottom_mm: Option<f64>,
+
+    /// Left-side padding, in mm.
+    #[arg(long)]
+    padding_left_mm: Option<f64>,
+
     /// Gap between flex children (text, QR, barcode, …), in mm (overrides config
     /// `style.element_gap_mm`).
     #[arg(long)]
@@ -412,6 +436,24 @@ impl StyleArgs {
         }
         if let Some(v) = self.padding_mm {
             style.padding_mm = v;
+        }
+        if let Some(v) = self.padding_horizontal_mm {
+            style.padding_horizontal_mm = Some(v);
+        }
+        if let Some(v) = self.padding_vertical_mm {
+            style.padding_vertical_mm = Some(v);
+        }
+        if let Some(v) = self.padding_top_mm {
+            style.padding_top_mm = Some(v);
+        }
+        if let Some(v) = self.padding_right_mm {
+            style.padding_right_mm = Some(v);
+        }
+        if let Some(v) = self.padding_bottom_mm {
+            style.padding_bottom_mm = Some(v);
+        }
+        if let Some(v) = self.padding_left_mm {
+            style.padding_left_mm = Some(v);
         }
         if let Some(v) = self.element_gap_mm {
             style.element_gap_mm = v;
@@ -1570,7 +1612,7 @@ fn run_transpile(args: TranspileArgs) -> Result<()> {
         style.barcode_module_width_px = v;
     }
     if let Some(v) = args.padding_px {
-        style.padding_px = v;
+        style.set_padding_px_all(v);
     }
     if let Some(v) = args.border_px {
         style.border_width_px = v;

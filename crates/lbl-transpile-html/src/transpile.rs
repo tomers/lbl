@@ -10,6 +10,61 @@ use crate::assets::AssetsBase;
 use crate::layout_fit::{apply_content_head_text_fit, apply_layout_fit};
 use crate::qr::{QrElementOverrides, QrErrorCorrection};
 
+/// Cascading inset in millimetres: uniform → axis → per-side, with more
+/// specific fields overriding less specific ones.
+///
+/// Shared by label content padding and [`MediaInset`] (which maps start/end /
+/// cross-* onto top/bottom/left/right in the portrait reading frame).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CascadingInsetMm {
+    /// Uniform value on all sides.
+    pub all: f64,
+    /// Both horizontal sides (left + right).
+    pub horizontal: Option<f64>,
+    /// Both vertical sides (top + bottom).
+    pub vertical: Option<f64>,
+    /// Top side.
+    pub top: Option<f64>,
+    /// Right side.
+    pub right: Option<f64>,
+    /// Bottom side.
+    pub bottom: Option<f64>,
+    /// Left side.
+    pub left: Option<f64>,
+}
+
+/// Resolved inset on each CSS side, in millimetres.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SidesMm {
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+    pub left: f64,
+}
+
+impl CascadingInsetMm {
+    /// Uniform inset on all sides (no axis/side overrides).
+    pub fn uniform(all: f64) -> Self {
+        Self {
+            all,
+            ..Default::default()
+        }
+    }
+
+    /// Resolve side values; more specific fields override axis/uniform defaults.
+    pub fn resolve(self) -> SidesMm {
+        let base = self.all.max(0.0);
+        let horizontal = self.horizontal.unwrap_or(base).max(0.0);
+        let vertical = self.vertical.unwrap_or(base).max(0.0);
+        SidesMm {
+            top: self.top.unwrap_or(vertical).max(0.0),
+            right: self.right.unwrap_or(horizontal).max(0.0),
+            bottom: self.bottom.unwrap_or(vertical).max(0.0),
+            left: self.left.unwrap_or(horizontal).max(0.0),
+        }
+    }
+}
+
 /// Visual sizing for a label, in **CSS pixels** (which map 1:1 to render
 /// device dots at the render viewport's resolution).
 ///
@@ -28,8 +83,14 @@ pub struct LabelStyle {
     pub barcode_height_px: f64,
     /// Barcode single-module (narrowest bar) width, in pixels.
     pub barcode_module_width_px: f64,
-    /// Inner padding between the label edge and its content, in pixels.
-    pub padding_px: f64,
+    /// Inner padding — top, in pixels.
+    pub padding_top_px: f64,
+    /// Inner padding — right, in pixels.
+    pub padding_right_px: f64,
+    /// Inner padding — bottom, in pixels.
+    pub padding_bottom_px: f64,
+    /// Inner padding — left, in pixels.
+    pub padding_left_px: f64,
     /// Gap between sibling flex items, in pixels.
     pub element_gap_px: f64,
     /// Border drawn around the label, in pixels (0 = no border).
@@ -56,7 +117,10 @@ impl Default for LabelStyle {
             qr_size_mm: 15.0,
             barcode_height_px: 100.0,
             barcode_module_width_px: 2.0,
-            padding_px: 20.0,
+            padding_top_px: 20.0,
+            padding_right_px: 20.0,
+            padding_bottom_px: 20.0,
+            padding_left_px: 20.0,
             element_gap_px: 8.0,
             border_width_px: 0.0,
             corner_radius_px: 0.0,
@@ -69,6 +133,24 @@ impl Default for LabelStyle {
 }
 
 impl LabelStyle {
+    /// Set all four padding sides to the same pixel value.
+    pub fn set_padding_px_all(&mut self, px: f64) {
+        self.padding_top_px = px;
+        self.padding_right_px = px;
+        self.padding_bottom_px = px;
+        self.padding_left_px = px;
+    }
+
+    /// Sum of left + right padding (clamped ≥ 0 per side).
+    pub fn padding_x_px(&self) -> f64 {
+        self.padding_left_px.max(0.0) + self.padding_right_px.max(0.0)
+    }
+
+    /// Sum of top + bottom padding (clamped ≥ 0 per side).
+    pub fn padding_y_px(&self) -> f64 {
+        self.padding_top_px.max(0.0) + self.padding_bottom_px.max(0.0)
+    }
+
     /// Resolve physical (mm) sizes to pixels for a render targeting `dpi` at the
     /// given `supersample` factor.
     ///
@@ -81,7 +163,7 @@ impl LabelStyle {
         qr_size_mm: f64,
         barcode_height_mm: f64,
         barcode_module_width_mm: f64,
-        padding_mm: f64,
+        padding: CascadingInsetMm,
         element_gap_mm: f64,
         border_width_mm: f64,
         corner_radius_mm: f64,
@@ -89,13 +171,17 @@ impl LabelStyle {
         supersample: u32,
     ) -> Self {
         let px_per_mm = dpi * supersample.max(1) as f64 / 25.4;
+        let pad = padding.resolve();
         Self {
             font_size_px: font_size_mm * px_per_mm,
             qr_size_px: qr_size_mm * px_per_mm,
             qr_size_mm,
             barcode_height_px: barcode_height_mm * px_per_mm,
             barcode_module_width_px: barcode_module_width_mm * px_per_mm,
-            padding_px: padding_mm * px_per_mm,
+            padding_top_px: pad.top * px_per_mm,
+            padding_right_px: pad.right * px_per_mm,
+            padding_bottom_px: pad.bottom * px_per_mm,
+            padding_left_px: pad.left * px_per_mm,
             element_gap_px: element_gap_mm * px_per_mm,
             border_width_px: border_width_mm * px_per_mm,
             corner_radius_px: corner_radius_mm * px_per_mm,
@@ -131,11 +217,22 @@ impl LabelStyle {
     fn to_css(&self) -> String {
         // `box-sizing:border-box` (from the base CSS) keeps the label within the
         // media width even with padding and a border applied.
+        let t = self.padding_top_px.max(0.0);
+        let r = self.padding_right_px.max(0.0);
+        let b = self.padding_bottom_px.max(0.0);
+        let l = self.padding_left_px.max(0.0);
+        let pad = if (t - r).abs() < f64::EPSILON
+            && (t - b).abs() < f64::EPSILON
+            && (t - l).abs() < f64::EPSILON
+        {
+            format!("{t:.2}px")
+        } else {
+            format!("{t:.2}px {r:.2}px {b:.2}px {l:.2}px")
+        };
         format!(
-            ".lbl-label,.lbl-row,.lbl-col{{gap:{gap:.2}px}}\n.lbl-label{{font-size:{fs:.2}px;line-height:1.3;padding:{pad:.2}px;border:{bw:.2}px solid #000}}\n.lbl-qr{{width:{qr:.2}px;height:{qr:.2}px}}\n",
+            ".lbl-label,.lbl-row,.lbl-col{{gap:{gap:.2}px}}\n.lbl-label{{font-size:{fs:.2}px;line-height:1.3;padding:{pad};border:{bw:.2}px solid #000}}\n.lbl-qr{{width:{qr:.2}px;height:{qr:.2}px}}\n",
             gap = self.element_gap_px.max(0.0),
             fs = self.font_size_px.max(1.0),
-            pad = self.padding_px.max(0.0),
             bw = self.border_width_px.max(0.0),
             qr = self.qr_size_px.max(1.0),
         )
@@ -236,14 +333,22 @@ pub struct MediaInsetSides {
 impl MediaInset {
     /// Resolve side values; more specific fields override axis/uniform defaults.
     pub fn resolve(self) -> MediaInsetSides {
-        let base = self.all_mm.max(0.0);
-        let horizontal = self.horizontal_mm.unwrap_or(base).max(0.0);
-        let vertical = self.vertical_mm.unwrap_or(base).max(0.0);
+        // Portrait reading frame: start/end = top/bottom, cross_* = left/right.
+        let sides = CascadingInsetMm {
+            all: self.all_mm,
+            horizontal: self.horizontal_mm,
+            vertical: self.vertical_mm,
+            top: self.start_mm,
+            right: self.cross_end_mm,
+            bottom: self.end_mm,
+            left: self.cross_start_mm,
+        }
+        .resolve();
         MediaInsetSides {
-            start: self.start_mm.unwrap_or(vertical),
-            end: self.end_mm.unwrap_or(vertical),
-            cross_start: self.cross_start_mm.unwrap_or(horizontal),
-            cross_end: self.cross_end_mm.unwrap_or(horizontal),
+            start: sides.top,
+            end: sides.bottom,
+            cross_start: sides.left,
+            cross_end: sides.right,
         }
     }
 
@@ -943,7 +1048,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -979,7 +1087,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 40.0,
                 ..Default::default()
             },
@@ -1008,7 +1119,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 element_gap_px: 8.0,
                 ..Default::default()
             },
@@ -1032,7 +1146,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 40.0,
                 element_gap_px: 8.0,
                 ..Default::default()
@@ -1066,7 +1183,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 40.0,
                 element_gap_px: 8.0,
                 ..Default::default()
@@ -1120,7 +1240,18 @@ mod tests {
                 width: Some(100.0),
                 height: Some(200.0),
             }),
-            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 300.0, 2),
+            style: LabelStyle::from_mm(
+                2.0,
+                15.0,
+                12.0,
+                0.33,
+                CascadingInsetMm::uniform(2.0),
+                2.0,
+                0.0,
+                2.0,
+                300.0,
+                2,
+            ),
             ..Default::default()
         };
         let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
@@ -1151,7 +1282,18 @@ mod tests {
                 width: None,
                 height: Some(170.0),
             }),
-            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            style: LabelStyle::from_mm(
+                2.0,
+                15.0,
+                12.0,
+                0.33,
+                CascadingInsetMm::uniform(2.0),
+                2.0,
+                0.0,
+                2.0,
+                180.0,
+                2,
+            ),
             ..Default::default()
         };
         let body =
@@ -1217,7 +1359,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             font_fit_scale: 0.5,
@@ -1260,7 +1405,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -1284,7 +1432,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -1300,7 +1451,7 @@ mod tests {
         let fit = out
             .rsplit(".lbl-label>.lbl-text:only-child{font-size:")
             .next()
-            .and_then(|s| s.split("px}").next())
+            .and_then(|s| s.split("px").next())
             .and_then(|s| s.parse::<f64>().ok())
             .expect("computed lone-text font size");
         assert!(
@@ -1345,6 +1496,75 @@ mod tests {
         assert_eq!(sides.end, 3.0);
         assert_eq!(sides.cross_start, 2.0);
         assert_eq!(sides.cross_end, 5.0);
+    }
+
+    #[test]
+    fn cascading_inset_resolves_uniform_axis_and_sides() {
+        let uniform = CascadingInsetMm::uniform(2.0).resolve();
+        assert_eq!(uniform.top, 2.0);
+        assert_eq!(uniform.right, 2.0);
+        assert_eq!(uniform.bottom, 2.0);
+        assert_eq!(uniform.left, 2.0);
+
+        let axes = CascadingInsetMm {
+            all: 1.0,
+            horizontal: Some(3.0),
+            vertical: Some(4.0),
+            ..Default::default()
+        }
+        .resolve();
+        assert_eq!(axes.top, 4.0);
+        assert_eq!(axes.bottom, 4.0);
+        assert_eq!(axes.left, 3.0);
+        assert_eq!(axes.right, 3.0);
+
+        let sides = CascadingInsetMm {
+            all: 1.0,
+            horizontal: Some(2.0),
+            vertical: Some(3.0),
+            top: Some(5.0),
+            right: Some(6.0),
+            ..Default::default()
+        }
+        .resolve();
+        assert_eq!(sides.top, 5.0);
+        assert_eq!(sides.right, 6.0);
+        assert_eq!(sides.bottom, 3.0);
+        assert_eq!(sides.left, 2.0);
+    }
+
+    #[test]
+    fn cascading_inset_clamps_negative_to_zero() {
+        let sides = CascadingInsetMm {
+            all: -1.0,
+            horizontal: Some(-2.0),
+            top: Some(-3.0),
+            ..Default::default()
+        }
+        .resolve();
+        assert_eq!(sides.top, 0.0);
+        assert_eq!(sides.right, 0.0);
+        assert_eq!(sides.bottom, 0.0);
+        assert_eq!(sides.left, 0.0);
+    }
+
+    #[test]
+    fn asymmetric_padding_emits_trbl_css() {
+        let opts = TranspileOptions {
+            style: LabelStyle {
+                padding_top_px: 10.0,
+                padding_right_px: 20.0,
+                padding_bottom_px: 30.0,
+                padding_left_px: 40.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let out = transpile("<div class=\"lbl-label\">hi</div>", &opts);
+        assert!(
+            out.contains("padding:10.00px 20.00px 30.00px 40.00px"),
+            "{out}"
+        );
     }
 
     #[test]
@@ -1515,7 +1735,10 @@ mod tests {
                 qr_size_px: 300.0,
                 barcode_height_px: 200.0,
                 barcode_module_width_px: 4.0,
-                padding_px: 24.0,
+                padding_top_px: 24.0,
+                padding_right_px: 24.0,
+                padding_bottom_px: 24.0,
+                padding_left_px: 24.0,
                 border_width_px: 6.0,
                 ..Default::default()
             },
@@ -1559,10 +1782,26 @@ mod tests {
     #[test]
     fn from_mm_scales_with_dpi_and_supersample() {
         // 3mm at 300dpi, supersample 3 -> 3 * 300 * 3 / 25.4 = ~106.3px.
-        let s = LabelStyle::from_mm(3.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 300.0, 3);
+        let s = LabelStyle::from_mm(
+            3.0,
+            15.0,
+            12.0,
+            0.33,
+            CascadingInsetMm::uniform(2.0),
+            2.0,
+            0.0,
+            2.0,
+            300.0,
+            3,
+        );
         assert!((s.font_size_px - 106.299).abs() < 0.1, "{}", s.font_size_px);
         // 2mm padding at the same density.
-        assert!((s.padding_px - 70.866).abs() < 0.1, "{}", s.padding_px);
+        assert!(
+            (s.padding_top_px - 70.866).abs() < 0.1,
+            "{}",
+            s.padding_top_px
+        );
+        assert!((s.padding_right_px - 70.866).abs() < 0.1);
     }
 
     #[test]

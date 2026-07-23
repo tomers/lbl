@@ -33,12 +33,15 @@ CSS fallback when viewport geometry is not known.
 
 | Key / flag | Default | Effect |
 | ---------- | ------- | ------ |
-| `padding_mm` / `--padding-mm` | 2.0 mm | Inner gutter between the label box and content (all sides) |
+| `padding_mm` / `--padding-mm` | 2.0 mm | Inner gutter between the label box and content (uniform base) |
+| `padding_horizontal_mm` / `padding_vertical_mm` | — | Axis overrides (both sides) |
+| `padding_top_mm` / `padding_right_mm` / `padding_bottom_mm` / `padding_left_mm` | — | Per-side overrides |
 | `border_width_mm` / `--border-mm` | 0 | Optional border drawn around `.lbl-label` |
 | `font_size_mm` / `--font-size-mm` | 2.0 mm | Base text size (before auto-fit on lone text blocks) |
 | `media_inset_*` / `--media-inset-*` | 0 | Shrink the layout shell inside the physical media edge |
 
-Padding is always applied by the pipeline — it is not part of authoring HTML.
+Padding uses the same cascade as media insets (uniform → axis → side). It is
+always applied by the pipeline — it is not part of authoring HTML.
 See [Configuration](../guides/configuration.md#padding-and-insets).
 
 ## Browser-ready HTML

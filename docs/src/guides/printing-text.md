@@ -55,9 +55,11 @@ after the text.
 ## Padding
 
 `lbl print` adds **inner padding** around every label automatically (default
-**2 mm** via `[style] padding_mm`). It is applied at transpile time on
-`.lbl-label`, not in your text string. Override per run with `--padding-mm`, in
-config with `padding_mm`, or via `LBL_STYLE__PADDING_MM`. See
+**2 mm** via `[style] padding_mm`, with optional axis/side overrides). It is
+applied at transpile time on `.lbl-label`, not in your text string. Override
+per run with `--padding-mm` (and `--padding-horizontal-mm` /
+`--padding-vertical-mm` / `--padding-top-mm` / …), in config with the
+`padding_*` fields, or via `LBL_STYLE__PADDING_MM`. See
 [Configuration — padding and insets](./configuration.md#padding-and-insets).
 
 ## End to end

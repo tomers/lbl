@@ -172,18 +172,19 @@ pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
     }
     const UNBOUNDED_AXIS_PX: f64 = 1.0e6;
     let scale = opts.label_fit_scale.clamp(0.01, 1.0);
-    let pad = opts.style.padding_px.max(0.0);
+    let pad_x = opts.style.padding_x_px();
+    let pad_y = opts.style.padding_y_px();
     let border = opts.style.border_width_px.max(0.0);
     let inset = opts.media_inset;
     let box_w = if let Some(w) = width {
         let inner_w = (w - inset.cross_start - inset.cross_end).max(0.0);
-        inner_w * scale - 2.0 * pad - 2.0 * border
+        inner_w * scale - pad_x - 2.0 * border
     } else {
         UNBOUNDED_AXIS_PX
     };
     let box_h = if let Some(h) = height {
         let inner_h = (h - inset.start - inset.end).max(0.0);
-        inner_h * scale - 2.0 * pad - 2.0 * border
+        inner_h * scale - pad_y - 2.0 * border
     } else {
         UNBOUNDED_AXIS_PX
     };
@@ -382,7 +383,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             media_inset: MediaInsetPx::default(),
@@ -416,7 +420,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             media_inset: MediaInsetPx::default(),
@@ -439,7 +446,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 ..Default::default()
             },
             media_inset: MediaInsetPx::default(),
@@ -454,8 +464,8 @@ mod tests {
         let font: f64 = css
             .split("font-size:")
             .nth(1)
+            .and_then(|s| s.split("px").next())
             .unwrap()
-            .trim_end_matches("px}\n")
             .parse()
             .unwrap();
         assert!(
@@ -473,7 +483,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 160.0,
                 element_gap_px: 8.0,
                 ..Default::default()
@@ -517,7 +530,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 160.0,
                 element_gap_px: 8.0,
                 ..Default::default()
@@ -558,7 +574,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 160.0,
                 element_gap_px: 8.0,
                 ..Default::default()

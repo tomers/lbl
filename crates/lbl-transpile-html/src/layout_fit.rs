@@ -187,7 +187,7 @@ fn fit_lone(
             // Advance width only — VISUAL_WIDTH_MARGIN is for fit checks inside a
             // fixed box, not for sizing continuous stock around known text.
             let content_w = text_advance_width_px(&text, font_px)
-                + 2.0 * opts.style.padding_px.max(0.0)
+                + opts.style.padding_x_px()
                 + 2.0 * opts.style.border_width_px.max(0.0);
             // Match text_fit::LINE_HEIGHT (1.1). Base .lbl-label uses 1.3, which
             // would clip head-fitted glyphs. nowrap keeps continuous feed text on
@@ -1051,7 +1051,7 @@ fn patch_nth_code(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transpile::{LabelFit, LabelStyle, MediaInsetPx, ViewportPx};
+    use crate::transpile::{CascadingInsetMm, LabelFit, LabelStyle, MediaInsetPx, ViewportPx};
 
     fn fill_opts() -> TranspileOptions {
         TranspileOptions {
@@ -1061,7 +1061,10 @@ mod tests {
                 height: Some(142.0),
             }),
             style: LabelStyle {
-                padding_px: 0.0,
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
                 qr_size_px: 40.0,
                 element_gap_px: 8.0,
                 ..Default::default()
@@ -1079,7 +1082,18 @@ mod tests {
                 width: None,
                 height: Some(170.0),
             }),
-            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            style: LabelStyle::from_mm(
+                2.0,
+                15.0,
+                12.0,
+                0.33,
+                CascadingInsetMm::uniform(2.0),
+                2.0,
+                0.0,
+                2.0,
+                180.0,
+                2,
+            ),
             ..Default::default()
         };
         let body =
@@ -1103,7 +1117,18 @@ mod tests {
                 width: None,
                 height: Some(170.0),
             }),
-            style: LabelStyle::from_mm(2.0, 15.0, 12.0, 0.33, 2.0, 2.0, 0.0, 2.0, 180.0, 2),
+            style: LabelStyle::from_mm(
+                2.0,
+                15.0,
+                12.0,
+                0.33,
+                CascadingInsetMm::uniform(2.0),
+                2.0,
+                0.0,
+                2.0,
+                180.0,
+                2,
+            ),
             ..Default::default()
         };
         let body = r#"<div class="lbl-label"><img src="data:image/png;base64,xx" /></div>"#;

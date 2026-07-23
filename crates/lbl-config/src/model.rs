@@ -87,8 +87,21 @@ pub struct StyleConfig {
     pub barcode_height_mm: f64,
     /// Barcode single-module (narrowest bar) width, in mm.
     pub barcode_module_width_mm: f64,
-    /// Inner padding between the label edge and its content, in mm.
+    /// Inner padding between the label edge and its content, in mm (uniform
+    /// base). See also the axis and side-specific `padding_*` fields.
     pub padding_mm: f64,
+    /// Padding on both horizontal sides (left + right).
+    pub padding_horizontal_mm: Option<f64>,
+    /// Padding on both vertical sides (top + bottom).
+    pub padding_vertical_mm: Option<f64>,
+    /// Top-side padding.
+    pub padding_top_mm: Option<f64>,
+    /// Right-side padding.
+    pub padding_right_mm: Option<f64>,
+    /// Bottom-side padding.
+    pub padding_bottom_mm: Option<f64>,
+    /// Left-side padding.
+    pub padding_left_mm: Option<f64>,
     /// Gap between sibling elements inside `.lbl-label` / flex rows, in mm.
     pub element_gap_mm: f64,
     /// Border drawn around the label, in mm (0 = no border).
@@ -138,6 +151,12 @@ impl Default for StyleConfig {
             barcode_height_mm: 12.0,
             barcode_module_width_mm: 0.33,
             padding_mm: 2.0,
+            padding_horizontal_mm: None,
+            padding_vertical_mm: None,
+            padding_top_mm: None,
+            padding_right_mm: None,
+            padding_bottom_mm: None,
+            padding_left_mm: None,
             element_gap_mm: 4.0,
             border_width_mm: 0.0,
             corner_radius_mm: 2.0,

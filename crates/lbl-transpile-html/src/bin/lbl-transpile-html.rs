@@ -134,7 +134,7 @@ fn main() -> Result<()> {
         style.barcode_module_width_px = v;
     }
     if let Some(v) = cli.padding_px {
-        style.padding_px = v;
+        style.set_padding_px_all(v);
     }
     if let Some(v) = cli.border_px {
         style.border_width_px = v;

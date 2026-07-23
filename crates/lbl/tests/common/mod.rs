@@ -37,8 +37,8 @@ use lbl_render::{
 };
 use lbl_template::{DefaultResolver, Engine, RenderOptions, ResourceResolver, TemplateError};
 use lbl_transpile_html::{
-    transpile, AssetsBase, LabelAlign, LabelFit, LabelStyle, LabelValign, MediaInsetPx, PageSizeMm,
-    TranspileOptions,
+    transpile, AssetsBase, CascadingInsetMm, LabelAlign, LabelFit, LabelStyle, LabelValign,
+    MediaInsetPx, PageSizeMm, TranspileOptions,
 };
 
 /// Authoring HTML for layout/fit golden cases: short text + QR on a tall label.
@@ -109,13 +109,35 @@ pub fn inline_assets(html: &str) -> String {
 /// `supersample`). Mirrors the kind of style the orchestrator produces.
 pub fn default_style(dpi: f64, supersample: u32) -> LabelStyle {
     // font, qr, barcode height, barcode module, padding, border (all mm).
-    LabelStyle::from_mm(4.0, 18.0, 10.0, 0.33, 2.0, 2.0, 0.0, 2.0, dpi, supersample)
+    LabelStyle::from_mm(
+        4.0,
+        18.0,
+        10.0,
+        0.33,
+        CascadingInsetMm::uniform(2.0),
+        2.0,
+        0.0,
+        2.0,
+        dpi,
+        supersample,
+    )
 }
 
 /// Like [`default_style`] but draws a border and uses generous padding, to
 /// exercise the border/padding styling path.
 pub fn bordered_style(dpi: f64, supersample: u32) -> LabelStyle {
-    LabelStyle::from_mm(4.0, 18.0, 10.0, 0.33, 3.0, 2.0, 1.0, 2.0, dpi, supersample)
+    LabelStyle::from_mm(
+        4.0,
+        18.0,
+        10.0,
+        0.33,
+        CascadingInsetMm::uniform(3.0),
+        2.0,
+        1.0,
+        2.0,
+        dpi,
+        supersample,
+    )
 }
 
 /// Run a single authoring-HTML label through transpile -> render -> dither,
@@ -247,7 +269,7 @@ pub fn vector_style() -> LabelStyle {
         18.0,
         10.0,
         0.33,
-        2.0,
+        CascadingInsetMm::uniform(2.0),
         2.0,
         0.0,
         2.0,
@@ -473,7 +495,18 @@ fn guess_image_mime(path: &Path) -> String {
 /// DYMO 99014 (54×101 mm) at print resolution.
 pub fn identity_card_style(dpi: f64, supersample: u32) -> LabelStyle {
     // font, qr, barcode height, barcode module, padding, border (all mm).
-    LabelStyle::from_mm(3.0, 11.0, 9.0, 0.32, 2.0, 2.0, 0.5, 2.0, dpi, supersample)
+    LabelStyle::from_mm(
+        3.0,
+        11.0,
+        9.0,
+        0.32,
+        CascadingInsetMm::uniform(2.0),
+        2.0,
+        0.5,
+        2.0,
+        dpi,
+        supersample,
+    )
 }
 
 /// A small grayscale checkerboard, embedded as a `data:` URI, for the image
