@@ -13,6 +13,9 @@
 
 use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
+/// Name prefixes accepted by Web Bluetooth `requestDevice` filters.
+pub const NAME_PREFIXES: &[&str] = &["Letratag", "DYMO LT-200B", "LT-200B", "LT20"];
+
 /// Canonical GATT service UUID (first 8 hex digits are the stable prefix).
 pub const SERVICE_UUID: &str = "be3dd650-2b3d-42f1-99c1-f0f749dd0678";
 /// Print-request characteristic (write-without-response).

@@ -22,7 +22,7 @@ impl Handshake for FireAndForget {
     fn start(&mut self) -> Vec<DeliveryAction> {
         let bytes = self.bytes.take().unwrap_or_default();
         vec![
-            DeliveryAction::progress("sending", "Sending label to printer…"),
+            DeliveryAction::progress("sending"),
             DeliveryAction::send(bytes),
         ]
     }

@@ -146,21 +146,18 @@ pub struct Lw550EngineVersion {
     pub usb_pid: u16,
 }
 
-/// JSON-friendly view of [`Lw550PrintStatus`] for APIs and CLI output.
+/// JSON-friendly view of [`Lw550PrintStatus`] for APIs and WASM.
 ///
-/// Round-trippable JSON: the fields carried only by an `ESC U` / `ESC V` follow-up
-/// (`label_total`, engine version) default to `None` when absent, so a serialized
-/// view can be deserialized and folded back in (see [`merge_dymo_lw_status_view`]).
+/// Machine codes only — consumers map codes to display copy. Round-trippable:
+/// follow-up fields (`label_total`, engine version) default to `None` when
+/// absent (see [`merge_dymo_lw_status_view`]).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Lw550PrintStatusView {
-    pub print_status: String,
     pub print_status_code: u8,
     pub print_job_id: u32,
     pub label_index: u16,
-    pub print_head_status: String,
     pub print_head_status_code: u8,
     pub print_density: u8,
-    pub main_bay_status: String,
     pub main_bay_status_code: u8,
     pub sku: Option<String>,
     pub error_id: u32,
@@ -168,7 +165,6 @@ pub struct Lw550PrintStatusView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_total: Option<u16>,
     pub eps_present: bool,
-    pub print_head_voltage: String,
     pub print_head_voltage_code: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hardware_version: Option<String>,
@@ -185,21 +181,17 @@ pub struct Lw550PrintStatusView {
 impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
     fn from(status: &Lw550PrintStatus) -> Self {
         Self {
-            print_status: status.print_status.label().into(),
             print_status_code: status.print_status_code,
             print_job_id: status.print_job_id,
             label_index: status.label_index,
-            print_head_status: status.print_head_status.label().into(),
             print_head_status_code: status.print_head_status_code,
             print_density: status.print_density,
-            main_bay_status: status.main_bay_status.label().into(),
             main_bay_status_code: status.main_bay_status_code,
             sku: status.sku.clone(),
             error_id: status.error_id,
             label_count: status.label_count,
             label_total: status.label_total,
             eps_present: status.eps_present,
-            print_head_voltage: status.print_head_voltage.label().into(),
             print_head_voltage_code: status.print_head_voltage_code,
             hardware_version: status.hardware_version.clone(),
             firmware_version: status.firmware_version.clone(),
@@ -211,7 +203,7 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
 }
 
 impl Lw550PrintStatus {
-    /// Convert to a JSON-friendly view with human-readable status strings.
+    /// Convert to a JSON-friendly codes-only view.
     pub fn to_view(&self) -> Lw550PrintStatusView {
         Lw550PrintStatusView::from(self)
     }

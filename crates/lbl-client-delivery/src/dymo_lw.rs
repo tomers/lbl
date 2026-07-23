@@ -206,11 +206,9 @@ impl DymoLw {
     /// (e.g. a status notification carried over from the prior handshake).
     fn send_current_label(&mut self, mut lead: Vec<DeliveryAction>) -> Vec<DeliveryAction> {
         let total = self.label_count();
-        let num = self.label_idx as u32 + 1;
         self.phase = Phase::LabelSent;
         lead.push(DeliveryAction::label_progress(
             "sending_label",
-            format!("Sending label {num} of {total}…"),
             self.label_idx as u32,
             total,
         ));
@@ -225,7 +223,7 @@ impl Handshake for DymoLw {
     fn start(&mut self) -> Vec<DeliveryAction> {
         self.phase = Phase::LockSent;
         vec![
-            DeliveryAction::progress("acquiring_lock", "Acquiring print lock…"),
+            DeliveryAction::progress("acquiring_lock"),
             DeliveryAction::send(status_request(LOCK_ACQUIRE).to_vec()),
         ]
     }
@@ -243,10 +241,7 @@ impl Handshake for DymoLw {
                         let mut lead = vec![status_action(&status)];
                         if !self.job.preamble.is_empty() {
                             self.phase = Phase::PreambleSent;
-                            lead.push(DeliveryAction::progress(
-                                "sending_preamble",
-                                "Sending job header…",
-                            ));
+                            lead.push(DeliveryAction::progress("sending_preamble"));
                             lead.push(DeliveryAction::send(self.job.preamble.clone()));
                             lead
                         } else {
@@ -261,14 +256,8 @@ impl Handshake for DymoLw {
                 let last = self.label_idx as u32 + 1 == self.label_count();
                 let lock = if last { LOCK_RELEASE } else { LOCK_INTER_LABEL };
                 let total = self.label_count();
-                let num = self.label_idx as u32 + 1;
                 vec![
-                    DeliveryAction::label_progress(
-                        "handshake",
-                        format!("Waiting for printer ({num}/{total})…"),
-                        self.label_idx as u32,
-                        total,
-                    ),
+                    DeliveryAction::label_progress("handshake", self.label_idx as u32, total),
                     DeliveryAction::send(status_request(lock).to_vec()),
                 ]
             }
@@ -294,10 +283,7 @@ impl Handshake for DymoLw {
                 }
             }
             (Phase::FinalizeSent, Event::SendComplete) => {
-                vec![
-                    DeliveryAction::progress("finalizing", "Finalizing job…"),
-                    DeliveryAction::Done,
-                ]
+                vec![DeliveryAction::progress("finalizing"), DeliveryAction::Done]
             }
             _ => vec![DeliveryAction::error(
                 "dymo-lw delivery received an out-of-order transport event",

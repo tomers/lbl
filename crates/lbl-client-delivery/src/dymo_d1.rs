@@ -76,10 +76,7 @@ impl DymoD1 {
 
 impl Handshake for DymoD1 {
     fn start(&mut self) -> Vec<DeliveryAction> {
-        vec![
-            DeliveryAction::progress("sending", "Sending to printer…"),
-            self.ping(),
-        ]
+        vec![DeliveryAction::progress("sending"), self.ping()]
     }
 
     fn advance(&mut self, event: Event) -> Vec<DeliveryAction> {

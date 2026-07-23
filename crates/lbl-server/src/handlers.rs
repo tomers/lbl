@@ -220,6 +220,7 @@ fn device_api_json(device: &DeviceEntry) -> serde_json::Value {
     value["media_noun"] = json!(driver_settings::media_noun(device));
     value["supports_orientation"] = json!(driver_settings::supports_orientation(device));
     value["supports_high_speed"] = json!(driver_settings::supports_high_speed(device));
+    value["bitmap_width_is_feed"] = json!(driver_settings::bitmap_width_is_feed(device));
     value
 }
 
@@ -1907,8 +1908,16 @@ pub fn browser_transport_hints(
     protocol: Protocol,
     printer_key: Option<&str>,
 ) -> serde_json::Value {
-    let Some(printer) = resolve_catalog_printer(catalog, printer_key, protocol) else {
-        return json!({ "api": default_browser_api(protocol) });
+    let printer = resolve_catalog_printer(catalog, printer_key, protocol);
+    let driver_variant =
+        printer_key.and_then(|key| Registry::driver_variant_for_printer_key(protocol, key));
+
+    let Some(printer) = printer else {
+        return with_ble_profile_fields(
+            json!({ "api": default_browser_api(protocol) }),
+            protocol,
+            driver_variant,
+        );
     };
 
     let mut webusb_filters = Vec::new();
@@ -1933,17 +1942,56 @@ pub fn browser_transport_hints(
         }
     }
 
-    if !webusb_filters.is_empty() {
-        return json!({ "api": "webusb", "filters": webusb_filters });
-    }
-    if !ble_names.is_empty() {
-        return json!({ "api": "web_bluetooth", "names": ble_names });
-    }
-    if has_serial {
-        return json!({ "api": "web_serial" });
-    }
+    let base = if !webusb_filters.is_empty() {
+        json!({ "api": "webusb", "filters": webusb_filters })
+    } else if !ble_names.is_empty() {
+        json!({ "api": "web_bluetooth", "names": ble_names })
+    } else if has_serial {
+        json!({ "api": "web_serial" })
+    } else {
+        json!({ "api": default_browser_api(protocol) })
+    };
 
-    json!({ "api": default_browser_api(protocol) })
+    with_ble_profile_fields(base, protocol, driver_variant)
+}
+
+fn with_ble_profile_fields(
+    mut hints: serde_json::Value,
+    protocol: Protocol,
+    driver_variant: Option<&'static str>,
+) -> serde_json::Value {
+    if let Some(variant) = driver_variant {
+        hints["driver_variant"] = json!(variant);
+    }
+    match protocol {
+        Protocol::Niimbot => {
+            hints["ble_profile"] = json!("niimbot");
+            hints["service_uuid"] = json!(lbl_driver_niimbot::ble::BLE_SERVICE_UUID);
+            hints["characteristic_uuid"] = json!(lbl_driver_niimbot::ble::BLE_CHARACTERISTIC_UUID);
+            if driver_variant == Some("b1") {
+                hints["framing"] = json!({
+                    "pace_ms": lbl_driver_niimbot::ble::B1_PACE_MS,
+                    "bundle_max": lbl_driver_niimbot::ble::B1_BUNDLE_MAX,
+                });
+            }
+        }
+        Protocol::LetraTag => {
+            hints["ble_profile"] = json!("letratag");
+            hints["service_uuid"] = json!(lbl_driver_letratag::SERVICE_UUID);
+            hints["write_uuid"] = json!(lbl_driver_letratag::WRITE_UUID);
+            hints["notify_uuid"] = json!(lbl_driver_letratag::NOTIFY_UUID);
+            hints["name_prefixes"] = json!(lbl_driver_letratag::NAME_PREFIXES);
+            hints["framing"] = json!({ "chunk_payload": lbl_driver_letratag::CHUNK_PAYLOAD });
+        }
+        Protocol::Phomemo
+        | Protocol::PhomemoM02x
+        | Protocol::PhomemoM110
+        | Protocol::PhomemoD30 => {
+            hints["ble_profile"] = json!("niimbot"); // phomemo often shares BLE picker path
+        }
+        _ => {}
+    }
+    hints
 }
 
 fn default_browser_api(protocol: Protocol) -> &'static str {
@@ -2157,7 +2205,7 @@ mod device_api_json_tests {
     fn brother_media_nouns_and_no_schema() {
         let catalog = Catalog::bundled().unwrap();
         let ql = device_api_json(catalog.lookup_device("QL-820NWBc").unwrap());
-        assert_eq!(ql["media_noun"], "paper type");
+        assert_eq!(ql["media_noun"], "paper_type");
         assert!(ql.get("driver_settings_schema").is_none());
         let pt = device_api_json(catalog.lookup_device("PT-E550W").unwrap());
         assert_eq!(pt["media_noun"], "tape");
@@ -2168,6 +2216,8 @@ mod device_api_json_tests {
     fn cutter_exposes_silhouette_schema() {
         let catalog = Catalog::bundled().unwrap();
         let value = device_api_json(catalog.lookup_device("cameo4").unwrap());
-        assert!(value["driver_settings_schema"]["properties"]["silhouette"].is_object());
+        let schema = &value["driver_settings_schema"];
+        assert!(schema["properties"]["silhouette"].is_object());
+        assert!(schema["properties"]["silhouette"].get("title").is_none());
     }
 }

@@ -107,7 +107,7 @@ impl Handshake for NiimbotPoll {
         self.phase = Phase::SendingJob;
         self.bundle_idx = 0;
         vec![
-            DeliveryAction::progress("sending", "Sending label to printer…"),
+            DeliveryAction::progress("sending"),
             DeliveryAction::send(self.bundles[0].clone()),
         ]
     }

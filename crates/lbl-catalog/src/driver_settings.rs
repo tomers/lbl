@@ -6,22 +6,41 @@
 //! `driver` options bag, where each driver reads only the sub-object it owns
 //! (e.g. `dymo` for LabelWriter, `silhouette` for GPGL cutters).
 //!
+//! Schemas are machine-stable only (types, enums, defaults, bounds). Display
+//! titles and descriptions belong to the consuming UI (i18n).
+//!
 //! The helpers alongside the schema builder ([`media_noun`],
-//! [`supports_orientation`], [`supports_high_speed`]) describe UI-facing
-//! capabilities that are derived from a device's protocol/model rather than
-//! stored in the catalog data.
+//! [`supports_orientation`], [`supports_high_speed`]) describe capabilities
+//! derived from a device's protocol/model rather than stored in the catalog
+//! data.
 
 use lbl_core::printer::Protocol;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::model::{DeviceEntry, DeviceRole};
+
+/// Machine-stable noun for the device's loaded consumable.
+///
+/// Consumers map these tokens to localized UI copy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaNoun {
+    /// Generic consumable (default).
+    Media,
+    /// Continuous tape (e.g. Brother P-touch TZe).
+    Tape,
+    /// Die-cut or continuous paper (e.g. Brother QL).
+    PaperType,
+}
 
 /// JSON Schema for a device's protocol-specific driver options, or `None` when
 /// the protocol exposes no tunable options.
 ///
 /// The schema's top-level `properties` are keyed by the driver that consumes
 /// them (`dymo`, `silhouette`, …) so several protocols can coexist in one
-/// `driver` bag without clashing.
+/// `driver` bag without clashing. No `title` / `description` fields are
+/// emitted — those are presentation concerns.
 pub fn schema_for(device: &DeviceEntry) -> Option<Value> {
     if device.role == DeviceRole::Cutter || device.protocol == Protocol::Gpgl {
         return Some(silhouette_schema());
@@ -37,22 +56,13 @@ fn dymo_lw_schema(device: &DeviceEntry) -> Value {
         json!({
             "type": "string",
             "enum": ["normal", "high"],
-            "title": "Print speed",
-            "default": "normal",
-            "oneOf": [
-                { "const": "normal", "title": "Normal" },
-                { "const": "high", "title": "High" }
-            ]
+            "default": "normal"
         })
     } else {
         json!({
             "type": "string",
             "enum": ["normal"],
-            "title": "Print speed",
-            "default": "normal",
-            "oneOf": [
-                { "const": "normal", "title": "Normal" }
-            ]
+            "default": "normal"
         })
     };
     json!({
@@ -60,17 +70,11 @@ fn dymo_lw_schema(device: &DeviceEntry) -> Value {
         "properties": {
             "dymo": {
                 "type": "object",
-                "title": "LabelWriter",
                 "properties": {
                     "output_mode": {
                         "type": "string",
                         "enum": ["text", "graphics"],
-                        "title": "Print mode",
-                        "default": "text",
-                        "oneOf": [
-                            { "const": "text", "title": "Text" },
-                            { "const": "graphics", "title": "Graphics & barcodes" }
-                        ]
+                        "default": "text"
                     },
                     "speed": speed
                 },
@@ -86,28 +90,21 @@ fn silhouette_schema() -> Value {
         "properties": {
             "silhouette": {
                 "type": "object",
-                "title": "Cutter",
                 "properties": {
                     "force": {
                         "type": "number",
-                        "title": "Force",
-                        "description": "Blade down-force (1–33).",
                         "minimum": 1,
                         "maximum": 33,
                         "default": 10
                     },
                     "speed": {
                         "type": "number",
-                        "title": "Speed",
-                        "description": "Feed speed (1–10).",
                         "minimum": 1,
                         "maximum": 10,
                         "default": 5
                     },
                     "mat": {
                         "type": "integer",
-                        "title": "Mat",
-                        "description": "Cutting mat preset (0 = none, 1 = 12×12 in, 2 = 12×24 in).",
                         "minimum": 0,
                         "maximum": 2,
                         "default": 1
@@ -119,15 +116,15 @@ fn silhouette_schema() -> Value {
     })
 }
 
-/// Noun for the device's loaded consumable in UI copy.
+/// Noun token for the device's loaded consumable.
 ///
-/// Brother P-touch runs continuous TZe *tape*; Brother QL runs die-cut/roll
-/// *paper*; everything else is generic *media*.
-pub fn media_noun(device: &DeviceEntry) -> &'static str {
+/// Brother P-touch runs continuous TZe tape; Brother QL runs die-cut/roll
+/// paper; everything else is generic media.
+pub fn media_noun(device: &DeviceEntry) -> MediaNoun {
     match device.protocol {
-        Protocol::BrotherPt => "tape",
-        Protocol::BrotherQl => "paper type",
-        _ => "media",
+        Protocol::BrotherPt => MediaNoun::Tape,
+        Protocol::BrotherQl => MediaNoun::PaperType,
+        _ => MediaNoun::Media,
     }
 }
 
@@ -137,6 +134,14 @@ pub fn media_noun(device: &DeviceEntry) -> &'static str {
 /// head, so orientation follows the media rather than a user toggle.
 pub fn supports_orientation(device: &DeviceEntry) -> bool {
     !matches!(device.protocol, Protocol::Dymo | Protocol::BrotherPt)
+}
+
+/// Whether the protocol's bitmap width runs along the feed axis (not the head).
+///
+/// DYMO D1 tape and LetraTag encode this way; most other drivers use head-width
+/// as bitmap width.
+pub fn bitmap_width_is_feed(device: &DeviceEntry) -> bool {
+    matches!(device.protocol, Protocol::Dymo | Protocol::LetraTag)
 }
 
 /// Whether the device offers a user-selectable high print speed.
@@ -162,10 +167,35 @@ mod tests {
         catalog.lookup_device(key).expect("device in catalog")
     }
 
+    fn assert_no_presentation_keys(value: &Value) {
+        match value {
+            Value::Object(map) => {
+                assert!(
+                    !map.contains_key("title"),
+                    "schema must not embed title: {value}"
+                );
+                assert!(
+                    !map.contains_key("description"),
+                    "schema must not embed description: {value}"
+                );
+                for child in map.values() {
+                    assert_no_presentation_keys(child);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    assert_no_presentation_keys(child);
+                }
+            }
+            _ => {}
+        }
+    }
+
     #[test]
     fn dymo_lw_550_offers_high_speed_in_schema() {
         let catalog = Catalog::bundled().unwrap();
         let schema = schema_for(device(&catalog, "LabelWriter 550")).unwrap();
+        assert_no_presentation_keys(&schema);
         let speed = &schema["properties"]["dymo"]["properties"]["speed"];
         assert_eq!(speed["enum"], json!(["normal", "high"]));
         let output = &schema["properties"]["dymo"]["properties"]["output_mode"];
@@ -177,18 +207,17 @@ mod tests {
     fn dymo_lw_5xl_drops_high_speed_from_schema() {
         let catalog = Catalog::bundled().unwrap();
         let schema = schema_for(device(&catalog, "LabelWriter 5XL")).unwrap();
+        assert_no_presentation_keys(&schema);
         let speed = &schema["properties"]["dymo"]["properties"]["speed"];
         assert_eq!(speed["enum"], json!(["normal"]));
-        assert_eq!(
-            speed["oneOf"],
-            json!([{ "const": "normal", "title": "Normal" }])
-        );
+        assert!(speed.get("oneOf").is_none());
     }
 
     #[test]
     fn cutter_exposes_silhouette_schema() {
         let catalog = Catalog::bundled().unwrap();
         let schema = schema_for(device(&catalog, "cameo4")).unwrap();
+        assert_no_presentation_keys(&schema);
         let silhouette = &schema["properties"]["silhouette"]["properties"];
         assert_eq!(silhouette["force"]["maximum"], json!(33));
         assert_eq!(silhouette["speed"]["maximum"], json!(10));
@@ -207,10 +236,20 @@ mod tests {
     #[test]
     fn media_noun_follows_protocol() {
         let catalog = Catalog::bundled().unwrap();
-        assert_eq!(media_noun(device(&catalog, "PT-E550W")), "tape");
-        assert_eq!(media_noun(device(&catalog, "QL-820NWBc")), "paper type");
-        assert_eq!(media_noun(device(&catalog, "LabelWriter 550")), "media");
-        assert_eq!(media_noun(device(&catalog, "D110")), "media");
+        assert_eq!(media_noun(device(&catalog, "PT-E550W")), MediaNoun::Tape);
+        assert_eq!(
+            media_noun(device(&catalog, "QL-820NWBc")),
+            MediaNoun::PaperType
+        );
+        assert_eq!(
+            media_noun(device(&catalog, "LabelWriter 550")),
+            MediaNoun::Media
+        );
+        assert_eq!(media_noun(device(&catalog, "D110")), MediaNoun::Media);
+        assert_eq!(
+            serde_json::to_value(MediaNoun::PaperType).unwrap(),
+            json!("paper_type")
+        );
     }
 
     #[test]

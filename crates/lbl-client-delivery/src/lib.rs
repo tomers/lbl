@@ -75,13 +75,12 @@ pub enum DeliveryAction {
         /// Advisory read timeout in milliseconds (caller-enforced).
         timeout_ms: u32,
     },
-    /// A human-readable progress update; call
-    /// [`ClientDeliverySession::tick`] to continue.
+    /// A machine-stable progress update; call
+    /// [`ClientDeliverySession::tick`] to continue. Consumers map `phase` to
+    /// display copy.
     Progress {
         /// Stable phase id (e.g. `acquiring_lock`, `sending_label`).
         phase: String,
-        /// Human-readable message.
-        message: String,
         /// 0-based label index within a batch, when known.
         #[serde(skip_serializing_if = "Option::is_none")]
         batch_index: Option<u32>,
@@ -97,9 +96,9 @@ pub enum DeliveryAction {
     },
     /// Delivery finished successfully. Terminal.
     Done,
-    /// Delivery failed. Terminal; `message` describes the device-side failure.
+    /// Delivery failed. Terminal; `message` is a diagnostic (not UI copy).
     Error {
-        /// Human-readable failure description.
+        /// Machine/diagnostic failure description.
         message: String,
     },
 }
@@ -116,24 +115,17 @@ impl DeliveryAction {
         }
     }
 
-    pub(crate) fn progress(phase: &str, message: impl Into<String>) -> Self {
+    pub(crate) fn progress(phase: &str) -> Self {
         Self::Progress {
             phase: phase.to_string(),
-            message: message.into(),
             batch_index: None,
             batch_total: None,
         }
     }
 
-    pub(crate) fn label_progress(
-        phase: &str,
-        message: impl Into<String>,
-        index: u32,
-        total: u32,
-    ) -> Self {
+    pub(crate) fn label_progress(phase: &str, index: u32, total: u32) -> Self {
         Self::Progress {
             phase: phase.to_string(),
-            message: message.into(),
             batch_index: Some(index),
             batch_total: Some(total),
         }
