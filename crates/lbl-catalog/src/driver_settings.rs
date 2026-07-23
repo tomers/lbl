@@ -47,8 +47,33 @@ pub fn schema_for(device: &DeviceEntry) -> Option<Value> {
     }
     match device.protocol {
         Protocol::DymoLw => Some(dymo_lw_schema(device)),
+        Protocol::DymoLwClassic => Some(dymo_lw_classic_schema()),
         _ => None,
     }
+}
+
+fn dymo_lw_classic_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "dymo": {
+                "type": "object",
+                "properties": {
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["text", "graphics"],
+                        "default": "text"
+                    },
+                    "roll": {
+                        "type": "string",
+                        "enum": ["auto", "left", "right"],
+                        "default": "auto"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    })
 }
 
 fn dymo_lw_schema(device: &DeviceEntry) -> Value {
@@ -280,6 +305,16 @@ mod tests {
         assert!(schema_for(device(&catalog, "QL-820NWBc")).is_none());
         assert!(schema_for(device(&catalog, "LabelManager 280")).is_none());
         assert!(schema_for(device(&catalog, "D110")).is_none());
+    }
+
+    #[test]
+    fn dymo_lw_classic_offers_roll_and_output_mode() {
+        let catalog = Catalog::bundled().unwrap();
+        let schema = schema_for(device(&catalog, "LabelWriter 450")).unwrap();
+        assert_no_presentation_keys(&schema);
+        let dymo = &schema["properties"]["dymo"]["properties"];
+        assert_eq!(dymo["roll"]["enum"], json!(["auto", "left", "right"]));
+        assert_eq!(dymo["output_mode"]["enum"], json!(["text", "graphics"]));
     }
 
     #[test]

@@ -9,7 +9,7 @@
 //!
 //! Head geometry is selected from [`DeviceCapabilities::max_width_mm`]: printers
 //! wider than 70 mm use the QL-11xx / QL-1050-class 1296-dot / 162-byte row
-//! layout (350-byte invalidate per Brother's QL-500-series command reference).
+//! layout.
 //!
 //! Cut / expanded / mode-switch opcodes are gated by
 //! [`DeviceCapabilities::supports_cut`],
@@ -21,9 +21,9 @@
 //! ## Print job structure
 //!
 //! ```text
-//! N × 0x00                invalidate (400 narrow / 350 wide; override via caps)
-//! ESC @                   initialize
+//! N × 0x00                invalidate (200 default; 400 two-colour; caps override)
 //! ESC i a 0x01            switch to raster mode (when emit_raster_mode_switch)
+//! ESC @                   initialize
 //! per page / copy:
 //!   ESC i S               status information request
 //!   ESC i z …             print information (media + raster line count)
@@ -31,9 +31,10 @@
 //!   ESC i A …             cut every N labels (when supports_cut_every)
 //!   ESC i K …             expanded mode (when supports_expanded_mode)
 //!   ESC i d …             margin / feed amount
-//!   M 0x00                compression off
+//!   M 0x00 | M 0x02       compression off or TIFF PackBits
 //!   per row (mono):
 //!     g 0x00 n <n bytes>  raster graphics transfer (row mirrored)
+//!     or Z                blank row (PackBits mode only)
 //!   per row (two-color / DK-22251):
 //!     w 0x01 n <black>    high-energy (black) plane
 //!     w 0x02 n <red>      low-energy (red) plane
@@ -42,7 +43,8 @@
 //!
 //! Two-color mode is selected when [`EncodeContext::two_color`] is true (media
 //! flagged `two_color`, e.g. DK-22251). Quality-priority is omitted in that
-//! mode per Brother's raster reference.
+//! mode per Brother's raster reference. High-resolution sets `ESC i K` bit 4
+//! when [`DeviceCapabilities::supports_high_resolution`] is set.
 //!
 //! Bit polarity matches [`MonoBitmap`]: `1` = ink. Each row is mirrored
 //! left-to-right before packing, matching the head wiring used by
@@ -52,7 +54,9 @@
 
 use lbl_core::job::CutMode;
 use lbl_core::media::MediaLength;
-use lbl_driver_api::{Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
+use lbl_driver_api::{
+    is_blank_row, packbits_compress, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
+};
 
 const ESC: u8 = 0x1B;
 
@@ -72,14 +76,14 @@ struct HeadProfile {
 const HEAD_QL8XX: HeadProfile = HeadProfile {
     head_dots: 720,
     bytes_per_row: 90,
-    invalidate_bytes: 400,
+    invalidate_bytes: 200,
     additional_offset_r: 0,
 };
 
 const HEAD_QL11XX: HeadProfile = HeadProfile {
     head_dots: 1296,
     bytes_per_row: 162,
-    invalidate_bytes: 350,
+    invalidate_bytes: 200,
     additional_offset_r: 44,
 };
 
@@ -463,6 +467,22 @@ impl BrotherQlDriver {
         row
     }
 
+    fn emit_mono_row(out: &mut Vec<u8>, row: &[u8], packbits: bool) {
+        if packbits {
+            if is_blank_row(row) {
+                out.push(b'Z');
+                return;
+            }
+            if let Some(compressed) = packbits_compress(row) {
+                out.extend_from_slice(&[b'g', 0x00, compressed.len() as u8]);
+                out.extend_from_slice(&compressed);
+                return;
+            }
+        }
+        out.extend_from_slice(&[b'g', 0x00, row.len() as u8]);
+        out.extend_from_slice(row);
+    }
+
     fn push_page(
         out: &mut Vec<u8>,
         black: &MonoBitmap,
@@ -476,6 +496,8 @@ impl BrotherQlDriver {
             cut_at_end,
             quality,
             two_color,
+            high_res,
+            packbits,
             first_page,
             last_page,
             supports_cut,
@@ -509,11 +531,14 @@ impl BrotherQlDriver {
             if two_color {
                 expanded |= 1 << 0;
             }
+            if high_res {
+                expanded |= 1 << 4;
+            }
             out.extend_from_slice(&[ESC, b'i', b'K', expanded]);
         }
         out.extend_from_slice(&[ESC, b'i', b'd']);
         out.extend_from_slice(&geom.feed_margin.to_le_bytes());
-        out.extend_from_slice(&[b'M', 0x00]);
+        out.extend_from_slice(&[b'M', if packbits && !two_color { 0x02 } else { 0x00 }]);
 
         for y in 0..black.height {
             if two_color {
@@ -525,8 +550,7 @@ impl BrotherQlDriver {
                 out.extend_from_slice(&red_row);
             } else {
                 let row = Self::pack_mirrored_row(black, y, head);
-                out.extend_from_slice(&[b'g', 0x00, head.bytes_per_row as u8]);
-                out.extend_from_slice(&row);
+                Self::emit_mono_row(out, &row, packbits);
             }
         }
 
@@ -540,6 +564,8 @@ struct PageEncodeOpts {
     cut_at_end: bool,
     quality: bool,
     two_color: bool,
+    high_res: bool,
+    packbits: bool,
     first_page: bool,
     last_page: bool,
     supports_cut: bool,
@@ -562,13 +588,20 @@ impl Driver for BrotherQlDriver {
 
     fn encode(&self, bitmap: &MonoBitmap, ctx: &EncodeContext) -> Result<Vec<u8>, DriverError> {
         let head = head_profile(ctx);
+        let two_color = ctx.two_color();
+        let default_invalidate = if two_color {
+            400
+        } else {
+            head.invalidate_bytes
+        };
         let invalidate_bytes = ctx
             .capabilities
             .invalidate_bytes
             .map(|n| n as usize)
-            .unwrap_or(head.invalidate_bytes);
+            .unwrap_or(default_invalidate);
         let geom = Self::resolve_media(ctx, head);
-        let two_color = ctx.two_color();
+        let high_res = ctx.capabilities.supports_high_resolution;
+        let packbits = ctx.capabilities.supports_packbits && !two_color;
         let black = Self::pad_to_head(bitmap, geom, head)?;
         let red = if two_color {
             let red_src = match ctx.secondary {
@@ -609,10 +642,10 @@ impl Driver for BrotherQlDriver {
                 + copies as usize * (black.data.len() + black.height as usize * row_overhead + 48),
         );
         out.extend(std::iter::repeat_n(0u8, invalidate_bytes));
-        out.extend_from_slice(&[ESC, b'@']);
         if caps.emit_raster_mode_switch {
             out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
         }
+        out.extend_from_slice(&[ESC, b'@']);
 
         for index in 0..copies {
             Self::push_page(
@@ -626,6 +659,8 @@ impl Driver for BrotherQlDriver {
                     cut_at_end,
                     quality: self.quality_priority,
                     two_color,
+                    high_res,
+                    packbits,
                     first_page: index == 0,
                     last_page: index + 1 == copies,
                     supports_cut: caps.supports_cut,
@@ -674,7 +709,7 @@ mod tests {
         assert!(bytes[..HEAD_QL8XX.invalidate_bytes].iter().all(|&b| b == 0));
         assert_eq!(
             &bytes[HEAD_QL8XX.invalidate_bytes..HEAD_QL8XX.invalidate_bytes + 6],
-            &[ESC, b'@', ESC, b'i', b'a', 0x01]
+            &[ESC, b'i', b'a', 0x01, ESC, b'@']
         );
         assert_eq!(*bytes.last().unwrap(), 0x1A);
     }

@@ -244,9 +244,16 @@ pub struct DeviceCapabilities {
     #[serde(default = "default_true")]
     pub emit_raster_mode_switch: bool,
     /// Brother QL: override leading invalidate (`0x00`) length.
-    /// When unset, the driver picks 400 (narrow) or 350 (wide) from head geometry.
+    /// When unset, the driver picks a family default (see brother-ql / brother-pt).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidate_bytes: Option<u32>,
+    /// Brother QL/PT: emit TIFF PackBits (`M 02`) raster rows when beneficial.
+    /// QL-800 firmware lacks compression; leave false there.
+    #[serde(default)]
+    pub supports_packbits: bool,
+    /// Brother QL/PT: high-resolution feed mode (`ESC i K` bit 4 on QL, bit 6 on PT).
+    #[serde(default)]
+    pub supports_high_resolution: bool,
 }
 
 impl Default for DeviceCapabilities {
@@ -265,6 +272,8 @@ impl Default for DeviceCapabilities {
             supports_cut_every: true,
             emit_raster_mode_switch: true,
             invalidate_bytes: None,
+            supports_packbits: false,
+            supports_high_resolution: false,
         }
     }
 }

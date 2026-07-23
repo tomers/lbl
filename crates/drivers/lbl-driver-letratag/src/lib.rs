@@ -59,6 +59,8 @@ pub struct LetraTagDriver {
     pub column_scale: u32,
     /// Pad feed to at least this many columns after scaling.
     pub min_feed_columns: u32,
+    /// Negotiated ATT MTU (default 247). Caps chunk payload via [`payload_ceiling`].
+    pub mtu: u16,
 }
 
 impl Default for LetraTagDriver {
@@ -67,6 +69,7 @@ impl Default for LetraTagDriver {
             variant: LetraTagVariant::Avatar,
             column_scale: 2,
             min_feed_columns: MIN_FEED_COLUMNS,
+            mtu: 247,
         }
     }
 }
@@ -129,7 +132,7 @@ impl Driver for LetraTagDriver {
             LetraTagVariant::Avatar => build_body_avatar(copies, width, &pixels, do_cut),
             LetraTagVariant::Genie => build_body_genie(width, &pixels),
         };
-        Ok(frame_job(&body))
+        Ok(frame_job_with_mtu(&body, self.mtu))
     }
 }
 
@@ -224,18 +227,6 @@ fn build_body_genie(width: u32, pixels: &[u8]) -> Vec<u8> {
     body
 }
 
-/// Wrap a job body as concatenated BLE TX frames: `[header][chunk…]`.
-pub fn frame_job(body: &[u8]) -> Vec<u8> {
-    let header = build_header(body.len() as u32);
-    let chunks = chunk_body(body);
-    let mut out = Vec::with_capacity(header.len() + chunks.iter().map(Vec::len).sum::<usize>());
-    out.extend_from_slice(&header);
-    for c in chunks {
-        out.extend_from_slice(&c);
-    }
-    out
-}
-
 /// Sequence index for zero-based chunk position `i` (skips 27).
 pub fn chunk_index(i: usize) -> u8 {
     let idx = i as u8;
@@ -247,7 +238,11 @@ pub fn chunk_index(i: usize) -> u8 {
 }
 
 /// Split `body` into wire chunks (`index || payload [|| MAGIC]`).
-pub fn chunk_body(body: &[u8]) -> Vec<Vec<u8>> {
+///
+/// `max_payload` is the body-byte ceiling per chunk (typically
+/// `min(500, mtu.saturating_sub(1))`).
+pub fn chunk_body_with_limit(body: &[u8], max_payload: usize) -> Vec<Vec<u8>> {
+    let max_payload = max_payload.clamp(1, CHUNK_PAYLOAD);
     if body.is_empty() {
         return vec![vec![chunk_index(0), MAGIC[0], MAGIC[1]]];
     }
@@ -256,7 +251,7 @@ pub fn chunk_body(body: &[u8]) -> Vec<Vec<u8>> {
     let mut i = 0;
     while offset < body.len() {
         let remaining = body.len() - offset;
-        let take = remaining.min(CHUNK_PAYLOAD);
+        let take = remaining.min(max_payload);
         let is_last = take == remaining;
         let mut chunk = Vec::with_capacity(1 + take + if is_last { 2 } else { 0 });
         chunk.push(chunk_index(i));
@@ -271,9 +266,43 @@ pub fn chunk_body(body: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
+/// Split `body` into wire chunks at the protocol 500-byte payload ceiling.
+pub fn chunk_body(body: &[u8]) -> Vec<Vec<u8>> {
+    chunk_body_with_limit(body, CHUNK_PAYLOAD)
+}
+
+/// Effective per-chunk payload ceiling for a negotiated ATT MTU.
+pub fn payload_ceiling(mtu: u16) -> usize {
+    let mtu = mtu.max(23) as usize;
+    CHUNK_PAYLOAD.min(mtu.saturating_sub(1))
+}
+
+/// Wrap a job body as concatenated BLE TX frames: `[header][chunk…]`.
+pub fn frame_job_with_mtu(body: &[u8], mtu: u16) -> Vec<u8> {
+    let header = build_header(body.len() as u32);
+    let chunks = chunk_body_with_limit(body, payload_ceiling(mtu));
+    let mut out = Vec::with_capacity(header.len() + chunks.iter().map(Vec::len).sum::<usize>());
+    out.extend_from_slice(&header);
+    for c in chunks {
+        out.extend_from_slice(&c);
+    }
+    out
+}
+
+/// Wrap a job body as concatenated BLE TX frames at the protocol max chunk size.
+pub fn frame_job(body: &[u8]) -> Vec<u8> {
+    frame_job_with_mtu(body, 247)
+}
+
 /// Split a framed job (output of [`frame_job`] / [`Driver::encode`]) into BLE
-/// write payloads.
+/// write payloads. Chunk size is inferred from the framed layout.
 pub fn tx_frames(data: &[u8]) -> Vec<&[u8]> {
+    tx_frames_with_limit(data, CHUNK_PAYLOAD)
+}
+
+/// Like [`tx_frames`], but with an explicit payload ceiling (e.g. from MTU).
+pub fn tx_frames_with_limit(data: &[u8], max_payload: usize) -> Vec<&[u8]> {
+    let max_payload = max_payload.clamp(1, CHUNK_PAYLOAD);
     if data.len() < 9 || data[0] != 0xff || data[1] != 0xf0 {
         return if data.is_empty() {
             Vec::new()
@@ -287,7 +316,7 @@ pub fn tx_frames(data: &[u8]) -> Vec<&[u8]> {
     let mut remaining = body_len;
     let mut i = 0;
     while remaining > 0 || (body_len == 0 && i == 0) {
-        let take = remaining.min(CHUNK_PAYLOAD);
+        let take = remaining.min(max_payload);
         let is_last = take == remaining;
         let wire_len = 1 + take + if is_last { 2 } else { 0 };
         if offset + wire_len > data.len() {

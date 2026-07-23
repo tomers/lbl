@@ -3776,6 +3776,7 @@ keys = ["QL-800", "QL800"]
 name = "Brother QL-800"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql800eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -3816,6 +3817,8 @@ keys = ["QL-810W", "QL810W"]
 name = "Brother QL-810W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql810weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -3856,6 +3859,8 @@ keys = ["QL-820NWBc", "QL-820NWB", "QL820NWBc", "QL820NWB"]
 name = "Brother QL-820NWBc"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql820nwbeus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -3896,6 +3901,7 @@ keys = ["QL-700", "QL700"]
 name = "Brother QL-700"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql700eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -3935,6 +3941,7 @@ keys = ["QL-710W", "QL710W"]
 name = "Brother QL-710W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql710weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -3974,6 +3981,7 @@ keys = ["QL-720NW", "QL720NW"]
 name = "Brother QL-720NW"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql720nweus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -4017,6 +4025,7 @@ keys = ["QL-600", "QL600"]
 name = "Brother QL-600"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql600eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 62.0
@@ -4056,6 +4065,8 @@ keys = ["QL-1100", "QL1100"]
 name = "Brother QL-1100"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1100eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 103.0
@@ -4108,6 +4119,8 @@ keys = ["QL-1110NWB", "QL-1110NWBc", "QL1110NWB"]
 name = "Brother QL-1110NWB"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1110nwbeus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 103.0
@@ -4160,6 +4173,8 @@ keys = ["QL-1115NWB", "QL1115NWB"]
 name = "Brother QL-1115NWB"
 support = { brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 103.0
@@ -4217,6 +4232,8 @@ keys = ["QL-1050", "QL1050"]
 name = "Brother QL-1050"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=lpql1050eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 103.0
@@ -4270,6 +4287,8 @@ keys = ["QL-1060N", "QL1060N"]
 name = "Brother QL-1060N"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=ql1060neus", brand_url = "https://support.brother.com/" }
 protocol = "brotherql"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 dpi = 300.0
 max_width_mm = 103.0
@@ -5638,6 +5657,7 @@ keys = ["PT-P700", "PTP700", "P700"]
 name = "Brother PT-P700"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p700eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5678,6 +5698,7 @@ keys = ["PT-P750W", "PTP750W", "P750W"]
 name = "Brother PT-P750W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5718,6 +5739,7 @@ keys = ["PT-H500", "PTH500", "H500"]
 name = "Brother PT-H500"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=h500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5758,6 +5780,7 @@ keys = ["PT-E500", "PTE500", "E500"]
 name = "Brother PT-E500"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5800,6 +5823,7 @@ keys = ["PT-E550W", "PTE550W", "E550W"]
 name = "Brother PT-E550W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e550weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5840,6 +5864,7 @@ keys = ["PT-D600", "PTD600", "D600"]
 name = "Brother PT-D600"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d600eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5880,6 +5905,7 @@ keys = ["PT-D450", "PTD450", "D450"]
 name = "Brother PT-D450"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d450eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5915,6 +5941,7 @@ keys = ["PT-P710BT", "PTP710BT", "P710BT", "Cube"]
 name = "Brother PT-P710BT (P-touch Cube Plus)"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p710bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 180.0
@@ -5957,6 +5984,7 @@ keys = ["PT-P300BT", "PTP300BT", "P300BT"]
 name = "Brother PT-P300BT (P-touch Cube)"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p300bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = false
 dpi = 180.0
@@ -5991,6 +6019,8 @@ keys = ["PT-P900", "PTP900", "P900"]
 name = "Brother PT-P900"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p900eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 360.0
@@ -6032,6 +6062,8 @@ keys = ["PT-P900W", "PTP900W", "P900W"]
 name = "Brother PT-P900W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p900weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 360.0
@@ -6073,6 +6105,8 @@ keys = ["PT-P950NW", "PTP950NW", "P950NW"]
 name = "Brother PT-P950NW"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p950nweus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_high_resolution = true
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 360.0
@@ -6114,6 +6148,7 @@ keys = ["PT-P910BT", "PTP910BT", "P910BT"]
 name = "Brother PT-P910BT"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p910bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
+supports_packbits = true
 maturity = "experimental"
 reports_media = true
 dpi = 360.0

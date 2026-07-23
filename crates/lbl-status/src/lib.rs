@@ -10,8 +10,11 @@
 mod brother;
 mod brother_pt;
 mod brother_ql;
+pub mod dymo_d1;
 pub mod dymo_lw;
+mod dymo_lw_classic;
 mod error;
+mod letratag;
 mod session;
 mod zpl;
 
@@ -30,6 +33,10 @@ pub use brother_ql::{
     BrotherQlStatus, STATUS_REPLY_LEN as BROTHER_QL_STATUS_REPLY_LEN,
     STATUS_REQUEST as BROTHER_QL_STATUS_REQUEST,
 };
+pub use dymo_d1::{
+    parse_status as parse_dymo_d1_status, DymoD1Status, STATUS_READ_LEN as DYMO_D1_STATUS_READ_LEN,
+    STATUS_REQUEST as DYMO_D1_STATUS_REQUEST,
+};
 pub use dymo_lw::{
     apply_engine_version, apply_sku_info, bay_is_ok, media_likely_present, merge_dymo_lw_status,
     merge_dymo_lw_status_view, parse_engine_version, parse_print_status, parse_sku_info,
@@ -39,7 +46,12 @@ pub use dymo_lw::{
     ENGINE_VERSION_REPLY_LEN as DYMO_LW_ENGINE_VERSION_REPLY_LEN,
     SKU_INFO_REPLY_LEN as DYMO_LW_SKU_INFO_REPLY_LEN, STATUS_REPLY_LEN as DYMO_LW_STATUS_REPLY_LEN,
 };
+pub use dymo_lw_classic::{
+    parse_status as parse_dymo_lw_classic_status, DymoLwClassicStatus,
+    STATUS_REQUEST as DYMO_LW_CLASSIC_STATUS_REQUEST,
+};
 pub use error::StatusError;
+pub use letratag::{parse_advertising_status as parse_letratag_ad_status, LetraTagAdStatus};
 pub use session::{
     ClientStatusSession, StatusAction, StatusSessionContext, StatusSessionContextView,
     StatusSessionError,
@@ -59,6 +71,12 @@ pub enum PrintStatus {
     /// DYMO LabelWriter 550-series (`dymo-lw`).
     #[serde(rename = "dymo-lw")]
     DymoLw(Lw550PrintStatusView),
+    /// DYMO LabelManager / D1 tape (`dymo`).
+    #[serde(rename = "dymo")]
+    Dymo(DymoD1Status),
+    /// DYMO LabelWriter classic 450-series (`dymolwclassic`).
+    #[serde(rename = "dymolwclassic")]
+    DymoLwClassic(DymoLwClassicStatus),
     /// Brother QL-series (`brother-ql`).
     #[serde(rename = "brother-ql")]
     BrotherQl(BrotherQlStatus),
@@ -75,6 +93,9 @@ pub enum PrintStatus {
     /// Graphtec / Silhouette GPGL cutter (`gpgl`).
     #[serde(rename = "gpgl")]
     Gpgl(GpglStatusView),
+    /// DYMO LetraTag advertising-data status (`letratag`).
+    #[serde(rename = "letratag")]
+    LetraTag(LetraTagAdStatus),
 }
 
 /// GPGL cutter status snapshot.
@@ -120,11 +141,14 @@ pub fn status_supported(protocol: Protocol) -> bool {
     matches!(
         protocol,
         Protocol::DymoLw
+            | Protocol::Dymo
+            | Protocol::DymoLwClassic
             | Protocol::BrotherQl
             | Protocol::BrotherPt
             | Protocol::Zpl
             | Protocol::Niimbot
             | Protocol::Gpgl
+            | Protocol::LetraTag
     )
 }
 
@@ -138,14 +162,20 @@ pub fn soft_reboot_supported(protocol: Protocol) -> bool {
 /// Richer flows (e.g. DYMO's `ESC A` + `ESC V` + `ESC U`) issue several
 /// queries; this returns the primary one that yields a [`PrintStatus`] via
 /// [`parse_status`].
+///
+/// LetraTag status is read from BLE advertising data (no wire query); this
+/// returns an empty buffer for that protocol.
 pub fn status_query_bytes(protocol: Protocol) -> Result<Vec<u8>, StatusError> {
     match protocol {
         Protocol::DymoLw => Ok(dymo_lw::status_request(dymo_lw::LOCK_RELEASE).to_vec()),
+        Protocol::Dymo => Ok(DYMO_D1_STATUS_REQUEST.to_vec()),
+        Protocol::DymoLwClassic => Ok(DYMO_LW_CLASSIC_STATUS_REQUEST.to_vec()),
         Protocol::BrotherQl => Ok(BROTHER_QL_STATUS_REQUEST.to_vec()),
         Protocol::BrotherPt => Ok(BROTHER_PT_STATUS_REQUEST.to_vec()),
         Protocol::Zpl => Ok(HOST_STATUS_CMD.to_vec()),
         Protocol::Niimbot => Ok(lbl_driver_niimbot::status_query()),
         Protocol::Gpgl => Ok(lbl_driver_gpgl::STATUS_QUERY.to_vec()),
+        Protocol::LetraTag => Ok(Vec::new()),
         other => Err(StatusError::Parse(format!(
             "status query not supported for protocol {other:?}"
         ))),
@@ -155,12 +185,16 @@ pub fn status_query_bytes(protocol: Protocol) -> Result<Vec<u8>, StatusError> {
 /// Expected minimum reply length for a primary status query, when fixed.
 ///
 /// `None` when the reply is variable-length (ZPL `~HS` framing, NIIMBOT
-/// packets, GPGL ASCII status).
+/// packets, GPGL ASCII status). LetraTag advertising status is fixed at 3
+/// bytes (no wire query; parse the manufacturer AD payload).
 pub fn status_reply_len(protocol: Protocol) -> Option<usize> {
     match protocol {
         Protocol::DymoLw => Some(DYMO_LW_STATUS_REPLY_LEN),
+        Protocol::Dymo => Some(1),
+        Protocol::DymoLwClassic => Some(1),
         Protocol::BrotherQl => Some(BROTHER_QL_STATUS_REPLY_LEN),
         Protocol::BrotherPt => Some(BROTHER_PT_STATUS_REPLY_LEN),
+        Protocol::LetraTag => Some(3),
         Protocol::Zpl | Protocol::Niimbot | Protocol::Gpgl => None,
         _ => None,
     }
@@ -171,12 +205,18 @@ pub fn status_reply_len(protocol: Protocol) -> Option<usize> {
 /// For `dymo-lw` this parses the `ESC A` reply into a view with `label_total`
 /// and engine-version fields unset; callers polling `ESC U` / `ESC V` fill
 /// those in and combine with [`merge_dymo_lw_status`].
+///
+/// For `letratag`, `bytes` is the 3-byte advertising manufacturer payload.
 pub fn parse_status(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, StatusError> {
     match protocol {
         Protocol::DymoLw => {
             let status = parse_print_status(bytes)?;
             Ok(PrintStatus::DymoLw(status.to_view()))
         }
+        Protocol::Dymo => Ok(PrintStatus::Dymo(parse_dymo_d1_status(bytes)?)),
+        Protocol::DymoLwClassic => Ok(PrintStatus::DymoLwClassic(parse_dymo_lw_classic_status(
+            bytes,
+        )?)),
         Protocol::BrotherQl => Ok(PrintStatus::BrotherQl(parse_brother_ql_status(bytes)?)),
         Protocol::BrotherPt => Ok(PrintStatus::BrotherPt(parse_brother_pt_status(bytes)?)),
         Protocol::Zpl => Ok(PrintStatus::Zpl(parse_zpl_host_status(bytes)?)),
@@ -186,6 +226,7 @@ pub fn parse_status(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, Sta
         Protocol::Gpgl => lbl_driver_gpgl::parse_status(bytes)
             .map(|s| PrintStatus::Gpgl(GpglHostStatus::from(s).into()))
             .ok_or_else(|| StatusError::Parse("unrecognized GPGL status response".into())),
+        Protocol::LetraTag => Ok(PrintStatus::LetraTag(parse_letratag_ad_status(bytes)?)),
         other => Err(StatusError::Parse(format!(
             "status parsing not supported for protocol {other:?}"
         ))),
@@ -209,7 +250,19 @@ pub fn media_key_hint(status: &PrintStatus) -> Option<String> {
         PrintStatus::BrotherPt(s) => brother_pt_media_key_hint(s),
         PrintStatus::DymoLw(s) => s.sku.clone(),
         PrintStatus::Niimbot(s) => niimbot_media_key_hint(s),
-        PrintStatus::Zpl(_) | PrintStatus::Gpgl(_) => None,
+        PrintStatus::LetraTag(s) if s.cassette_id > 0 => Some(match s.cassette_id {
+            1 => "6".into(),
+            2 => "9".into(),
+            3 => "12".into(),
+            4 => "19".into(),
+            5 => "24".into(),
+            other => other.to_string(),
+        }),
+        PrintStatus::Dymo(_)
+        | PrintStatus::DymoLwClassic(_)
+        | PrintStatus::Zpl(_)
+        | PrintStatus::Gpgl(_)
+        | PrintStatus::LetraTag(_) => None,
     }
 }
 

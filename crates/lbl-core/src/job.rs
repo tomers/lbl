@@ -107,23 +107,61 @@ impl LwSpeed {
     }
 }
 
-/// DYMO LabelWriter 550-series protocol options.
+/// Twin Turbo (and similar dual-bay) roll selection (`ESC q`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LwRollSelect {
+    /// Firmware toggles between rolls (`ESC q '0'`).
+    #[default]
+    Auto,
+    /// Left roll (`ESC q '1'`).
+    Left,
+    /// Right roll (`ESC q '2'`).
+    Right,
+}
+
+impl LwRollSelect {
+    /// Parse a CLI/API-friendly name (`auto`, `left`, `right`).
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "auto" | "automatic" | "0" => Some(Self::Auto),
+            "left" | "l" | "1" => Some(Self::Left),
+            "right" | "r" | "2" => Some(Self::Right),
+            _ => None,
+        }
+    }
+
+    /// Wire byte for classic LabelWriter `ESC q`.
+    pub fn wire_byte(self) -> u8 {
+        match self {
+            Self::Auto => b'0',
+            Self::Left => b'1',
+            Self::Right => b'2',
+        }
+    }
+}
+
+/// DYMO LabelWriter protocol options (550-series + classic 450-series).
 ///
-/// Ignored by drivers that are not `dymo-lw`. See the LW550 Tech Ref.
+/// LW550 reads `output_mode` / `speed` and ignores `roll`. Classic LW reads
+/// `output_mode` / `roll` and ignores `speed`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DymoLwOptions {
     /// Text vs graphics engine mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_mode: Option<LwOutputMode>,
-    /// Feed speed. High speed is chassis- and roll-dependent.
+    /// Feed speed. High speed is chassis- and roll-dependent (LW550).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speed: Option<LwSpeed>,
+    /// Twin Turbo roll select (classic LW `ESC q`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roll: Option<LwRollSelect>,
 }
 
 impl DymoLwOptions {
-    /// Whether both fields are unset.
+    /// Whether all fields are unset.
     pub fn is_empty(&self) -> bool {
-        self.output_mode.is_none() && self.speed.is_none()
+        self.output_mode.is_none() && self.speed.is_none() && self.roll.is_none()
     }
 }
 
@@ -144,14 +182,26 @@ impl DriverOptions {
         self.dymo.as_ref().is_none_or(DymoLwOptions::is_empty)
     }
 
-    /// Build options with a DYMO LW bag when either field is set.
+    /// Build options with a DYMO LW bag when any field is set.
     pub fn from_dymo(output_mode: Option<LwOutputMode>, speed: Option<LwSpeed>) -> Self {
-        if output_mode.is_none() && speed.is_none() {
+        Self::from_dymo_full(output_mode, speed, None)
+    }
+
+    /// Build options with the full DYMO LW bag when any field is set.
+    pub fn from_dymo_full(
+        output_mode: Option<LwOutputMode>,
+        speed: Option<LwSpeed>,
+        roll: Option<LwRollSelect>,
+    ) -> Self {
+        let opts = DymoLwOptions {
+            output_mode,
+            speed,
+            roll,
+        };
+        if opts.is_empty() {
             return Self::default();
         }
-        Self {
-            dymo: Some(DymoLwOptions { output_mode, speed }),
-        }
+        Self { dymo: Some(opts) }
     }
 }
 

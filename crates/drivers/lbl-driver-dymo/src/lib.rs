@@ -24,10 +24,24 @@ pub mod lw550;
 pub use lw450::LabelWriter450Driver;
 pub use lw550::LabelWriter550Driver;
 
+use lbl_core::media::MediaColor;
 use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
 const ESC: u8 = 0x1B;
 const SYN: u8 = 0x16;
+
+/// Map catalog media colour onto the D1 `ESC C` tape-type / strobe palette.
+///
+/// Ink colour is not modeled separately; unknown combinations fall back to `0`
+/// (black on white/clear), which thermal-label documents as the safe default.
+fn esc_c_tape_type(color: MediaColor) -> u8 {
+    match color {
+        MediaColor::White | MediaColor::Transparent => 0,
+        MediaColor::Yellow => 4,
+        MediaColor::Red => 2,
+        MediaColor::Other => 0,
+    }
+}
 
 /// LabelManager protocol column height in dots for a tape width (64 for 12 mm).
 fn protocol_head_dots(tape_width_mm: f64) -> u32 {
@@ -133,6 +147,7 @@ impl DymoDriver {
         lead_cols: u32,
         trail_cols: u32,
         feed_reverse: bool,
+        tape_type: u8,
     ) -> Result<(), DriverError> {
         let bytes_per_line = bitmap.height.div_ceil(8) as usize;
         if bytes_per_line > 0xFF {
@@ -142,27 +157,33 @@ impl DymoDriver {
             )));
         }
 
-        // Tape color (0 = black on white).
-        out.extend_from_slice(&[ESC, b'C', 0x00]);
+        out.extend_from_slice(&[ESC, b'C', tape_type]);
         // Reset dot-tab bias; firmware can carry a non-zero margin across jobs.
         out.extend_from_slice(&[ESC, b'B', 0x00]);
-        // Bytes per line.
+        // Bytes per line for content columns.
         out.extend_from_slice(&[ESC, b'D', bytes_per_line as u8]);
 
-        let total_cols = lead_cols + bitmap.width + trail_cols;
-        for i in 0..total_cols {
+        for i in 0..lead_cols {
+            let _ = i;
             out.push(SYN);
-            if i < lead_cols || i >= lead_cols + bitmap.width {
-                out.extend_from_slice(&vec![0u8; bytes_per_line]);
-                continue;
-            }
-            let src_x = i - lead_cols;
+            out.extend_from_slice(&vec![0u8; bytes_per_line]);
+        }
+        for src_x in 0..bitmap.width {
             let x = if feed_reverse {
                 bitmap.width - 1 - src_x
             } else {
                 src_x
             };
+            out.push(SYN);
             out.extend_from_slice(&Self::column_bytes(bitmap, x, bytes_per_line));
+        }
+        // Trailing skip-lines: ESC D 0 + bare SYN advances one dot row each
+        // (thermal-label d1-core). Restores are unnecessary before cut/status.
+        if trail_cols > 0 {
+            out.extend_from_slice(&[ESC, b'D', 0x00]);
+            for _ in 0..trail_cols {
+                out.push(SYN);
+            }
         }
 
         // Cut/feed first, then status. ESC A is the job terminator: its IN
@@ -202,13 +223,16 @@ impl Driver for DymoDriver {
             .feed_lead_mm
             .map(|mm| Self::mm_to_feed_dots(mm, dpi))
             .unwrap_or(0);
+        // One skip-line SYN advances one feed row; catalog feed_trail_mm is the
+        // full head-to-cutter gap (no ×2 inflation).
         let trail_cols = ctx
             .capabilities
             .feed_trail_mm
-            .map(|mm| Self::mm_to_feed_dots(mm * 2.0, dpi))
+            .map(|mm| Self::mm_to_feed_dots(mm, dpi))
             .unwrap_or(0);
         let feed_reverse = ctx.capabilities.feed_reverse;
         let tape_mm = ctx.job.media.width_mm;
+        let tape_type = esc_c_tape_type(ctx.job.media.color);
         let bitmap = if let Some(printable_mm) = ctx.capabilities.head_printable_height_mm {
             Self::fit_to_protocol_column(bitmap, tape_mm, printable_mm)
         } else {
@@ -217,7 +241,14 @@ impl Driver for DymoDriver {
 
         let mut out = Vec::new();
         for _ in 0..ctx.copies() {
-            Self::append_job(&mut out, &bitmap, lead_cols, trail_cols, feed_reverse)?;
+            Self::append_job(
+                &mut out,
+                &bitmap,
+                lead_cols,
+                trail_cols,
+                feed_reverse,
+                tape_type,
+            )?;
         }
         Ok(out)
     }
@@ -268,19 +299,20 @@ mod tests {
     }
 
     #[test]
-    fn feed_trail_adds_blank_columns() {
+    fn feed_trail_uses_skip_line_mode() {
         let mut bmp = MonoBitmap::new(1, 8);
         bmp.set(0, 0, true);
         let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
-            feed_trail_mm: Some(12.7), // gap; driver feeds 2× → 25.4 mm ≈ 180 dots
+            feed_trail_mm: Some(12.7), // ≈ 90 dots at 180 dpi
             ..Default::default()
         };
         let job = ctx_job(1);
         let ctx = EncodeContext::new(&job, &caps);
         let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
+        assert!(bytes.windows(3).any(|w| w == [ESC, b'D', 0x00]));
         let syn_count = bytes.iter().filter(|&&b| b == SYN).count();
-        assert_eq!(syn_count, 1 + 180);
+        assert_eq!(syn_count, 1 + 90);
     }
 
     #[test]

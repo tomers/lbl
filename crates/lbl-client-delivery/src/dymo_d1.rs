@@ -12,6 +12,7 @@
 //! native senders via [`lbl_driver_dymo::d1`].
 
 use lbl_driver_dymo::d1;
+use lbl_status::PrintStatus;
 
 use crate::{DeliveryAction, Event, Handshake};
 
@@ -102,15 +103,21 @@ impl Handshake for DymoD1 {
                     )]
                 }
             }
-            (Phase::ChunkDrain, Event::Rx(_)) => {
+            (Phase::ChunkDrain, Event::Rx(bytes)) => {
+                let mut actions = Vec::new();
+                if let Ok(status) = lbl_status::parse_dymo_d1_status(&bytes) {
+                    actions.push(DeliveryAction::status(PrintStatus::Dymo(status)));
+                }
                 self.pending_drains -= 1;
                 if self.pending_drains > 0 {
-                    vec![DeliveryAction::recv(
+                    actions.push(DeliveryAction::recv(
                         d1::STATUS_READ_LEN,
                         JOB_COMPLETE_TIMEOUT_MS,
-                    )]
+                    ));
+                    actions
                 } else {
-                    self.next_chunk()
+                    actions.extend(self.next_chunk());
+                    actions
                 }
             }
             _ => vec![DeliveryAction::error(
@@ -165,11 +172,18 @@ mod tests {
         };
         assert_eq!(chunk, job);
 
-        // One trailer ESC A → one drain, then Done.
+        // One trailer ESC A → status note + Done.
         let action = session.on_send_complete().unwrap();
         assert_eq!(action, DeliveryAction::recv(64, 60_000));
-        let action = session.feed_rx(&[0x00]).unwrap();
-        assert_eq!(action, DeliveryAction::Done);
+        let action = session.feed_rx(&[0x40]).unwrap();
+        match action {
+            DeliveryAction::Status { .. } => {
+                let action = session.tick().unwrap();
+                assert_eq!(action, DeliveryAction::Done);
+            }
+            DeliveryAction::Done => {}
+            other => panic!("expected Status or Done, got {other:?}"),
+        }
         assert!(session.is_finished());
     }
 }

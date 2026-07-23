@@ -120,13 +120,29 @@ pub struct BrotherQlStatus {
     pub media_length_mm: u8,
     /// Model identity derived from the firmware model byte (e.g. `QL-820NWB`).
     pub model_code: String,
+    /// Bit 7 of reserved byte 25: two-colour roll loaded (DK-22251 class).
+    pub two_color_roll: bool,
     /// Decoded error flags from error-info bitmasks.
     pub errors: Vec<BrotherQlError>,
     /// Derived readiness summary (state token + severity).
     pub summary: BrotherStatusSummary,
 }
 
-const MODEL_CODES: &[(u8, &str)] = &[(0x38, "QL-800"), (0x39, "QL-810W"), (0x41, "QL-820NWB")];
+const MODEL_CODES: &[(u8, &str)] = &[
+    (0x31, "QL-500"),
+    (0x32, "QL-550"),
+    (0x33, "QL-560"),
+    (0x34, "QL-570"),
+    (0x35, "QL-580N"),
+    (0x36, "QL-650TD"),
+    (0x37, "QL-700"),
+    (0x38, "QL-800"),
+    (0x39, "QL-810W"),
+    (0x41, "QL-820NWB"),
+    (0x43, "QL-1100"),
+    (0x44, "QL-1110NWB"),
+    (0x47, "QL-1115NWB"),
+];
 
 fn decode_errors(error1: u8, error2: u8) -> Vec<BrotherQlError> {
     let mut out = collect_error_bits(ERROR1, error1);
@@ -175,6 +191,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherQlStatus, StatusError> {
                     format!("0x{model_byte:02X}")
                 }
             }),
+        two_color_roll: status[25] & 0x80 != 0,
         errors,
         summary,
     })

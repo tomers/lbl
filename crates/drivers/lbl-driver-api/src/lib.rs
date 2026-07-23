@@ -9,9 +9,12 @@
 //! Drivers live under `crates/drivers/` and are intentionally small and
 //! self-contained so adding a new one is an isolated drop-in.
 
+pub mod packbits;
+
 pub use lbl_core::bitmap::MonoBitmap;
 pub use lbl_core::job::{CutMode, JobSpec};
 pub use lbl_core::printer::{DeviceCapabilities, Protocol};
+pub use packbits::{compress as packbits_compress, is_blank_row};
 
 /// Errors a driver can produce while encoding.
 #[derive(Debug, thiserror::Error)]

@@ -25,7 +25,11 @@ pub enum BrotherPtMediaType {
     NoMedia,
     LaminatedTape,
     NonLaminatedTape,
+    FabricTape,
     HeatShrinkTube2To1,
+    FleTape,
+    FlexibleIdTape,
+    SatinTape,
     HeatShrinkTube3To1,
     IncompatibleTape,
     Unknown,
@@ -37,7 +41,11 @@ impl BrotherPtMediaType {
             0x00 => Self::NoMedia,
             0x01 => Self::LaminatedTape,
             0x03 => Self::NonLaminatedTape,
+            0x04 => Self::FabricTape,
             0x11 => Self::HeatShrinkTube2To1,
+            0x13 => Self::FleTape,
+            0x14 => Self::FlexibleIdTape,
+            0x15 => Self::SatinTape,
             0x17 => Self::HeatShrinkTube3To1,
             0xff => Self::IncompatibleTape,
             _ => Self::Unknown,
@@ -49,7 +57,11 @@ impl BrotherPtMediaType {
             Self::NoMedia => "no_media",
             Self::LaminatedTape => "laminated_tape",
             Self::NonLaminatedTape => "non_laminated_tape",
+            Self::FabricTape => "fabric_tape",
             Self::HeatShrinkTube2To1 => "heat_shrink_tube_2_to_1",
+            Self::FleTape => "fle_tape",
+            Self::FlexibleIdTape => "flexible_id_tape",
+            Self::SatinTape => "satin_tape",
             Self::HeatShrinkTube3To1 => "heat_shrink_tube_3_to_1",
             Self::IncompatibleTape => "incompatible_tape",
             Self::Unknown => "unknown",
@@ -57,7 +69,7 @@ impl BrotherPtMediaType {
     }
 
     pub fn is_present(self) -> bool {
-        !matches!(self, Self::NoMedia)
+        !matches!(self, Self::NoMedia | Self::IncompatibleTape)
     }
 }
 
@@ -139,6 +151,14 @@ pub struct BrotherPtStatus {
     pub media_length_mm: u8,
     /// Model identity derived from the firmware model byte (e.g. `PT-P700`).
     pub model_code: String,
+    /// Battery / power byte (offset 6); meaning is model-family specific.
+    pub battery_level: u8,
+    /// Extended error code (offset 7), or `0` when none.
+    pub extended_error: u8,
+    /// Cassette tape colour ID (offset 24).
+    pub tape_color_id: u8,
+    /// Cassette ink / text colour ID (offset 25).
+    pub text_color_id: u8,
     /// Decoded error flags from error-info bitmasks.
     pub errors: Vec<BrotherPtError>,
     /// Derived readiness summary (state token + severity).
@@ -203,6 +223,10 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
                     format!("0x{model_byte:02X}")
                 }
             }),
+        battery_level: status[6],
+        extended_error: status[7],
+        tape_color_id: status[24],
+        text_color_id: status[25],
         errors,
         summary,
     })
@@ -239,11 +263,14 @@ mod tests {
         s[3] = b'0';
         s[4] = b'g'; // PT-P700
         s[5] = b'0';
+        s[6] = 0x04; // AC adapter (560-pin table)
         s[10] = 12;
         s[11] = 0x01; // laminated
         s[17] = 0;
         s[18] = 0x00;
         s[19] = 0x00;
+        s[24] = 0x01; // white
+        s[25] = 0x01; // black
         s
     }
 
@@ -253,9 +280,27 @@ mod tests {
         assert_eq!(status.model_code, "PT-P700");
         assert_eq!(status.media_width_mm, 12);
         assert_eq!(status.media_type, BrotherPtMediaType::LaminatedTape);
+        assert_eq!(status.battery_level, 0x04);
+        assert_eq!(status.tape_color_id, 0x01);
+        assert_eq!(status.text_color_id, 0x01);
         assert!(status.errors.is_empty());
         assert_eq!(media_key_hint(&status).as_deref(), Some("12"));
         assert_eq!(status_summary(&status).state, "ready");
+    }
+
+    #[test]
+    fn parses_fabric_and_satin_media() {
+        let mut s = sample_ready_12mm();
+        s[11] = 0x04;
+        assert_eq!(
+            parse_status(&s).unwrap().media_type,
+            BrotherPtMediaType::FabricTape
+        );
+        s[11] = 0x15;
+        assert_eq!(
+            parse_status(&s).unwrap().media_type,
+            BrotherPtMediaType::SatinTape
+        );
     }
 
     #[test]

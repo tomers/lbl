@@ -10,7 +10,7 @@ pub use lbl_status::{soft_reboot_supported, status_supported, PrintStatus};
 use lbl_core::printer::Protocol;
 
 #[cfg(feature = "usb")]
-use crate::transport::UsbTransport;
+use crate::transport::{open_usb_bulk_session, UsbTransport};
 #[cfg(feature = "usb")]
 use crate::DeviceError;
 #[cfg(feature = "usb")]
@@ -30,6 +30,22 @@ pub fn query_print_status(
         Protocol::DymoLw => {
             let status = dymo_lw::query_status(usb)?;
             Ok(PrintStatus::DymoLw(status.to_view()))
+        }
+        Protocol::Dymo => {
+            let mut session = open_usb_bulk_session(usb)?;
+            session.transfer_out(&lbl_status::DYMO_D1_STATUS_REQUEST)?;
+            let status = session.transfer_in(lbl_status::DYMO_D1_STATUS_READ_LEN)?;
+            Ok(PrintStatus::Dymo(lbl_status::parse_dymo_d1_status(
+                &status,
+            )?))
+        }
+        Protocol::DymoLwClassic => {
+            let mut session = open_usb_bulk_session(usb)?;
+            session.transfer_out(&lbl_status::DYMO_LW_CLASSIC_STATUS_REQUEST)?;
+            let status = session.transfer_in(64)?;
+            Ok(PrintStatus::DymoLwClassic(
+                lbl_status::parse_dymo_lw_classic_status(&status)?,
+            ))
         }
         Protocol::BrotherQl => {
             let status = brother_ql::query_status(usb)?;

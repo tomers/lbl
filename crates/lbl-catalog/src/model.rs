@@ -310,6 +310,12 @@ pub struct DeviceEntry {
     /// Brother QL: optional invalidate (`0x00`) byte count override.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalidate_bytes: Option<u32>,
+    /// Brother QL/PT: TIFF PackBits compression. Defaults off.
+    #[serde(default)]
+    pub supports_packbits: bool,
+    /// Brother QL/PT: high-resolution feed mode. Defaults off.
+    #[serde(default)]
+    pub supports_high_resolution: bool,
     /// Whether the printer reports loaded media for auto-detection.
     #[serde(default)]
     pub reports_media: bool,
@@ -413,6 +419,8 @@ impl DeviceEntry {
             supports_cut_every: self.supports_cut_every,
             emit_raster_mode_switch: self.emit_raster_mode_switch,
             invalidate_bytes: self.invalidate_bytes,
+            supports_packbits: self.supports_packbits,
+            supports_high_resolution: self.supports_high_resolution,
         }
     }
 
