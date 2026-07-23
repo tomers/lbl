@@ -17,15 +17,16 @@ use tracing::{error, info, warn};
 
 use lbl::debug::protocol_cli_name;
 use lbl::pipeline::{
-    authoring_labels, effective_printable_width_mm, encode_label, frame_html_preview_stock,
-    preview_feed_plan, preview_stock_frame, resolve_font_fit_scale, resolve_label_align,
+    apply_virtual_feed_gaps, authoring_labels, effective_printable_width_mm, encode_label,
+    frame_html_preview_stock, preview_stock_frame, resolve_font_fit_scale, resolve_label_align,
     resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
     resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
     PipelineOptions, PreviewFeedOverrides, Source, TemplateFormat, VECTOR_CSS_DPI,
 };
 #[cfg(feature = "chromium")]
 use lbl::pipeline::{
-    inked_content_bounds, pad_preview_encode_feed_plan, pad_preview_head_tape, render_label_raster,
+    inked_content_bounds, pad_preview_encode_feed_plan, pad_preview_head_tape, preview_feed_plan,
+    render_label_raster,
 };
 use lbl_catalog::{driver_settings, encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
@@ -652,8 +653,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     // printer key only selects native DPI; layout/rotation still follow the
     // chosen orientation without the head quarter-turn applied at encode time.
     let protocol = Protocol::Virtual;
-    let style_cfg = load_style_cfg(&state, &req.style);
-    let style = resolve_style(&style_cfg, dpi, supersample);
+    let mut style_cfg = load_style_cfg(&state, &req.style);
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
@@ -670,7 +670,6 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, supersample);
     let rotation = resolve_rotation(
         &state,
         &media,
@@ -678,14 +677,32 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         req.rotate_cw,
         req.rotate_ccw,
     );
+    let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
+    let feed_overrides = enrich_feed_from_style(
+        &mut style_cfg,
+        &encode_caps,
+        rotation.swaps_axes(),
+        feed_overrides,
+    );
+    let style = resolve_style(&style_cfg, dpi, supersample);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, supersample);
     let corner_radius_px = match media.length {
         lbl_core::media::MediaLength::Fixed(_) => style.corner_radius_px / supersample as f64,
         lbl_core::media::MediaLength::Continuous => 0.0,
     };
-    let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     let printable_width_mm = effective_printable_width_mm(&media, &encode_caps);
     let feed_along_width = rotation.swaps_axes();
     let feed_plan = preview_feed_plan(&encode_caps, &feed_overrides);
+    let virtual_start_px = feed_overrides
+        .virtual_feed_start_mm
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .map(|mm| ((mm / 25.4) * encode_caps.dpi.0).round().max(0.0) as u32)
+        .unwrap_or(0);
+    let virtual_end_px = feed_overrides
+        .virtual_feed_end_mm
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .map(|mm| ((mm / 25.4) * encode_caps.dpi.0).round().max(0.0) as u32)
+        .unwrap_or(0);
     let opts = PipelineOptions {
         protocol,
         media: media.clone(),
@@ -770,7 +787,12 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                         serde_json::Value::from(head_pad.pad_after_px);
                     label_json["head_along_height"] = serde_json::Value::from(feed_along_width);
                 }
-                if padded.trail_feed_px > 0 || padded.lead_feed_px > 0 || padded.precut {
+                if padded.trail_feed_px > 0
+                    || padded.lead_feed_px > 0
+                    || padded.precut
+                    || virtual_start_px > 0
+                    || virtual_end_px > 0
+                {
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(padded.content_feed_end_px);
                     label_json["feed_trail_px"] = serde_json::Value::from(padded.trail_feed_px);
@@ -780,6 +802,13 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     }
                     if padded.lead_feed_px > 0 {
                         label_json["feed_lead_px"] = serde_json::Value::from(padded.lead_feed_px);
+                    }
+                    if virtual_start_px > 0 {
+                        label_json["virtual_feed_start_px"] =
+                            serde_json::Value::from(virtual_start_px);
+                    }
+                    if virtual_end_px > 0 {
+                        label_json["virtual_feed_end_px"] = serde_json::Value::from(virtual_end_px);
                     }
                     if padded.precut {
                         label_json["precut"] = serde_json::Value::Bool(true);
@@ -824,12 +853,12 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
 }
 
 pub async fn preview_html(State(state): State<AppState>, Json(req): Json<PreviewReq>) -> ApiResult {
-    let feed_overrides = preview_feed_overrides(&req)?;
+    let mut feed_overrides = preview_feed_overrides(&req)?;
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
     let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
-    let style_cfg = load_style_cfg(&state, &req.style);
+    let mut style_cfg = load_style_cfg(&state, &req.style);
     let print_geometry = req.geometry == PreviewGeometry::Print;
     let supersample = if print_geometry {
         req.supersample.max(1)
@@ -837,11 +866,6 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         1
     };
     let layout_dpi = if print_geometry { dpi } else { VECTOR_CSS_DPI };
-    let style = if print_geometry {
-        resolve_style(&style_cfg, dpi, supersample)
-    } else {
-        resolve_style_vector(&style_cfg)
-    };
     let media = resolve_media(
         &state.catalog,
         req.media.as_deref(),
@@ -858,7 +882,6 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(layout_dpi, supersample);
     let rotation = resolve_rotation(
         &state,
         &media,
@@ -867,6 +890,18 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         req.rotate_ccw,
     );
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
+    feed_overrides = enrich_feed_from_style(
+        &mut style_cfg,
+        &encode_caps,
+        rotation.swaps_axes(),
+        feed_overrides,
+    );
+    let style = if print_geometry {
+        resolve_style(&style_cfg, dpi, supersample)
+    } else {
+        resolve_style_vector(&style_cfg)
+    };
+    let media_inset = resolve_media_inset(&style_cfg).to_px(layout_dpi, supersample);
     let opts = PipelineOptions {
         protocol: Protocol::Virtual,
         media: media.clone(),
@@ -969,7 +1004,12 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 label_json["head_pad_after_px"] = serde_json::Value::from(stock.head_pad_after_px);
                 label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
             }
-            if stock.lead_feed_px > 0 || stock.trail_feed_px > 0 || stock.precut {
+            if stock.lead_feed_px > 0
+                || stock.trail_feed_px > 0
+                || stock.precut
+                || stock.virtual_feed_start_px > 0
+                || stock.virtual_feed_end_px > 0
+            {
                 if content_feed_end_px > 0 {
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(content_feed_end_px);
@@ -981,6 +1021,14 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 }
                 if stock.lead_feed_px > 0 {
                     label_json["feed_lead_px"] = serde_json::Value::from(stock.lead_feed_px);
+                }
+                if stock.virtual_feed_start_px > 0 {
+                    label_json["virtual_feed_start_px"] =
+                        serde_json::Value::from(stock.virtual_feed_start_px);
+                }
+                if stock.virtual_feed_end_px > 0 {
+                    label_json["virtual_feed_end_px"] =
+                        serde_json::Value::from(stock.virtual_feed_end_px);
                 }
                 if stock.precut {
                     label_json["precut"] = serde_json::Value::Bool(true);
@@ -1351,7 +1399,32 @@ fn preview_feed_overrides(req: &PreviewReq) -> Result<PreviewFeedOverrides, ApiE
         feed_lead_mm: req.feed_lead_mm,
         feed_end_mm: req.feed_end_mm,
         precut: req.precut,
+        virtual_feed_start_mm: None,
+        virtual_feed_end_mm: None,
     })
+}
+
+/// Split label padding into tape lead/end; rewrite `style_cfg`; enrich feed overrides.
+fn enrich_feed_from_style(
+    style_cfg: &mut lbl_config::StyleConfig,
+    caps: &DeviceCapabilities,
+    feed_along_width: bool,
+    mut feed: PreviewFeedOverrides,
+) -> PreviewFeedOverrides {
+    let gaps = apply_virtual_feed_gaps(
+        style_cfg,
+        caps,
+        feed.cut_mode,
+        feed.precut,
+        feed_along_width,
+        feed.feed_lead_mm,
+        feed.feed_end_mm,
+    );
+    feed.feed_lead_mm = gaps.feed_lead_mm.or(feed.feed_lead_mm);
+    feed.feed_end_mm = gaps.feed_end_mm.or(feed.feed_end_mm);
+    feed.virtual_feed_start_mm = Some(gaps.virtual_feed_start_mm);
+    feed.virtual_feed_end_mm = Some(gaps.virtual_feed_end_mm);
+    feed
 }
 
 /// Protocol-specific options on print / encode requests.
@@ -1417,8 +1490,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let style_cfg = load_style_cfg(&state, &req.style);
-    let style = resolve_style(&style_cfg, dpi, req.supersample);
+    let mut style_cfg = load_style_cfg(&state, &req.style);
+    let cut_mode = resolve_cut_mode(req.cut, req.cut_mode.as_deref())?;
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
@@ -1427,7 +1500,6 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let label_valign = resolve_label_valign(&style_cfg.label_valign);
     let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
     let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
-    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, req.supersample);
 
     if req.dispatch_mode == DispatchMode::Client
         && matches!(
@@ -1456,18 +1528,29 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         &media,
         req.supports_cut,
     );
+    let gaps = apply_virtual_feed_gaps(
+        &mut style_cfg,
+        &encode_caps,
+        cut_mode,
+        req.precut,
+        rotation.swaps_axes(),
+        req.feed_lead_mm,
+        req.feed_end_mm,
+    );
+    let style = resolve_style(&style_cfg, dpi, req.supersample);
+    let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, req.supersample);
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let opts = PipelineOptions {
         protocol,
         media,
         supports_cut: req.supports_cut,
-        cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
+        cut_mode,
         copies: req.copies,
         batch_index: 0,
         batch_total: 1,
         density: req.density,
-        feed_lead_mm: req.feed_lead_mm,
-        feed_end_mm: req.feed_end_mm,
+        feed_lead_mm: gaps.feed_lead_mm.or(req.feed_lead_mm),
+        feed_end_mm: gaps.feed_end_mm.or(req.feed_end_mm),
         precut: req.precut,
         driver: resolve_driver_options(&req.driver)?,
         dither: Algorithm::parse(&req.dither)

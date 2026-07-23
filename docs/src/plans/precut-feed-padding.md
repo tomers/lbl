@@ -91,10 +91,24 @@ before enabling.
 | Symbol | Meaning | Source |
 | --- | --- | --- |
 | \(D_x\) | Head-to-cutter distance (mm) | `DeviceCapabilities::feed_trail_mm` (required when `supports_precut`) |
-| \(p_{\mathrm{lead}}\) | Requested blank before content (mm) | Job / print settings (`feed_lead_mm` or explicit padding field — see §5) |
-| \(p_{\mathrm{end}}\) | Requested blank after content before cut (mm) | Job / settings |
+| \(G\) | Virtual feed-start gap (mm) | Label style padding on the feed-start side (landscape → left; portrait → top). Studio’s single UX control. |
+| \(p_{\mathrm{lead}}\) | Mechanical blank tape before content (mm) | Derived by [`resolve_virtual_feed_gaps`](../../crates/lbl-core/src/feed_plan.rs) from \(G\), or explicit job `feed_lead_mm` override |
+| \(p_{\mathrm{end}}\) | Blank tape after content before cut (mm) | Derived from feed-end padding \(G_{\mathrm{end}}\), or explicit `feed_end_mm` |
 | \(p_{\min}\) | Minimum lead the chassis can honor after a pre-cut (mm) | Catalog optional `feed_lead_min_mm`; default `0` or driver floor (e.g. Brother `ESC i d` clamp) |
 | Pre-cut | Zero-content (or protocol-equivalent) feed to cutter + cut, ejecting \(\approx D_x\) scrap | Driver `precut` prologue |
+
+**Virtual gap split (when device has \(D_x\)):** visual blank before ink ≈
+\(p_{\mathrm{lead}} +\) feed-start content inset \(= G\). Cutter / pre-cut
+policy uses **only** \(p_{\mathrm{lead}}\).
+
+| Condition | \(p_{\mathrm{lead}}\) | Feed-start content inset |
+| --- | --- | --- |
+| Cut + \(G < D_x\) | \(G\) | 0 |
+| Cut + \(G \ge D_x\) | \(D_x\) | \(G - D_x\) |
+| No cut | 0 | \(G\) |
+| No \(D_x\) | unset / 0 | \(G\) (unchanged) |
+
+With \(D_x\): \(p_{\mathrm{end}} = G_{\mathrm{end}}\), feed-end content inset = 0.
 
 **Decision rule (when cut will fire after this label / job):**
 
@@ -143,25 +157,27 @@ Populate:
 
 ## 5. Job / API surface (generic)
 
-Prefer **padding as the user-facing knob**; pre-cut as an explicit preference:
+Prefer **Label → Padding** as the user-facing knob (virtual gap \(G\)); pre-cut
+as an explicit preference. Explicit job `feed_lead_mm` / `feed_end_mm` remain
+power-user overrides (skip deriving that side from padding):
 
 ```text
 JobSpec / print options:
-  feed_lead_mm: Option<f64>     # requested lead padding (content-side)
-  feed_end_mm: Option<f64>      # optional trailing padding before cut
+  feed_lead_mm: Option<f64>     # override mechanical lead; else derived from G
+  feed_end_mm: Option<f64>      # override end; else derived from G_end
   precut: Option<bool>          # None = use device precut_default (true on capable devices)
   cut_mode: CutMode             # existing
 ```
 
 CLI / HTTP / WASM:
 
-- Accept the same fields.
+- Accept the same fields; Studio omits lead/end so the engine derives from style.
 - On reject, return a structured error, e.g.
   `lead_padding_below_cutter_gap { requested_mm, cutter_gap_mm, precut_supported }`
   so UIs can offer “enable pre-cut” or “increase margin” without hardcoding PT.
 
 Do **not** expose a Brother-only `ESC i …` toggle in Studio. If a power-user
-override is needed, it is `precut: bool` on the job.
+override is needed, it is `precut: bool` on the job (or explicit feed_lead).
 
 ### 5.1 What “reject” means (surfacing)
 
@@ -184,13 +200,13 @@ auto-apply them:**
 
 | Condition | Suggested actions in the message |
 | --- | --- |
-| `precut_supported` (capability on; preference still off) | **Increase lead padding** to at least \(D_x\) **mm**, **or enable pre-cut** (user action). When suggesting pre-cut, **mention the empty scrap** (\(\approx D_x\) mm drops off before the real label). |
-| Pre-cut not supported on this device | **Increase lead padding** to at least \(D_x\) **mm** only. |
+| `precut_supported` (capability on; preference still off) | **Increase Label → Padding** on the feed start to at least \(D_x\) **mm**, **or enable pre-cut** (user action). When suggesting pre-cut, **mention the empty scrap** (\(\approx D_x\) mm drops off before the real label). |
+| Pre-cut not supported on this device | **Increase feed-start padding** to at least \(D_x\) **mm** only. |
 
-Example tone (final strings live in `engine-labels`): *“Lead padding (4 mm) is
-below this printer’s cutter gap (24 mm). Increase padding to 24 mm, or enable
-pre-cut (ejects ~24 mm of empty tape as scrap, then prints with your smaller
-margin).”*
+Example tone (final strings live in `engine-labels`): *“Start margin (4 mm) is
+below this printer’s cutter gap (24 mm). Increase Label → Padding on the feed
+start to 24 mm, or enable pre-cut (ejects ~24 mm of empty tape as scrap, then
+prints with your smaller margin).”*
 
 UI may deep-link focus to the pre-cut toggle / padding field; it must **not**
 set `precut: true` without an explicit user gesture (click the toggle / confirm).
@@ -279,14 +295,19 @@ Preview must not invent vendor opcodes.
 - Read `supports_precut`, `feed_trail_mm`, `precut_default` (true on capable
   devices), min lead from catalog / device capabilities JSON Schema (or existing
   caps DTO).
-- Print settings: numeric **lead/end padding**; **“Allow pre-cut”** (or similar)
-  bound to `precut`, default on; help text states the empty-scrap tradeoff (§2.1).
-  When print is blocked by lead \(< D_x\) with pre-cut off, show a warning
-  callout with an **Enable pre-cut** action (do not auto-flip from padding alone).
-- If user sets lead \(< D_x\) and pre-cut off → **disable Print** + hint that
-  offers **increase padding to \(D_x\)** and, when supported, **enable pre-cut**
-  (user must toggle — do not auto-enable) (§5.1); encode-path rejection as
-  backstop.
+- **Label → Padding** is the virtual gap \(G\) / \(G_{\mathrm{end}}\) (uniform /
+  axes / custom unchanged). Engine splits into tape lead/end vs content inset.
+- Print settings: **“Allow pre-cut”** only (no separate Lead/End fields), bound
+  to `precut`, default on; help text states the empty-scrap tradeoff (§2.1).
+  When print is blocked by \(G < D_x\) with pre-cut off, show a warning callout
+  with an **Enable pre-cut** action (do not auto-flip from padding alone).
+- Measurements: show **virtual Start** and mechanical **Lead** guides (coincide
+  when \(G \le D_x\); diverge when remainder is content inset). With pre-cut,
+  keep the kept-label lead guide plus the ejected-scrap band.
+- If user sets \(G < D_x\) and pre-cut off → **disable Print** + hint that
+  offers **increase feed-start padding to \(D_x\)** and, when supported,
+  **enable pre-cut** (user must toggle — do not auto-enable) (§5.1); encode-path
+  rejection as backstop.
 - No `brother-pt` branches for this feature.
 
 ---
@@ -331,8 +352,9 @@ Done = all of the above green for PT; at least one non-PT driver documents
    PT maps lead → `ESC i d`; end → trailing blank raster rows. Last-job
    no-chain / mechanical after-cut gap unchanged.
 3. **Profile vs job:** Catalog `precut_default = true` on capable devices. Studio
-   persists `precut` + padding in per-printer print settings (default on); job
-   JSON wins at encode.
+   persists `precut` in per-printer print settings (default on); virtual gap
+   lives in Label style padding. Explicit job `feed_lead_mm` / `feed_end_mm`
+   still override at encode when set.
 4. **Naming:** `feed_lead_mm` / `feed_end_mm` / `precut` (existing `feed_*`
    vocabulary).
 
@@ -340,10 +362,11 @@ Done = all of the above green for PT; at least one non-PT driver documents
 
 ## 13. Summary decision
 
-**Padding is the user control; pre-cut is a preference (default on for capable
-devices).** Shrinking padding below \(D_x\) **suggests** enabling pre-cut when
-it was turned off (and mentions the empty scrap) or increasing padding — it does
-**not** turn pre-cut on by itself. Once enabled, the engine applies pre-cut when
-needed. Capability (`supports_precut`) is catalog; preference defaults **on** for
-devices that support it. All policy lives in `lbl`; drivers only emit the empty
-feed-and-cut their protocol defines.
+**Label → Padding is the user control (virtual gap); pre-cut is a preference
+(default on for capable devices).** The engine splits \(G\) into mechanical lead
+vs content inset. Shrinking padding below \(D_x\) **suggests** enabling pre-cut
+when it was turned off (and mentions the empty scrap) or increasing padding —
+it does **not** turn pre-cut on by itself. Once enabled, the engine applies
+pre-cut when needed. Capability (`supports_precut`) is catalog; preference
+defaults **on** for devices that support it. All policy lives in `lbl`; drivers
+only emit the empty feed-and-cut their protocol defines.

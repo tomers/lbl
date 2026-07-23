@@ -689,6 +689,57 @@ pub fn resolve_label_padding(style: &lbl_config::StyleConfig) -> CascadingInsetM
     }
 }
 
+/// Resolved TRBL millimetres from the style padding cascade.
+pub fn resolve_label_padding_sides(style: &lbl_config::StyleConfig) -> lbl_core::PaddingSidesMm {
+    let s = resolve_label_padding(style).resolve();
+    lbl_core::PaddingSidesMm {
+        top: s.top,
+        right: s.right,
+        bottom: s.bottom,
+        left: s.left,
+    }
+}
+
+/// Write explicit per-side padding onto a style config (clears axis/uniform cascade).
+pub fn apply_padding_sides_to_style(
+    style: &mut lbl_config::StyleConfig,
+    sides: lbl_core::PaddingSidesMm,
+) {
+    style.padding_mm = 0.0;
+    style.padding_horizontal_mm = None;
+    style.padding_vertical_mm = None;
+    style.padding_top_mm = Some(sides.top);
+    style.padding_right_mm = Some(sides.right);
+    style.padding_bottom_mm = Some(sides.bottom);
+    style.padding_left_mm = Some(sides.left);
+}
+
+/// Derive tape lead/end from feed-axis label padding; rewrite style padding in place.
+///
+/// When `override_lead` / `override_end` are set (explicit job fields), that side
+/// is not derived from padding.
+pub fn apply_virtual_feed_gaps(
+    style: &mut lbl_config::StyleConfig,
+    caps: &DeviceCapabilities,
+    cut_mode: CutMode,
+    precut: Option<bool>,
+    feed_along_width: bool,
+    override_lead: Option<f64>,
+    override_end: Option<f64>,
+) -> lbl_core::VirtualFeedGaps {
+    let gaps = lbl_core::resolve_virtual_feed_gaps(
+        caps,
+        cut_mode,
+        precut,
+        resolve_label_padding_sides(style),
+        feed_along_width,
+        override_lead,
+        override_end,
+    );
+    apply_padding_sides_to_style(style, gaps.padding);
+    gaps
+}
+
 /// Build a [`MediaInset`] from the style configuration.
 pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     MediaInset {
@@ -911,6 +962,10 @@ pub struct PreviewStockFrame {
     pub trail_feed_px: u32,
     pub content_feed_end_px: u32,
     pub precut: bool,
+    /// User-facing virtual start gap (lead + feed-start content inset), layout px.
+    pub virtual_feed_start_px: u32,
+    /// User-facing virtual end gap (end margin + feed-end content inset), layout px.
+    pub virtual_feed_end_px: u32,
 }
 
 fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
@@ -928,6 +983,10 @@ pub struct PreviewFeedOverrides {
     pub feed_lead_mm: Option<f64>,
     pub feed_end_mm: Option<f64>,
     pub precut: Option<bool>,
+    /// Virtual start gap \(G\) before first ink (mm); when set, exposed as marker px.
+    pub virtual_feed_start_mm: Option<f64>,
+    /// Virtual end gap after last ink (mm).
+    pub virtual_feed_end_mm: Option<f64>,
 }
 
 /// Resolve a feed plan for preview; on policy errors keep lead/end without pre-cut.
@@ -994,6 +1053,16 @@ pub fn preview_stock_frame(
     let (lead_feed, end_margin, dx) = preview_feed_margins_from_plan(&plan, layout_dpi);
     let trail_feed = if plan.precut || dx > 0 { dx } else { 0 };
     let precut = plan.precut;
+    let virtual_start = feed
+        .virtual_feed_start_mm
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .map(|mm| feed_mm_px(mm, layout_dpi))
+        .unwrap_or(lead_feed);
+    let virtual_end = feed
+        .virtual_feed_end_mm
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .map(|mm| feed_mm_px(mm, layout_dpi))
+        .unwrap_or(end_margin);
     // Unknown continuous length: leave feed axis open (0). Known length: bake
     // lead+end into the stock box. Margins themselves always come from caps.
     let content_feed_end = if content_feed > 0 {
@@ -1034,6 +1103,8 @@ pub fn preview_stock_frame(
         trail_feed_px: trail_feed,
         content_feed_end_px: content_feed_end,
         precut,
+        virtual_feed_start_px: virtual_start,
+        virtual_feed_end_px: virtual_end,
     }
 }
 
@@ -2024,6 +2095,7 @@ mod tests {
                 feed_lead_mm: Some(2.0),
                 feed_end_mm: None,
                 precut: Some(true),
+                ..Default::default()
             },
         );
         let lead = feed_margin_px(Some(2.0), VECTOR_CSS_DPI);
