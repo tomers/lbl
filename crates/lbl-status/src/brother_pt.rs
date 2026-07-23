@@ -73,10 +73,14 @@ impl BrotherPtMediaType {
     }
 }
 
-/// Decoded PT error-info bitmask flags (bytes 8–9).
+/// Decoded PT fault tokens from error-info bitmasks, extended-error codes,
+/// notification number, and media/phase cues.
 ///
 /// Bit meanings follow the PT-P900 / P900W / P950NW / P910BT Raster Command
-/// Reference (cross-checked via thermal-label PT protocol docs).
+/// Reference (cross-checked via thermal-label PT protocol docs). Extended-error
+/// codes and notification numbers are documented for the 560-pin family; the
+/// 128-pin PT-P710BT family shares the same notification table and may report
+/// `status_type = error` with empty bitmasks when the fault is elsewhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrotherPtError {
@@ -93,6 +97,14 @@ pub enum BrotherPtError {
     Overheating,
     BlackMarkingNotDetected,
     SystemError,
+    /// Extended error `0x10` — Fle tape end.
+    FleTapeEnd,
+    /// Extended error `0x1D` — high-resolution / draft mode rejected.
+    HighResDraftError,
+    /// Extended error `0x1E` — AC adapter insert/remove fault.
+    AdapterInsertError,
+    /// Extended error `0x21`, or media-type `0xFF`.
+    IncompatibleMedia,
 }
 
 impl BrotherPtError {
@@ -111,6 +123,10 @@ impl BrotherPtError {
             Self::Overheating => "overheating",
             Self::BlackMarkingNotDetected => "black_marking_not_detected",
             Self::SystemError => "system_error",
+            Self::FleTapeEnd => "fle_tape_end",
+            Self::HighResDraftError => "high_res_draft_error",
+            Self::AdapterInsertError => "adapter_insert_error",
+            Self::IncompatibleMedia => "incompatible_media",
         }
     }
 }
@@ -155,11 +171,15 @@ pub struct BrotherPtStatus {
     pub battery_level: u8,
     /// Extended error code (offset 7), or `0` when none.
     pub extended_error: u8,
+    /// Notification number (offset 22); cover open/closed on many PT models.
+    pub notification_number: u8,
+    /// Phase number (offsets 20–21, big-endian).
+    pub phase_number: u16,
     /// Cassette tape colour ID (offset 24).
     pub tape_color_id: u8,
     /// Cassette ink / text colour ID (offset 25).
     pub text_color_id: u8,
-    /// Decoded error flags from error-info bitmasks.
+    /// Decoded fault tokens (bitmasks + extended/notification/media cues).
     pub errors: Vec<BrotherPtError>,
     /// Derived readiness summary (state token + severity).
     pub summary: BrotherStatusSummary,
@@ -175,9 +195,68 @@ const MODEL_CODES: &[(u8, &str)] = &[
     (b'x', "PT-P910BT"),
 ];
 
-fn decode_errors(error1: u8, error2: u8) -> Vec<BrotherPtError> {
+fn decode_error_bits(error1: u8, error2: u8) -> Vec<BrotherPtError> {
     let mut out = collect_error_bits(ERROR1, error1);
     out.extend(collect_error_bits(ERROR2, error2));
+    out
+}
+
+fn decode_extended_error(code: u8) -> Option<BrotherPtError> {
+    match code {
+        0x00 => None,
+        0x10 => Some(BrotherPtError::FleTapeEnd),
+        0x1d => Some(BrotherPtError::HighResDraftError),
+        0x1e => Some(BrotherPtError::AdapterInsertError),
+        0x21 => Some(BrotherPtError::IncompatibleMedia),
+        _ => None,
+    }
+}
+
+/// Cover-open while receiving (editing phase number 20) per PT raster manuals.
+const PHASE_COVER_OPEN_WHILE_RECEIVING: u16 = 20;
+
+fn push_unique(out: &mut Vec<BrotherPtError>, err: BrotherPtError) {
+    if !out.contains(&err) {
+        out.push(err);
+    }
+}
+
+struct ErrorCues {
+    error1: u8,
+    error2: u8,
+    extended_error: u8,
+    notification_number: u8,
+    phase_number: u16,
+    media_type: BrotherPtMediaType,
+    media_width_mm: u8,
+    status_type: BrotherStatusType,
+}
+
+/// Fold bitmask, extended-error, notification, phase, and media cues into one
+/// fault list so hosts never see a bare `status_type = error` with no tokens.
+fn collect_errors(cues: ErrorCues) -> Vec<BrotherPtError> {
+    let mut out = decode_error_bits(cues.error1, cues.error2);
+    if let Some(err) = decode_extended_error(cues.extended_error) {
+        push_unique(&mut out, err);
+    }
+    // Notification 01h = cover open (PT-E550W / P750W / P710BT / P900 family).
+    if cues.notification_number == 0x01 {
+        push_unique(&mut out, BrotherPtError::CoverOpen);
+    }
+    if cues.phase_number == PHASE_COVER_OPEN_WHILE_RECEIVING {
+        push_unique(&mut out, BrotherPtError::CoverOpen);
+    }
+    if cues.media_type == BrotherPtMediaType::IncompatibleTape {
+        push_unique(&mut out, BrotherPtError::IncompatibleMedia);
+    }
+    // Some chassis raise status_type=error with empty bitmasks when the cassette
+    // is missing; treat that the same as the no-media bit.
+    if cues.status_type == BrotherStatusType::Error
+        && out.is_empty()
+        && (cues.media_width_mm == 0 || cues.media_type == BrotherPtMediaType::NoMedia)
+    {
+        push_unique(&mut out, BrotherPtError::NoMedia);
+    }
     out
 }
 
@@ -201,8 +280,20 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
     let status_type = BrotherStatusType::from_byte(status[18]);
     let phase_type = BrotherPhaseType::from_byte(status[19]);
     let model_byte = status[4];
-    let errors = decode_errors(status[8], status[9]);
+    let extended_error = status[7];
+    let notification_number = status[22];
+    let phase_number = u16::from_be_bytes([status[20], status[21]]);
     let media_width_mm = status[10];
+    let errors = collect_errors(ErrorCues {
+        error1: status[8],
+        error2: status[9],
+        extended_error,
+        notification_number,
+        phase_number,
+        media_type,
+        media_width_mm,
+        status_type,
+    });
     let media_present = media_width_mm > 0 && media_type.is_present();
     let summary = summary_from_parts(&errors, status_type, phase_type, media_present);
 
@@ -224,7 +315,9 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
                 }
             }),
         battery_level: status[6],
-        extended_error: status[7],
+        extended_error,
+        notification_number,
+        phase_number,
         tape_color_id: status[24],
         text_color_id: status[25],
         errors,
@@ -312,6 +405,50 @@ mod tests {
         assert_eq!(status.errors, vec![BrotherPtError::CoverOpen]);
         assert_eq!(status.status_type, BrotherStatusType::Error);
         assert_eq!(status_summary(&status).state, "cover_open");
+    }
+
+    #[test]
+    fn folds_notification_cover_open_into_errors() {
+        let mut s = sample_ready_12mm();
+        s[18] = 0x05; // notification
+        s[22] = 0x01; // cover open
+        let status = parse_status(&s).unwrap();
+        assert_eq!(status.notification_number, 0x01);
+        assert_eq!(status.errors, vec![BrotherPtError::CoverOpen]);
+        assert_eq!(status_summary(&status).state, "cover_open");
+    }
+
+    #[test]
+    fn folds_extended_incompatible_media() {
+        let mut s = sample_ready_12mm();
+        s[7] = 0x21;
+        s[18] = 0x02;
+        let status = parse_status(&s).unwrap();
+        assert_eq!(status.extended_error, 0x21);
+        assert_eq!(status.errors, vec![BrotherPtError::IncompatibleMedia]);
+        assert_eq!(status_summary(&status).state, "incompatible_media");
+    }
+
+    #[test]
+    fn folds_incompatible_tape_media_type() {
+        let mut s = sample_ready_12mm();
+        s[11] = 0xff;
+        s[18] = 0x02;
+        let status = parse_status(&s).unwrap();
+        assert_eq!(status.media_type, BrotherPtMediaType::IncompatibleTape);
+        assert_eq!(status.errors, vec![BrotherPtError::IncompatibleMedia]);
+        assert_eq!(status_summary(&status).state, "incompatible_media");
+    }
+
+    #[test]
+    fn folds_empty_bitmask_error_with_no_tape_as_no_media() {
+        let mut s = sample_ready_12mm();
+        s[10] = 0;
+        s[11] = 0x00;
+        s[18] = 0x02;
+        let status = parse_status(&s).unwrap();
+        assert_eq!(status.errors, vec![BrotherPtError::NoMedia]);
+        assert_eq!(status_summary(&status).state, "no_media");
     }
 
     #[test]
