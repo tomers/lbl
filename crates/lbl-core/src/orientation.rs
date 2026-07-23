@@ -103,6 +103,16 @@ impl Rotation {
         matches!(self, Rotation::Cw90 | Rotation::Cw270)
     }
 
+    /// Whether the nominal reading-frame feed-start edge lands at the trailing
+    /// side of the physical feed after this quarter-turn.
+    ///
+    /// Nominal start is left when [`swaps_axes`] is true, otherwise top. Half
+    /// turns ([`Cw180`] / [`Cw270`], e.g. landscape + 180° extra) reverse that
+    /// edge, so virtual gap / lead mapping must swap start↔end sides.
+    pub fn reverses_feed_start(self) -> bool {
+        matches!(self, Rotation::Cw180 | Rotation::Cw270)
+    }
+
     /// Resolve the net rotation for a print from a base [`Orientation`] plus any
     /// additional clockwise / counter-clockwise quarter-turns the user
     /// requested.
@@ -207,6 +217,17 @@ mod tests {
         assert!(Rotation::Cw90.swaps_axes());
         assert!(!Rotation::Cw180.swaps_axes());
         assert!(Rotation::Cw270.swaps_axes());
+    }
+
+    #[test]
+    fn half_turns_reverse_feed_start() {
+        assert!(!Rotation::None.reverses_feed_start());
+        assert!(!Rotation::Cw90.reverses_feed_start());
+        assert!(Rotation::Cw180.reverses_feed_start());
+        assert!(Rotation::Cw270.reverses_feed_start());
+        // Landscape + 180° extra → Cw270.
+        assert!(Rotation::for_print(Orientation::Landscape, 2, 0).reverses_feed_start());
+        assert!(!Rotation::for_print(Orientation::Landscape, 0, 0).reverses_feed_start());
     }
 
     #[test]

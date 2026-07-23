@@ -91,7 +91,7 @@ before enabling.
 | Symbol | Meaning | Source |
 | --- | --- | --- |
 | \(D_x\) | Head-to-cutter distance (mm) | `DeviceCapabilities::feed_trail_mm` (required when `supports_precut`) |
-| \(G\) | Virtual feed-start gap (mm) | Label style padding on the feed-start side (landscape → left; portrait → top). Studio’s single UX control. |
+| \(G\) | Virtual feed-start gap (mm) | Label style padding on the feed-start side. Default: landscape → left, portrait → top. With a 180°-class turn ([`Rotation::reverses_feed_start`](../../crates/lbl-core/src/orientation.rs)), start is the opposite side (right / bottom). Studio’s single UX control. |
 | \(p_{\mathrm{lead}}\) | Mechanical blank tape before content (mm) | Derived by [`resolve_virtual_feed_gaps`](../../crates/lbl-core/src/feed_plan.rs) from \(G\), or explicit job `feed_lead_mm` override |
 | \(p_{\mathrm{end}}\) | Blank tape after content before cut (mm) | Derived from feed-end padding \(G_{\mathrm{end}}\), or explicit `feed_end_mm` |
 | \(p_{\min}\) | Minimum lead the chassis can honor after a pre-cut (mm) | Catalog optional `feed_lead_min_mm`; default `0` or driver floor (e.g. Brother `ESC i d` clamp) |

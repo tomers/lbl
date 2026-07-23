@@ -132,23 +132,33 @@ fn cutter_gap_mm(caps: &DeviceCapabilities) -> f64 {
 
 /// Split reading-frame padding on the feed axis into blank-tape lead/end vs content inset.
 ///
-/// `feed_along_width`: landscape / `Rotation::swaps_axes()` — left = start, right = end.
-/// Otherwise portrait — top = start, bottom = end.
+/// `feed_along_width`: landscape / `Rotation::swaps_axes()` — left/right are feed sides.
+/// Otherwise portrait — top/bottom are feed sides.
+///
+/// `feed_reversed`: [`Rotation::reverses_feed_start`] — start is right/bottom instead of
+/// left/top (e.g. landscape + 180° extra → Cw270).
 ///
 /// Explicit `override_lead` / `override_end` skip deriving that side from padding
-/// (CLI / power-user job fields).
+/// (CLI / power-user job fields). Pre-cut is decided later by [`resolve_feed_plan`]
+/// from the derived lead, not here.
 pub fn resolve_virtual_feed_gaps(
     caps: &DeviceCapabilities,
     cut_mode: CutMode,
-    _precut: Option<bool>,
     padding: PaddingSidesMm,
     feed_along_width: bool,
+    feed_reversed: bool,
     override_lead: Option<f64>,
     override_end: Option<f64>,
 ) -> VirtualFeedGaps {
     let dx = cutter_gap_mm(caps);
     let (g_start, g_end) = if feed_along_width {
-        (padding.left.max(0.0), padding.right.max(0.0))
+        if feed_reversed {
+            (padding.right.max(0.0), padding.left.max(0.0))
+        } else {
+            (padding.left.max(0.0), padding.right.max(0.0))
+        }
+    } else if feed_reversed {
+        (padding.bottom.max(0.0), padding.top.max(0.0))
     } else {
         (padding.top.max(0.0), padding.bottom.max(0.0))
     };
@@ -171,7 +181,13 @@ pub fn resolve_virtual_feed_gaps(
             };
             feed_lead_mm = Some(lead);
             if feed_along_width {
-                out.left = inset;
+                if feed_reversed {
+                    out.right = inset;
+                } else {
+                    out.left = inset;
+                }
+            } else if feed_reversed {
+                out.bottom = inset;
             } else {
                 out.top = inset;
             }
@@ -181,7 +197,13 @@ pub fn resolve_virtual_feed_gaps(
             // With Dx devices, end margin is blank tape; clear feed-end content inset.
             feed_end_mm = Some(g_end);
             if feed_along_width {
-                out.right = 0.0;
+                if feed_reversed {
+                    out.left = 0.0;
+                } else {
+                    out.right = 0.0;
+                }
+            } else if feed_reversed {
+                out.top = 0.0;
             } else {
                 out.bottom = 0.0;
             }
@@ -410,9 +432,9 @@ mod tests {
         let gaps = resolve_virtual_feed_gaps(
             &pt_caps(),
             CutMode::Every,
-            Some(true),
             pad_left(5.5),
             true,
+            false,
             None,
             None,
         );
@@ -431,9 +453,9 @@ mod tests {
         let gaps = resolve_virtual_feed_gaps(
             &pt_caps(),
             CutMode::Every,
-            Some(false),
             pad_left(30.0),
             true,
+            false,
             None,
             None,
         );
@@ -458,9 +480,9 @@ mod tests {
         let gaps = resolve_virtual_feed_gaps(
             &caps,
             CutMode::Every,
-            Some(true),
             pad_left(5.5),
             true,
+            false,
             None,
             None,
         );
@@ -473,9 +495,9 @@ mod tests {
         let gaps = resolve_virtual_feed_gaps(
             &pt_caps(),
             CutMode::Every,
-            Some(true),
             pad_left(10.0),
             true,
+            false,
             Some(2.0),
             None,
         );
@@ -491,15 +513,8 @@ mod tests {
             right: 4.0,
             ..Default::default()
         };
-        let gaps = resolve_virtual_feed_gaps(
-            &pt_caps(),
-            CutMode::Every,
-            Some(true),
-            pad,
-            true,
-            None,
-            None,
-        );
+        let gaps =
+            resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, true, false, None, None);
         assert!((gaps.feed_end_mm.unwrap() - 4.0).abs() < 1e-9);
         assert!((gaps.padding.right).abs() < 1e-9);
         assert!((gaps.virtual_feed_end_mm - 4.0).abs() < 1e-9);
@@ -512,18 +527,28 @@ mod tests {
             bottom: 5.0,
             ..Default::default()
         };
-        let gaps = resolve_virtual_feed_gaps(
-            &pt_caps(),
-            CutMode::Every,
-            Some(true),
-            pad,
-            false,
-            None,
-            None,
-        );
+        let gaps =
+            resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, false, false, None, None);
         assert!((gaps.feed_lead_mm.unwrap() - 3.0).abs() < 1e-9);
         assert!((gaps.padding.top).abs() < 1e-9);
         assert!((gaps.feed_end_mm.unwrap() - 5.0).abs() < 1e-9);
         assert!((gaps.padding.bottom).abs() < 1e-9);
+    }
+
+    #[test]
+    fn virtual_reversed_uses_right_as_start() {
+        let pad = PaddingSidesMm {
+            left: 4.0,
+            right: 30.0,
+            ..Default::default()
+        };
+        let gaps =
+            resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, true, true, None, None);
+        assert!((gaps.virtual_feed_start_mm - 30.0).abs() < 1e-9);
+        assert!((gaps.virtual_feed_end_mm - 4.0).abs() < 1e-9);
+        assert!((gaps.feed_lead_mm.unwrap() - 24.0).abs() < 1e-9);
+        assert!((gaps.padding.right - 6.0).abs() < 1e-9);
+        assert!((gaps.padding.left).abs() < 1e-9);
+        assert!((gaps.feed_end_mm.unwrap() - 4.0).abs() < 1e-9);
     }
 }

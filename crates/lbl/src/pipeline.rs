@@ -716,25 +716,23 @@ pub fn apply_padding_sides_to_style(
 
 /// Derive tape lead/end from feed-axis label padding; rewrite style padding in place.
 ///
-/// When `override_lead` / `override_end` are set (explicit job fields), that side
-/// is not derived from padding.
+/// When `feed.feed_lead_mm` / `feed.feed_end_mm` are set (explicit job fields),
+/// that side is not derived from padding.
 pub fn apply_virtual_feed_gaps(
     style: &mut lbl_config::StyleConfig,
     caps: &DeviceCapabilities,
-    cut_mode: CutMode,
-    precut: Option<bool>,
+    feed: &PreviewFeedOverrides,
     feed_along_width: bool,
-    override_lead: Option<f64>,
-    override_end: Option<f64>,
+    feed_reversed: bool,
 ) -> lbl_core::VirtualFeedGaps {
     let gaps = lbl_core::resolve_virtual_feed_gaps(
         caps,
-        cut_mode,
-        precut,
+        feed.cut_mode,
         resolve_label_padding_sides(style),
         feed_along_width,
-        override_lead,
-        override_end,
+        feed_reversed,
+        feed.feed_lead_mm,
+        feed.feed_end_mm,
     );
     apply_padding_sides_to_style(style, gaps.padding);
     gaps
@@ -966,6 +964,8 @@ pub struct PreviewStockFrame {
     pub virtual_feed_start_px: u32,
     /// User-facing virtual end gap (end margin + feed-end content inset), layout px.
     pub virtual_feed_end_px: u32,
+    /// When true, lead/start sit on the trailing reading-frame edge (180°-class turns).
+    pub feed_reversed: bool,
 }
 
 fn mm_to_layout_px(mm: f64, layout_dpi: f64) -> f64 {
@@ -1013,6 +1013,19 @@ pub fn preview_feed_plan(
     }
 }
 
+/// Inputs for [`preview_stock_frame`].
+#[derive(Debug, Clone, Copy)]
+pub struct PreviewStockFrameParams<'a> {
+    pub content_width_px: f64,
+    pub content_height_px: f64,
+    pub media: &'a Media,
+    pub caps: &'a DeviceCapabilities,
+    pub head_along_height: bool,
+    pub layout_dpi: f64,
+    pub feed: &'a PreviewFeedOverrides,
+    pub feed_reversed: bool,
+}
+
 /// Compute head + feed padding that expands printable HTML to physical stock.
 ///
 /// A non-positive content size on the feed axis means continuous / content-sized
@@ -1020,15 +1033,17 @@ pub fn preview_feed_plan(
 /// viewport / `--lbl-feed-px`). Head-to-cutter lead/end margins from
 /// [`DeviceCapabilities`] are still applied as stock padding so the preview
 /// matches real cut gaps (same DX rule as [`pad_preview_encode_feed`]).
-pub fn preview_stock_frame(
-    content_width_px: f64,
-    content_height_px: f64,
-    media: &Media,
-    caps: &DeviceCapabilities,
-    head_along_height: bool,
-    layout_dpi: f64,
-    feed: &PreviewFeedOverrides,
-) -> PreviewStockFrame {
+pub fn preview_stock_frame(params: PreviewStockFrameParams<'_>) -> PreviewStockFrame {
+    let PreviewStockFrameParams {
+        content_width_px,
+        content_height_px,
+        media,
+        caps,
+        head_along_height,
+        layout_dpi,
+        feed,
+        feed_reversed,
+    } = params;
     let tape_head_px = mm_to_layout_px(media.width_mm, layout_dpi).round().max(0.0);
     let content_head = if head_along_height {
         content_height_px
@@ -1066,7 +1081,12 @@ pub fn preview_stock_frame(
     // Unknown continuous length: leave feed axis open (0). Known length: bake
     // lead+end into the stock box. Margins themselves always come from caps.
     let content_feed_end = if content_feed > 0 {
-        lead_feed + content_feed
+        if feed_reversed {
+            // Reading frame: [end][content][lead] so content ends before lead.
+            end_margin + content_feed
+        } else {
+            lead_feed + content_feed
+        }
     } else {
         0
     };
@@ -1105,6 +1125,7 @@ pub fn preview_stock_frame(
         precut,
         virtual_feed_start_px: virtual_start,
         virtual_feed_end_px: virtual_end,
+        feed_reversed,
     }
 }
 
@@ -1124,12 +1145,24 @@ pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String
     }
 
     let (pad_left, pad_top) = if frame.head_along_height {
-        (frame.lead_feed_px, frame.head_pad_before_px)
+        if frame.feed_reversed {
+            (frame.feed_end_margin_px, frame.head_pad_before_px)
+        } else {
+            (frame.lead_feed_px, frame.head_pad_before_px)
+        }
+    } else if frame.feed_reversed {
+        (frame.head_pad_before_px, frame.feed_end_margin_px)
     } else {
         (frame.head_pad_before_px, frame.lead_feed_px)
     };
     let (pad_right, pad_bottom) = if frame.head_along_height {
-        (frame.feed_end_margin_px, frame.head_pad_after_px)
+        if frame.feed_reversed {
+            (frame.lead_feed_px, frame.head_pad_after_px)
+        } else {
+            (frame.feed_end_margin_px, frame.head_pad_after_px)
+        }
+    } else if frame.feed_reversed {
+        (frame.head_pad_after_px, frame.lead_feed_px)
     } else {
         (frame.head_pad_after_px, frame.feed_end_margin_px)
     };
@@ -1383,7 +1416,7 @@ pub fn pad_preview_encode_feed(
 ) -> PreviewFeedPad {
     // Caps-only preview: no cut → allow any lead (including catalog small lead).
     let plan = preview_resolve_feed_plan(caps, CutMode::None, None, None, None).unwrap_or_default();
-    pad_preview_encode_feed_plan(image, &plan, caps.dpi.0, feed_along_width)
+    pad_preview_encode_feed_plan(image, &plan, caps.dpi.0, feed_along_width, false)
 }
 
 /// Like [`pad_preview_encode_feed`] with an explicit [`lbl_core::FeedPlan`].
@@ -1392,6 +1425,7 @@ pub fn pad_preview_encode_feed_plan(
     plan: &lbl_core::FeedPlan,
     dpi: f64,
     feed_along_width: bool,
+    feed_reversed: bool,
 ) -> PreviewFeedPad {
     use image::{imageops, Rgba};
 
@@ -1415,7 +1449,13 @@ pub fn pad_preview_encode_feed_plan(
     }
 
     let label_white = Rgba([255, 255, 255, 255]);
-    let content_end = preview_lead + content_feed;
+    // Normal: [lead][content][end]; reversed (180°): [end][content][lead].
+    let pad_before = if feed_reversed {
+        end_margin
+    } else {
+        preview_lead
+    };
+    let content_end = pad_before + content_feed;
     let trail_feed_px = if plan.precut || cutter_gap > 0 {
         cutter_gap
     } else {
@@ -1425,7 +1465,7 @@ pub fn pad_preview_encode_feed_plan(
     if feed_along_width {
         let (w, h) = image.dimensions();
         let mut out = RgbaImage::from_pixel(w + preview_lead + end_margin, h, label_white);
-        imageops::overlay(&mut out, &image, preview_lead as i64, 0);
+        imageops::overlay(&mut out, &image, pad_before as i64, 0);
         PreviewFeedPad {
             image: out,
             content_feed_end_px: content_end,
@@ -1437,7 +1477,7 @@ pub fn pad_preview_encode_feed_plan(
     } else {
         let (w, h) = image.dimensions();
         let mut out = RgbaImage::from_pixel(w, h + preview_lead + end_margin, label_white);
-        imageops::overlay(&mut out, &image, 0, preview_lead as i64);
+        imageops::overlay(&mut out, &image, 0, pad_before as i64);
         PreviewFeedPad {
             image: out,
             content_feed_end_px: content_end,
@@ -1972,15 +2012,16 @@ mod tests {
         };
         let content_w = mm_to_layout_px(12.0, VECTOR_CSS_DPI);
         let content_h = mm_to_layout_px(30.0, VECTOR_CSS_DPI);
-        let frame = preview_stock_frame(
-            content_w,
-            content_h,
-            &media,
-            &caps,
-            false,
-            VECTOR_CSS_DPI,
-            &PreviewFeedOverrides::default(),
-        );
+        let frame = preview_stock_frame(PreviewStockFrameParams {
+            content_width_px: content_w,
+            content_height_px: content_h,
+            media: &media,
+            caps: &caps,
+            head_along_height: false,
+            layout_dpi: VECTOR_CSS_DPI,
+            feed: &PreviewFeedOverrides::default(),
+            feed_reversed: false,
+        });
         assert!(frame.head_pad_before_px > 0);
         assert!(frame.head_pad_after_px > 0);
         assert!(
@@ -2012,15 +2053,16 @@ mod tests {
             ..Default::default()
         };
         let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
-        let frame = preview_stock_frame(
-            0.0,
-            content_h,
-            &media,
-            &caps,
-            true,
-            VECTOR_CSS_DPI,
-            &PreviewFeedOverrides::default(),
-        );
+        let frame = preview_stock_frame(PreviewStockFrameParams {
+            content_width_px: 0.0,
+            content_height_px: content_h,
+            media: &media,
+            caps: &caps,
+            head_along_height: true,
+            layout_dpi: VECTOR_CSS_DPI,
+            feed: &PreviewFeedOverrides::default(),
+            feed_reversed: false,
+        });
         let dx = feed_margin_px(caps.feed_trail_mm, VECTOR_CSS_DPI);
         assert_eq!(
             frame.width_px, 0.0,
@@ -2083,21 +2125,23 @@ mod tests {
             ..Default::default()
         };
         let content_h = mm_to_layout_px(8.2, VECTOR_CSS_DPI);
-        let frame = preview_stock_frame(
-            0.0,
-            content_h,
-            &media,
-            &caps,
-            true,
-            VECTOR_CSS_DPI,
-            &PreviewFeedOverrides {
-                cut_mode: CutMode::Every,
-                feed_lead_mm: Some(2.0),
-                feed_end_mm: None,
-                precut: Some(true),
-                ..Default::default()
-            },
-        );
+        let feed = PreviewFeedOverrides {
+            cut_mode: CutMode::Every,
+            feed_lead_mm: Some(2.0),
+            feed_end_mm: None,
+            precut: Some(true),
+            ..Default::default()
+        };
+        let frame = preview_stock_frame(PreviewStockFrameParams {
+            content_width_px: 0.0,
+            content_height_px: content_h,
+            media: &media,
+            caps: &caps,
+            head_along_height: true,
+            layout_dpi: VECTOR_CSS_DPI,
+            feed: &feed,
+            feed_reversed: false,
+        });
         let lead = feed_margin_px(Some(2.0), VECTOR_CSS_DPI);
         let dx = feed_margin_px(Some(24.0), VECTOR_CSS_DPI);
         assert_eq!(frame.lead_feed_px, lead);
@@ -2136,7 +2180,7 @@ mod tests {
             precut: true,
             cutter_gap_mm: 24.0,
         };
-        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true);
+        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true, false);
         let lead = feed_mm_px(2.0, 180.0);
         let dx = feed_mm_px(24.0, 180.0);
         assert_eq!(padded.lead_feed_px, lead);
@@ -2158,7 +2202,7 @@ mod tests {
             precut: false,
             cutter_gap_mm: 24.0,
         };
-        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true);
+        let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true, false);
         let lead = feed_mm_px(2.0, 180.0);
         let dx = feed_mm_px(24.0, 180.0);
         assert_eq!(padded.lead_feed_px, lead);

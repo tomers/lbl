@@ -21,7 +21,8 @@ use lbl::pipeline::{
     frame_html_preview_stock, preview_stock_frame, resolve_font_fit_scale, resolve_label_align,
     resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
     resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
-    PipelineOptions, PreviewFeedOverrides, Source, TemplateFormat, VECTOR_CSS_DPI,
+    PipelineOptions, PreviewFeedOverrides, PreviewStockFrameParams, Source, TemplateFormat,
+    VECTOR_CSS_DPI,
 };
 #[cfg(feature = "chromium")]
 use lbl::pipeline::{
@@ -682,6 +683,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         &mut style_cfg,
         &encode_caps,
         rotation.swaps_axes(),
+        rotation.reverses_feed_start(),
         feed_overrides,
     );
     let style = resolve_style(&style_cfg, dpi, supersample);
@@ -692,6 +694,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     };
     let printable_width_mm = effective_printable_width_mm(&media, &encode_caps);
     let feed_along_width = rotation.swaps_axes();
+    let feed_reversed = rotation.reverses_feed_start();
     let feed_plan = preview_feed_plan(&encode_caps, &feed_overrides);
     let virtual_start_px = feed_overrides
         .virtual_feed_start_mm
@@ -757,6 +760,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     &feed_plan,
                     encode_caps.dpi.0,
                     feed_along_width,
+                    feed_reversed,
                 );
                 let image = padded.image;
                 let content_bounds = inked_content_bounds(&image);
@@ -802,6 +806,9 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     }
                     if padded.lead_feed_px > 0 {
                         label_json["feed_lead_px"] = serde_json::Value::from(padded.lead_feed_px);
+                    }
+                    if feed_reversed {
+                        label_json["feed_reversed"] = serde_json::Value::Bool(true);
                     }
                     if virtual_start_px > 0 {
                         label_json["virtual_feed_start_px"] =
@@ -894,6 +901,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         &mut style_cfg,
         &encode_caps,
         rotation.swaps_axes(),
+        rotation.reverses_feed_start(),
         feed_overrides,
     );
     let style = if print_geometry {
@@ -939,6 +947,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let px_per_mm = layout_dpi * supersample as f64 / 25.4;
 
     let feed_along_width = rotation.swaps_axes();
+    let feed_reversed = rotation.reverses_feed_start();
     let mut rendered = Vec::with_capacity(count);
     for label in labels {
         let transpiled = transpile_label_html(&label.html, &opts).map_err(fail_internal)?;
@@ -961,15 +970,16 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             }
             (transpiled.html, width_px, height_px, None, 0u32)
         } else {
-            let stock = preview_stock_frame(
-                transpiled.width_px,
-                transpiled.height_px,
-                &media,
-                &encode_caps,
-                feed_along_width,
+            let stock = preview_stock_frame(PreviewStockFrameParams {
+                content_width_px: transpiled.width_px,
+                content_height_px: transpiled.height_px,
+                media: &media,
+                caps: &encode_caps,
+                head_along_height: feed_along_width,
                 layout_dpi,
-                &feed_overrides,
-            );
+                feed: &feed_overrides,
+                feed_reversed,
+            });
             let html = frame_html_preview_stock(&transpiled.html, &stock);
             // Continuous feed: content head-fit pins `.lbl-label{--lbl-feed-px}` so
             // Studio can size the iframe without measuring opaque sandbox docs.
@@ -978,7 +988,11 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 (stock.width_px, stock.content_feed_end_px)
             } else if let Some(content_feed) = injected_label_min_width_px(&html) {
                 let feed = content_feed + f64::from(stock.lead_feed_px + stock.feed_end_margin_px);
-                let content_end = stock.lead_feed_px + content_feed.round().max(0.0) as u32;
+                let content_end = if stock.feed_reversed {
+                    stock.feed_end_margin_px + content_feed.round().max(0.0) as u32
+                } else {
+                    stock.lead_feed_px + content_feed.round().max(0.0) as u32
+                };
                 (feed, content_end)
             } else {
                 (0.0, stock.content_feed_end_px)
@@ -1021,6 +1035,9 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                 }
                 if stock.lead_feed_px > 0 {
                     label_json["feed_lead_px"] = serde_json::Value::from(stock.lead_feed_px);
+                }
+                if stock.feed_reversed {
+                    label_json["feed_reversed"] = serde_json::Value::Bool(true);
                 }
                 if stock.virtual_feed_start_px > 0 {
                     label_json["virtual_feed_start_px"] =
@@ -1409,17 +1426,10 @@ fn enrich_feed_from_style(
     style_cfg: &mut lbl_config::StyleConfig,
     caps: &DeviceCapabilities,
     feed_along_width: bool,
+    feed_reversed: bool,
     mut feed: PreviewFeedOverrides,
 ) -> PreviewFeedOverrides {
-    let gaps = apply_virtual_feed_gaps(
-        style_cfg,
-        caps,
-        feed.cut_mode,
-        feed.precut,
-        feed_along_width,
-        feed.feed_lead_mm,
-        feed.feed_end_mm,
-    );
+    let gaps = apply_virtual_feed_gaps(style_cfg, caps, &feed, feed_along_width, feed_reversed);
     feed.feed_lead_mm = gaps.feed_lead_mm.or(feed.feed_lead_mm);
     feed.feed_end_mm = gaps.feed_end_mm.or(feed.feed_end_mm);
     feed.virtual_feed_start_mm = Some(gaps.virtual_feed_start_mm);
@@ -1531,11 +1541,15 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let gaps = apply_virtual_feed_gaps(
         &mut style_cfg,
         &encode_caps,
-        cut_mode,
-        req.precut,
+        &PreviewFeedOverrides {
+            cut_mode,
+            feed_lead_mm: req.feed_lead_mm,
+            feed_end_mm: req.feed_end_mm,
+            precut: req.precut,
+            ..Default::default()
+        },
         rotation.swaps_axes(),
-        req.feed_lead_mm,
-        req.feed_end_mm,
+        rotation.reverses_feed_start(),
     );
     let style = resolve_style(&style_cfg, dpi, req.supersample);
     let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, req.supersample);
