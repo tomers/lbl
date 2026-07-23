@@ -148,24 +148,24 @@ pub struct Lw550EngineVersion {
 
 /// JSON-friendly view of [`Lw550PrintStatus`] for APIs and WASM.
 ///
-/// Machine codes only — consumers map codes to display copy. Round-trippable:
-/// follow-up fields (`label_total`, engine version) default to `None` when
-/// absent (see [`merge_dymo_lw_status_view`]).
+/// Machine-stable enum tokens only — consumers map tokens to display copy.
+/// Round-trippable: follow-up fields (`label_total`, engine version) default to
+/// `None` when absent (see [`merge_dymo_lw_status_view`]).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Lw550PrintStatusView {
-    pub print_status_code: u8,
+    pub print_status: Lw550PrintEngineStatus,
     pub print_job_id: u32,
     pub label_index: u16,
-    pub print_head_status_code: u8,
+    pub print_head_status: Lw550PrintHeadStatus,
     pub print_density: u8,
-    pub main_bay_status_code: u8,
+    pub main_bay_status: Lw550MainBayStatus,
     pub sku: Option<String>,
     pub error_id: u32,
     pub label_count: u16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_total: Option<u16>,
     pub eps_present: bool,
-    pub print_head_voltage_code: u8,
+    pub print_head_voltage: Lw550PrintHeadVoltage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hardware_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -181,18 +181,18 @@ pub struct Lw550PrintStatusView {
 impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
     fn from(status: &Lw550PrintStatus) -> Self {
         Self {
-            print_status_code: status.print_status_code,
+            print_status: status.print_status,
             print_job_id: status.print_job_id,
             label_index: status.label_index,
-            print_head_status_code: status.print_head_status_code,
+            print_head_status: status.print_head_status,
             print_density: status.print_density,
-            main_bay_status_code: status.main_bay_status_code,
+            main_bay_status: status.main_bay_status,
             sku: status.sku.clone(),
             error_id: status.error_id,
             label_count: status.label_count,
             label_total: status.label_total,
             eps_present: status.eps_present,
-            print_head_voltage_code: status.print_head_voltage_code,
+            print_head_voltage: status.print_head_voltage,
             hardware_version: status.hardware_version.clone(),
             firmware_version: status.firmware_version.clone(),
             firmware_kind: status.firmware_kind.clone(),
@@ -203,14 +203,41 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
 }
 
 impl Lw550PrintStatus {
-    /// Convert to a JSON-friendly codes-only view.
+    /// Convert to a JSON-friendly token view.
     pub fn to_view(&self) -> Lw550PrintStatusView {
         Lw550PrintStatusView::from(self)
     }
 }
 
+/// Whether the bay byte indicates media is likely loaded (gate for `ESC U`).
+pub fn media_likely_present(bay: Lw550MainBayStatus) -> bool {
+    matches!(
+        bay,
+        Lw550MainBayStatus::MediaPresentUnknown
+            | Lw550MainBayStatus::MediaEmpty
+            | Lw550MainBayStatus::MediaCriticallyLow
+            | Lw550MainBayStatus::MediaLow
+            | Lw550MainBayStatus::MediaOk
+            | Lw550MainBayStatus::MediaJammed
+            | Lw550MainBayStatus::MediaCounterfeit
+    )
+}
+
+/// Whether the print engine is actively working a job.
+pub fn print_job_active(status: Lw550PrintEngineStatus) -> bool {
+    matches!(
+        status,
+        Lw550PrintEngineStatus::Printing | Lw550PrintEngineStatus::Busy
+    )
+}
+
+/// Whether the main bay reports a healthy media-present state.
+pub fn bay_is_ok(bay: Lw550MainBayStatus) -> bool {
+    matches!(bay, Lw550MainBayStatus::MediaOk)
+}
+
 /// Byte 0 of the status reply (`Print status`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Lw550PrintEngineStatus {
     Idle,
@@ -219,7 +246,7 @@ pub enum Lw550PrintEngineStatus {
     Cancel,
     Busy,
     NoLock,
-    Unknown(u8),
+    Unknown,
 }
 
 impl Lw550PrintEngineStatus {
@@ -231,31 +258,31 @@ impl Lw550PrintEngineStatus {
             3 => Self::Cancel,
             4 => Self::Busy,
             5 => Self::NoLock,
-            other => Self::Unknown(other),
+            _ => Self::Unknown,
         }
     }
 
-    pub fn label(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Idle => "idle",
             Self::Printing => "printing",
             Self::Error => "error",
             Self::Cancel => "cancel",
             Self::Busy => "busy",
-            Self::NoLock => "no lock (another host may be printing)",
-            Self::Unknown(_) => "unknown",
+            Self::NoLock => "no_lock",
+            Self::Unknown => "unknown",
         }
     }
 }
 
 /// Byte 8 of the status reply (`Print head status`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Lw550PrintHeadStatus {
     Ok,
     Overheated,
+    StatusUnknown,
     Unknown,
-    UnknownCode(u8),
 }
 
 impl Lw550PrintHeadStatus {
@@ -263,23 +290,23 @@ impl Lw550PrintHeadStatus {
         match value {
             0 => Self::Ok,
             1 => Self::Overheated,
-            2 => Self::Unknown,
-            other => Self::UnknownCode(other),
+            2 => Self::StatusUnknown,
+            _ => Self::Unknown,
         }
     }
 
-    pub fn label(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Ok => "ok",
             Self::Overheated => "overheated",
-            Self::Unknown => "status unknown",
-            Self::UnknownCode(_) => "unknown",
+            Self::StatusUnknown => "status_unknown",
+            Self::Unknown => "unknown",
         }
     }
 }
 
 /// Byte 10 of the status reply (`Main bay status`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Lw550MainBayStatus {
     BayUnknown,
@@ -293,7 +320,7 @@ pub enum Lw550MainBayStatus {
     MediaOk,
     MediaJammed,
     MediaCounterfeit,
-    Unknown(u8),
+    Unknown,
 }
 
 impl Lw550MainBayStatus {
@@ -310,30 +337,30 @@ impl Lw550MainBayStatus {
             8 => Self::MediaOk,
             9 => Self::MediaJammed,
             10 => Self::MediaCounterfeit,
-            other => Self::Unknown(other),
+            _ => Self::Unknown,
         }
     }
 
-    pub fn label(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
-            Self::BayUnknown => "bay status unknown",
-            Self::BayOpen => "bay open; media presence unknown",
-            Self::NoMedia => "no media present",
-            Self::MediaNotInsertedProperly => "media not inserted properly",
-            Self::MediaPresentUnknown => "media present — status unknown",
-            Self::MediaEmpty => "media present — empty",
-            Self::MediaCriticallyLow => "media present — critically low",
-            Self::MediaLow => "media present — low",
-            Self::MediaOk => "media present — ok",
-            Self::MediaJammed => "media present — jammed",
-            Self::MediaCounterfeit => "media present — counterfeit media",
-            Self::Unknown(_) => "unknown",
+            Self::BayUnknown => "bay_unknown",
+            Self::BayOpen => "bay_open",
+            Self::NoMedia => "no_media",
+            Self::MediaNotInsertedProperly => "media_not_inserted_properly",
+            Self::MediaPresentUnknown => "media_present_unknown",
+            Self::MediaEmpty => "media_empty",
+            Self::MediaCriticallyLow => "media_critically_low",
+            Self::MediaLow => "media_low",
+            Self::MediaOk => "media_ok",
+            Self::MediaJammed => "media_jammed",
+            Self::MediaCounterfeit => "media_counterfeit",
+            Self::Unknown => "unknown",
         }
     }
 }
 
 /// Byte 30 (low nibble) of the status reply (`Print head voltage`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Lw550PrintHeadVoltage {
     Unknown,
@@ -341,7 +368,6 @@ pub enum Lw550PrintHeadVoltage {
     Low,
     CriticallyLow,
     TooLowForPrinting,
-    UnknownCode(u8),
 }
 
 impl Lw550PrintHeadVoltage {
@@ -352,18 +378,17 @@ impl Lw550PrintHeadVoltage {
             2 => Self::Low,
             3 => Self::CriticallyLow,
             4 => Self::TooLowForPrinting,
-            other => Self::UnknownCode(other),
+            _ => Self::Unknown,
         }
     }
 
-    pub fn label(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
             Self::Ok => "ok",
             Self::Low => "low",
-            Self::CriticallyLow => "critically low",
-            Self::TooLowForPrinting => "too low for printing",
-            Self::UnknownCode(_) => "unknown",
+            Self::CriticallyLow => "critically_low",
+            Self::TooLowForPrinting => "too_low_for_printing",
         }
     }
 }
@@ -515,13 +540,6 @@ pub fn apply_sku_info(status: &mut Lw550PrintStatus, info: &Lw550SkuInfo) {
     if status.sku.is_none() {
         status.sku = info.sku.clone();
     }
-}
-
-/// Whether the main-bay status code indicates media is likely present.
-///
-/// Used to decide whether issuing `ESC U` (NFC dump) is worthwhile.
-pub fn media_likely_present(bay_code: u8) -> bool {
-    matches!(bay_code, 4..=10)
 }
 
 /// Read the NFC-reported consumable SKU from a 32-byte LW5 status reply.

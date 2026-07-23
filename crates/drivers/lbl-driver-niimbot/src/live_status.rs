@@ -251,6 +251,26 @@ pub fn parse_model_id_payload(data: &[u8]) -> Option<u16> {
     }
 }
 
+/// Map a NIIMBOT ModelId to a catalog device key.
+///
+/// Ids from <https://printers.niim.blue/hardware/models/>.
+pub fn catalog_key_for_model_id(model_id: u16) -> Option<&'static str> {
+    Some(match model_id {
+        512 => "D11",
+        514 => "D11S",
+        528 => "D11_H",
+        531 => "D11_PRO",
+        2304 | 2305 => "D110",
+        2320 => "D110_M",
+        2560 => "D101",
+        4096 => "B1",
+        4097 => "B1_PRO",
+        4098 => "B1_SE",
+        768 => "B21",
+        _ => return None,
+    })
+}
+
 /// Format a `PrinterInfo` software/hardware version payload as `major.minor`.
 ///
 /// D-series units (and the official app) report `[major, minor]`, rendered with

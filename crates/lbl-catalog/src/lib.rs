@@ -21,6 +21,10 @@ mod model;
 mod validate;
 
 pub use driver_settings::MediaNoun;
+pub use driver_settings::{
+    bitmap_width_is_feed, cutter_mat_sheet_mm, default_browser_api, media_noun,
+    supports_high_speed, supports_network, supports_orientation,
+};
 pub use model::{
     encode_capabilities_for, CatalogEntry, ConnectionHint, DeviceEntry, DeviceRole, DeviceSupport,
     ImageInfo, Maturity, MediaSpec, ResolvedTransport,

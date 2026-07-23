@@ -416,8 +416,8 @@ impl ClientStatusSession {
                     if let Some(eng) = engine.clone() {
                         apply_engine_version(&mut status, &eng);
                     }
-                    let bay = status.main_bay_status_code;
-                    if media_likely_present(bay) {
+                    let bay = status.main_bay_status;
+                    if dymo_lw::media_likely_present(bay) {
                         *phase = DymoPhase::SkuSent;
                         Ok(vec![StatusAction::Send {
                             bytes: dymo_lw::sku_info_request().to_vec(),
@@ -664,10 +664,6 @@ fn niimbot_query_bytes(phase: NiimbotPhase, is_b1: bool, rfid_try_second: bool) 
         NiimbotPhase::PrintSent => live_status::print_progress_query(),
         _ => live_status::print_progress_query(),
     }
-}
-
-fn media_likely_present(bay_code: u8) -> bool {
-    (4..=10).contains(&bay_code)
 }
 
 fn device_info_has_fields(info: &NiimbotDeviceInfo) -> bool {

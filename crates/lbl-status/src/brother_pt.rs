@@ -1,11 +1,15 @@
 //! Brother P-touch / TZe status reply (`ESC i S`) parsing.
 //!
 //! The printer returns a fixed 32-byte status block. See Brother's *Raster
-//! Command Reference* for the PT-H500 / PT-P700 / PT-E500 family.
+//! Command Reference* for the PT-H500 / PT-P700 / PT-E500 / P900 family.
 //!
-//! The wire shape exposes machine codes only. Consumers map codes and error
-//! bitmasks to display copy.
+//! The wire shape exposes machine-stable tokens only. Consumers map tokens to
+//! display copy.
 
+use crate::brother::{
+    collect_error_bits, summary_from_parts, BrotherPhaseType, BrotherStatusSummary,
+    BrotherStatusType,
+};
 use crate::StatusError;
 
 /// Length of a Brother PT status reply on bulk IN.
@@ -14,19 +18,131 @@ pub const STATUS_REPLY_LEN: usize = 32;
 /// `ESC i S` status information request.
 pub const STATUS_REQUEST: [u8; 3] = [0x1B, b'i', b'S'];
 
+/// PT media-type byte (offset 11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrotherPtMediaType {
+    NoMedia,
+    LaminatedTape,
+    NonLaminatedTape,
+    HeatShrinkTube2To1,
+    HeatShrinkTube3To1,
+    IncompatibleTape,
+    Unknown,
+}
+
+impl BrotherPtMediaType {
+    pub fn from_byte(value: u8) -> Self {
+        match value {
+            0x00 => Self::NoMedia,
+            0x01 => Self::LaminatedTape,
+            0x03 => Self::NonLaminatedTape,
+            0x11 => Self::HeatShrinkTube2To1,
+            0x17 => Self::HeatShrinkTube3To1,
+            0xff => Self::IncompatibleTape,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NoMedia => "no_media",
+            Self::LaminatedTape => "laminated_tape",
+            Self::NonLaminatedTape => "non_laminated_tape",
+            Self::HeatShrinkTube2To1 => "heat_shrink_tube_2_to_1",
+            Self::HeatShrinkTube3To1 => "heat_shrink_tube_3_to_1",
+            Self::IncompatibleTape => "incompatible_tape",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn is_present(self) -> bool {
+        !matches!(self, Self::NoMedia)
+    }
+}
+
+/// Decoded PT error-info bitmask flags (bytes 8–9).
+///
+/// Bit meanings follow the PT-P900 / P900W / P950NW / P910BT Raster Command
+/// Reference (cross-checked via thermal-label PT protocol docs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrotherPtError {
+    NoMedia,
+    EndOfMedia,
+    CutterJam,
+    WeakBatteries,
+    HighVoltageAdapter,
+    ReplaceMedia,
+    ExpansionBufferFull,
+    CommunicationError,
+    CommunicationBufferFull,
+    CoverOpen,
+    Overheating,
+    BlackMarkingNotDetected,
+    SystemError,
+}
+
+impl BrotherPtError {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NoMedia => "no_media",
+            Self::EndOfMedia => "end_of_media",
+            Self::CutterJam => "cutter_jam",
+            Self::WeakBatteries => "weak_batteries",
+            Self::HighVoltageAdapter => "high_voltage_adapter",
+            Self::ReplaceMedia => "replace_media",
+            Self::ExpansionBufferFull => "expansion_buffer_full",
+            Self::CommunicationError => "communication_error",
+            Self::CommunicationBufferFull => "communication_buffer_full",
+            Self::CoverOpen => "cover_open",
+            Self::Overheating => "overheating",
+            Self::BlackMarkingNotDetected => "black_marking_not_detected",
+            Self::SystemError => "system_error",
+        }
+    }
+}
+
+impl AsRef<str> for BrotherPtError {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+const ERROR1: &[(u8, BrotherPtError)] = &[
+    (0, BrotherPtError::NoMedia),
+    (1, BrotherPtError::EndOfMedia),
+    (2, BrotherPtError::CutterJam),
+    (3, BrotherPtError::WeakBatteries),
+    (6, BrotherPtError::HighVoltageAdapter),
+];
+
+const ERROR2: &[(u8, BrotherPtError)] = &[
+    (0, BrotherPtError::ReplaceMedia),
+    (1, BrotherPtError::ExpansionBufferFull),
+    (2, BrotherPtError::CommunicationError),
+    (3, BrotherPtError::CommunicationBufferFull),
+    (4, BrotherPtError::CoverOpen),
+    (5, BrotherPtError::Overheating),
+    (6, BrotherPtError::BlackMarkingNotDetected),
+    (7, BrotherPtError::SystemError),
+];
+
 /// Parsed fields from the 32-byte status reply.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct BrotherPtStatus {
-    pub status_type_code: u8,
-    pub phase_type_code: u8,
-    pub media_type_code: u8,
+    pub status_type: BrotherStatusType,
+    pub phase_type: BrotherPhaseType,
+    pub media_type: BrotherPtMediaType,
     pub media_width_mm: u8,
     /// Always `0` for continuous TZe tape.
     pub media_length_mm: u8,
     /// Model identity derived from the firmware model byte (e.g. `PT-P700`).
     pub model_code: String,
-    pub error_info_1: u8,
-    pub error_info_2: u8,
+    /// Decoded error flags from error-info bitmasks.
+    pub errors: Vec<BrotherPtError>,
+    /// Derived readiness summary (state token + severity).
+    pub summary: BrotherStatusSummary,
 }
 
 const MODEL_CODES: &[(u8, &str)] = &[
@@ -38,6 +154,12 @@ const MODEL_CODES: &[(u8, &str)] = &[
     (b'p', "PT-P950NW"),
     (b'x', "PT-P910BT"),
 ];
+
+fn decode_errors(error1: u8, error2: u8) -> Vec<BrotherPtError> {
+    let mut out = collect_error_bits(ERROR1, error1);
+    out.extend(collect_error_bits(ERROR2, error2));
+    out
+}
 
 /// Parse a 32-byte Brother PT status reply.
 pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
@@ -55,18 +177,20 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
         )));
     }
 
-    let error1 = status[8];
-    let error2 = status[9];
-    let media_type_code = status[11];
-    let status_type_code = status[18];
-    let phase_type_code = status[19];
+    let media_type = BrotherPtMediaType::from_byte(status[11]);
+    let status_type = BrotherStatusType::from_byte(status[18]);
+    let phase_type = BrotherPhaseType::from_byte(status[19]);
     let model_byte = status[4];
+    let errors = decode_errors(status[8], status[9]);
+    let media_width_mm = status[10];
+    let media_present = media_width_mm > 0 && media_type.is_present();
+    let summary = summary_from_parts(&errors, status_type, phase_type, media_present);
 
     Ok(BrotherPtStatus {
-        status_type_code,
-        phase_type_code,
-        media_type_code,
-        media_width_mm: status[10],
+        status_type,
+        phase_type,
+        media_type,
+        media_width_mm,
         media_length_mm: status[17],
         model_code: MODEL_CODES
             .iter()
@@ -79,17 +203,28 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
                     format!("0x{model_byte:02X}")
                 }
             }),
-        error_info_1: error1,
-        error_info_2: error2,
+        errors,
+        summary,
     })
 }
 
 /// Best-effort media width key from status (e.g. `12` or `4` for 3.5 mm TZe).
 pub fn media_key_hint(status: &BrotherPtStatus) -> Option<String> {
-    if status.media_width_mm == 0 || status.media_type_code == 0 {
+    if status.media_width_mm == 0 || !status.media_type.is_present() {
         return None;
     }
     Some(status.media_width_mm.to_string())
+}
+
+/// Readiness summary so UI hosts do not re-encode status bytes.
+pub fn status_summary(status: &BrotherPtStatus) -> BrotherStatusSummary {
+    let media_present = status.media_width_mm > 0 && status.media_type.is_present();
+    summary_from_parts(
+        &status.errors,
+        status.status_type,
+        status.phase_type,
+        media_present,
+    )
 }
 
 #[cfg(test)]
@@ -117,10 +252,10 @@ mod tests {
         let status = parse_status(&sample_ready_12mm()).unwrap();
         assert_eq!(status.model_code, "PT-P700");
         assert_eq!(status.media_width_mm, 12);
-        assert_eq!(status.media_type_code, 0x01);
-        assert_eq!(status.error_info_1, 0);
-        assert_eq!(status.error_info_2, 0);
+        assert_eq!(status.media_type, BrotherPtMediaType::LaminatedTape);
+        assert!(status.errors.is_empty());
         assert_eq!(media_key_hint(&status).as_deref(), Some("12"));
+        assert_eq!(status_summary(&status).state, "ready");
     }
 
     #[test]
@@ -129,8 +264,9 @@ mod tests {
         s[9] = 1 << 4;
         s[18] = 0x02;
         let status = parse_status(&s).unwrap();
-        assert_eq!(status.error_info_2 & (1 << 4), 1 << 4);
-        assert_eq!(status.status_type_code, 0x02);
+        assert_eq!(status.errors, vec![BrotherPtError::CoverOpen]);
+        assert_eq!(status.status_type, BrotherStatusType::Error);
+        assert_eq!(status_summary(&status).state, "cover_open");
     }
 
     #[test]

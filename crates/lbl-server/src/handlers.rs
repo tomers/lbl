@@ -144,6 +144,8 @@ fn device_api_json(device: &DeviceEntry) -> serde_json::Value {
     value["supports_orientation"] = json!(driver_settings::supports_orientation(device));
     value["supports_high_speed"] = json!(driver_settings::supports_high_speed(device));
     value["bitmap_width_is_feed"] = json!(driver_settings::bitmap_width_is_feed(device));
+    value["supports_network"] = json!(driver_settings::supports_network(device));
+    value["default_browser_api"] = json!(driver_settings::default_browser_api(device.protocol));
     value
 }
 
@@ -1911,17 +1913,7 @@ fn with_ble_profile_fields(
 }
 
 fn default_browser_api(protocol: Protocol) -> &'static str {
-    match protocol {
-        Protocol::Niimbot => "web_serial",
-        Protocol::LetraTag => "web_bluetooth",
-        Protocol::Phomemo
-        | Protocol::PhomemoM02x
-        | Protocol::PhomemoM110
-        | Protocol::PhomemoD30 => "web_bluetooth",
-        Protocol::Dymo | Protocol::DymoLw | Protocol::DymoLwClassic => "webusb",
-        Protocol::BrotherQl | Protocol::BrotherPt => "webusb",
-        _ => "webusb",
-    }
+    lbl_catalog::driver_settings::default_browser_api(protocol)
 }
 
 fn build_client_print_response(

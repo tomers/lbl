@@ -130,6 +130,14 @@ pub fn packet_payload_for_command(buffer: &[u8], response_cmd: u8) -> Option<(Ve
     None
 }
 
+/// Response command byte for a `PrinterInfo(ModelId)` reply.
+pub const PRINTER_MODEL_ID_RESPONSE: u8 = 0x48;
+
+/// Extract a ModelId payload from a BLE notify chunk, if present.
+pub fn model_id_payload_from_notify(buffer: &[u8]) -> Option<Vec<u8>> {
+    packet_payload_for_command(buffer, PRINTER_MODEL_ID_RESPONSE).map(|(p, _)| p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +158,12 @@ mod tests {
         let (payload, end) = packet_payload_for_command(&pkt, 0x1b).unwrap();
         assert_eq!(payload, vec![0x11, 0x22]);
         assert_eq!(end, pkt.len());
+    }
+
+    #[test]
+    fn extracts_model_id_payload() {
+        let pkt = frame_packet(PRINTER_MODEL_ID_RESPONSE, &[0x09]);
+        assert_eq!(model_id_payload_from_notify(&pkt), Some(vec![0x09]));
     }
 
     #[test]

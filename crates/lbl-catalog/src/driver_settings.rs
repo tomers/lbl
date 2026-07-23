@@ -151,6 +151,55 @@ pub fn supports_high_speed(device: &DeviceEntry) -> bool {
     device.protocol == Protocol::DymoLw && !is_5xl(device)
 }
 
+/// Whether the protocol commonly supports raw network (TCP/9100) printing.
+pub fn supports_network(device: &DeviceEntry) -> bool {
+    matches!(
+        device.protocol,
+        Protocol::Zpl
+            | Protocol::Ezpl
+            | Protocol::Tspl
+            | Protocol::Tpcl
+            | Protocol::Sbpl
+            | Protocol::Slcs
+            | Protocol::Dpl
+            | Protocol::EscPos
+            | Protocol::BrotherQl
+            | Protocol::BrotherPt
+            | Protocol::Gpgl
+    ) || device
+        .connections
+        .iter()
+        .any(|c| matches!(c, crate::model::ConnectionHint::Network { .. }))
+}
+
+/// Default browser transport API for a protocol when no connection hints exist.
+pub fn default_browser_api(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Niimbot => "web_serial",
+        Protocol::LetraTag => "web_bluetooth",
+        Protocol::Phomemo
+        | Protocol::PhomemoM02x
+        | Protocol::PhomemoM110
+        | Protocol::PhomemoD30 => "web_bluetooth",
+        Protocol::Dymo | Protocol::DymoLw | Protocol::DymoLwClassic => "webusb",
+        Protocol::BrotherQl | Protocol::BrotherPt => "webusb",
+        _ => "webusb",
+    }
+}
+
+/// Silhouette / GPGL mat index → cuttable sheet size in millimeters.
+///
+/// Indices align with the `silhouette.mat` driver setting and catalog mat media.
+pub fn cutter_mat_sheet_mm(mat: u32) -> (f64, f64) {
+    match mat {
+        0 | 1 => (304.8, 304.8),
+        2 => (304.8, 609.6),
+        3 => (381.0, 381.0),
+        4 => (609.6, 609.6),
+        _ => (304.8, 304.8),
+    }
+}
+
 fn is_5xl(device: &DeviceEntry) -> bool {
     device
         .keys

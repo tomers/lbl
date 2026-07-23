@@ -15,15 +15,6 @@ pub use lbl_status::dymo_lw::*;
 use crate::transport::{open_usb_bulk_session, Transport, UsbBulkSession, UsbTransport};
 use crate::DeviceError;
 
-/// Main-bay status: media present and OK (NFC-valid genuine roll).
-const BAY_MEDIA_OK: u8 = 8;
-
-/// Main-bay status: NFC rejected the inserted roll as non-genuine.
-const BAY_MEDIA_COUNTERFEIT: u8 = 10;
-
-/// Print-engine status: reply before lock is granted to this host.
-const PRINT_STATUS_NO_LOCK: u8 = 5;
-
 /// Query the full print-engine status without acquiring the print lock.
 ///
 /// Issues `ESC A` for engine/remaining-count fields, `ESC V` for HW/FW/PID,
@@ -35,7 +26,7 @@ pub fn query_print_status(session: &mut UsbBulkSession) -> Result<Lw550PrintStat
     if let Ok(ver) = query_engine_version(session) {
         apply_engine_version(&mut parsed, &ver);
     }
-    if media_likely_present(parsed.main_bay_status_code) {
+    if media_likely_present(parsed.main_bay_status) {
         if let Ok(info) = query_sku_info(session) {
             if info.total_label_count > 0 {
                 parsed.label_total = Some(info.total_label_count);
@@ -279,56 +270,51 @@ pub fn query_loaded_media_sku(session: &mut UsbBulkSession) -> Result<Option<Str
 }
 
 fn interpret_status(status: &[u8], phase: &str) -> Result<(), DeviceError> {
-    if status.len() < STATUS_REPLY_LEN {
-        return Err(DeviceError::Transport(format!(
-            "{phase}: short status reply ({} bytes)",
-            status.len()
-        )));
-    }
+    let parsed =
+        parse_print_status(status).map_err(|e| DeviceError::Transport(format!("{phase}: {e}")))?;
 
-    match status[0] {
-        PRINT_STATUS_NO_LOCK => {
+    match parsed.print_status {
+        Lw550PrintEngineStatus::NoLock => {
             return Err(DeviceError::Transport(format!(
                 "{phase}: printer did not grant the print lock (another host may be using it)"
             )));
         }
-        2 => {
+        Lw550PrintEngineStatus::Error => {
             return Err(DeviceError::Transport(format!(
-                "{phase}: printer reported an error (status byte {})",
-                status[0]
+                "{phase}: printer reported an error"
             )));
         }
         _ => {}
     }
 
-    if status.len() > 10 {
-        match status[10] {
-            BAY_MEDIA_OK => {}
-            BAY_MEDIA_COUNTERFEIT => {
-                return Err(DeviceError::Transport(
-                    "printer rejected the loaded media (NFC reports non-genuine labels); \
-                     LabelWriter 550 requires authentic DYMO rolls"
-                        .into(),
-                ));
-            }
-            2 => {
-                return Err(DeviceError::Transport(format!(
-                    "{phase}: no media loaded in the printer"
-                )));
-            }
-            5..=7 => {
-                return Err(DeviceError::Transport(format!(
-                    "{phase}: media roll is empty or nearly empty (bay status {})",
-                    status[10]
-                )));
-            }
-            9 => {
-                return Err(DeviceError::Transport(format!(
-                    "{phase}: media jam reported by printer"
-                )));
-            }
-            _ => {}
+    match parsed.main_bay_status {
+        Lw550MainBayStatus::MediaOk => {}
+        Lw550MainBayStatus::MediaCounterfeit => {
+            return Err(DeviceError::Transport(
+                "printer rejected the loaded media (NFC reports non-genuine labels); \
+                 LabelWriter 550 requires authentic DYMO rolls"
+                    .into(),
+            ));
         }
+        Lw550MainBayStatus::NoMedia => {
+            return Err(DeviceError::Transport(format!(
+                "{phase}: no media loaded in the printer"
+            )));
+        }
+        Lw550MainBayStatus::MediaEmpty
+        | Lw550MainBayStatus::MediaCriticallyLow
+        | Lw550MainBayStatus::MediaLow => {
+            return Err(DeviceError::Transport(format!(
+                "{phase}: media roll is empty or nearly empty ({})",
+                parsed.main_bay_status.as_str()
+            )));
+        }
+        Lw550MainBayStatus::MediaJammed => {
+            return Err(DeviceError::Transport(format!(
+                "{phase}: media jam reported by printer"
+            )));
+        }
+        _ => {}
     }
 
     Ok(())
@@ -356,7 +342,7 @@ mod tests {
     #[test]
     fn interpret_status_flags_counterfeit_media() {
         let mut status = vec![0u8; STATUS_REPLY_LEN];
-        status[10] = BAY_MEDIA_COUNTERFEIT;
+        status[10] = 10; // media counterfeit
         let err = interpret_status(&status, "test").unwrap_err();
         assert!(err.to_string().contains("non-genuine"));
     }

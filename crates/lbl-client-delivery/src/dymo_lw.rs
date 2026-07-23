@@ -11,8 +11,8 @@
 //! mirroring the native `lbl-device` LW5 USB session.
 
 use lbl_status::dymo_lw::{
-    parse_print_status, status_request, Lw550PrintStatus, LOCK_ACQUIRE, LOCK_INTER_LABEL,
-    LOCK_RELEASE, STATUS_REPLY_LEN,
+    parse_print_status, status_request, Lw550MainBayStatus, Lw550PrintEngineStatus,
+    Lw550PrintStatus, LOCK_ACQUIRE, LOCK_INTER_LABEL, LOCK_RELEASE, STATUS_REPLY_LEN,
 };
 use lbl_status::PrintStatus;
 
@@ -136,32 +136,38 @@ fn parse_job(payload: &[u8]) -> Result<ParsedJob, DeliveryError> {
 /// Interpret a status reply, rejecting no-lock / error / bad-media conditions.
 fn interpret(bytes: &[u8], phase: &str) -> Result<Lw550PrintStatus, String> {
     let status = parse_print_status(bytes).map_err(|e| format!("{phase}: {e}"))?;
-    match status.print_status_code {
-        5 => {
+    match status.print_status {
+        Lw550PrintEngineStatus::NoLock => {
             return Err(format!(
                 "{phase}: printer did not grant the print lock (another host may be using it)"
             ))
         }
-        2 => return Err(format!("{phase}: printer reported an error")),
-        3 => return Err(format!("{phase}: print job was cancelled")),
+        Lw550PrintEngineStatus::Error => return Err(format!("{phase}: printer reported an error")),
+        Lw550PrintEngineStatus::Cancel => return Err(format!("{phase}: print job was cancelled")),
         _ => {}
     }
-    match status.main_bay_status_code {
-        10 => {
+    match status.main_bay_status {
+        Lw550MainBayStatus::MediaCounterfeit => {
             return Err(
                 "printer rejected the loaded media (NFC reports non-genuine labels); \
                  LabelWriter 550 requires authentic DYMO rolls"
                     .into(),
             )
         }
-        2 => return Err(format!("{phase}: no media loaded in the printer")),
-        5..=7 => {
+        Lw550MainBayStatus::NoMedia => {
+            return Err(format!("{phase}: no media loaded in the printer"))
+        }
+        Lw550MainBayStatus::MediaEmpty
+        | Lw550MainBayStatus::MediaCriticallyLow
+        | Lw550MainBayStatus::MediaLow => {
             return Err(format!(
-                "{phase}: media roll is empty or nearly empty (bay status {})",
-                status.main_bay_status_code
+                "{phase}: media roll is empty or nearly empty ({})",
+                status.main_bay_status.as_str()
             ))
         }
-        9 => return Err(format!("{phase}: media jam reported by printer")),
+        Lw550MainBayStatus::MediaJammed => {
+            return Err(format!("{phase}: media jam reported by printer"))
+        }
         _ => {}
     }
     Ok(status)

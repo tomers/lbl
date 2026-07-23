@@ -7,6 +7,7 @@
 //! the transport (USB bulk, serial, BLE, network) and map [`StatusError`] onto
 //! their own error type at the I/O boundary.
 
+mod brother;
 mod brother_pt;
 mod brother_ql;
 pub mod dymo_lw;
@@ -16,22 +17,25 @@ mod zpl;
 
 use lbl_core::printer::Protocol;
 
+pub use brother::{BrotherPhaseType, BrotherSeverity, BrotherStatusSummary, BrotherStatusType};
 pub use brother_pt::{
     media_key_hint as brother_pt_media_key_hint, parse_status as parse_brother_pt_status,
+    status_summary as brother_pt_status_summary, BrotherPtError, BrotherPtMediaType,
     BrotherPtStatus, STATUS_REPLY_LEN as BROTHER_PT_STATUS_REPLY_LEN,
     STATUS_REQUEST as BROTHER_PT_STATUS_REQUEST,
 };
 pub use brother_ql::{
     media_key_hint as brother_ql_media_key_hint, parse_status as parse_brother_ql_status,
+    status_summary as brother_ql_status_summary, BrotherQlError, BrotherQlMediaType,
     BrotherQlStatus, STATUS_REPLY_LEN as BROTHER_QL_STATUS_REPLY_LEN,
     STATUS_REQUEST as BROTHER_QL_STATUS_REQUEST,
 };
 pub use dymo_lw::{
-    apply_engine_version, apply_sku_info, merge_dymo_lw_status, merge_dymo_lw_status_view,
-    parse_engine_version, parse_print_status, parse_sku_info,
-    soft_reboot_request as dymo_lw_soft_reboot_request, Lw550EngineVersion, Lw550MainBayStatus,
-    Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage, Lw550PrintStatus,
-    Lw550PrintStatusView, Lw550SkuInfo,
+    apply_engine_version, apply_sku_info, bay_is_ok, media_likely_present, merge_dymo_lw_status,
+    merge_dymo_lw_status_view, parse_engine_version, parse_print_status, parse_sku_info,
+    print_job_active, soft_reboot_request as dymo_lw_soft_reboot_request, Lw550EngineVersion,
+    Lw550MainBayStatus, Lw550PrintEngineStatus, Lw550PrintHeadStatus, Lw550PrintHeadVoltage,
+    Lw550PrintStatus, Lw550PrintStatusView, Lw550SkuInfo,
     ENGINE_VERSION_REPLY_LEN as DYMO_LW_ENGINE_VERSION_REPLY_LEN,
     SKU_INFO_REPLY_LEN as DYMO_LW_SKU_INFO_REPLY_LEN, STATUS_REPLY_LEN as DYMO_LW_STATUS_REPLY_LEN,
 };
