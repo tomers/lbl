@@ -5947,7 +5947,10 @@ reports_media     = true
 dpi               = 180.0
 max_width_mm      = 24.0
 supports_cut      = true
-# ~24 mm head-to-cutter gap (Brother TZe lamination path); preview/feed UI.
+# ESC i d default (14 dots @ 180 dpi ≈ 2 mm) — drawn lead on the kept label.
+# Head-to-cutter (~24 mm) is ejected (firmware / pre-cut), not blank on the sticker;
+# do not leave feed_lead unset or preview will paint DX as attached gaps.
+feed_lead_mm = 2.0
 feed_trail_mm = 24.0
 default_media = "TZe-231"
 supported_media = [

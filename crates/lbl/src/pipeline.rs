@@ -1188,9 +1188,11 @@ fn feed_margin_px(mm: Option<f64>, dpi: f64) -> u32 {
 
 /// Lead / end / cutter-gap along feed for preview (matches [`pad_preview_encode_feed`]).
 ///
-/// When only [`DeviceCapabilities::feed_trail_mm`] is set, the head-to-cutter
-/// distance is used as both lead and end so the preview shows the same blank
-/// tape drawn for DX on each side of the payload.
+/// - **Trail only** (`feed_trail_mm`, no `feed_lead_mm`): treat the head-to-cutter
+///   distance as **attached** blank on both sides of the content (LabelManager-style).
+/// - **Lead + trail**: drawn lead is `feed_lead_mm` (protocol content margin); trail
+///   is metadata only (ejected scrap / pre-cut gap), not painted onto the sticker.
+///   Brother PT with auto-cut belongs here: small `ESC i d` lead, large `feed_trail_mm`.
 fn preview_feed_margins(caps: &DeviceCapabilities, dpi: f64) -> (u32, u32, u32) {
     let dx = feed_margin_px(caps.feed_trail_mm, dpi);
     let explicit_lead = feed_margin_px(caps.feed_lead_mm, dpi);
@@ -1219,11 +1221,9 @@ pub struct PreviewFeedPad {
 
 /// Extend a preview raster with encode feed margins for tape printers.
 ///
-/// When [`DeviceCapabilities::feed_trail_mm`] is set and [`DeviceCapabilities::feed_lead_mm`]
-/// is not, the head-to-cutter distance is also used as the implicit lead: the print
-/// head often already sits that far past the last cut when printing starts. Preview
-/// shows symmetric white margins on both sides of the content, with dashed markers
-/// between lead/content and content/right padding.
+/// See [`preview_feed_margins`]: trail-only caps draw DX as attached lead/end;
+/// lead+trail caps draw only the lead (content margin) and keep DX as
+/// [`PreviewFeedPad::trail_feed_px`] metadata for ejected / pre-cut scrap.
 pub fn pad_preview_encode_feed(
     image: RgbaImage,
     caps: &DeviceCapabilities,
@@ -1888,6 +1888,32 @@ mod tests {
             padded.image.get_pixel(dx + 10 + dx - 1, 0).0,
             [255, 255, 255, 255],
             "sticker face ends with white margin, not a drawn gap zone"
+        );
+    }
+
+    #[test]
+    fn preview_explicit_lead_keeps_cutter_gap_as_metadata_only() {
+        use image::Rgba;
+
+        // Brother PT-style: small protocol lead, large ejected DX.
+        let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
+        let caps = DeviceCapabilities {
+            dpi: Dpi(180.0),
+            feed_lead_mm: Some(2.0),
+            feed_trail_mm: Some(24.0),
+            ..Default::default()
+        };
+        let padded = pad_preview_encode_feed(image, &caps, true);
+        let lead = feed_margin_px(caps.feed_lead_mm, caps.dpi.0);
+        let dx = feed_margin_px(caps.feed_trail_mm, caps.dpi.0);
+        assert_eq!(padded.lead_feed_px, lead);
+        assert_eq!(padded.feed_end_margin_px, 0);
+        assert_eq!(padded.trail_feed_px, dx);
+        assert_eq!(padded.content_feed_end_px, lead + 10);
+        assert_eq!(padded.image.width(), 10 + lead);
+        assert!(
+            lead < dx,
+            "kept-label lead must be smaller than ejected cutter gap"
         );
     }
 

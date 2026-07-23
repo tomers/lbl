@@ -41,8 +41,10 @@ Brother documents this as unavoidable waste on a fully cut job:
   Official Windows drivers often **precut** (zero-raster feed + cut) so the
   real label starts at a fresh edge; community tools expose that as an optional
   `--precut`.
-- **This encoder does not emit an explicit precut.** One leader per *job* that
-  ends with no-chain + auto-cut is still expected from the mechanism.
+- **This encoder** uses a small `ESC i d` feed (~14 dots ≈ 2 mm at 180 dpi) on
+  the kept label. Cube-class auto-cut effectively ejects the head-to-cutter gap
+  (scrap or equivalent); preview must not paint that gap as sticker padding.
+  Catalog: `feed_lead_mm` ≈ protocol margin, `feed_trail_mm` ≈ ejected DX.
 - **Multi-label batches:** do **not** end every page with no-chain/`0x1A` as its
   own job — that repeats the leader scrap before every label. Use one job,
   `0x0C` between pages, no-chain only on the last page (see above).
