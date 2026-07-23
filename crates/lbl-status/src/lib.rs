@@ -65,7 +65,7 @@ pub use lbl_driver_niimbot::live_status as niimbot;
 pub use lbl_driver_niimbot::live_status::NiimbotLiveStatus;
 
 /// Unified, protocol-tagged print-engine status for APIs and WASM JSON.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(tag = "protocol", rename_all = "kebab-case")]
 pub enum PrintStatus {
     /// DYMO LabelWriter 550-series (`dymo-lw`).

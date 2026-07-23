@@ -92,7 +92,7 @@ pub enum DeliveryAction {
     /// [`ClientDeliverySession::tick`] to continue.
     Status {
         /// Protocol-tagged status snapshot.
-        status: PrintStatus,
+        status: Box<PrintStatus>,
     },
     /// Delivery finished successfully. Terminal.
     Done,
@@ -132,7 +132,9 @@ impl DeliveryAction {
     }
 
     pub(crate) fn status(status: PrintStatus) -> Self {
-        Self::Status { status }
+        Self::Status {
+            status: Box::new(status),
+        }
     }
 
     pub(crate) fn error(message: impl Into<String>) -> Self {

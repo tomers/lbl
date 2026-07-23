@@ -43,8 +43,27 @@ const STATUS_SKU_LEN: usize = 12;
 /// First byte of the 12-character SKU field in a 63-byte `ESC U` reply.
 const SKU_INFO_SKU_START: usize = 8;
 
-/// Offset of total label count (u16 LE) in an `ESC U` reply.
-const SKU_INFO_TOTAL_LABEL_COUNT: usize = 50;
+/// Wire length fields in `ESC U` are tenths of a millimetre (deci-mm).
+///
+/// The Tech Ref labels them "Length in mm"; bench captures (e.g. S0722540
+/// 57.1×31.7 mm → `571`/`317`) confirm ÷10 for real millimetres. Count,
+/// strategy, and date fields are not length-scaled.
+fn deci_mm_to_mm(raw: u16) -> f64 {
+    f64::from(raw) / 10.0
+}
+
+/// Label length along the feed: `0` / `0xFFFF` mean continuous stock.
+fn optional_die_cut_mm(raw: u16) -> Option<f64> {
+    if raw == 0 || raw == 0xFFFF {
+        None
+    } else {
+        Some(deci_mm_to_mm(raw))
+    }
+}
+
+fn le_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
+}
 
 /// Build an `ESC A` status request with the given lock byte.
 pub fn status_request(lock: u8) -> [u8; 3] {
@@ -70,7 +89,7 @@ pub fn soft_reboot_request() -> [u8; 2] {
 }
 
 /// Parsed fields from the 32-byte `ESC A` print-engine status reply.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Lw550PrintStatus {
     /// Byte 0 — print engine state (idle, printing, error, …).
     pub print_status: Lw550PrintEngineStatus,
@@ -99,6 +118,9 @@ pub struct Lw550PrintStatus {
     /// Full-roll label count from `ESC U` (NFC), when available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label_total: Option<u16>,
+    /// Full `ESC U` NFC consumable dump, when queried.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sku_info: Option<Lw550SkuInfo>,
     /// Byte 29 (low nibble) — external power supply detected.
     pub eps_present: bool,
     /// Byte 30 (low nibble) — print head supply voltage.
@@ -123,12 +145,93 @@ pub struct Lw550PrintStatus {
 }
 
 /// Fields from the 63-byte `ESC U` NFC consumable-info reply.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+///
+/// Length fields are exposed in **millimetres** after converting the on-wire
+/// deci-mm encoding (÷10). See [`deci_mm_to_mm`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Lw550SkuInfo {
     /// Bytes 8–19 — NFC-reported consumable SKU (when present).
     pub sku: Option<String>,
+    /// Byte 20 — brand id (`0` = DYMO).
+    pub brand_id: u8,
+    /// Byte 21 — region (`0xFF` = global).
+    pub region: u8,
+    /// Byte 22 — material type code.
+    pub material_type: u8,
+    /// Byte 23 — label type (`0` continuous · `1` die · `2` card).
+    pub label_type: u8,
+    /// Byte 24 — label colour code.
+    pub label_colour: u8,
+    /// Byte 25 — content / ink colour code.
+    pub content_colour: u8,
+    /// Byte 26 — marker / cut-edge geometry (`0..3`).
+    pub marker_type: u8,
+    /// Bytes 28–29 — marker pitch (mm).
+    pub marker_pitch_mm: f64,
+    /// Bytes 30–31 — marker 1 width (mm).
+    pub marker1_width_mm: f64,
+    /// Bytes 32–33 — marker 1 to start of label (mm).
+    pub marker1_to_label_start_mm: f64,
+    /// Bytes 34–35 — marker 2 width (mm).
+    pub marker2_width_mm: f64,
+    /// Bytes 36–37 — marker 2 offset (mm).
+    pub marker2_offset_mm: f64,
+    /// Bytes 38–39 — vertical offset (mm).
+    pub vertical_offset_mm: f64,
+    /// Bytes 40–41 — label length along feed (mm); `None` on continuous stock.
+    pub label_length_mm: Option<f64>,
+    /// Bytes 42–43 — label width across head (mm).
+    pub label_width_mm: f64,
+    /// Bytes 44–45 — printable horizontal offset (mm).
+    pub printable_h_offset_mm: f64,
+    /// Bytes 46–47 — printable vertical offset (mm).
+    pub printable_v_offset_mm: f64,
+    /// Bytes 48–49 — liner width (mm).
+    pub liner_width_mm: f64,
     /// Bytes 50–51 — labels on a full (unused) roll.
     pub total_label_count: u16,
+    /// Bytes 52–53 — roll length (mm).
+    pub total_length_mm: f64,
+    /// Bytes 54–55 — counter margin used for remaining-label math.
+    pub counter_margin: u16,
+    /// Byte 56 — counter strategy (`0` up · `1` down).
+    pub counter_strategy: u8,
+    /// Bytes 60–61 — production date (ASCII, Tech Ref `DDYY` packing).
+    pub production_date: String,
+    /// Bytes 62–63 — production time (ASCII, Tech Ref `HHMM` packing).
+    pub production_time: String,
+}
+
+impl Default for Lw550SkuInfo {
+    fn default() -> Self {
+        Self {
+            sku: None,
+            brand_id: 0,
+            region: 0xff,
+            material_type: 0,
+            label_type: 0,
+            label_colour: 0,
+            content_colour: 0,
+            marker_type: 0,
+            marker_pitch_mm: 0.0,
+            marker1_width_mm: 0.0,
+            marker1_to_label_start_mm: 0.0,
+            marker2_width_mm: 0.0,
+            marker2_offset_mm: 0.0,
+            vertical_offset_mm: 0.0,
+            label_length_mm: None,
+            label_width_mm: 0.0,
+            printable_h_offset_mm: 0.0,
+            printable_v_offset_mm: 0.0,
+            liner_width_mm: 0.0,
+            total_label_count: 0,
+            total_length_mm: 0.0,
+            counter_margin: 0,
+            counter_strategy: 0,
+            production_date: String::new(),
+            production_time: String::new(),
+        }
+    }
 }
 
 /// Fields from the 34-byte `ESC V` engine-version reply.
@@ -149,9 +252,9 @@ pub struct Lw550EngineVersion {
 /// JSON-friendly view of [`Lw550PrintStatus`] for APIs and WASM.
 ///
 /// Machine-stable enum tokens only — consumers map tokens to display copy.
-/// Round-trippable: follow-up fields (`label_total`, engine version) default to
-/// `None` when absent (see [`merge_dymo_lw_status_view`]).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Round-trippable: follow-up fields (`label_total`, `sku_info`, engine version)
+/// default to `None` when absent (see [`merge_dymo_lw_status_view`]).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Lw550PrintStatusView {
     pub print_status: Lw550PrintEngineStatus,
     pub print_job_id: u32,
@@ -164,6 +267,8 @@ pub struct Lw550PrintStatusView {
     pub label_count: u16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_total: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sku_info: Option<Lw550SkuInfo>,
     pub eps_present: bool,
     pub print_head_voltage: Lw550PrintHeadVoltage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -191,6 +296,7 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
             error_id: status.error_id,
             label_count: status.label_count,
             label_total: status.label_total,
+            sku_info: status.sku_info.clone(),
             eps_present: status.eps_present,
             print_head_voltage: status.print_head_voltage,
             hardware_version: status.hardware_version.clone(),
@@ -437,6 +543,7 @@ pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, StatusError
         error_id: u32::from_le_bytes(status[23..27].try_into().unwrap()),
         label_count: u16::from_le_bytes(status[27..29].try_into().unwrap()),
         label_total: None,
+        sku_info: None,
         eps_present: status[29] & 0x0f == 1,
         print_head_voltage: Lw550PrintHeadVoltage::from_nibble(status[30]),
         print_head_voltage_code: status[30] & 0x0f,
@@ -449,6 +556,8 @@ pub fn parse_print_status(status: &[u8]) -> Result<Lw550PrintStatus, StatusError
 }
 
 /// Parse a 63-byte `ESC U` NFC consumable-info reply.
+///
+/// Length fields are converted from on-wire deci-mm to millimetres (÷10).
 pub fn parse_sku_info(data: &[u8]) -> Result<Lw550SkuInfo, StatusError> {
     if data.len() < SKU_INFO_REPLY_LEN {
         return Err(StatusError::Parse(format!(
@@ -456,7 +565,7 @@ pub fn parse_sku_info(data: &[u8]) -> Result<Lw550SkuInfo, StatusError> {
             data.len()
         )));
     }
-    let magic = u16::from_le_bytes(data[0..2].try_into().unwrap());
+    let magic = le_u16(data, 0);
     if magic != SKU_INFO_MAGIC {
         return Err(StatusError::Parse(format!(
             "invalid ESC U magic {magic:#06x} (expected {SKU_INFO_MAGIC:#06x})"
@@ -464,11 +573,32 @@ pub fn parse_sku_info(data: &[u8]) -> Result<Lw550SkuInfo, StatusError> {
     }
     Ok(Lw550SkuInfo {
         sku: parse_fixed_sku(&data[SKU_INFO_SKU_START..SKU_INFO_SKU_START + STATUS_SKU_LEN]),
-        total_label_count: u16::from_le_bytes(
-            data[SKU_INFO_TOTAL_LABEL_COUNT..SKU_INFO_TOTAL_LABEL_COUNT + 2]
-                .try_into()
-                .unwrap(),
-        ),
+        brand_id: data[20],
+        region: data[21],
+        material_type: data[22],
+        label_type: data[23],
+        label_colour: data[24],
+        content_colour: data[25],
+        marker_type: data[26],
+        marker_pitch_mm: deci_mm_to_mm(le_u16(data, 28)),
+        marker1_width_mm: deci_mm_to_mm(le_u16(data, 30)),
+        marker1_to_label_start_mm: deci_mm_to_mm(le_u16(data, 32)),
+        marker2_width_mm: deci_mm_to_mm(le_u16(data, 34)),
+        marker2_offset_mm: deci_mm_to_mm(le_u16(data, 36)),
+        vertical_offset_mm: deci_mm_to_mm(le_u16(data, 38)),
+        label_length_mm: optional_die_cut_mm(le_u16(data, 40)),
+        label_width_mm: deci_mm_to_mm(le_u16(data, 42)),
+        printable_h_offset_mm: deci_mm_to_mm(le_u16(data, 44)),
+        printable_v_offset_mm: deci_mm_to_mm(le_u16(data, 46)),
+        liner_width_mm: deci_mm_to_mm(le_u16(data, 48)),
+        total_label_count: le_u16(data, 50),
+        total_length_mm: deci_mm_to_mm(le_u16(data, 52)),
+        counter_margin: le_u16(data, 54),
+        counter_strategy: data[56],
+        production_date: parse_padded_ascii(&data[60..62]),
+        // Tech Ref table lists bytes 62–63, but the reply is 63 bytes (indices
+        // 0..62); take whatever remains after the date field.
+        production_time: parse_padded_ascii(&data[62..SKU_INFO_REPLY_LEN]),
     })
 }
 
@@ -530,10 +660,12 @@ pub fn apply_engine_version(status: &mut Lw550PrintStatus, ver: &Lw550EngineVers
 
 /// Fold an `ESC U` NFC consumable dump into a parsed `ESC A` status.
 ///
-/// Copies the full-roll label total when the roll reports one, and fills the
-/// SKU when the status reply itself did not carry it (the `ESC A` SKU field is
-/// blank while the bay is mid-transition).
+/// Stores the full dump on [`Lw550PrintStatus::sku_info`], copies the full-roll
+/// label total when the roll reports one, and fills the SKU when the status
+/// reply itself did not carry it (the `ESC A` SKU field is blank while the bay
+/// is mid-transition).
 pub fn apply_sku_info(status: &mut Lw550PrintStatus, info: &Lw550SkuInfo) {
+    status.sku_info = Some(info.clone());
     if info.total_label_count > 0 {
         status.label_total = Some(info.total_label_count);
     }
@@ -573,23 +705,31 @@ fn parse_fixed_sku(raw: &[u8]) -> Option<String> {
 /// (`ESC U`) nor the engine-version block (`ESC V`). When polling repeatedly,
 /// carry those forward from the previous status so they don't flicker away:
 ///
-/// - `label_total` sticks only while the SKU is unchanged (a new roll may have
-///   a different capacity).
+/// - `label_total` / `sku_info` stick only while the SKU is unchanged (a new
+///   roll may have different capacity and NFC geometry).
 /// - Engine-version fields carry only when the fresh reply has none of them.
 pub fn merge_dymo_lw_status(prior: &Lw550PrintStatus, next: Lw550PrintStatus) -> Lw550PrintStatus {
     let label_total =
         carried_label_total(prior.label_total, &prior.sku, next.label_total, &next.sku);
+    let sku_info = carried_sku_info(
+        prior.sku_info.as_ref(),
+        &prior.sku,
+        next.sku_info,
+        &next.sku,
+    );
 
     let carry_engine = next.hardware_version.is_none() && next.firmware_version.is_none();
     if !carry_engine {
         return Lw550PrintStatus {
             label_total,
+            sku_info,
             ..next
         };
     }
 
     Lw550PrintStatus {
         label_total,
+        sku_info,
         hardware_version: next
             .hardware_version
             .or_else(|| prior.hardware_version.clone()),
@@ -623,6 +763,20 @@ fn carried_label_total(
     }
 }
 
+/// Carry a full `ESC U` dump forward across handshake-only polls.
+fn carried_sku_info(
+    prior_info: Option<&Lw550SkuInfo>,
+    prior_sku: &Option<String>,
+    next_info: Option<Lw550SkuInfo>,
+    next_sku: &Option<String>,
+) -> Option<Lw550SkuInfo> {
+    match next_info {
+        Some(info) => Some(info),
+        None if prior_sku == next_sku => prior_info.cloned(),
+        None => None,
+    }
+}
+
 /// Merge two [`Lw550PrintStatusView`] polls, preserving fields the fresh view
 /// omits but the prior one knew.
 ///
@@ -637,17 +791,25 @@ pub fn merge_dymo_lw_status_view(
 ) -> Lw550PrintStatusView {
     let label_total =
         carried_label_total(prior.label_total, &prior.sku, next.label_total, &next.sku);
+    let sku_info = carried_sku_info(
+        prior.sku_info.as_ref(),
+        &prior.sku,
+        next.sku_info,
+        &next.sku,
+    );
 
     let carry_engine = next.hardware_version.is_none() && next.firmware_version.is_none();
     if !carry_engine {
         return Lw550PrintStatusView {
             label_total,
+            sku_info,
             ..next
         };
     }
 
     Lw550PrintStatusView {
         label_total,
+        sku_info,
         hardware_version: next
             .hardware_version
             .or_else(|| prior.hardware_version.clone()),
@@ -684,6 +846,34 @@ mod tests {
         let parsed = parse_sku_info(&raw).unwrap();
         assert_eq!(parsed.sku.as_deref(), Some("3025"));
         assert_eq!(parsed.total_label_count, 350);
+    }
+
+    #[test]
+    fn parse_sku_info_deci_mm_lengths_to_mm() {
+        // S0722540-class capture: 57.1 × 31.7 mm die-cut reports 571 / 317.
+        let mut raw = vec![0u8; SKU_INFO_REPLY_LEN];
+        raw[0..2].copy_from_slice(&SKU_INFO_MAGIC.to_le_bytes());
+        raw[8..16].copy_from_slice(b"S0722540");
+        raw[23] = 1; // die-cut
+        raw[40..42].copy_from_slice(&571u16.to_le_bytes());
+        raw[42..44].copy_from_slice(&317u16.to_le_bytes());
+        raw[50..52].copy_from_slice(&350u16.to_le_bytes());
+
+        let parsed = parse_sku_info(&raw).unwrap();
+        assert_eq!(parsed.sku.as_deref(), Some("S0722540"));
+        assert_eq!(parsed.label_type, 1);
+        assert_eq!(parsed.label_length_mm, Some(57.1));
+        assert!((parsed.label_width_mm - 31.7).abs() < 1e-9);
+        assert_eq!(parsed.total_label_count, 350);
+    }
+
+    #[test]
+    fn parse_sku_info_continuous_length_is_none() {
+        let mut raw = vec![0u8; SKU_INFO_REPLY_LEN];
+        raw[0..2].copy_from_slice(&SKU_INFO_MAGIC.to_le_bytes());
+        raw[40..42].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        let parsed = parse_sku_info(&raw).unwrap();
+        assert_eq!(parsed.label_length_mm, None);
     }
 
     #[test]
@@ -759,11 +949,18 @@ mod tests {
     fn merge_keeps_label_total_across_same_sku() {
         let mut prior = parse_status_from(8, Some("30252"), 82);
         prior.label_total = Some(350);
+        prior.sku_info = Some(Lw550SkuInfo {
+            sku: Some("30252".into()),
+            total_label_count: 350,
+            label_width_mm: 31.7,
+            ..Default::default()
+        });
         let next = parse_status_from(8, Some("30252"), 81);
 
         let merged = merge_dymo_lw_status(&prior, next);
         assert_eq!(merged.label_count, 81);
         assert_eq!(merged.label_total, Some(350));
+        assert!((merged.sku_info.as_ref().unwrap().label_width_mm - 31.7).abs() < 1e-9);
     }
 
     #[test]
@@ -796,10 +993,18 @@ mod tests {
         let info = Lw550SkuInfo {
             sku: Some("30252".into()),
             total_label_count: 350,
+            label_width_mm: 31.7,
+            label_length_mm: Some(57.1),
+            ..Default::default()
         };
         apply_sku_info(&mut status, &info);
         assert_eq!(status.label_total, Some(350));
         assert_eq!(status.sku.as_deref(), Some("30252"));
+        assert_eq!(
+            status.sku_info.as_ref().map(|i| i.total_label_count),
+            Some(350)
+        );
+        assert!((status.sku_info.as_ref().unwrap().label_width_mm - 31.7).abs() < 1e-9);
     }
 
     #[test]
@@ -808,6 +1013,7 @@ mod tests {
         let info = Lw550SkuInfo {
             sku: Some("99014".into()),
             total_label_count: 0,
+            ..Default::default()
         };
         apply_sku_info(&mut status, &info);
         assert_eq!(status.label_total, None);
