@@ -50,7 +50,7 @@ impl Handshake for LetraTag {
         self.phase = Phase::JobSent;
         let bytes = self.bytes.take().unwrap_or_default();
         vec![
-            DeliveryAction::progress("sending", "Sending label to printer…"),
+            DeliveryAction::progress("sending"),
             DeliveryAction::send(bytes),
         ]
     }
@@ -61,10 +61,7 @@ impl Handshake for LetraTag {
             (Phase::AwaitingNotify, Event::Rx(bytes)) => {
                 self.polls += 1;
                 if parse_result(&bytes).is_some() {
-                    vec![
-                        DeliveryAction::progress("done", "Printer confirmed print"),
-                        DeliveryAction::Done,
-                    ]
+                    vec![DeliveryAction::progress("done"), DeliveryAction::Done]
                 } else if self.polls >= MAX_POLLS {
                     vec![DeliveryAction::Done]
                 } else {

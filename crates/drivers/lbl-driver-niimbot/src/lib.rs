@@ -38,6 +38,7 @@
 
 use lbl_driver_api::{ClientHandshake, Driver, DriverError, EncodeContext, MonoBitmap, Protocol};
 
+pub mod ble;
 pub mod live_status;
 
 // Packet framing.

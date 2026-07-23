@@ -20,6 +20,7 @@ pub mod driver_settings;
 mod model;
 mod validate;
 
+pub use driver_settings::MediaNoun;
 pub use model::{
     encode_capabilities_for, CatalogEntry, ConnectionHint, DeviceEntry, DeviceRole, DeviceSupport,
     ImageInfo, Maturity, MediaSpec, ResolvedTransport,

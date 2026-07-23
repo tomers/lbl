@@ -77,7 +77,7 @@ impl Gpgl {
             }
             ReadyNext::SendCut => {
                 self.phase = Phase::CutSent;
-                lead.push(DeliveryAction::progress("cutting", "Sending cut job…"));
+                lead.push(DeliveryAction::progress("cutting"));
                 lead.push(DeliveryAction::send(self.cut_bytes.clone()));
             }
             ReadyNext::Finish => lead.push(DeliveryAction::Done),
@@ -94,7 +94,7 @@ impl Handshake for Gpgl {
     fn start(&mut self) -> Vec<DeliveryAction> {
         self.phase = Phase::InitSent;
         vec![
-            DeliveryAction::progress("init", "Initializing cutter…"),
+            DeliveryAction::progress("init"),
             DeliveryAction::send(INIT_CMD.to_vec()),
         ]
     }

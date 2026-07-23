@@ -19,18 +19,20 @@ chromium = ["lbl/chromium", "lbl-render/chromium"]
 ble      = ["lbl-device/ble"]
 
 [dependencies]
-lbl-core           = { workspace = true }
-lbl-config         = { workspace = true }
-lbl-catalog        = { workspace = true }
-lbl                = { path = "../lbl", default-features = false }
-lbl-template       = { workspace = true }
-lbl-transpile-html = { workspace = true }
-lbl-device         = { workspace = true }
-lbl-encode         = { workspace = true }
-lbl-driver-file    = { workspace = true }
-lbl-render         = { workspace = true }
-lbl-dither         = { workspace = true }
-lbl-spool          = { workspace = true }
+lbl-core            = { workspace = true }
+lbl-config          = { workspace = true }
+lbl-catalog         = { workspace = true }
+lbl                 = { path = "../lbl", default-features = false }
+lbl-template        = { workspace = true }
+lbl-transpile-html  = { workspace = true }
+lbl-device          = { workspace = true }
+lbl-encode          = { workspace = true }
+lbl-driver-file     = { workspace = true }
+lbl-driver-niimbot  = { workspace = true }
+lbl-driver-letratag = { workspace = true }
+lbl-render          = { workspace = true }
+lbl-dither          = { workspace = true }
+lbl-spool           = { workspace = true }
 
 serde              = { workspace = true }
 serde_json         = { workspace = true }

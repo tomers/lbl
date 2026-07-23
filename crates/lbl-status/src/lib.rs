@@ -11,6 +11,7 @@ mod brother_pt;
 mod brother_ql;
 pub mod dymo_lw;
 mod error;
+mod session;
 mod zpl;
 
 use lbl_core::printer::Protocol;
@@ -35,6 +36,10 @@ pub use dymo_lw::{
     SKU_INFO_REPLY_LEN as DYMO_LW_SKU_INFO_REPLY_LEN, STATUS_REPLY_LEN as DYMO_LW_STATUS_REPLY_LEN,
 };
 pub use error::StatusError;
+pub use session::{
+    ClientStatusSession, StatusAction, StatusSessionContext, StatusSessionContextView,
+    StatusSessionError,
+};
 pub use zpl::{parse_host_status as parse_zpl_host_status, ZplHostStatus, HOST_STATUS_CMD};
 
 /// NIIMBOT live-status protocol module (query builders + payload parsers +

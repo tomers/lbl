@@ -1856,6 +1856,8 @@ dependencies = [
  "lbl-device",
  "lbl-dither",
  "lbl-driver-file",
+ "lbl-driver-letratag",
+ "lbl-driver-niimbot",
  "lbl-encode",
  "lbl-render",
  "lbl-spool",
