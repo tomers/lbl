@@ -15,6 +15,7 @@ use serde_json::json;
 use tokio::task::spawn_blocking;
 use tracing::{error, info, warn};
 
+use lbl::debug::protocol_cli_name;
 use lbl::pipeline::{
     authoring_labels, effective_printable_width_mm, encode_label, frame_html_preview_stock,
     preview_stock_frame, resolve_font_fit_scale, resolve_label_align, resolve_label_fit,
@@ -387,7 +388,7 @@ pub async fn profile_cut_now(
 
     let mut req = req;
     if req.protocol.is_none() {
-        req.protocol = Some(opts_protocol_name(profile.model.protocol).to_string());
+        req.protocol = Some(protocol_cli_name(profile.model.protocol).to_string());
     }
     if req.media.is_none() && req.width_mm.is_none() {
         req.media = profile.default_media.clone();
@@ -1678,7 +1679,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
             };
             Ok(json!({
                 "count": out_labels.len(),
-                "protocol": opts_protocol_name(opts.protocol),
+                "protocol": protocol_cli_name(opts.protocol),
                 "media_type": media_type.map(|mt| mt.name()),
                 "labels": out_labels,
                 "debug_html": debug_html,
@@ -1705,11 +1706,6 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     .map_err(fail_internal)?;
 
     Ok(Json(result).into_response())
-}
-
-/// The CLI/display name of a protocol (matches the `--protocol` value).
-fn opts_protocol_name(protocol: Protocol) -> &'static str {
-    lbl::debug::protocol_cli_name(protocol)
 }
 
 /// A render backend object-safe enough to trace one label through the pipeline.
@@ -1832,7 +1828,7 @@ pub fn browser_transport_hints(
 
     let Some(printer) = printer else {
         return with_ble_profile_fields(
-            json!({ "api": default_browser_api(protocol) }),
+            json!({ "api": driver_settings::default_browser_api(protocol) }),
             protocol,
             driver_variant,
         );
@@ -1867,7 +1863,7 @@ pub fn browser_transport_hints(
     } else if has_serial {
         json!({ "api": "web_serial" })
     } else {
-        json!({ "api": default_browser_api(protocol) })
+        json!({ "api": driver_settings::default_browser_api(protocol) })
     };
 
     with_ble_profile_fields(base, protocol, driver_variant)
@@ -1912,10 +1908,6 @@ fn with_ble_profile_fields(
     hints
 }
 
-fn default_browser_api(protocol: Protocol) -> &'static str {
-    lbl_catalog::driver_settings::default_browser_api(protocol)
-}
-
 fn build_client_print_response(
     catalog: &Catalog,
     protocol: Protocol,
@@ -1941,7 +1933,7 @@ fn build_client_print_response(
 
     Ok(json!({
         "dispatch_mode": "client",
-        "protocol": opts_protocol_name(protocol),
+        "protocol": protocol_cli_name(protocol),
         "handshake": handshake,
         "transport": browser_transport_hints(catalog, protocol, printer_key),
         "driver_variant": driver_variant,
