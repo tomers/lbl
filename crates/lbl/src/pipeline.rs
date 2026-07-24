@@ -1385,8 +1385,8 @@ pub fn preview_resolve_feed_plan(
 /// Lead / end / cutter-gap along feed for preview from a resolved [`FeedPlan`].
 ///
 /// When `precut`, trail is scrap metadata only (not painted onto the sticker).
-/// When trail-only legacy caps are used via a plan with lead = \(D_x\) and end = 0,
-/// only the lead is drawn (unset end → 0).
+/// When cutting with a known \(D_x\), [`FeedPlan::end_mm`] is floored to \(D_x\)
+/// so the kept sticker shows post-print clearance (unset user end → \(D_x\)).
 fn preview_feed_margins_from_plan(plan: &lbl_core::FeedPlan, dpi: f64) -> (u32, u32, u32) {
     let lead = feed_mm_px(plan.lead_mm, dpi);
     let end = feed_mm_px(plan.end_mm, dpi);
@@ -2145,7 +2145,11 @@ mod tests {
             feed_reversed: false,
         });
         assert_eq!(frame.lead_feed_px, 0);
-        assert_eq!(frame.feed_end_margin_px, 0);
+        let dx = feed_margin_px(Some(24.0), VECTOR_CSS_DPI);
+        assert_eq!(
+            frame.feed_end_margin_px, dx,
+            "cut floors end to Dx (post-print cutter clearance)"
+        );
         assert_eq!(frame.head_pad_before_px, 0);
         assert_eq!(frame.head_pad_after_px, 0);
 
@@ -2204,6 +2208,7 @@ mod tests {
         let dx = feed_margin_px(Some(24.0), VECTOR_CSS_DPI);
         assert_eq!(frame.lead_feed_px, lead);
         assert_eq!(frame.trail_feed_px, dx);
+        assert_eq!(frame.feed_end_margin_px, dx, "cut floors unset end to Dx");
         assert!(frame.precut);
     }
 
