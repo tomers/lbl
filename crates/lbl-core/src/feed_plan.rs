@@ -193,20 +193,25 @@ pub fn resolve_virtual_feed_gaps(
             }
         }
 
+        let will_cut = caps.supports_cut && cut_mode.requests_cut();
         if feed_end_mm.is_none() {
-            // With Dx devices, end margin is blank tape; clear feed-end content inset.
-            feed_end_mm = Some(g_end);
-            if feed_along_width {
-                if feed_reversed {
-                    out.left = 0.0;
-                } else {
-                    out.right = 0.0;
-                }
-            } else if feed_reversed {
-                out.top = 0.0;
+            // End blank lives on tape (not content inset). When cutting, the
+            // chassis needs ≥ Dx after last ink — G_end below Dx is consumed.
+            feed_end_mm = Some(if will_cut { g_end.max(dx) } else { g_end });
+        }
+        // Always clear feed-end content inset when Dx is known. Otherwise an
+        // explicit feed_end_mm override (or a stale side pad) stacks on top of
+        // the floored cutter clearance (e.g. 10 mm pad + 24 mm Dx → 34 mm).
+        if feed_along_width {
+            if feed_reversed {
+                out.left = 0.0;
             } else {
-                out.bottom = 0.0;
+                out.right = 0.0;
             }
+        } else if feed_reversed {
+            out.top = 0.0;
+        } else {
+            out.bottom = 0.0;
         }
     }
 
@@ -222,7 +227,9 @@ pub fn resolve_virtual_feed_gaps(
 /// Resolve feed margins and pre-cut from job + capabilities.
 ///
 /// Unset lead → \(D_x\) when known, else `caps.feed_lead_mm`, else `0`.
-/// Unset end → `0`. Unset `job.precut` → `caps.precut_default`.
+/// Unset end → `0`, then when a cut will fire and \(D_x > 0\) floor end to
+/// \(D_x\) (post-print head-to-cutter clearance on the kept sticker; no end-side
+/// pre-cut). Unset `job.precut` → `caps.precut_default`.
 ///
 /// Never turns pre-cut on solely because padding is small.
 pub fn resolve_feed_plan(
@@ -240,13 +247,19 @@ pub fn resolve_feed_plan(
             .unwrap_or(0.0),
     };
 
-    let end_mm = job
+    let mut end_mm = job
         .feed_end_mm
         .filter(|d| d.is_finite() && *d >= 0.0)
         .unwrap_or(0.0);
 
     let precut_enabled = job.precut.unwrap_or(caps.precut_default);
     let will_cut = caps.supports_cut && job.cut_mode.requests_cut();
+
+    // Last ink prints at the head; the cutter sits \(D_x\) downstream. A cut
+    // therefore leaves at least \(D_x\) blank after content on the kept sticker.
+    if will_cut && cutter_gap_mm > 0.0 {
+        end_mm = end_mm.max(cutter_gap_mm);
+    }
 
     let precut = if !will_cut || cutter_gap_mm <= 0.0 || lead_mm + f64::EPSILON >= cutter_gap_mm {
         false
@@ -323,6 +336,30 @@ mod tests {
         assert!((plan.lead_mm - 24.0).abs() < 1e-9);
         assert!(!plan.precut);
         assert!((plan.cutter_gap_mm - 24.0).abs() < 1e-9);
+        assert!(
+            (plan.end_mm - 24.0).abs() < 1e-9,
+            "cut floors end to Dx (post-print clearance)"
+        );
+    }
+
+    #[test]
+    fn cut_floors_end_to_cutter_gap() {
+        let mut job = job_with(CutMode::Every, Some(24.0), Some(false));
+        job.feed_end_mm = Some(0.0);
+        let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!((plan.end_mm - 24.0).abs() < 1e-9);
+
+        job.feed_end_mm = Some(30.0);
+        let plan_hi = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!((plan_hi.end_mm - 30.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn no_cut_does_not_floor_end() {
+        let mut job = job_with(CutMode::None, Some(2.0), Some(false));
+        job.feed_end_mm = Some(0.0);
+        let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!((plan.end_mm - 0.0).abs() < 1e-9);
     }
 
     #[test]
@@ -515,9 +552,56 @@ mod tests {
         };
         let gaps =
             resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, true, false, None, None);
-        assert!((gaps.feed_end_mm.unwrap() - 4.0).abs() < 1e-9);
+        // Cutting: G_end 4 is consumed into Dx 24 (not stacked as content inset).
+        assert!((gaps.feed_end_mm.unwrap() - 24.0).abs() < 1e-9);
         assert!((gaps.padding.right).abs() < 1e-9);
         assert!((gaps.virtual_feed_end_mm - 4.0).abs() < 1e-9);
+        let mut job = job_with(CutMode::Every, gaps.feed_lead_mm, Some(true));
+        job.feed_end_mm = gaps.feed_end_mm;
+        let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!((plan.end_mm - 24.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn virtual_end_override_still_clears_content_inset() {
+        let pad = PaddingSidesMm {
+            left: 0.0,
+            right: 10.0,
+            ..Default::default()
+        };
+        // Explicit feed_end must not leave the 10 mm side pad on content while
+        // resolve_feed_plan floors end to Dx (that would paint 10+24).
+        let gaps = resolve_virtual_feed_gaps(
+            &pt_caps(),
+            CutMode::Every,
+            pad,
+            true,
+            false,
+            None,
+            Some(10.0),
+        );
+        assert!((gaps.feed_end_mm.unwrap() - 10.0).abs() < 1e-9);
+        assert!(
+            (gaps.padding.right).abs() < 1e-9,
+            "feed-end content inset must clear when Dx is known"
+        );
+        let mut job = job_with(CutMode::Every, Some(24.0), Some(false));
+        job.feed_end_mm = gaps.feed_end_mm;
+        let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!((plan.end_mm - 24.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn virtual_end_above_dx_keeps_full_tape_end() {
+        let pad = PaddingSidesMm {
+            left: 0.0,
+            right: 30.0,
+            ..Default::default()
+        };
+        let gaps =
+            resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, true, false, None, None);
+        assert!((gaps.feed_end_mm.unwrap() - 30.0).abs() < 1e-9);
+        assert!((gaps.padding.right).abs() < 1e-9);
     }
 
     #[test]
@@ -531,7 +615,7 @@ mod tests {
             resolve_virtual_feed_gaps(&pt_caps(), CutMode::Every, pad, false, false, None, None);
         assert!((gaps.feed_lead_mm.unwrap() - 3.0).abs() < 1e-9);
         assert!((gaps.padding.top).abs() < 1e-9);
-        assert!((gaps.feed_end_mm.unwrap() - 5.0).abs() < 1e-9);
+        assert!((gaps.feed_end_mm.unwrap() - 24.0).abs() < 1e-9);
         assert!((gaps.padding.bottom).abs() < 1e-9);
     }
 
@@ -549,6 +633,6 @@ mod tests {
         assert!((gaps.feed_lead_mm.unwrap() - 24.0).abs() < 1e-9);
         assert!((gaps.padding.right - 6.0).abs() < 1e-9);
         assert!((gaps.padding.left).abs() < 1e-9);
-        assert!((gaps.feed_end_mm.unwrap() - 4.0).abs() < 1e-9);
+        assert!((gaps.feed_end_mm.unwrap() - 24.0).abs() < 1e-9);
     }
 }
