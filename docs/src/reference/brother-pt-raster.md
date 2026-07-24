@@ -42,6 +42,11 @@ Brother documents this as unavoidable waste on a fully cut job:
   before the first content page, ejecting ≈ \(D_x\) as scrap; content uses
   `ESC i d` from `feed_plan.lead_mm`.
 - **Small lead** without pre-cut: encode rejects (`lead_padding_below_cutter_gap`).
+- **End clearance:** after the last inked row (still at the head), print-with-feed
+  and cut leave ≈ \(D_x\) blank **after** content on the kept sticker.
+  `resolve_feed_plan` floors `end_mm` to \(D_x\) when cutting so preview matches;
+  this driver emits trailing blank rasters only for surplus above \(D_x\) (firmware
+  `0x1A` already advances the clearance).
 - **Multi-label batches:** one pre-cut for the job (`batch_first` only); do **not**
   end every page with no-chain/`0x1A` as its own job.
 - Unset job lead defaults to \(D_x\) (no surprise scrap). See

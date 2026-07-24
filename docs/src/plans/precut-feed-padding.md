@@ -93,7 +93,7 @@ before enabling.
 | \(D_x\) | Head-to-cutter distance (mm) | `DeviceCapabilities::feed_trail_mm` (required when `supports_precut`) |
 | \(G\) | Virtual feed-start gap (mm) | Label style padding on the feed-start side. Default: landscape → left, portrait → top. With a 180°-class turn ([`Rotation::reverses_feed_start`](../../crates/lbl-core/src/orientation.rs)), start is the opposite side (right / bottom). Studio’s single UX control. |
 | \(p_{\mathrm{lead}}\) | Mechanical blank tape before content (mm) | Derived by [`resolve_virtual_feed_gaps`](../../crates/lbl-core/src/feed_plan.rs) from \(G\), or explicit job `feed_lead_mm` override |
-| \(p_{\mathrm{end}}\) | Blank tape after content before cut (mm) | Derived from feed-end padding \(G_{\mathrm{end}}\), or explicit `feed_end_mm` |
+| \(p_{\mathrm{end}}\) | Blank tape after content before cut (mm) | When cutting with \(D_x\): \(\max(G_{\mathrm{end}}, D_x)\) ( \(G_{\mathrm{end}}\) below \(D_x\) is consumed, not stacked). Feed-end content inset is always cleared when \(D_x\) is known. |
 | \(p_{\min}\) | Minimum lead the chassis can honor after a pre-cut (mm) | Catalog optional `feed_lead_min_mm`; default `0` or driver floor (e.g. Brother `ESC i d` clamp) |
 | Pre-cut | Zero-content (or protocol-equivalent) feed to cutter + cut, ejecting \(\approx D_x\) scrap | Driver `precut` prologue |
 
@@ -108,7 +108,13 @@ policy uses **only** \(p_{\mathrm{lead}}\).
 | No cut | 0 | \(G\) |
 | No \(D_x\) | unset / 0 | \(G\) (unchanged) |
 
-With \(D_x\): \(p_{\mathrm{end}} = G_{\mathrm{end}}\), feed-end content inset = 0.
+With \(D_x\): feed-end content inset is always cleared (tape owns the end
+gap). When a cut will fire, \(p_{\mathrm{end}} = \max(G_{\mathrm{end}}, D_x)\) —
+\(G_{\mathrm{end}}\) below \(D_x\) is **consumed** by cutter clearance (not
+stacked on top). There is no end-side pre-cut; Studio preview paints this end
+clearance (and labels it under measurement guides). Brother PT encode emits
+trailing blank rasters only for surplus above \(D_x\) (`0x1A` already advances
+the clearance). Without a cut, \(p_{\mathrm{end}} = G_{\mathrm{end}}\) (no floor).
 
 **Decision rule (when cut will fire after this label / job):**
 
@@ -283,6 +289,9 @@ Align `pad_preview_encode_feed` / layout CSS with `FeedPlan`:
 - When `precut`: show a discarded scrap marker of width \(D_x\) (dashed /
   labeled “ejected” / scrap), then the kept label with lead \(p_{\mathrm{lead}}\).
 - When `!precut` and \(p \ge D_x\): single strip, lead \(p\).
+- When cutting with known \(D_x\): paint \(p_{\mathrm{end}} \ge D_x\) on the kept
+  sticker (post-print clearance). Measurement guides label it
+  “End / Cutter clearance”.
 - When validation would reject: preview/editor surfaces the same error token
   before print (with enable / increase suggestions).
 
