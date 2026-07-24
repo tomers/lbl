@@ -353,8 +353,31 @@ impl BrotherPtDriver {
     }
 
     /// Trailing blank feed rows from [`FeedPlan::end_mm`] (base DPI; hi-res doubles in emit).
+    ///
+    /// When a cut will fire, [`FeedPlan::end_mm`] includes the head-to-cutter
+    /// clearance \(D_x\) (floored in `resolve_feed_plan`). Print-with-feed
+    /// (`0x1A`) already advances that clearance to the cutter, so only emit
+    /// raster blank for the surplus above \(D_x\) — otherwise the kept sticker
+    /// would show ~\(2 D_x\) after last ink.
     fn end_blank_rows(ctx: &EncodeContext<'_>) -> u32 {
-        Self::mm_to_feed_dots(ctx.feed_plan.end_mm, ctx.capabilities.dpi.0) as u32
+        let end_mm = ctx.feed_plan.end_mm;
+        // Prefer the resolved plan gap; fall back to caps if a caller built a
+        // plan without cutter_gap_mm populated but still passed feed_trail.
+        let dx = if ctx.feed_plan.cutter_gap_mm > 0.0 {
+            ctx.feed_plan.cutter_gap_mm
+        } else {
+            ctx.capabilities
+                .feed_trail_mm
+                .filter(|d| d.is_finite() && *d > 0.0)
+                .unwrap_or(0.0)
+        };
+        let will_cut = ctx.capabilities.supports_cut && ctx.cut_mode().requests_cut();
+        let encode_mm = if will_cut && dx > 0.0 {
+            (end_mm - dx).max(0.0)
+        } else {
+            end_mm
+        };
+        Self::mm_to_feed_dots(encode_mm, ctx.capabilities.dpi.0) as u32
     }
 
     /// Zero-raster page + auto-cut + no-chain + `0x1A` (eject head-to-cutter scrap).
@@ -890,5 +913,83 @@ mod tests {
             1
         );
         assert_eq!(bytes.iter().filter(|&&b| b == 0x1A).count(), 1);
+    }
+
+    #[test]
+    fn cut_end_clearance_not_double_emitted_as_blank_rows() {
+        // FeedPlan.end_mm is floored to Dx for preview; 0x1A supplies that
+        // clearance — only surplus above Dx becomes trailing blank rasters.
+        let (mut job, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job.feed_lead_mm = Some(24.0);
+        job.feed_end_mm = Some(0.0);
+        caps.feed_trail_mm = Some(24.0);
+        let plan = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
+        assert!((plan.end_mm - 24.0).abs() < 1e-9);
+        let ctx = EncodeContext::with_feed_plan(&job, &caps, plan);
+        let bmp = MonoBitmap::new(8, 2);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        let z = bytes
+            .windows(3)
+            .position(|w| *w == [ESC, b'i', b'z'])
+            .unwrap();
+        let raster_lines =
+            u32::from_le_bytes([bytes[z + 7], bytes[z + 8], bytes[z + 9], bytes[z + 10]]);
+        assert_eq!(raster_lines, 2, "Dx end clearance must not add blank rows");
+
+        job.feed_end_mm = Some(30.0);
+        let plan_hi = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
+        assert!((plan_hi.end_mm - 30.0).abs() < 1e-9);
+        let ctx_hi = EncodeContext::with_feed_plan(&job, &caps, plan_hi);
+        let bytes_hi = BrotherPtDriver::new().encode(&bmp, &ctx_hi).unwrap();
+        let z_hi = bytes_hi
+            .windows(3)
+            .position(|w| *w == [ESC, b'i', b'z'])
+            .unwrap();
+        let raster_hi = u32::from_le_bytes([
+            bytes_hi[z_hi + 7],
+            bytes_hi[z_hi + 8],
+            bytes_hi[z_hi + 9],
+            bytes_hi[z_hi + 10],
+        ]);
+        // Surplus 6 mm @ 180 dpi ≈ 42 dots
+        let surplus = ((6.0_f64 * 180.0) / 25.4).round() as u32;
+        assert_eq!(raster_hi, 2 + surplus);
+    }
+
+    #[test]
+    fn end_pad_below_dx_does_not_stack_on_firmware_clearance() {
+        // Horizontal/axes padding sets G_end=20 while Dx=24: policy floors end
+        // to Dx for preview, but 0x1A already advances Dx — emit no blank rows.
+        let (mut job, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job.feed_lead_mm = Some(20.0);
+        job.feed_end_mm = Some(20.0);
+        job.precut = Some(true);
+        caps.feed_trail_mm = Some(24.0);
+        caps.supports_precut = true;
+        let plan = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
+        assert!((plan.end_mm - 24.0).abs() < 1e-9);
+        let ctx = EncodeContext::with_feed_plan(&job, &caps, plan);
+        let bmp = MonoBitmap::new(8, 2);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        let z = bytes
+            .windows(3)
+            .position(|w| *w == [ESC, b'i', b'z'])
+            .unwrap();
+        // Skip precut page (zero raster lines); find the content page.
+        let content_z = bytes[z + 1..]
+            .windows(3)
+            .position(|w| *w == [ESC, b'i', b'z'])
+            .map(|i| z + 1 + i)
+            .unwrap_or(z);
+        let raster_lines = u32::from_le_bytes([
+            bytes[content_z + 7],
+            bytes[content_z + 8],
+            bytes[content_z + 9],
+            bytes[content_z + 10],
+        ]);
+        assert_eq!(
+            raster_lines, 2,
+            "G_end ≤ Dx must not add blank rows on top of 0x1A clearance"
+        );
     }
 }
