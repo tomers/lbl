@@ -1,99 +1,159 @@
-//! Supported label fonts and helpers for CSS / web-font loading.
+//! System font stacks and helpers for `[[font:slug]]` / `data-lbl-font`.
+//!
+//! Web-font catalogs and face fetching are **not** part of this crate. Callers
+//! that want named web fonts supply self-describing [`FontFaceRule`] values
+//! through `lbl-transpile-html::FontDelivery`.
 
-/// A font available for inline `[[font:…]]` directives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FontDef {
-    /// Slug used in directives (e.g. `roboto`, `bebas-neue`).
-    pub slug: &'static str,
-    /// CSS `font-family` value.
-    pub css: &'static str,
-    /// Google Fonts family query fragment, if a web font must be loaded.
-    pub google: Option<&'static str>,
+use std::collections::HashMap;
+
+/// A single `@font-face` rule ready for injection (no external catalog needed).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontFaceRule {
+    /// Directive / `data-lbl-font` slug (e.g. `roboto`).
+    pub slug: String,
+    /// CSS `font-family` stack for this slug (e.g. `'Roboto',sans-serif`).
+    pub css_family: String,
+    pub weight: u16,
+    pub unicode_range: Option<String>,
+    pub source: FontFaceSource,
 }
 
-/// Curated fonts for label printing. System stacks need no web-font load.
-pub const FONTS: &[FontDef] = &[
-    FontDef {
+/// Where a face binary is loaded from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FontFaceSource {
+    /// Absolute URL for `src:url(...)`.
+    Url(String),
+    /// Raw `woff2` bytes (emitted as a `data:` URI).
+    Bytes(Vec<u8>),
+}
+
+/// Hardcoded system stacks (no `@font-face` files).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SystemFont {
+    pub slug: &'static str,
+    pub label: &'static str,
+    pub css: &'static str,
+}
+
+/// System stacks available without a web-font provider.
+pub const SYSTEM_FONTS: &[SystemFont] = &[
+    SystemFont {
         slug: "sans",
+        label: "Sans (system)",
         css: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
-        google: None,
     },
-    FontDef {
+    SystemFont {
         slug: "serif",
+        label: "Serif (system)",
         css: "Georgia,'Times New Roman',serif",
-        google: None,
     },
-    FontDef {
+    SystemFont {
         slug: "mono",
+        label: "Monospace (system)",
         css: "ui-monospace,'Cascadia Code','Roboto Mono',monospace",
-        google: None,
-    },
-    FontDef {
-        slug: "roboto",
-        css: "'Roboto',sans-serif",
-        google: Some("Roboto"),
-    },
-    FontDef {
-        slug: "roboto-mono",
-        css: "'Roboto Mono',monospace",
-        google: Some("Roboto+Mono"),
-    },
-    FontDef {
-        slug: "open-sans",
-        css: "'Open Sans',sans-serif",
-        google: Some("Open+Sans"),
-    },
-    FontDef {
-        slug: "lato",
-        css: "'Lato',sans-serif",
-        google: Some("Lato"),
-    },
-    FontDef {
-        slug: "oswald",
-        css: "'Oswald',sans-serif",
-        google: Some("Oswald"),
-    },
-    FontDef {
-        slug: "barlow-condensed",
-        css: "'Barlow Condensed',sans-serif",
-        google: Some("Barlow+Condensed"),
-    },
-    FontDef {
-        slug: "bebas-neue",
-        css: "'Bebas Neue',sans-serif",
-        google: Some("Bebas+Neue"),
     },
 ];
 
-/// Look up a font by its directive slug (case-insensitive).
-pub fn resolve_slug(slug: &str) -> Option<&'static FontDef> {
-    let slug = slug.trim();
-    FONTS.iter().find(|f| f.slug.eq_ignore_ascii_case(slug))
+/// Look up a system stack by slug (case-insensitive).
+pub fn resolve_system_slug(slug: &str) -> Option<&'static SystemFont> {
+    let key = slug.trim().to_ascii_lowercase();
+    SYSTEM_FONTS.iter().find(|f| f.slug == key)
 }
 
-/// Build a Google Fonts stylesheet URL for the given web-font slugs.
-pub fn google_fonts_link(slugs: &[&str]) -> Option<String> {
-    let mut families: Vec<&str> = Vec::new();
-    for slug in slugs {
-        if let Some(def) = resolve_slug(slug) {
-            if let Some(g) = def.google {
-                if !families.contains(&g) {
-                    families.push(g);
-                }
-            }
+/// True when `slug` is a non-empty font directive identifier.
+pub fn is_font_slug(slug: &str) -> bool {
+    !slug.trim().is_empty()
+}
+
+/// CSS `font-family` for a system slug, if known.
+pub fn system_font_css(slug: &str) -> Option<&'static str> {
+    resolve_system_slug(slug).map(|f| f.css)
+}
+
+/// Build `@font-face` CSS for one rule.
+pub fn font_face_css_rule(rule: &FontFaceRule) -> String {
+    let family = css_family_name(&rule.css_family).replace('\'', "\\'");
+    let ur = rule
+        .unicode_range
+        .as_deref()
+        .map(|r| format!("unicode-range:{r};"))
+        .unwrap_or_default();
+    let src = match &rule.source {
+        FontFaceSource::Url(url) => {
+            format!("url('{}') format('woff2')", url.replace('\'', "%27"))
+        }
+        FontFaceSource::Bytes(bytes) => {
+            format!(
+                "url(data:font/woff2;base64,{}) format('woff2')",
+                base64_encode(bytes)
+            )
+        }
+    };
+    format!(
+        "@font-face{{font-family:'{family}';font-style:normal;font-weight:{w};font-display:swap;\
+{ur}src:{src};}}\n",
+        family = family,
+        w = rule.weight,
+        ur = ur,
+        src = src,
+    )
+}
+
+/// Prefer the quoted family name from a CSS stack for `@font-face font-family`.
+fn css_family_name(css_stack: &str) -> String {
+    let t = css_stack.trim();
+    if let Some(rest) = t.strip_prefix('\'') {
+        if let Some(end) = rest.find('\'') {
+            return rest[..end].to_string();
         }
     }
-    if families.is_empty() {
-        return None;
+    if let Some(rest) = t.strip_prefix('"') {
+        if let Some(end) = rest.find('"') {
+            return rest[..end].to_string();
+        }
     }
-    let query = families
-        .iter()
-        .map(|f| format!("family={f}"))
-        .collect::<Vec<_>>()
-        .join("&");
-    Some(format!(
-        "https://fonts.googleapis.com/css2?{query}&display=swap"
-    ))
+    t.split(',')
+        .next()
+        .unwrap_or(t)
+        .trim()
+        .trim_matches('\'')
+        .trim_matches('"')
+        .to_string()
+}
+
+/// Group rules by slug (first `css_family` wins for the element rule).
+pub fn rules_by_slug(rules: &[FontFaceRule]) -> HashMap<String, Vec<&FontFaceRule>> {
+    let mut map: HashMap<String, Vec<&FontFaceRule>> = HashMap::new();
+    for rule in rules {
+        map.entry(rule.slug.to_ascii_lowercase())
+            .or_default()
+            .push(rule);
+    }
+    map
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = Vec::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let a = chunk[0] as u32;
+        let b = chunk.get(1).copied().unwrap_or(0) as u32;
+        let c = chunk.get(2).copied().unwrap_or(0) as u32;
+        let n = (a << 16) | (b << 8) | c;
+        out.push(T[((n >> 18) & 63) as usize]);
+        out.push(T[((n >> 12) & 63) as usize]);
+        out.push(if chunk.len() > 1 {
+            T[((n >> 6) & 63) as usize]
+        } else {
+            b'='
+        });
+        out.push(if chunk.len() > 2 {
+            T[(n & 63) as usize]
+        } else {
+            b'='
+        });
+    }
+    String::from_utf8(out).expect("base64 alphabet is utf8")
 }
 
 #[cfg(test)]
@@ -101,16 +161,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolves_known_slugs() {
-        assert!(resolve_slug("roboto").is_some());
-        assert!(resolve_slug("Roboto-Mono").is_some());
-        assert!(resolve_slug("unknown").is_none());
+    fn resolves_system_slugs() {
+        assert!(resolve_system_slug("sans").is_some());
+        assert!(resolve_system_slug("Mono").is_some());
+        assert!(resolve_system_slug("roboto").is_none());
     }
 
     #[test]
-    fn google_link_deduplicates() {
-        let url = google_fonts_link(&["roboto", "roboto"]).expect("url");
-        assert!(url.contains("family=Roboto"));
-        assert!(!url.contains("family=Roboto&family=Roboto"));
+    fn rule_css_url_and_bytes() {
+        let url_rule = FontFaceRule {
+            slug: "roboto".into(),
+            css_family: "'Roboto',sans-serif".into(),
+            weight: 400,
+            unicode_range: Some("U+0000-00FF".into()),
+            source: FontFaceSource::Url("https://example/v1/files/roboto/400-latin.woff2".into()),
+        };
+        let css = font_face_css_rule(&url_rule);
+        assert!(css.contains("@font-face"));
+        assert!(css.contains("https://example/v1/files/roboto/"));
+        assert!(css.contains("font-family:'Roboto'"));
+
+        let bytes_rule = FontFaceRule {
+            slug: "x".into(),
+            css_family: "X".into(),
+            weight: 400,
+            unicode_range: None,
+            source: FontFaceSource::Bytes(b"woff".to_vec()),
+        };
+        let css = font_face_css_rule(&bytes_rule);
+        assert!(css.contains("data:font/woff2;base64,"));
     }
 }

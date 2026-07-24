@@ -13,12 +13,10 @@ name = "lbl-text"
 path = "src/bin/lbl-text.rs"
 
 [dependencies]
-chrono     = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-thiserror  = { workspace = true }
-clap       = { workspace = true }
-lbl-cli    = { workspace = true }
-anyhow     = { workspace = true }
+chrono    = { workspace = true }
+thiserror = { workspace = true }
+clap      = { workspace = true }
+lbl-cli   = { workspace = true }
+anyhow    = { workspace = true }
 
 [dev-dependencies]

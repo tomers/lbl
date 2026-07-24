@@ -2376,7 +2376,11 @@ dependencies = [
  "lbl-render",
  "lbl-spool",
  "lbl-template",
+ "lbl-text",
  "lbl-transpile-html",
+ "once_cell",
+ "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
@@ -2440,7 +2444,6 @@ dependencies = [
  "chrono",
  "clap",
  "lbl-cli",
- "serde",
  "thiserror 2.0.18",
 ]
 

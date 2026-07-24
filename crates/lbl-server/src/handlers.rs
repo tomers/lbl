@@ -39,11 +39,37 @@ use lbl_dither::Algorithm;
 use lbl_encode::Registry;
 use lbl_render::{RenderBackend, SidecarBackend};
 use lbl_template::TemplateError;
-use lbl_transpile_html::{injected_fit_font_px, injected_label_min_width_px, AssetsBase, LabelFitSetting};
+use lbl_transpile_html::{
+    injected_fit_font_px, injected_label_min_width_px, AssetsBase, FontDelivery, LabelFitSetting,
+};
 
 use crate::AppState;
 
-
+async fn inline_font_delivery_for_labels(
+    state: &AppState,
+    labels: &[AuthoringLabel],
+) -> Result<FontDelivery, ApiError> {
+    let mut combined = String::new();
+    for label in labels {
+        combined.push_str(&label.html);
+        combined.push('\n');
+    }
+    let provider = state.font_provider.clone();
+    spawn_blocking(move || provider.delivery_for_html(&combined))
+        .await
+        .map_err(|e| {
+            ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("font provider task failed: {e}"),
+            )
+        })?
+        .map_err(|e| {
+            ApiError(
+                StatusCode::BAD_GATEWAY,
+                format!("failed to resolve label fonts: {e}"),
+            )
+        })
+}
 
 /// A handler error that renders as a JSON `{ "error": ... }` with a status.
 pub struct ApiError(StatusCode, String);
@@ -130,8 +156,6 @@ pub async fn get_config_sources(State(state): State<AppState>) -> ApiResult {
 pub async fn list_catalog(State(state): State<AppState>) -> ApiResult {
     Ok(Json(state.catalog.entries()).into_response())
 }
-
-/// Font picker catalog (metadata + CDN URLs). Binary faces are not embedded.
 
 /// Serialize a catalog device for the API, enriched with UI-facing fields that
 /// are derived from the device (JSON Schema for driver options and capability
@@ -706,6 +730,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         .filter(|v| v.is_finite() && *v > 0.0)
         .map(|mm| ((mm / 25.4) * encode_caps.dpi.0).round().max(0.0) as u32)
         .unwrap_or(0);
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
         media: media.clone(),
@@ -725,6 +750,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
         mirror: req.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type: None,
         virtual_export_mode: VirtualExportMode::Raster,
@@ -922,6 +948,8 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         mirror: req.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
+        // Inline faces so sandboxed / null-origin HTML previews do not need CDN CORS.
+        font_delivery: inline_font_delivery_for_labels(&state, &labels).await?,
         style,
         media_type: None,
         virtual_export_mode: if print_geometry {
@@ -1543,6 +1571,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let style = resolve_style(&style_cfg, dpi, req.supersample);
     let media_inset = resolve_media_inset(&style_cfg).to_px(dpi, req.supersample);
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
         media,
@@ -1563,6 +1592,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         mirror: req.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type: None,
         virtual_export_mode: lbl_driver_file::VirtualExportMode::Raster,
@@ -1765,6 +1795,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     );
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
+    let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
         media,
@@ -1785,6 +1816,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         mirror: req.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
+        font_delivery,
         style,
         media_type,
         virtual_export_mode,

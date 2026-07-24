@@ -28,7 +28,7 @@ mod symbology;
 mod text_fit;
 mod transpile;
 
-pub use assets::AssetsBase;
+pub use assets::{AssetsBase, FontDelivery};
 pub use qr::{QrElementOverrides, QrErrorCorrection};
 pub use symbology::{resolve_symbology, BarcodeRenderer, SymbologyInfo};
 pub use text_fit::{fitted_font_px, injected_fit_font_px, injected_label_min_width_px};

@@ -30,6 +30,10 @@ lbl-text "Prep [[date:%Y-%m-%d]] [[time:%H:%M]]"
   once per preview/print job.
 - `[[size:SCALE:text]]` — text at `SCALE`× the base font size (aliases:
   `font-size`, `fs`; `SCALE` accepts `1.5`, `1.5x`, or `150%`)
+- `[[font:SLUG:text]]` — text tagged with a font slug (aliases: `font-family`,
+  `ff`). System stacks `sans` / `serif` / `mono` need no faces; other slugs
+  require the caller to supply face rules via `FontDelivery`. Unknown empty
+  specs stay literal.
 
 Unrecognized `[[…]]` is left as literal text, and `{{ … }}` is never touched —
 those braces belong to the templating layer (`lbl-template`), so directives and
@@ -65,5 +69,6 @@ per run with `--padding-mm` (and `--padding-horizontal-mm` /
 ## End to end
 
 ```bash
-lbl print --text "Hello [[qr:https://example.com]]" --media 11352 --protocol dymo --usb 0922:1001
+lbl print --text "Hello [[qr:https://example.com]]" \
+  --media 11352 --protocol dymo --usb 0922:1001
 ```

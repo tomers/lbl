@@ -6,6 +6,7 @@ use std::sync::Arc;
 use lbl_catalog::Catalog;
 use lbl_config::{Loader, ProfileStore};
 
+use crate::font_provider::{FontProvider, NoopFontProvider};
 use crate::render_pool::RenderPool;
 
 /// Application state shared across handlers (cheaply cloneable).
@@ -23,11 +24,20 @@ pub struct AppState {
     /// Shared headless-Chromium renderer reused across all preview/print
     /// requests, with a bound on how many renders run concurrently.
     pub renderer: Arc<RenderPool>,
+    /// Optional web-font face resolver (`data-lbl-font`). Default is a no-op.
+    pub font_provider: Arc<dyn FontProvider>,
 }
 
 impl AppState {
     /// Build state using discovered config paths and the bundled catalog.
     pub fn discover() -> anyhow::Result<Self> {
+        Self::discover_with_font_provider(Arc::new(NoopFontProvider))
+    }
+
+    /// Like [`discover`], with a custom [`FontProvider`] for web-font faces.
+    pub fn discover_with_font_provider(
+        font_provider: Arc<dyn FontProvider>,
+    ) -> anyhow::Result<Self> {
         let loader = Loader::new();
         let profiles = ProfileStore::new(loader.paths().profiles.clone());
         let catalog = Catalog::load_with_overlays(&loader.load()?.catalog.extra_paths)
@@ -38,6 +48,7 @@ impl AppState {
             loader: Arc::new(loader),
             host_discovery_enabled: host_discovery_enabled_from_env(),
             renderer: Arc::new(RenderPool::new(render_concurrency_from_env())),
+            font_provider,
         })
     }
 

@@ -4,10 +4,12 @@
 //! printer discovery and profile management, label preview (server raster), and
 //! printing (the full pipeline).
 
+mod font_provider;
 mod handlers;
 mod render_pool;
 mod state;
 
+pub use font_provider::{FontProvider, NoopFontProvider};
 pub use render_pool::RenderPool;
 pub use state::AppState;
 
@@ -137,8 +139,7 @@ mod tests {
             loader: Arc::new(Loader::new()),
             host_discovery_enabled: true,
             renderer: Arc::new(RenderPool::new(1)),
-                env::temp_dir().join("lbl-server-test-font-cache"),
-            )),
+            font_provider: Arc::new(NoopFontProvider),
         }
     }
 
@@ -156,7 +157,6 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
-
 
     #[tokio::test]
     async fn catalog_lists_entries() {

@@ -1,12 +1,12 @@
 //! Core transpilation: rewrite custom elements and assemble the document.
 
 use lbl_core::job::OutputMode;
-use lbl_text::{google_fonts_link, resolve_slug};
+use lbl_text::{font_face_css_rule, is_font_slug, rules_by_slug, system_font_css};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::assets;
-use crate::assets::AssetsBase;
+use crate::assets::{AssetsBase, FontDelivery};
 use crate::layout_fit::{apply_content_head_text_fit, apply_layout_fit};
 use crate::qr::{QrElementOverrides, QrErrorCorrection};
 
@@ -617,6 +617,8 @@ pub struct TranspileOptions {
     pub mode: OutputMode,
     /// Where third-party libraries are loaded from.
     pub assets_base: AssetsBase,
+    /// How web fonts for `data-lbl-font` are injected (`FontDelivery` rules).
+    pub font_delivery: FontDelivery,
     /// Label index within a batch (preview gallery addressing).
     pub index: Option<usize>,
     /// Total number of labels in the batch (preview gallery addressing).
@@ -647,6 +649,7 @@ impl Default for TranspileOptions {
         Self {
             mode: OutputMode::Print,
             assets_base: AssetsBase::default(),
+            font_delivery: FontDelivery::default(),
             index: None,
             count: None,
             style: LabelStyle::default(),
@@ -812,29 +815,46 @@ fn preview_corner_radius_css(style: &LabelStyle) -> String {
 static LBL_FONT_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"data-lbl-font="([^"]+)""#).expect("lbl font attr regex"));
 
-/// CSS rules and optional Google Fonts link for `data-lbl-font` spans in `body`.
-fn font_assets_for_body(body: &str) -> (String, Option<String>) {
+/// CSS rules (`@font-face` + `font-family`) for `data-lbl-font` spans in `body`.
+fn font_assets_for_body(body: &str, delivery: &FontDelivery) -> String {
     let mut slugs: Vec<String> = Vec::new();
     for caps in LBL_FONT_ATTR_RE.captures_iter(body) {
         let slug = caps[1].to_string();
-        if resolve_slug(&slug).is_some() && !slugs.iter().any(|s| s == &slug) {
+        if is_font_slug(&slug) && !slugs.iter().any(|s| s == &slug) {
             slugs.push(slug);
         }
     }
 
+    let by_slug = match delivery {
+        FontDelivery::None => Default::default(),
+        FontDelivery::Rules(rules) => rules_by_slug(rules),
+    };
+
     let mut css = String::new();
     for slug in &slugs {
-        if let Some(def) = resolve_slug(slug) {
+        let key = slug.to_ascii_lowercase();
+        if let Some(rules) = by_slug.get(&key) {
+            for rule in rules {
+                css.push_str(&font_face_css_rule(rule));
+            }
+            if let Some(first) = rules.first() {
+                css.push_str(&format!(
+                    ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{family}}}\n",
+                    slug = slug,
+                    family = first.css_family
+                ));
+            }
+            continue;
+        }
+        if let Some(family) = system_font_css(slug) {
             css.push_str(&format!(
-                ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{css}}}\n",
+                ".lbl-label [data-lbl-font=\"{slug}\"]{{font-family:{family}}}\n",
                 slug = slug,
-                css = def.css
+                family = family
             ));
         }
     }
-
-    let link = google_fonts_link(&slugs.iter().map(String::as_str).collect::<Vec<_>>());
-    (css, link)
+    css
 }
 
 fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &str) -> String {
@@ -846,8 +866,7 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
     }
     head.push_str(assets::BASE_CSS);
     head.push_str(&opts.style.to_css());
-    let (font_css, font_link) = font_assets_for_body(body);
-    head.push_str(&font_css);
+    head.push_str(&font_assets_for_body(body, &opts.font_delivery));
     if opts.label_fit == LabelFit::Fill {
         head.push_str(&format!(
             ".lbl-label{{--lbl-font-fit-scale:{:.4}}}\n",
@@ -890,12 +909,6 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
         }
     }
     head.push_str("</style>\n");
-    if let Some(url) = font_link {
-        head.push_str(&format!(
-            "<link rel=\"stylesheet\" href=\"{}\">\n",
-            attr(&url)
-        ));
-    }
 
     // Wrap body: preview mode adds an addressable, gallery-friendly container.
     let wrapped_body = if opts.mode == OutputMode::Preview {
@@ -950,16 +963,83 @@ fn attr(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lbl_text::{FontFaceRule, FontFaceSource};
 
     #[test]
-    fn font_directive_injects_css_and_google_link() {
+    fn font_directive_injects_css_from_delivery_rules() {
         let out = transpile(
             "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"roboto\">Hi</span><span class=\"lbl-text\" data-lbl-font=\"bebas-neue\">Title</span></div>",
-            &TranspileOptions::default(),
+            &TranspileOptions {
+                font_delivery: FontDelivery::Rules(vec![
+                    FontFaceRule {
+                        slug: "roboto".into(),
+                        css_family: "'Roboto',sans-serif".into(),
+                        weight: 400,
+                        unicode_range: Some("U+0000-00FF".into()),
+                        source: FontFaceSource::Url(
+                            "https://fonts.example/v1/files/roboto/400-latin.woff2".into(),
+                        ),
+                    },
+                    FontFaceRule {
+                        slug: "bebas-neue".into(),
+                        css_family: "'Bebas Neue',sans-serif".into(),
+                        weight: 400,
+                        unicode_range: None,
+                        source: FontFaceSource::Url(
+                            "https://fonts.example/v1/files/bebas-neue/400-latin.woff2".into(),
+                        ),
+                    },
+                ]),
+                ..TranspileOptions::default()
+            },
         );
         assert!(out.contains("font-family:'Roboto',sans-serif"), "{out}");
         assert!(out.contains("font-family:'Bebas Neue',sans-serif"), "{out}");
-        assert!(out.contains("fonts.googleapis.com"), "{out}");
+        assert!(out.contains("@font-face"), "{out}");
+        assert!(
+            out.contains("https://fonts.example/v1/files/roboto/"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn unknown_font_slug_gets_no_font_face() {
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"not-a-font\">Hi</span></div>",
+            &TranspileOptions::default(),
+        );
+        assert!(!out.contains("@font-face"), "{out}");
+        assert!(!out.contains("not-a-font\"]{font-family"), "{out}");
+    }
+
+    #[test]
+    fn system_font_slug_gets_family_without_faces() {
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"sans\">Hi</span></div>",
+            &TranspileOptions::default(),
+        );
+        assert!(!out.contains("@font-face"), "{out}");
+        assert!(out.contains("font-family:system-ui"), "{out}");
+    }
+
+    #[test]
+    fn inline_font_delivery_embeds_woff2_data_uri() {
+        let bytes = b"fake-woff2-bytes-for-test____________".to_vec();
+        let out = transpile(
+            "<div class=\"lbl-label\"><span class=\"lbl-text\" data-lbl-font=\"heebo\">אבג</span></div>",
+            &TranspileOptions {
+                font_delivery: FontDelivery::Rules(vec![FontFaceRule {
+                    slug: "heebo".into(),
+                    css_family: "'Heebo',sans-serif".into(),
+                    weight: 400,
+                    unicode_range: Some("U+0590-05FF".into()),
+                    source: FontFaceSource::Bytes(bytes),
+                }]),
+                ..TranspileOptions::default()
+            },
+        );
+        assert!(out.contains("data:font/woff2;base64,"), "{out}");
+        assert!(out.contains("font-family:'Heebo'"), "{out}");
     }
 
     #[test]

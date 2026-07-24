@@ -36,3 +36,7 @@ for known `data-lbl-font` slugs only — never Google Fonts. See
 cat label.html | lbl-transpile-html --mode print
 lbl-transpile-html label.html --mode preview --index 7 --count 200
 ```
+
+Web fonts: pass `FontDelivery::Rules` with `FontFaceRule`s (URLs or bytes).
+System stacks `sans` / `serif` / `mono` need no faces. This crate does not
+fetch font binaries.

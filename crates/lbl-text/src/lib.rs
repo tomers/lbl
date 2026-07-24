@@ -20,8 +20,10 @@
 //!   preview/print job via [`resolve_stamps_at`]
 //! - `[[size:1.5:World]]` -> text at 1.5x the base font size (aliases:
 //!   `font-size`, `fs`; scale also accepts `1.5x` or `150%`)
-//! - `[[font:roboto:Hello]]` -> text in a named font (aliases: `font-family`,
-//!   `ff`; see [`fonts::catalog`] for supported slugs)
+//! - `[[font:roboto:Hello]]` -> text tagged with a font slug (aliases:
+//!   `font-family`, `ff`). System stacks `sans` / `serif` / `mono` need no
+//!   faces; web fonts require the caller to supply [`FontFaceRule`]s via
+//!   `FontDelivery`
 //! - `[[color:#ff0000:Hello]]` -> colored text (aliases: `fg`, `foreground`,
 //!   `text-color`, `tc`; hex `#rgb` or `#rrggbb`)
 //!
@@ -43,6 +45,10 @@ mod parse;
 mod qr;
 mod stamp;
 
+pub use fonts::{
+    font_face_css_rule, is_font_slug, resolve_system_slug, rules_by_slug, system_font_css,
+    FontFaceRule, FontFaceSource, SystemFont, SYSTEM_FONTS,
+};
 pub use parse::{
     barcode_from_spec, parse_directive, scan_directive_at, BarcodeHeightMode, Block, Document,
 };

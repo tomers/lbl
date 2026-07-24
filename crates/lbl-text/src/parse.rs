@@ -668,10 +668,13 @@ fn parse_hex_color(s: &str) -> Option<String> {
 }
 
 /// Parse a font spec `SLUG:TEXT` (e.g. `roboto:Hello`) into a [`Block::Font`].
+///
+/// Slugs are opaque identifiers. Web-face delivery is supplied separately via
+/// `FontDelivery`; system stacks (`sans` / `serif` / `mono`) need no faces.
 fn font_from_spec(spec: &str) -> Option<Block> {
     let (family, rest) = spec.split_once(':')?;
     let family = family.trim();
-    if family.is_empty() || crate::fonts::resolve_slug(family).is_none() {
+    if !crate::fonts::is_font_slug(family) {
         return None;
     }
     let content = inline_content_from_spec(rest)?;
@@ -926,7 +929,7 @@ mod tests {
 
     #[test]
     fn invalid_font_is_kept_literal() {
-        for inner in ["font:roboto", "font:unknown:x", "font::x"] {
+        for inner in ["font:roboto", "font::x"] {
             let doc = Document::parse(&format!("a [[{inner}]] b"), false);
             assert_eq!(
                 doc.blocks,
@@ -934,6 +937,18 @@ mod tests {
                 "inner: {inner}"
             );
         }
+    }
+
+    #[test]
+    fn unknown_font_slug_is_accepted() {
+        let doc = Document::parse("[[font:unknown:x]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Font {
+                family: "unknown".to_string(),
+                content: vec![Block::Text("x".to_string())]
+            }]
+        );
     }
 
     #[test]

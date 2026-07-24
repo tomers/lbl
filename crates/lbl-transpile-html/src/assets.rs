@@ -1,6 +1,8 @@
 //! Static assets injected into transpiled documents: flex utilities, base CSS,
 //! and third-party library references for QR/barcode rendering.
 
+use lbl_text::FontFaceRule;
+
 /// Where third-party JS libraries are loaded from.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum AssetsBase {
@@ -42,6 +44,19 @@ impl AssetsBase {
             }
         }
     }
+}
+
+/// How web fonts referenced by `data-lbl-font` are delivered to the document.
+///
+/// The engine does not fetch faces. Callers that want named web fonts pass
+/// self-describing [`FontFaceRule`]s (URLs or inlined bytes).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum FontDelivery {
+    /// No web faces — system stacks only (`sans` / `serif` / `mono`).
+    #[default]
+    None,
+    /// Explicit `@font-face` rules for the slugs used in the document.
+    Rules(Vec<FontFaceRule>),
 }
 
 /// Base + flex-utility CSS available to every transpiled label.

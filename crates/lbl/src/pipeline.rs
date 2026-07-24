@@ -519,7 +519,7 @@ pub struct PipelineOptions {
     pub supersample: u32,
     /// Where transpilation loads JS libraries from.
     pub assets_base: AssetsBase,
-    /// How catalog web fonts are injected into transpiled HTML.
+    /// How web fonts for `data-lbl-font` are injected (`FontDelivery`).
     pub font_delivery: FontDelivery,
     /// Font / QR / barcode sizing (already resolved to pixels for this run's
     /// DPI and supersample factor; see [`resolve_style`]).
