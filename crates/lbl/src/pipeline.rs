@@ -1183,13 +1183,18 @@ pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String
         } else {
             format!("height:{:.2}px", frame.height_px)
         };
+        // min-width/height:max-content beats transpile's min-*:100% so a warm
+        // iframe that still has the previous (larger) viewport can shrink when
+        // feed-end padding goes to 0 — otherwise measure sticks on the old size.
         format!(
             ".lbl-stock{{position:relative;{width_rule};{height_rule};box-sizing:border-box;\
              padding:{pad_top}px {pad_right}px {pad_bottom}px {pad_left}px;\
-             background:#fff;overflow:visible;align-self:flex-start;flex:0 0 auto}}\n\
+             background:#fff;overflow:visible;align-self:flex-start;flex:0 0 auto;\
+             min-width:max-content;min-height:max-content}}\n\
              .lbl-stock-print{{box-sizing:border-box;display:flex;flex-direction:column;\
              justify-content:center;{print_width};{print_height}}}\n\
-             html,body{{margin:0;{width_rule};{height_rule};align-items:flex-start}}\n\
+             html,body{{margin:0;{width_rule};{height_rule};align-items:flex-start;\
+             min-width:max-content;min-height:max-content}}\n\
              .lbl-label{{width:max-content;max-width:none;flex:0 0 auto}}\n",
             width_rule = width_rule,
             height_rule = height_rule,

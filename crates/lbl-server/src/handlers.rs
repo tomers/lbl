@@ -800,23 +800,16 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     label_json["content_feed_end_px"] =
                         serde_json::Value::from(padded.content_feed_end_px);
                     label_json["feed_trail_px"] = serde_json::Value::from(padded.trail_feed_px);
-                    if padded.feed_end_margin_px > 0 {
-                        label_json["feed_end_margin_px"] =
-                            serde_json::Value::from(padded.feed_end_margin_px);
-                    }
+                    label_json["feed_end_margin_px"] =
+                        serde_json::Value::from(padded.feed_end_margin_px);
                     if padded.lead_feed_px > 0 {
                         label_json["feed_lead_px"] = serde_json::Value::from(padded.lead_feed_px);
                     }
                     if feed_reversed {
                         label_json["feed_reversed"] = serde_json::Value::Bool(true);
                     }
-                    if virtual_start_px > 0 {
-                        label_json["virtual_feed_start_px"] =
-                            serde_json::Value::from(virtual_start_px);
-                    }
-                    if virtual_end_px > 0 {
-                        label_json["virtual_feed_end_px"] = serde_json::Value::from(virtual_end_px);
-                    }
+                    label_json["virtual_feed_start_px"] = serde_json::Value::from(virtual_start_px);
+                    label_json["virtual_feed_end_px"] = serde_json::Value::from(virtual_end_px);
                     if padded.precut {
                         label_json["precut"] = serde_json::Value::Bool(true);
                     }
@@ -1029,24 +1022,20 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                         serde_json::Value::from(content_feed_end_px);
                 }
                 label_json["feed_trail_px"] = serde_json::Value::from(stock.trail_feed_px);
-                if stock.feed_end_margin_px > 0 {
-                    label_json["feed_end_margin_px"] =
-                        serde_json::Value::from(stock.feed_end_margin_px);
-                }
+                // Always publish end/start px (including 0) so clients clear a
+                // prior positive margin instead of keeping a stale overlay size.
+                label_json["feed_end_margin_px"] =
+                    serde_json::Value::from(stock.feed_end_margin_px);
                 if stock.lead_feed_px > 0 {
                     label_json["feed_lead_px"] = serde_json::Value::from(stock.lead_feed_px);
                 }
                 if stock.feed_reversed {
                     label_json["feed_reversed"] = serde_json::Value::Bool(true);
                 }
-                if stock.virtual_feed_start_px > 0 {
-                    label_json["virtual_feed_start_px"] =
-                        serde_json::Value::from(stock.virtual_feed_start_px);
-                }
-                if stock.virtual_feed_end_px > 0 {
-                    label_json["virtual_feed_end_px"] =
-                        serde_json::Value::from(stock.virtual_feed_end_px);
-                }
+                label_json["virtual_feed_start_px"] =
+                    serde_json::Value::from(stock.virtual_feed_start_px);
+                label_json["virtual_feed_end_px"] =
+                    serde_json::Value::from(stock.virtual_feed_end_px);
                 if stock.precut {
                     label_json["precut"] = serde_json::Value::Bool(true);
                 }
