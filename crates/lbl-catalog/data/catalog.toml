@@ -5658,7 +5658,7 @@ name = "Brother PT-P700"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p700eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5699,7 +5699,7 @@ name = "Brother PT-P750W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5740,7 +5740,7 @@ name = "Brother PT-H500"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=h500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5781,7 +5781,7 @@ name = "Brother PT-E500"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e500eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5824,7 +5824,7 @@ name = "Brother PT-E550W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=e550weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5865,7 +5865,7 @@ name = "Brother PT-D600"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d600eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
@@ -5906,7 +5906,7 @@ name = "Brother PT-D450"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=d450eus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 180.0
 max_width_mm = 18.0
@@ -5942,7 +5942,7 @@ name              = "Brother PT-P710BT (P-touch Cube Plus)"
 support           = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p710bteus", brand_url = "https://support.brother.com/" }
 protocol          = "brotherpt"
 supports_packbits = true
-maturity          = "experimental"
+maturity          = "verified"
 reports_media     = true
 dpi               = 180.0
 max_width_mm      = 24.0
@@ -5991,7 +5991,7 @@ name = "Brother PT-P300BT (P-touch Cube)"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p300bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = false
 dpi = 180.0
 max_width_mm = 12.0
@@ -6027,7 +6027,7 @@ support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&
 protocol = "brotherpt"
 supports_high_resolution = true
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 360.0
 max_width_mm = 36.0
@@ -6070,7 +6070,7 @@ support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&
 protocol = "brotherpt"
 supports_high_resolution = true
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 360.0
 max_width_mm = 36.0
@@ -6113,7 +6113,7 @@ support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&
 protocol = "brotherpt"
 supports_high_resolution = true
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 360.0
 max_width_mm = 36.0
@@ -6155,7 +6155,7 @@ name = "Brother PT-P910BT"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p910bteus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "experimental"
+maturity = "supported"
 reports_media = true
 dpi = 360.0
 max_width_mm = 36.0
