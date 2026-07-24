@@ -1136,13 +1136,10 @@ pub fn preview_stock_frame(params: PreviewStockFrameParams<'_>) -> PreviewStockF
 /// printable band absolutely positioned inside. When a continuous feed axis is
 /// still `0`, padding + `100%` keeps that axis open so Studio can size it.
 pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String {
-    if frame.head_pad_before_px == 0
-        && frame.head_pad_after_px == 0
-        && frame.lead_feed_px == 0
-        && frame.feed_end_margin_px == 0
-    {
-        return html.to_string();
-    }
+    // Always frame continuous / open-axis stock — even when every pad is 0.
+    // Skipping the wrapper drops `.lbl-label{width:max-content}`, so the label
+    // stretches to an underestimated iframe width and LTR glyph ink clips on
+    // the trailing edge (left side-bearing still visible, right flush).
 
     let (pad_left, pad_top) = if frame.head_along_height {
         if frame.feed_reversed {
@@ -2111,6 +2108,62 @@ mod tests {
                 frame.head_pad_before_px, frame.head_pad_after_px, dx
             )),
             "stock must pad head laminate and feed lead, got: {framed}"
+        );
+    }
+
+    #[test]
+    fn frame_html_preview_stock_zero_pads_keeps_max_content() {
+        use lbl_core::units::Dpi;
+
+        // 24 mm TZe with full printable height — no head/feed pads when G=0.
+        let media = Media::continuous(24.0, Dpi(180.0));
+        let caps = DeviceCapabilities {
+            dpi: Dpi(180.0),
+            max_width_mm: 24.0,
+            feed_trail_mm: Some(24.0),
+            supports_cut: true,
+            supports_precut: true,
+            precut_default: true,
+            ..Default::default()
+        };
+        let content_h = mm_to_layout_px(24.0, VECTOR_CSS_DPI);
+        let feed = PreviewFeedOverrides {
+            cut_mode: CutMode::Every,
+            feed_lead_mm: Some(0.0),
+            feed_end_mm: Some(0.0),
+            precut: Some(true),
+            ..Default::default()
+        };
+        let frame = preview_stock_frame(PreviewStockFrameParams {
+            content_width_px: 0.0,
+            content_height_px: content_h,
+            media: &media,
+            caps: &caps,
+            head_along_height: true,
+            layout_dpi: VECTOR_CSS_DPI,
+            feed: &feed,
+            feed_reversed: false,
+        });
+        assert_eq!(frame.lead_feed_px, 0);
+        assert_eq!(frame.feed_end_margin_px, 0);
+        assert_eq!(frame.head_pad_before_px, 0);
+        assert_eq!(frame.head_pad_after_px, 0);
+
+        let framed = frame_html_preview_stock(
+            "<!doctype html><html><head><style>body{}</style></head><body><div class=\"lbl-label\"><span class=\"lbl-text\">abc</span></div></body></html>",
+            &frame,
+        );
+        assert!(
+            framed.contains("lbl-stock"),
+            "zero pads must still wrap stock so label stays max-content: {framed}"
+        );
+        assert!(
+            framed.contains(".lbl-label{width:max-content;max-width:none;flex:0 0 auto}"),
+            "zero-pad continuous must not stretch label to the iframe: {framed}"
+        );
+        assert!(
+            framed.contains("min-width:max-content"),
+            "zero-pad continuous must keep shrinkable max-content mins: {framed}"
         );
     }
 
