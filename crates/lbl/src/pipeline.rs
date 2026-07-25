@@ -454,22 +454,22 @@ fn discover_serial_port(printer: &DeviceEntry) -> Option<String> {
 /// `supersample` factor.
 pub fn resolve_style(style: &lbl_config::StyleConfig, dpi: f64, supersample: u32) -> LabelStyle {
     let mut label = LabelStyle::from_mm(
-        style.font_size_mm,
-        style.qr_size_mm,
-        style.barcode_height_mm,
-        style.barcode_module_width_mm,
+        style.typography.font_size_mm,
+        style.qr.qr_size_mm,
+        style.barcode.barcode_height_mm,
+        style.barcode.barcode_module_width_mm,
         resolve_label_padding(style),
-        style.element_gap_mm,
-        style.border_width_mm,
-        style.corner_radius_mm,
+        style.chrome.element_gap_mm,
+        style.chrome.border_width_mm,
+        style.chrome.corner_radius_mm,
         dpi,
         supersample,
     );
     label.qr_error_correction =
-        QrErrorCorrection::parse(&style.qr_error_correction).unwrap_or_default();
-    label.qr_margin = style.qr_margin;
-    label.qr_dark = style.qr_dark.clone();
-    label.qr_light = style.qr_light.clone();
+        QrErrorCorrection::parse(&style.qr.qr_error_correction).unwrap_or_default();
+    label.qr_margin = style.qr.qr_margin;
+    label.qr_dark = style.qr.qr_dark.clone();
+    label.qr_light = style.qr.qr_light.clone();
     label
 }
 
@@ -478,33 +478,32 @@ pub fn resolve_style_vector(style: &lbl_config::StyleConfig) -> LabelStyle {
     resolve_style(style, VECTOR_CSS_DPI, 1)
 }
 
+/// Layout policy resolved for one pipeline run (fit/align/inset).
+#[derive(Debug, Clone)]
+pub struct PipelineLayout {
+    /// How the label root fills the render viewport.
+    pub label_fit: LabelFit,
+    /// Cross-axis alignment when the viewport width is known.
+    pub label_align: LabelAlign,
+    /// Main-axis alignment in fill mode.
+    pub label_valign: LabelValign,
+    /// Fit-box scale in fill mode.
+    pub label_fit_scale: f64,
+    /// Auto-fit text scale in fill mode.
+    pub font_fit_scale: f64,
+    /// Inset from the physical media edge (CSS px).
+    pub media_inset: MediaInsetPx,
+}
+
 /// Options for encoding a label all the way to protocol bytes.
 #[derive(Debug, Clone)]
 pub struct PipelineOptions {
     /// Target protocol.
     pub protocol: Protocol,
-    /// Resolved media.
-    pub media: Media,
-    /// Whether the printer can cut.
+    /// Whether the printer can cut (may OR into [`Self::encode_caps`]).
     pub supports_cut: bool,
-    /// When to cut during the job.
-    pub cut_mode: CutMode,
-    /// Copies.
-    pub copies: u32,
-    /// 0-based index within a multi-label batch encode.
-    pub batch_index: u32,
-    /// Total labels in the batch encode (`1` = standalone).
-    pub batch_total: u32,
-    /// Optional print density / heat (driver-specific).
-    pub density: Option<u8>,
-    /// Requested feed lead padding (mm). `None` → resolve uses \(D_x\) when known.
-    pub feed_lead_mm: Option<f64>,
-    /// Requested feed end padding (mm). `None` → 0.
-    pub feed_end_mm: Option<f64>,
-    /// Opt-in pre-cut. `None` → catalog `precut_default`.
-    pub precut: Option<bool>,
-    /// Protocol-specific options (each driver reads only its own bag).
-    pub driver: lbl_core::DriverOptions,
+    /// Device job parameters (media, cut, feed, copies, driver bag).
+    pub job: JobSpec,
     /// Dithering algorithm.
     pub dither: Algorithm,
     /// Net rotation for layout viewport sizing (reading frame).
@@ -529,18 +528,8 @@ pub struct PipelineOptions {
     pub media_type: Option<MediaType>,
     /// Virtual-printer export mode: raster image vs vector PDF.
     pub virtual_export_mode: VirtualExportMode,
-    /// How the label root fills the render viewport (resolved from config/CLI).
-    pub label_fit: LabelFit,
-    /// Cross-axis alignment when the viewport width is known (resolved from config/CLI).
-    pub label_align: LabelAlign,
-    /// Main-axis alignment in fill mode (resolved from config/CLI).
-    pub label_valign: LabelValign,
-    /// Fit-box scale in fill mode (resolved from config/CLI).
-    pub label_fit_scale: f64,
-    /// Auto-fit text scale in fill mode (resolved from config/CLI).
-    pub font_fit_scale: f64,
-    /// Inset from the physical media edge (resolved from config/CLI).
-    pub media_inset: MediaInsetPx,
+    /// Viewport fit / alignment / media inset.
+    pub layout: PipelineLayout,
     /// Printer encode capabilities (feed padding, DPI, cut support).
     pub encode_caps: DeviceCapabilities,
 }
@@ -594,7 +583,7 @@ pub fn encode_labels<B: RenderBackend>(
 
     let preprocess_input = job_input(
         labels.len(),
-        &opts.media,
+        &opts.job.media,
         opts.rotation,
         opts.supersample,
         encode_opts.sidecar_backend,
@@ -612,11 +601,11 @@ pub fn encode_labels<B: RenderBackend>(
 
     for (position, label) in labels.iter().enumerate() {
         let mut label_opts = opts.clone();
-        label_opts.batch_index = position as u32;
-        label_opts.batch_total = labels.len() as u32;
+        label_opts.job.batch_index = position as u32;
+        label_opts.job.batch_total = labels.len() as u32;
         // Across a multi-label batch, "cut at end" applies only to the last label.
-        if opts.cut_mode == CutMode::End && position != last_index {
-            label_opts.cut_mode = CutMode::None;
+        if opts.job.cut_mode == CutMode::End && position != last_index {
+            label_opts.job.cut_mode = CutMode::None;
         }
         let started = Instant::now();
         let trace = encode_label_traced(backend, registry, label.index, &label.html, &label_opts)
@@ -679,13 +668,13 @@ pub fn resolve_font_fit_scale(scale: f64) -> f64 {
 /// Build a [`CascadingInsetMm`] from the style configuration's padding fields.
 pub fn resolve_label_padding(style: &lbl_config::StyleConfig) -> CascadingInsetMm {
     CascadingInsetMm {
-        all: style.padding_mm,
-        horizontal: style.padding_horizontal_mm,
-        vertical: style.padding_vertical_mm,
-        top: style.padding_top_mm,
-        right: style.padding_right_mm,
-        bottom: style.padding_bottom_mm,
-        left: style.padding_left_mm,
+        all: style.padding.padding_mm,
+        horizontal: style.padding.padding_horizontal_mm,
+        vertical: style.padding.padding_vertical_mm,
+        top: style.padding.padding_top_mm,
+        right: style.padding.padding_right_mm,
+        bottom: style.padding.padding_bottom_mm,
+        left: style.padding.padding_left_mm,
     }
 }
 
@@ -705,13 +694,13 @@ pub fn apply_padding_sides_to_style(
     style: &mut lbl_config::StyleConfig,
     sides: lbl_core::PaddingSidesMm,
 ) {
-    style.padding_mm = 0.0;
-    style.padding_horizontal_mm = None;
-    style.padding_vertical_mm = None;
-    style.padding_top_mm = Some(sides.top);
-    style.padding_right_mm = Some(sides.right);
-    style.padding_bottom_mm = Some(sides.bottom);
-    style.padding_left_mm = Some(sides.left);
+    style.padding.padding_mm = 0.0;
+    style.padding.padding_horizontal_mm = None;
+    style.padding.padding_vertical_mm = None;
+    style.padding.padding_top_mm = Some(sides.top);
+    style.padding.padding_right_mm = Some(sides.right);
+    style.padding.padding_bottom_mm = Some(sides.bottom);
+    style.padding.padding_left_mm = Some(sides.left);
 }
 
 /// Derive tape lead/end from feed-axis label padding; rewrite style padding in place.
@@ -741,13 +730,13 @@ pub fn apply_virtual_feed_gaps(
 /// Build a [`MediaInset`] from the style configuration.
 pub fn resolve_media_inset(style: &lbl_config::StyleConfig) -> MediaInset {
     MediaInset {
-        all_mm: style.media_inset_mm,
-        horizontal_mm: style.media_inset_horizontal_mm,
-        vertical_mm: style.media_inset_vertical_mm,
-        start_mm: style.media_inset_start_mm,
-        end_mm: style.media_inset_end_mm,
-        cross_start_mm: style.media_inset_cross_start_mm,
-        cross_end_mm: style.media_inset_cross_end_mm,
+        all_mm: style.media_inset.media_inset_mm,
+        horizontal_mm: style.media_inset.media_inset_horizontal_mm,
+        vertical_mm: style.media_inset.media_inset_vertical_mm,
+        start_mm: style.media_inset.media_inset_start_mm,
+        end_mm: style.media_inset.media_inset_end_mm,
+        cross_start_mm: style.media_inset.media_inset_cross_start_mm,
+        cross_end_mm: style.media_inset.media_inset_cross_end_mm,
     }
 }
 
@@ -1299,15 +1288,15 @@ pub fn transpile_label_html(
 ) -> Result<TranspiledLabelHtml> {
     let viewport = if opts.virtual_export_mode == VirtualExportMode::Raster {
         render_viewport_px(
-            &opts.media,
+            &opts.job.media,
             opts.supersample,
             opts.rotation,
             Some(&opts.encode_caps),
         )
     } else {
-        render_viewport_vector(&opts.media, opts.rotation, Some(&opts.encode_caps))
+        render_viewport_vector(&opts.job.media, opts.rotation, Some(&opts.encode_caps))
     };
-    let page_size = page_size_mm(&opts.media, opts.rotation);
+    let page_size = page_size_mm(&opts.job.media, opts.rotation);
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -1317,18 +1306,18 @@ pub fn transpile_label_html(
             index: None,
             count: None,
             style: opts.style.clone(),
-            label_fit: opts.label_fit,
+            label_fit: opts.layout.label_fit,
             viewport: Some(viewport.clone()),
-            label_align: opts.label_align,
-            label_valign: opts.label_valign,
-            label_fit_scale: opts.label_fit_scale,
-            font_fit_scale: opts.font_fit_scale,
-            media_inset: opts.media_inset,
+            label_align: opts.layout.label_align,
+            label_valign: opts.layout.label_valign,
+            label_fit_scale: opts.layout.label_fit_scale,
+            font_fit_scale: opts.layout.font_fit_scale,
+            media_inset: opts.layout.media_inset,
             page_size: Some(page_size),
         },
     );
 
-    let corner_radius_px = match opts.media.length {
+    let corner_radius_px = match opts.job.media.length {
         lbl_core::media::MediaLength::Fixed(_) => opts.style.corner_radius_px,
         lbl_core::media::MediaLength::Continuous => 0.0,
     };
@@ -1507,7 +1496,7 @@ fn render_label_print<B: RenderBackend>(
     opts: &PipelineOptions,
 ) -> Result<PrintRenderStage> {
     let viewport = render_viewport_px(
-        &opts.media,
+        &opts.job.media,
         opts.supersample,
         opts.rotation,
         Some(&opts.encode_caps),
@@ -1521,19 +1510,19 @@ fn render_label_print<B: RenderBackend>(
             index: None,
             count: None,
             style: opts.style.clone(),
-            label_fit: opts.label_fit,
+            label_fit: opts.layout.label_fit,
             viewport: Some(viewport),
-            label_align: opts.label_align,
-            label_valign: opts.label_valign,
-            label_fit_scale: opts.label_fit_scale,
-            font_fit_scale: opts.font_fit_scale,
-            media_inset: opts.media_inset,
+            label_align: opts.layout.label_align,
+            label_valign: opts.layout.label_valign,
+            label_fit_scale: opts.layout.label_fit_scale,
+            font_fit_scale: opts.layout.font_fit_scale,
+            media_inset: opts.layout.media_inset,
             ..Default::default()
         },
     );
 
-    let head_dots = effective_render_head_dots(&opts.media, &opts.encode_caps);
-    let feed_dots = opts.media.length_dots().map(|d| d.0);
+    let head_dots = effective_render_head_dots(&opts.job.media, &opts.encode_caps);
+    let feed_dots = opts.job.media.length_dots().map(|d| d.0);
     let (req_width, req_height) = if opts.rotation.swaps_axes() {
         (feed_dots, Some(head_dots))
     } else {
@@ -1602,7 +1591,7 @@ pub fn encode_label_from_rgba(
     rendered: &RgbaImage,
     opts: &PipelineOptions,
 ) -> Result<EncodeFromRgbaResult> {
-    let two_color = opts.media.two_color;
+    let two_color = opts.job.media.two_color;
     let color_png =
         if !two_color && opts.encode_caps.supports_color && opts.protocol == Protocol::EscLabel {
             Some(encode_rgba_png(rendered).context("encoding color PNG")?)
@@ -1616,16 +1605,7 @@ pub fn encode_label_from_rgba(
         (dither(rendered, opts.dither), None)
     };
 
-    let mut job = JobSpec::new(opts.media.clone());
-    job.cut_mode = opts.cut_mode;
-    job.copies = opts.copies;
-    job.batch_index = opts.batch_index;
-    job.batch_total = opts.batch_total;
-    job.density = opts.density;
-    job.feed_lead_mm = opts.feed_lead_mm;
-    job.feed_end_mm = opts.feed_end_mm;
-    job.precut = opts.precut;
-    job.driver = opts.driver.clone();
+    let job = opts.job.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
@@ -1712,8 +1692,8 @@ fn encode_label_vector_traced<B: RenderBackend>(
     opts: &PipelineOptions,
 ) -> Result<crate::debug::LabelTrace> {
     let applied_rotation = Rotation::None;
-    let viewport = render_viewport_vector(&opts.media, opts.rotation, Some(&opts.encode_caps));
-    let page_size = page_size_mm(&opts.media, opts.rotation);
+    let viewport = render_viewport_vector(&opts.job.media, opts.rotation, Some(&opts.encode_caps));
+    let page_size = page_size_mm(&opts.job.media, opts.rotation);
     let transpiled = transpile(
         authoring_html,
         &TranspileOptions {
@@ -1723,19 +1703,19 @@ fn encode_label_vector_traced<B: RenderBackend>(
             index: None,
             count: None,
             style: opts.style.clone(),
-            label_fit: opts.label_fit,
+            label_fit: opts.layout.label_fit,
             viewport: Some(viewport),
-            label_align: opts.label_align,
-            label_valign: opts.label_valign,
-            label_fit_scale: opts.label_fit_scale,
-            font_fit_scale: opts.font_fit_scale,
-            media_inset: opts.media_inset,
+            label_align: opts.layout.label_align,
+            label_valign: opts.layout.label_valign,
+            label_fit_scale: opts.layout.label_fit_scale,
+            font_fit_scale: opts.layout.font_fit_scale,
+            media_inset: opts.layout.media_inset,
             page_size: Some(page_size),
         },
     );
 
-    let head_dots = effective_render_head_dots(&opts.media, &opts.encode_caps);
-    let feed_dots = opts.media.length_dots().map(|d| d.0);
+    let head_dots = effective_render_head_dots(&opts.job.media, &opts.encode_caps);
+    let feed_dots = opts.job.media.length_dots().map(|d| d.0);
     let (req_width, req_height) = if opts.rotation.swaps_axes() {
         (feed_dots, Some(head_dots))
     } else {
@@ -1793,18 +1773,9 @@ pub fn encode_sample_pattern_traced(
     if head_dots == 0 {
         bail!("sample pattern height must be at least 1 dot");
     }
-    let bitmap = sample_pattern_for_media(head_dots, &opts.media, opts.protocol);
+    let bitmap = sample_pattern_for_media(head_dots, &opts.job.media, opts.protocol);
 
-    let mut job = JobSpec::new(opts.media.clone());
-    job.cut_mode = opts.cut_mode;
-    job.copies = opts.copies;
-    job.batch_index = opts.batch_index;
-    job.batch_total = opts.batch_total;
-    job.density = opts.density;
-    job.feed_lead_mm = opts.feed_lead_mm;
-    job.feed_end_mm = opts.feed_end_mm;
-    job.precut = opts.precut;
-    job.driver = opts.driver.clone();
+    let job = opts.job.clone();
     let caps = opts.encode_caps.clone();
     let driver = registry
         .get(opts.protocol)
@@ -1888,17 +1859,20 @@ mod tests {
         );
         PipelineOptions {
             protocol,
-            media: Media::fixed(12.0, 40.0, Dpi(203.0)),
             supports_cut: false,
-            cut_mode: CutMode::None,
-            copies: 1,
-            batch_index: 0,
-            batch_total: 1,
-            density: None,
-            feed_lead_mm: None,
-            feed_end_mm: None,
-            precut: None,
-            driver: lbl_core::DriverOptions::default(),
+            job: JobSpec {
+                media: Media::fixed(12.0, 40.0, Dpi(203.0)),
+                mode: OutputMode::Print,
+                cut_mode: CutMode::None,
+                copies: 1,
+                batch_index: 0,
+                batch_total: 1,
+                density: None,
+                feed_lead_mm: None,
+                feed_end_mm: None,
+                precut: None,
+                driver: lbl_core::DriverOptions::default(),
+            },
             dither: Algorithm::Threshold(128),
             rotation,
             head_rotation,
@@ -1909,12 +1883,14 @@ mod tests {
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
-            label_fit: LabelFit::Fill,
-            label_align: LabelAlign::default(),
-            label_valign: LabelValign::default(),
-            label_fit_scale: 1.0,
-            font_fit_scale: 1.0,
-            media_inset: MediaInsetPx::default(),
+            layout: PipelineLayout {
+                label_fit: LabelFit::Fill,
+                label_align: LabelAlign::default(),
+                label_valign: LabelValign::default(),
+                label_fit_scale: 1.0,
+                font_fit_scale: 1.0,
+                media_inset: MediaInsetPx::default(),
+            },
             encode_caps: DeviceCapabilities::default(),
         }
     }
@@ -2335,16 +2311,17 @@ mod tests {
         // Misclassifying DymoLw as feed-oriented leaves feed on bitmap width and
         // LabelWriter550Driver::pad_to_head rejects it (> 672 dots).
         let mut opts = landscape_opts(Protocol::DymoLw);
-        opts.media = Media::fixed(54.0, 101.0, Dpi(300.0));
+        opts.job.media = Media::fixed(54.0, 101.0, Dpi(300.0));
         opts.encode_caps = DeviceCapabilities {
             dpi: Dpi(300.0),
             max_width_mm: 57.0,
             ..Default::default()
         };
-        opts.rotation = Rotation::for_print_with_media(Orientation::Landscape, &opts.media, 0, 0);
+        opts.rotation =
+            Rotation::for_print_with_media(Orientation::Landscape, &opts.job.media, 0, 0);
         opts.head_rotation = Rotation::for_head_with_media(
             Orientation::Landscape,
-            &opts.media,
+            &opts.job.media,
             0,
             0,
             Protocol::DymoLw,
@@ -2553,17 +2530,20 @@ mod tests {
         let registry = Registry::with_builtin_drivers();
         let opts = PipelineOptions {
             protocol: Protocol::EscPos,
-            media: Media::continuous(58.0, Dpi(203.0)),
             supports_cut: false,
-            cut_mode: CutMode::None,
-            copies: 1,
-            batch_index: 0,
-            batch_total: 1,
-            density: None,
-            feed_lead_mm: None,
-            feed_end_mm: None,
-            precut: None,
-            driver: lbl_core::DriverOptions::default(),
+            job: JobSpec {
+                media: Media::continuous(58.0, Dpi(203.0)),
+                mode: OutputMode::Print,
+                cut_mode: CutMode::None,
+                copies: 1,
+                batch_index: 0,
+                batch_total: 1,
+                density: None,
+                feed_lead_mm: None,
+                feed_end_mm: None,
+                precut: None,
+                driver: lbl_core::DriverOptions::default(),
+            },
             dither: Algorithm::Threshold(128),
             rotation: Rotation::None,
             head_rotation: Rotation::None,
@@ -2574,12 +2554,14 @@ mod tests {
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
-            label_fit: LabelFit::Fill,
-            label_align: LabelAlign::default(),
-            label_valign: LabelValign::default(),
-            label_fit_scale: 1.0,
-            font_fit_scale: 1.0,
-            media_inset: MediaInsetPx::default(),
+            layout: PipelineLayout {
+                label_fit: LabelFit::Fill,
+                label_align: LabelAlign::default(),
+                label_valign: LabelValign::default(),
+                label_fit_scale: 1.0,
+                font_fit_scale: 1.0,
+                media_inset: MediaInsetPx::default(),
+            },
             encode_caps: DeviceCapabilities::default(),
         };
         let img = RgbaImage::from_pixel(64, 32, image::Rgba([0, 0, 0, 255]));
@@ -2595,17 +2577,20 @@ mod tests {
         let registry = Registry::with_builtin_drivers();
         let opts = PipelineOptions {
             protocol: Protocol::Dymo,
-            media: Media::continuous(12.0, Dpi(180.0)),
             supports_cut: false,
-            cut_mode: CutMode::None,
-            copies: 1,
-            batch_index: 0,
-            batch_total: 1,
-            density: None,
-            feed_lead_mm: None,
-            feed_end_mm: None,
-            precut: None,
-            driver: lbl_core::DriverOptions::default(),
+            job: JobSpec {
+                media: Media::continuous(12.0, Dpi(180.0)),
+                mode: OutputMode::Print,
+                cut_mode: CutMode::None,
+                copies: 1,
+                batch_index: 0,
+                batch_total: 1,
+                density: None,
+                feed_lead_mm: None,
+                feed_end_mm: None,
+                precut: None,
+                driver: lbl_core::DriverOptions::default(),
+            },
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
@@ -2616,12 +2601,14 @@ mod tests {
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
-            label_fit: LabelFit::Fill,
-            label_align: LabelAlign::default(),
-            label_valign: LabelValign::default(),
-            label_fit_scale: 1.0,
-            font_fit_scale: 1.0,
-            media_inset: MediaInsetPx::default(),
+            layout: PipelineLayout {
+                label_fit: LabelFit::Fill,
+                label_align: LabelAlign::default(),
+                label_valign: LabelValign::default(),
+                label_fit_scale: 1.0,
+                font_fit_scale: 1.0,
+                media_inset: MediaInsetPx::default(),
+            },
             encode_caps: DeviceCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 64, &opts).unwrap();
@@ -2637,17 +2624,20 @@ mod tests {
         let registry = Registry::with_builtin_drivers();
         let opts = PipelineOptions {
             protocol: Protocol::Niimbot,
-            media: Media::fixed(12.0, 30.0, Dpi(203.0)),
             supports_cut: false,
-            cut_mode: CutMode::None,
-            copies: 1,
-            batch_index: 0,
-            batch_total: 1,
-            density: None,
-            feed_lead_mm: None,
-            feed_end_mm: None,
-            precut: None,
-            driver: lbl_core::DriverOptions::default(),
+            job: JobSpec {
+                media: Media::fixed(12.0, 30.0, Dpi(203.0)),
+                mode: OutputMode::Print,
+                cut_mode: CutMode::None,
+                copies: 1,
+                batch_index: 0,
+                batch_total: 1,
+                density: None,
+                feed_lead_mm: None,
+                feed_end_mm: None,
+                precut: None,
+                driver: lbl_core::DriverOptions::default(),
+            },
             dither: Algorithm::Auto,
             rotation: Rotation::Cw90,
             head_rotation: Rotation::None,
@@ -2658,12 +2648,14 @@ mod tests {
             style: LabelStyle::default(),
             media_type: None,
             virtual_export_mode: VirtualExportMode::Raster,
-            label_fit: LabelFit::Fill,
-            label_align: LabelAlign::default(),
-            label_valign: LabelValign::default(),
-            label_fit_scale: 1.0,
-            font_fit_scale: 1.0,
-            media_inset: MediaInsetPx::default(),
+            layout: PipelineLayout {
+                label_fit: LabelFit::Fill,
+                label_align: LabelAlign::default(),
+                label_valign: LabelValign::default(),
+                label_fit_scale: 1.0,
+                font_fit_scale: 1.0,
+                media_inset: MediaInsetPx::default(),
+            },
             encode_caps: DeviceCapabilities::default(),
         };
         let trace = encode_sample_pattern_traced(&registry, 0, 96, &opts).unwrap();

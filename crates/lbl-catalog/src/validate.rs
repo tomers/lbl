@@ -83,7 +83,7 @@ fn looks_like_inch_dimensions(key_w: f64, key_l: f64, entry: &CatalogEntry) -> b
 }
 
 fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<CatalogGeometryError>) {
-    if !(printer.max_width_mm.is_finite() && printer.max_width_mm > 0.0) {
+    if !(printer.capabilities.max_width_mm.is_finite() && printer.capabilities.max_width_mm > 0.0) {
         errors.push(CatalogGeometryError {
             message: format!(
                 "printer `{}`: max_width_mm must be a positive finite value",
@@ -91,8 +91,9 @@ fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<Catal
             ),
         });
     }
-    if printer.supports_precut {
+    if printer.capabilities.supports_precut {
         let dx_ok = printer
+            .capabilities
             .feed_trail_mm
             .is_some_and(|d| d.is_finite() && d > 0.0);
         if !dx_ok {
@@ -104,7 +105,7 @@ fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<Catal
             });
         }
     }
-    if let Some(band) = printer.head_printable_height_mm {
+    if let Some(band) = printer.capabilities.head_printable_height_mm {
         if !(band.is_finite() && band > 0.0) {
             errors.push(CatalogGeometryError {
                 message: format!(
@@ -112,12 +113,12 @@ fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<Catal
                     printer.canonical_key()
                 ),
             });
-        } else if band > printer.max_width_mm + DIM_TOLERANCE_MM {
+        } else if band > printer.capabilities.max_width_mm + DIM_TOLERANCE_MM {
             errors.push(CatalogGeometryError {
                 message: format!(
                     "printer `{}`: head_printable_height_mm ({band}) exceeds max_width_mm ({})",
                     printer.canonical_key(),
-                    printer.max_width_mm
+                    printer.capabilities.max_width_mm
                 ),
             });
         }

@@ -11,7 +11,7 @@
 //!
 //! let catalog = Catalog::bundled().unwrap();
 //! let printer = catalog.lookup_device("LabelWriter 550").unwrap();
-//! assert_eq!(printer.dpi, 300.0);
+//! assert_eq!(printer.capabilities.dpi.0, 300.0);
 //! let media = catalog.compatible_with("LabelWriter 550");
 //! assert!(media.iter().any(|e| e.matches_key("11352")));
 //! ```
@@ -390,7 +390,7 @@ impl Catalog {
         }
         if let Some(key) = printer_key {
             if let Some(printer) = self.resolve_device(key) {
-                return printer.dpi;
+                return printer.capabilities.dpi.0;
             }
         }
         self.dpi_for_protocol(protocol).unwrap_or(cli_dpi)
@@ -401,7 +401,7 @@ impl Catalog {
             .devices
             .iter()
             .filter(|p| p.protocol == protocol)
-            .map(|p| p.dpi)
+            .map(|p| p.capabilities.dpi.0)
             .collect();
         if dpis.is_empty() {
             None
@@ -464,8 +464,8 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let printer = catalog.lookup_device("QL-820NWBc").unwrap();
         assert_eq!(printer.protocol, Protocol::BrotherQl);
-        assert_eq!(printer.dpi, 300.0);
-        assert!(printer.supports_cut);
+        assert_eq!(printer.capabilities.dpi.0, 300.0);
+        assert!(printer.capabilities.supports_cut);
         assert!(catalog.supports_media("QL-820NWBc", "DK-11201"));
         assert!(catalog.supports_media("QL820NWB", "DK-22205"));
         let matched = catalog.match_usb(0x04f9, 0x209d).unwrap();
@@ -479,35 +479,35 @@ mod tests {
         let ql500 = catalog.lookup_device("QL-500").unwrap();
         assert_eq!(ql500.protocol, Protocol::BrotherQl);
         assert_eq!(ql500.maturity, Maturity::Experimental);
-        assert!(!ql500.supports_cut);
-        assert!(!ql500.supports_expanded_mode);
-        assert!(!ql500.supports_cut_every);
-        assert!(!ql500.emit_raster_mode_switch);
-        assert_eq!(ql500.invalidate_bytes, Some(200));
+        assert!(!ql500.capabilities.supports_cut);
+        assert!(!ql500.capabilities.supports_expanded_mode);
+        assert!(!ql500.capabilities.supports_cut_every);
+        assert!(!ql500.capabilities.emit_raster_mode_switch);
+        assert_eq!(ql500.capabilities.invalidate_bytes, Some(200));
         assert_eq!(
             catalog.match_usb(0x04f9, 0x2015).unwrap().canonical_key(),
             "QL-500"
         );
 
         let ql550 = catalog.lookup_device("QL-550").unwrap();
-        assert!(ql550.supports_cut);
-        assert!(!ql550.supports_expanded_mode);
-        assert!(!ql550.supports_cut_every);
-        assert!(!ql550.emit_raster_mode_switch);
+        assert!(ql550.capabilities.supports_cut);
+        assert!(!ql550.capabilities.supports_expanded_mode);
+        assert!(!ql550.capabilities.supports_cut_every);
+        assert!(!ql550.capabilities.emit_raster_mode_switch);
 
         let ql560 = catalog.lookup_device("QL-560").unwrap();
-        assert!(ql560.supports_cut_every);
-        assert!(ql560.supports_expanded_mode);
-        assert!(!ql560.emit_raster_mode_switch);
+        assert!(ql560.capabilities.supports_cut_every);
+        assert!(ql560.capabilities.supports_expanded_mode);
+        assert!(!ql560.capabilities.emit_raster_mode_switch);
 
         let ql580 = catalog.lookup_device("QL-580N").unwrap();
-        assert!(ql580.emit_raster_mode_switch);
-        assert!(ql580.supports_cut_every);
+        assert!(ql580.capabilities.emit_raster_mode_switch);
+        assert!(ql580.capabilities.supports_cut_every);
 
         let ql650 = catalog.lookup_device("QL-650TD").unwrap();
-        assert!(ql650.supports_expanded_mode);
-        assert!(!ql650.supports_cut_every);
-        assert!(ql650.emit_raster_mode_switch);
+        assert!(ql650.capabilities.supports_expanded_mode);
+        assert!(!ql650.capabilities.supports_cut_every);
+        assert!(ql650.capabilities.emit_raster_mode_switch);
         assert_eq!(
             catalog.match_usb(0x04f9, 0x201b).unwrap().canonical_key(),
             "QL-650TD"
@@ -532,6 +532,15 @@ mod tests {
     }
 
     #[test]
+    fn labelmanager_pnp_caps() {
+        let catalog = Catalog::bundled().unwrap();
+        let printer = catalog.lookup_device("LabelManager PnP").unwrap();
+        assert_eq!(printer.capabilities.feed_trail_mm, Some(8.1));
+        assert!(printer.capabilities.feed_reverse);
+        assert_eq!(printer.capabilities.head_printable_height_mm, Some(8.2));
+    }
+
+    #[test]
     fn labelmanager_d1_tape_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
         let tape = catalog.lookup("45013S").unwrap();
@@ -546,9 +555,9 @@ mod tests {
         assert!(lm280.iter().any(|e| e.matches_key("45013S")));
         assert!(lm280.iter().any(|e| e.matches_key("S0720530S")));
         let printer = catalog.lookup_device("LM280").unwrap();
-        assert_eq!(printer.feed_trail_mm, Some(8.1));
-        assert_eq!(printer.head_printable_height_mm, Some(8.2));
-        assert!(printer.feed_reverse);
+        assert_eq!(printer.capabilities.feed_trail_mm, Some(8.1));
+        assert_eq!(printer.capabilities.head_printable_height_mm, Some(8.2));
+        assert!(printer.capabilities.feed_reverse);
         assert_eq!(printer.default_media.as_deref(), Some("45013"));
     }
 
@@ -568,9 +577,9 @@ mod tests {
         assert!(d110.iter().any(|e| e.matches_key("12x40")));
         assert!(d110.iter().any(|e| e.matches_key("15x30")));
         let printer = catalog.lookup_device("D110").unwrap();
-        assert_eq!(printer.dpi, 203.0);
-        assert_eq!(printer.max_width_mm, 12.0);
-        assert!(printer.reports_media);
+        assert_eq!(printer.capabilities.dpi.0, 203.0);
+        assert_eq!(printer.capabilities.max_width_mm, 12.0);
+        assert!(printer.capabilities.reports_media);
     }
 
     #[test]
@@ -579,7 +588,7 @@ mod tests {
         let label = catalog.lookup("50x30").unwrap();
         assert_eq!(label.media.width_mm, 50.0);
         let printer = catalog.lookup_device("B1").unwrap();
-        assert_eq!(printer.max_width_mm, 48.0);
+        assert_eq!(printer.capabilities.max_width_mm, 48.0);
     }
 
     #[test]
@@ -601,7 +610,7 @@ mod tests {
         let missing: Vec<_> = catalog
             .devices()
             .iter()
-            .filter(|p| p.protocol == Protocol::Niimbot && !p.reports_media)
+            .filter(|p| p.protocol == Protocol::Niimbot && !p.capabilities.reports_media)
             .map(|p| p.canonical_key())
             .collect();
         assert!(
@@ -619,7 +628,7 @@ mod tests {
         let printer = catalog.lookup_device("LT-200B").unwrap();
         assert_eq!(printer.protocol, Protocol::LetraTag);
         assert_eq!(printer.maturity, Maturity::Experimental);
-        assert!(printer.supports_cut);
+        assert!(printer.capabilities.supports_cut);
         assert!(printer
             .supported_media
             .iter()
@@ -716,7 +725,7 @@ mod tests {
         assert!(lm280_printer.matches_key("LabelManager 280"));
         let lm420p = catalog.match_usb(0x0922, 0x1004).unwrap();
         assert!(lm420p.matches_key("LabelManager 420P"));
-        assert_eq!(lm420p.max_width_mm, 19.0);
+        assert_eq!(lm420p.capabilities.max_width_mm, 19.0);
         let lm_wireless = catalog.match_usb(0x0922, 0x1008).unwrap();
         assert!(lm_wireless.matches_key("LabelManager Wireless PnP"));
         let lm_pc = catalog.match_usb(0x0922, 0x0011).unwrap();
@@ -725,13 +734,13 @@ mod tests {
         assert!(lm400.matches_key("LabelManager 400"));
         let lp350 = catalog.match_usb(0x0922, 0x0015).unwrap();
         assert!(lp350.matches_key("LabelPoint 350"));
-        assert_eq!(lp350.max_width_mm, 19.0);
+        assert_eq!(lp350.capabilities.max_width_mm, 19.0);
         let ql600 = catalog.match_usb(0x04f9, 0x20c0).unwrap();
         assert!(ql600.matches_key("QL-600"));
-        assert_eq!(ql600.max_width_mm, 62.0);
+        assert_eq!(ql600.capabilities.max_width_mm, 62.0);
         let ql1050 = catalog.match_usb(0x04f9, 0x2020).unwrap();
         assert!(ql1050.matches_key("QL-1050"));
-        assert_eq!(ql1050.max_width_mm, 103.0);
+        assert_eq!(ql1050.capabilities.max_width_mm, 103.0);
         let ql1060n = catalog.match_usb(0x04f9, 0x202a).unwrap();
         assert!(ql1060n.matches_key("QL-1060N"));
         let zd421 = catalog.match_usb(0x0a5f, 0x0185).unwrap();
@@ -763,23 +772,23 @@ mod tests {
     fn niimbot_wide_heads_and_d110m_are_catalogued() {
         let catalog = Catalog::bundled().unwrap();
         let b31 = catalog.lookup_device("B31").unwrap();
-        assert_eq!(b31.max_width_mm, 75.0);
-        assert_eq!(b31.dpi, 203.0);
+        assert_eq!(b31.capabilities.max_width_mm, 75.0);
+        assert_eq!(b31.capabilities.dpi.0, 203.0);
         assert!(catalog.supports_media("B31", "70x40"));
         let b4 = catalog.lookup_device("B4").unwrap();
-        assert_eq!(b4.max_width_mm, 104.0);
+        assert_eq!(b4.capabilities.max_width_mm, 104.0);
         assert!(catalog.supports_media("B4", "102x152"));
         let k3 = catalog.lookup_device("K3").unwrap();
-        assert_eq!(k3.max_width_mm, 80.0);
+        assert_eq!(k3.capabilities.max_width_mm, 80.0);
         assert!(k3.matches_key("K3_W"));
         let k4 = catalog.lookup_device("K4").unwrap();
-        assert_eq!(k4.max_width_mm, 104.0);
+        assert_eq!(k4.capabilities.max_width_mm, 104.0);
         let b1 = catalog.lookup_device("B1_SE").unwrap();
         assert!(b1.matches_key("B1"));
         let b21 = catalog.lookup_device("B21_C2B").unwrap();
         assert!(b21.matches_key("B21"));
         let d110m = catalog.lookup_device("D110_M").unwrap();
-        assert_eq!(d110m.max_width_mm, 12.0);
+        assert_eq!(d110m.capabilities.max_width_mm, 12.0);
         assert!(d110m.matches_key("D110M"));
         let d11 = catalog.lookup_device("D11").unwrap();
         assert_eq!(d11.name, "NIIMBOT D11");
@@ -874,7 +883,14 @@ mod tests {
             .collect();
         assert_eq!(
             verified,
-            vec!["LabelWriter 550", "LabelManager 280", "D110", "D11", "B1",]
+            vec![
+                "LabelWriter 550",
+                "LabelManager 280",
+                "D110",
+                "D11",
+                "B1",
+                "PT-P710BT",
+            ]
         );
         assert!(catalog
             .devices()
@@ -882,7 +898,11 @@ mod tests {
             .filter(|p| p.maturity == Maturity::Supported)
             .all(|p| matches!(
                 p.protocol,
-                Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot | Protocol::Gpgl
+                Protocol::DymoLw
+                    | Protocol::Dymo
+                    | Protocol::Niimbot
+                    | Protocol::Gpgl
+                    | Protocol::BrotherPt
             )));
         assert!(catalog.devices().iter().any(|p| {
             p.maturity == Maturity::Experimental
@@ -922,7 +942,7 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let da210 = catalog.lookup_device("DA210").unwrap();
         assert_eq!(da210.protocol, Protocol::Tspl);
-        assert_eq!(da210.max_width_mm, 108.0);
+        assert_eq!(da210.capabilities.max_width_mm, 108.0);
         assert!(da210
             .connections
             .iter()
@@ -949,21 +969,21 @@ mod tests {
         assert!(lm420p.iter().any(|e| e.matches_key("45803")));
         assert!(lm420p.iter().any(|e| e.matches_key("45808")));
         let lm500ts = catalog.lookup_device("LM500TS").unwrap();
-        assert_eq!(lm500ts.max_width_mm, 24.0);
+        assert_eq!(lm500ts.capabilities.max_width_mm, 24.0);
         assert!(catalog.supports_media("LM500TS", "53713"));
         assert!(lm500ts.connections.is_empty());
         let b18 = catalog.lookup_device("B18").unwrap();
         assert_eq!(b18.protocol, Protocol::Niimbot);
-        assert_eq!(b18.max_width_mm, 12.0);
+        assert_eq!(b18.capabilities.max_width_mm, 12.0);
         assert_eq!(b18.maturity, Maturity::Experimental);
         let n1 = catalog.lookup_device("N1").unwrap();
-        assert_eq!(n1.max_width_mm, 12.0);
+        assert_eq!(n1.capabilities.max_width_mm, 12.0);
         let m2h = catalog.lookup_device("M2_H").unwrap();
-        assert_eq!(m2h.dpi, 300.0);
-        assert_eq!(m2h.max_width_mm, 48.0);
+        assert_eq!(m2h.capabilities.dpi.0, 300.0);
+        assert_eq!(m2h.capabilities.max_width_mm, 48.0);
         let zt231 = catalog.lookup_device("ZT231").unwrap();
         assert_eq!(zt231.protocol, Protocol::Zpl);
-        assert_eq!(zt231.max_width_mm, 104.0);
+        assert_eq!(zt231.capabilities.max_width_mm, 104.0);
     }
 
     #[test]
@@ -971,13 +991,13 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let m02x = catalog.lookup_device("M02X").unwrap();
         assert_eq!(m02x.protocol, Protocol::PhomemoM02x);
-        assert_eq!(m02x.dpi, 203.0);
-        assert_eq!(m02x.max_width_mm, 53.0);
+        assert_eq!(m02x.capabilities.dpi.0, 203.0);
+        assert_eq!(m02x.capabilities.max_width_mm, 53.0);
         assert!(catalog.supports_media("M02X", "phomemo-53-cont"));
         assert!(catalog.supports_media("M02X", "phomemo-53-sticker"));
         let m02s = catalog.lookup_device("M02S").unwrap();
         assert_eq!(m02s.protocol, Protocol::Phomemo);
-        assert_eq!(m02s.dpi, 300.0);
+        assert_eq!(m02s.capabilities.dpi.0, 300.0);
         assert!(catalog.supports_media("M02S", "phomemo-15-cont"));
         let t02 = catalog.lookup_device("T02").unwrap();
         assert_eq!(t02.protocol, Protocol::Phomemo);
@@ -990,7 +1010,7 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let rollo = catalog.lookup_device("X1038").unwrap();
         assert_eq!(rollo.protocol, Protocol::Tspl);
-        assert_eq!(rollo.max_width_mm, 104.0);
+        assert_eq!(rollo.capabilities.max_width_mm, 104.0);
         assert!(catalog.supports_media("X1038", "102x152"));
         let wireless = catalog.lookup_device("X1040").unwrap();
         assert_eq!(wireless.protocol, Protocol::Tspl);
@@ -1002,12 +1022,12 @@ mod tests {
             .any(|c| c.is_exact_usb_match(0x09c6, 0x0426)));
         let m110 = catalog.lookup_device("M110").unwrap();
         assert_eq!(m110.protocol, Protocol::PhomemoM110);
-        assert_eq!(m110.max_width_mm, 50.0);
+        assert_eq!(m110.capabilities.max_width_mm, 50.0);
         assert!(catalog.supports_media("M110", "phomemo-50x30"));
         assert!(catalog.supports_media("M110", "phomemo-40x30"));
         let d30 = catalog.lookup_device("D30").unwrap();
         assert_eq!(d30.protocol, Protocol::PhomemoD30);
-        assert_eq!(d30.max_width_mm, 15.0);
+        assert_eq!(d30.capabilities.max_width_mm, 15.0);
         assert!(catalog.supports_media("D30", "phomemo-12x40"));
         let q30 = catalog.lookup_device("Q30").unwrap();
         assert_eq!(q30.protocol, Protocol::PhomemoD30);
@@ -1021,10 +1041,10 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let c4000 = catalog.lookup_device("CW-C4000").unwrap();
         assert_eq!(c4000.protocol, Protocol::EscLabel);
-        assert_eq!(c4000.dpi, 600.0);
-        assert_eq!(c4000.max_width_mm, 108.0);
-        assert!(c4000.supports_cut);
-        assert!(c4000.supports_color);
+        assert_eq!(c4000.capabilities.dpi.0, 600.0);
+        assert_eq!(c4000.capabilities.max_width_mm, 108.0);
+        assert!(c4000.capabilities.supports_cut);
+        assert!(c4000.capabilities.supports_color);
         assert_eq!(c4000.maturity, Maturity::Experimental);
         // No VID-only Epson wildcard — would match any Seiko Epson USB device.
         assert!(c4000.connections.is_empty());
@@ -1034,7 +1054,7 @@ mod tests {
         assert!(catalog.supports_media("CW-C4000", "epson-premium-matte-4x6"));
         assert!(catalog.supports_media("CW-C4000", "epson-cont-108"));
         let c6500 = catalog.lookup_device("CW-C6500A").unwrap();
-        assert_eq!(c6500.max_width_mm, 215.9);
+        assert_eq!(c6500.capabilities.max_width_mm, 215.9);
         assert!(c6500.connections.is_empty());
         assert!(catalog.supports_media("CW-C6500A", "epson-cont-215"));
         let matte = catalog.lookup("epson-matte-4x6").unwrap();
@@ -1051,8 +1071,8 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let dx420 = catalog.lookup_device("SLP-DX420").unwrap();
         assert_eq!(dx420.protocol, Protocol::Slcs);
-        assert_eq!(dx420.dpi, 203.0);
-        assert!(dx420.supports_cut);
+        assert_eq!(dx420.capabilities.dpi.0, 203.0);
+        assert!(dx420.capabilities.supports_cut);
         assert_eq!(dx420.maturity, Maturity::Experimental);
         assert!(catalog.supports_media("SLP-DX420", "102x152"));
         let t400 = catalog.lookup_device("SLP-T400").unwrap();
@@ -1071,13 +1091,13 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let dt4x = catalog.lookup_device("DT4x").unwrap();
         assert_eq!(dt4x.protocol, Protocol::Ezpl);
-        assert_eq!(dt4x.dpi, 203.0);
-        assert_eq!(dt4x.max_width_mm, 108.0);
-        assert!(dt4x.supports_cut);
+        assert_eq!(dt4x.capabilities.dpi.0, 203.0);
+        assert_eq!(dt4x.capabilities.max_width_mm, 108.0);
+        assert!(dt4x.capabilities.supports_cut);
         assert!(catalog.supports_media("DT4x", "102x152"));
         let g530 = catalog.lookup_device("G530").unwrap();
         assert_eq!(g530.protocol, Protocol::Ezpl);
-        assert_eq!(g530.dpi, 300.0);
+        assert_eq!(g530.capabilities.dpi.0, 300.0);
     }
 
     #[test]
@@ -1085,8 +1105,8 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let cl4 = catalog.lookup_device("CL4NX").unwrap();
         assert_eq!(cl4.protocol, Protocol::Sbpl);
-        assert_eq!(cl4.dpi, 203.0);
-        assert!(cl4.supports_cut);
+        assert_eq!(cl4.capabilities.dpi.0, 203.0);
+        assert!(cl4.capabilities.supports_cut);
         assert_eq!(cl4.maturity, Maturity::Experimental);
         assert!(catalog.supports_media("CL4NX", "102x152"));
         assert!(cl4.connections.iter().any(|c| matches!(
@@ -1103,12 +1123,12 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let pc42 = catalog.lookup_device("PC42d").unwrap();
         assert_eq!(pc42.protocol, Protocol::Dpl);
-        assert_eq!(pc42.dpi, 203.0);
-        assert!(pc42.supports_cut);
+        assert_eq!(pc42.capabilities.dpi.0, 203.0);
+        assert!(pc42.capabilities.supports_cut);
         assert!(catalog.supports_media("PC42d", "102x152"));
         let px65 = catalog.lookup_device("PX65").unwrap();
         assert_eq!(px65.protocol, Protocol::Dpl);
-        assert_eq!(px65.dpi, 300.0);
+        assert_eq!(px65.capabilities.dpi.0, 300.0);
         assert!(px65.connections.iter().any(|c| matches!(
             c,
             ConnectionHint::Usb {
@@ -1138,7 +1158,7 @@ mod tests {
         )));
         let s631 = catalog.lookup_device("CL-S631").unwrap();
         assert_eq!(s631.protocol, Protocol::Dpl);
-        assert_eq!(s631.dpi, 300.0);
+        assert_eq!(s631.capabilities.dpi.0, 300.0);
         assert!(s631.connections.iter().any(|c| matches!(
             c,
             ConnectionHint::Usb {
@@ -1175,14 +1195,14 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let ev4 = catalog.lookup_device("B-EV4D").unwrap();
         assert_eq!(ev4.protocol, Protocol::Tpcl);
-        assert_eq!(ev4.dpi, 203.0);
-        assert!(ev4.supports_cut);
+        assert_eq!(ev4.capabilities.dpi.0, 203.0);
+        assert!(ev4.capabilities.supports_cut);
         assert_eq!(ev4.maturity, Maturity::Experimental);
         assert!(catalog.supports_media("B-EV4D", "102x152"));
         assert!(ev4.connections.is_empty());
         let sx5 = catalog.lookup_device("B-SX5").unwrap();
         assert_eq!(sx5.protocol, Protocol::Tpcl);
-        assert_eq!(sx5.max_width_mm, 128.0);
+        assert_eq!(sx5.capabilities.max_width_mm, 128.0);
         let bv = catalog.lookup_device("BV420D").unwrap();
         assert_eq!(bv.protocol, Protocol::Tpcl);
         assert!(bv.connections.is_empty());
@@ -1209,12 +1229,12 @@ mod tests {
         let catalog = Catalog::bundled().unwrap();
         let d35 = catalog.lookup_device("D35").unwrap();
         assert_eq!(d35.protocol, Protocol::PhomemoD30);
-        assert_eq!(d35.max_width_mm, 15.0);
+        assert_eq!(d35.capabilities.max_width_mm, 15.0);
         let q30s = catalog.lookup_device("Q30S").unwrap();
         assert_eq!(q30s.protocol, Protocol::PhomemoD30);
         let ttp = catalog.lookup_device("TTP-244 Pro").unwrap();
         assert_eq!(ttp.protocol, Protocol::Tspl);
-        assert_eq!(ttp.max_width_mm, 108.0);
+        assert_eq!(ttp.capabilities.max_width_mm, 108.0);
         assert!(ttp.connections.is_empty());
         let xp = catalog.lookup_device("XP-420B").unwrap();
         assert_eq!(xp.protocol, Protocol::Tspl);

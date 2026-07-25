@@ -388,15 +388,27 @@ mod tests {
             "continuous head-fit text should pin feed estimate and nowrap"
         );
         let label = &json["labels"][0];
-        let lead = label["feed_lead_px"].as_u64().unwrap_or(0);
+        // Without an active cut, tape lead stays 0 and style padding is exposed as
+        // virtual feed markers; cutter-gap \(D_x\) remains on `feed_trail_px`.
+        let trail = label["feed_trail_px"].as_u64().unwrap_or(0);
+        let vstart = label["virtual_feed_start_px"].as_u64().unwrap_or(0);
+        let vend = label["virtual_feed_end_px"].as_u64().unwrap_or(0);
         let end_margin = label["feed_end_margin_px"].as_u64().unwrap_or(0);
         assert!(
-            lead > 0 && end_margin > 0,
-            "LabelManager feed_trail_mm should show symmetric head-to-cutter gaps, got lead={lead} end={end_margin}"
+            trail > 0,
+            "LabelManager feed_trail_mm should expose head-to-cutter Dx, got trail={trail}"
         );
         assert!(
-            label["content_feed_end_px"].as_u64().unwrap_or(0) > lead,
-            "content end marker should sit after lead + estimated payload"
+            vstart > 0 && vend > 0,
+            "virtual feed markers should reflect style padding, got start={vstart} end={vend}"
+        );
+        assert!(
+            end_margin > 0,
+            "feed-end margin should carry style/end gap, got end={end_margin}"
+        );
+        assert!(
+            label["content_feed_end_px"].as_u64().unwrap_or(0) > end_margin,
+            "content end marker should sit after end margin + estimated payload"
         );
         assert!(
             html.contains(&format!(
@@ -404,9 +416,9 @@ mod tests {
                 label["head_pad_before_px"].as_u64().unwrap_or(0),
                 end_margin,
                 label["head_pad_after_px"].as_u64().unwrap_or(0),
-                lead
+                label["feed_lead_px"].as_u64().unwrap_or(0)
             )),
-            "expected feed+head padding lead={lead} end={end_margin} in stock CSS, got: {html}"
+            "expected feed+head padding in stock CSS, got: {html}"
         );
     }
 

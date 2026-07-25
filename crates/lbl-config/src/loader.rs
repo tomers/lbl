@@ -192,4 +192,40 @@ mod tests {
         assert!(out.contains("Sources\n"));
         assert!(out.contains("render.supersample"));
     }
+
+    #[test]
+    #[allow(clippy::result_large_err)]
+    fn style_flat_keys_from_toml_and_env() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "lbl.toml",
+                r#"
+[style]
+font_size_mm = 3.5
+qr_size_mm = 20.0
+padding_mm = 1.0
+padding_top_mm = 2.0
+media_inset_mm = 0.5
+label_fit = "fill"
+"#,
+            )?;
+            jail.set_env("LBL_STYLE__BORDER_WIDTH_MM", "0.25");
+            let paths = ConfigPaths {
+                system: std::path::PathBuf::from("/nonexistent/system.toml"),
+                user: std::path::PathBuf::from("/nonexistent/user.toml"),
+                project: std::path::PathBuf::from("lbl.toml"),
+                profiles: std::path::PathBuf::from("/nonexistent/printers.toml"),
+                cache: std::path::PathBuf::from("/nonexistent/cache"),
+            };
+            let cfg = Loader::with_paths(paths).load().unwrap();
+            assert!((cfg.style.typography.font_size_mm - 3.5).abs() < f64::EPSILON);
+            assert!((cfg.style.qr.qr_size_mm - 20.0).abs() < f64::EPSILON);
+            assert!((cfg.style.padding.padding_mm - 1.0).abs() < f64::EPSILON);
+            assert_eq!(cfg.style.padding.padding_top_mm, Some(2.0));
+            assert!((cfg.style.media_inset.media_inset_mm - 0.5).abs() < f64::EPSILON);
+            assert_eq!(cfg.style.fit.label_fit, "fill");
+            assert!((cfg.style.chrome.border_width_mm - 0.25).abs() < f64::EPSILON);
+            Ok(())
+        });
+    }
 }

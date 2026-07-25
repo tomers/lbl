@@ -64,14 +64,56 @@ impl Default for RenderConfig {
 
 /// Default label visual sizing, in millimetres.
 ///
+/// Domain bags are flattened so TOML / env / JSON keep historical flat keys
+/// under `[style]` (`font_size_mm`, `padding_mm`, …).
+///
 /// These are physical sizes on the printed label; the pipeline converts them
 /// to pixels using the target DPI and supersample factor, so they stay
 /// consistent regardless of resolution.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct StyleConfig {
+    /// Base typography.
+    #[serde(flatten)]
+    pub typography: StyleTypography,
+    /// QR code defaults.
+    #[serde(flatten)]
+    pub qr: StyleQr,
+    /// 1D barcode defaults.
+    #[serde(flatten)]
+    pub barcode: StyleBarcode,
+    /// Inner content padding cascade.
+    #[serde(flatten)]
+    pub padding: StylePadding,
+    /// Border / gap / corner chrome.
+    #[serde(flatten)]
+    pub chrome: StyleChrome,
+    /// Viewport fit and alignment.
+    #[serde(flatten)]
+    pub fit: StyleFit,
+    /// Physical media-edge inset cascade.
+    #[serde(flatten)]
+    pub media_inset: StyleMediaInset,
+}
+
+/// Base text sizing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleTypography {
     /// Base text size, in mm.
     pub font_size_mm: f64,
+}
+
+impl Default for StyleTypography {
+    fn default() -> Self {
+        Self { font_size_mm: 2.0 }
+    }
+}
+
+/// QR code visual defaults.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleQr {
     /// QR code edge length, in mm.
     pub qr_size_mm: f64,
     /// QR error-correction level: `L`, `M`, `Q`, or `H` (aliases: `low`,
@@ -83,12 +125,44 @@ pub struct StyleConfig {
     pub qr_dark: String,
     /// QR light module color (hex, e.g. `#ffffff`).
     pub qr_light: String,
+}
+
+impl Default for StyleQr {
+    fn default() -> Self {
+        Self {
+            qr_size_mm: 15.0,
+            qr_error_correction: "M".into(),
+            qr_margin: 0,
+            qr_dark: "#000000".into(),
+            qr_light: "#ffffff".into(),
+        }
+    }
+}
+
+/// 1D barcode visual defaults.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleBarcode {
     /// Barcode bar height, in mm.
     pub barcode_height_mm: f64,
     /// Barcode single-module (narrowest bar) width, in mm.
     pub barcode_module_width_mm: f64,
-    /// Inner padding between the label edge and its content, in mm (uniform
-    /// base). See also the axis and side-specific `padding_*` fields.
+}
+
+impl Default for StyleBarcode {
+    fn default() -> Self {
+        Self {
+            barcode_height_mm: 12.0,
+            barcode_module_width_mm: 0.33,
+        }
+    }
+}
+
+/// Cascading inner padding between the label edge and its content (mm).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StylePadding {
+    /// Uniform base padding on all sides.
     pub padding_mm: f64,
     /// Padding on both horizontal sides (left + right).
     pub padding_horizontal_mm: Option<f64>,
@@ -102,12 +176,48 @@ pub struct StyleConfig {
     pub padding_bottom_mm: Option<f64>,
     /// Left-side padding.
     pub padding_left_mm: Option<f64>,
+}
+
+impl Default for StylePadding {
+    fn default() -> Self {
+        Self {
+            padding_mm: 2.0,
+            padding_horizontal_mm: None,
+            padding_vertical_mm: None,
+            padding_top_mm: None,
+            padding_right_mm: None,
+            padding_bottom_mm: None,
+            padding_left_mm: None,
+        }
+    }
+}
+
+/// Label chrome (gap, border, corners).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleChrome {
     /// Gap between sibling elements inside `.lbl-label` / flex rows, in mm.
     pub element_gap_mm: f64,
     /// Border drawn around the label, in mm (0 = no border).
     pub border_width_mm: f64,
     /// Corner radius on fixed die-cut labels, in mm (preview only).
     pub corner_radius_mm: f64,
+}
+
+impl Default for StyleChrome {
+    fn default() -> Self {
+        Self {
+            element_gap_mm: 4.0,
+            border_width_mm: 0.0,
+            corner_radius_mm: 2.0,
+        }
+    }
+}
+
+/// How `.lbl-label` fills and aligns inside the render viewport.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleFit {
     /// How `.lbl-label` fills the render viewport: `auto` (fill fixed-length
     /// media, shrink on continuous), `fill`, or `content`.
     pub label_fit: String,
@@ -122,8 +232,25 @@ pub struct StyleConfig {
     /// Multiplier applied to auto-fit text size in fill mode (`1.0` = grow to
     /// fill; `0.8` = 80% of the computed maximum).
     pub font_fit_scale: f64,
-    /// Inset from the physical media edge, uniform (mm). See also the axis and
-    /// side-specific `media_inset_*` fields.
+}
+
+impl Default for StyleFit {
+    fn default() -> Self {
+        Self {
+            label_fit: "auto".into(),
+            label_align: "center".into(),
+            label_valign: "center".into(),
+            label_fit_scale: 1.0,
+            font_fit_scale: 1.0,
+        }
+    }
+}
+
+/// Cascading inset from the physical media edge (mm).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StyleMediaInset {
+    /// Inset from the physical media edge, uniform (mm).
     pub media_inset_mm: f64,
     /// Inset on both cross-axis sides (left + right in portrait).
     pub media_inset_horizontal_mm: Option<f64>,
@@ -139,32 +266,9 @@ pub struct StyleConfig {
     pub media_inset_cross_end_mm: Option<f64>,
 }
 
-impl Default for StyleConfig {
+impl Default for StyleMediaInset {
     fn default() -> Self {
         Self {
-            font_size_mm: 2.0,
-            qr_size_mm: 15.0,
-            qr_error_correction: "M".into(),
-            qr_margin: 0,
-            qr_dark: "#000000".into(),
-            qr_light: "#ffffff".into(),
-            barcode_height_mm: 12.0,
-            barcode_module_width_mm: 0.33,
-            padding_mm: 2.0,
-            padding_horizontal_mm: None,
-            padding_vertical_mm: None,
-            padding_top_mm: None,
-            padding_right_mm: None,
-            padding_bottom_mm: None,
-            padding_left_mm: None,
-            element_gap_mm: 4.0,
-            border_width_mm: 0.0,
-            corner_radius_mm: 2.0,
-            label_fit: "auto".into(),
-            label_align: "center".into(),
-            label_valign: "center".into(),
-            label_fit_scale: 1.0,
-            font_fit_scale: 1.0,
             media_inset_mm: 0.0,
             media_inset_horizontal_mm: None,
             media_inset_vertical_mm: None,

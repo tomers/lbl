@@ -204,6 +204,7 @@ pub struct DeviceCapabilities {
     /// pads the leftover stock margins.
     pub max_width_mm: f64,
     /// Whether the printer can cut between jobs/items.
+    #[serde(default)]
     pub supports_cut: bool,
     /// Whether the printer deposits more than one ink color (full-color inkjet
     /// or dual-ink thermal). When set, the encode pipeline may supply a color
@@ -212,6 +213,7 @@ pub struct DeviceCapabilities {
     #[serde(default)]
     pub supports_color: bool,
     /// Whether the printer reports loaded media for auto-detection.
+    #[serde(default)]
     pub reports_media: bool,
     /// Blank feed before raster content when encoding. Some tape printers omit
     /// this because the head already sits past the last cut; preview may still

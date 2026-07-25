@@ -22,9 +22,9 @@ pub use pipeline::{
     resolve_label_padding, resolve_label_padding_sides, resolve_label_valign, resolve_media,
     resolve_media_inset, resolve_print_transport, resolve_style_vector, resolve_template_format,
     transpile_label_html, AuthoringLabel, BatchSelection, EncodeFromRgbaResult,
-    EncodeLabelsOptions, EncodeLabelsResult, LabelRaster, PipelineOptions, PreviewFeedOverrides,
-    PreviewFeedPad, PreviewStockFrame, PreviewStockFrameParams, Source, TemplateFormat,
-    TranspiledLabelHtml, VECTOR_CSS_DPI,
+    EncodeLabelsOptions, EncodeLabelsResult, LabelRaster, PipelineLayout, PipelineOptions,
+    PreviewFeedOverrides, PreviewFeedPad, PreviewStockFrame, PreviewStockFrameParams, Source,
+    TemplateFormat, TranspiledLabelHtml, VECTOR_CSS_DPI,
 };
 pub use preprocess::{
     estimate_job, estimate_render_dimensions, hires_pixels_per_label, job_input,

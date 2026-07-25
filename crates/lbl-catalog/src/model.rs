@@ -5,10 +5,6 @@ use lbl_core::printer::{DeviceCapabilities, DeviceModel, Protocol};
 use lbl_core::units::Dpi;
 use serde::{Deserialize, Serialize};
 
-fn default_true() -> bool {
-    true
-}
-
 /// The physical specification of a media SKU, independent of any printer's
 /// resolution. Combine with a [`Dpi`] to produce a device-ready [`Media`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -286,39 +282,12 @@ pub struct DeviceEntry {
     /// How thoroughly this model has been validated.
     #[serde(default)]
     pub maturity: Maturity,
-    /// Native print resolution in dots per inch.
-    pub dpi: f64,
-    /// Maximum printable width across the head, in millimeters.
-    pub max_width_mm: f64,
-    /// Whether the printer can cut between jobs/items.
-    #[serde(default)]
-    pub supports_cut: bool,
-    /// Whether the printer outputs more than one ink color. Thermal 1-bit heads
-    /// (DYMO, NIIMBOT, ESC/POS, …) leave this false. Preview sinks
-    /// (`virtual`, `html`, `console`) are treated as color-capable in the UI.
-    #[serde(default)]
-    pub supports_color: bool,
-    /// Brother QL: emit `ESC i K` expanded mode. Defaults on for modern QL.
-    #[serde(default = "default_true")]
-    pub supports_expanded_mode: bool,
-    /// Brother QL: emit `ESC i A` cut-every-N with auto-cut. Defaults on.
-    #[serde(default = "default_true")]
-    pub supports_cut_every: bool,
-    /// Brother QL: emit `ESC i a` raster-mode switch. Defaults on.
-    #[serde(default = "default_true")]
-    pub emit_raster_mode_switch: bool,
-    /// Brother QL: optional invalidate (`0x00`) byte count override.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub invalidate_bytes: Option<u32>,
-    /// Brother QL/PT: TIFF PackBits compression. Defaults off.
-    #[serde(default)]
-    pub supports_packbits: bool,
-    /// Brother QL/PT: high-resolution feed mode. Defaults off.
-    #[serde(default)]
-    pub supports_high_resolution: bool,
-    /// Whether the printer reports loaded media for auto-detection.
-    #[serde(default)]
-    pub reports_media: bool,
+    /// Encode-time capabilities (DPI, cut, feed, Brother dialect flags, …).
+    ///
+    /// Flattened so catalog TOML / device API JSON keep top-level keys
+    /// (`dpi`, `max_width_mm`, …) matching historical `[[devices]]` rows.
+    #[serde(flatten)]
+    pub capabilities: DeviceCapabilities,
     /// Whether the printer supports a host-initiated soft reboot of the print
     /// engine (recovery when wedged / lock stuck). Catalog/UI gate only — not
     /// an encode-time capability.
@@ -333,29 +302,6 @@ pub struct DeviceEntry {
     /// How to connect to this model (and, for USB, how to recognize it).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connections: Vec<ConnectionHint>,
-    /// Suggested / protocol reference lead (mm). Unset job lead uses \(D_x\) when
-    /// [`feed_trail_mm`] is set — see `resolve_feed_plan`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feed_lead_mm: Option<f64>,
-    /// Head-to-cutter distance along the feed (e.g. ~8.1 mm on DYMO LabelManager).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feed_trail_mm: Option<f64>,
-    /// Device can emit a pre-cut prologue. Requires [`feed_trail_mm`] > 0.
-    #[serde(default)]
-    pub supports_precut: bool,
-    /// Initial job preference when precut is unset (true on capable devices).
-    #[serde(default)]
-    pub precut_default: bool,
-    /// Minimum lead after pre-cut (protocol clamp), mm.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feed_lead_min_mm: Option<f64>,
-    /// Mirror content along the feed axis when encoding (mechanical/orientation).
-    #[serde(default)]
-    pub feed_reverse: bool,
-    /// Inkable height across the head when narrower than the loaded tape
-    /// (laminate / dead zones). Example: 8.2 mm on DYMO LabelManager.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub head_printable_height_mm: Option<f64>,
     /// Optional manufacturer support links (product page and/or brand hub).
     #[serde(default, skip_serializing_if = "support_is_empty")]
     pub support: DeviceSupport,
@@ -407,32 +353,13 @@ impl DeviceEntry {
             brand: self.brand.clone(),
             model: self.canonical_key().to_string(),
             protocol: self.protocol,
-            capabilities: self.encode_capabilities(),
+            capabilities: self.capabilities.clone(),
         }
     }
 
     /// Static capabilities for encode/dispatch (protocol padding, DPI, etc.).
     pub fn encode_capabilities(&self) -> DeviceCapabilities {
-        DeviceCapabilities {
-            dpi: Dpi(self.dpi),
-            max_width_mm: self.max_width_mm,
-            supports_cut: self.supports_cut,
-            supports_color: self.supports_color,
-            reports_media: self.reports_media,
-            feed_lead_mm: self.feed_lead_mm,
-            feed_trail_mm: self.feed_trail_mm,
-            feed_reverse: self.feed_reverse,
-            head_printable_height_mm: self.head_printable_height_mm,
-            supports_expanded_mode: self.supports_expanded_mode,
-            supports_cut_every: self.supports_cut_every,
-            emit_raster_mode_switch: self.emit_raster_mode_switch,
-            invalidate_bytes: self.invalidate_bytes,
-            supports_packbits: self.supports_packbits,
-            supports_high_resolution: self.supports_high_resolution,
-            supports_precut: self.supports_precut,
-            precut_default: self.precut_default,
-            feed_lead_min_mm: self.feed_lead_min_mm,
-        }
+        self.capabilities.clone()
     }
 
     /// Build transport targets from the first catalog connection hint.

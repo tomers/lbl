@@ -54,7 +54,7 @@ pub fn input_from_run(
         ctx.printer_entry.map(|p| p.brand.as_str()),
         ctx.protocol,
         ctx.dpi,
-        ctx.printer_entry.map(|p| p.max_width_mm),
+        ctx.printer_entry.map(|p| p.capabilities.max_width_mm),
         transport_summary(&ctx.transport),
     );
 

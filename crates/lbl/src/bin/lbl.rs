@@ -16,12 +16,12 @@ use lbl::pipeline::{
     resolve_label_align, resolve_label_fit, resolve_label_fit_scale, resolve_label_valign,
     resolve_media, resolve_media_inset, resolve_print_transport, resolve_status_target,
     resolve_style, resolve_style_vector, resolve_template_format, EncodeLabelsOptions,
-    EncodeLabelsResult, PipelineOptions, Source, VECTOR_CSS_DPI,
+    EncodeLabelsResult, PipelineLayout, PipelineOptions, Source, VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
 use lbl_catalog::{encode_capabilities_for, Catalog};
 use lbl_config::StyleConfig;
-use lbl_core::job::{CutMode, OutputMode};
+use lbl_core::job::{CutMode, JobSpec, OutputMode};
 use lbl_core::printer::Protocol;
 use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
@@ -411,58 +411,58 @@ impl StyleArgs {
             .map(|cfg| cfg.style)
             .unwrap_or_default();
         if let Some(v) = self.font_size_mm {
-            style.font_size_mm = v;
+            style.typography.font_size_mm = v;
         }
         if let Some(v) = self.qr_size_mm {
-            style.qr_size_mm = v;
+            style.qr.qr_size_mm = v;
         }
         if let Some(v) = &self.qr_error_correction {
-            style.qr_error_correction = v.clone();
+            style.qr.qr_error_correction = v.clone();
         }
         if let Some(v) = self.qr_margin {
-            style.qr_margin = v;
+            style.qr.qr_margin = v;
         }
         if let Some(v) = &self.qr_dark {
-            style.qr_dark = v.clone();
+            style.qr.qr_dark = v.clone();
         }
         if let Some(v) = &self.qr_light {
-            style.qr_light = v.clone();
+            style.qr.qr_light = v.clone();
         }
         if let Some(v) = self.barcode_height_mm {
-            style.barcode_height_mm = v;
+            style.barcode.barcode_height_mm = v;
         }
         if let Some(v) = self.barcode_module_mm {
-            style.barcode_module_width_mm = v;
+            style.barcode.barcode_module_width_mm = v;
         }
         if let Some(v) = self.padding_mm {
-            style.padding_mm = v;
+            style.padding.padding_mm = v;
         }
         if let Some(v) = self.padding_horizontal_mm {
-            style.padding_horizontal_mm = Some(v);
+            style.padding.padding_horizontal_mm = Some(v);
         }
         if let Some(v) = self.padding_vertical_mm {
-            style.padding_vertical_mm = Some(v);
+            style.padding.padding_vertical_mm = Some(v);
         }
         if let Some(v) = self.padding_top_mm {
-            style.padding_top_mm = Some(v);
+            style.padding.padding_top_mm = Some(v);
         }
         if let Some(v) = self.padding_right_mm {
-            style.padding_right_mm = Some(v);
+            style.padding.padding_right_mm = Some(v);
         }
         if let Some(v) = self.padding_bottom_mm {
-            style.padding_bottom_mm = Some(v);
+            style.padding.padding_bottom_mm = Some(v);
         }
         if let Some(v) = self.padding_left_mm {
-            style.padding_left_mm = Some(v);
+            style.padding.padding_left_mm = Some(v);
         }
         if let Some(v) = self.element_gap_mm {
-            style.element_gap_mm = v;
+            style.chrome.element_gap_mm = v;
         }
         if let Some(v) = self.border_mm {
-            style.border_width_mm = v;
+            style.chrome.border_width_mm = v;
         }
         if let Some(v) = self.label_fit {
-            style.label_fit = match v {
+            style.fit.label_fit = match v {
                 LabelFitArg::Auto => "auto",
                 LabelFitArg::Fill => "fill",
                 LabelFitArg::Content => "content",
@@ -470,7 +470,7 @@ impl StyleArgs {
             .into();
         }
         if let Some(v) = self.label_align {
-            style.label_align = match v {
+            style.fit.label_align = match v {
                 LabelAlignArg::Start => "start",
                 LabelAlignArg::Center => "center",
                 LabelAlignArg::End => "end",
@@ -478,7 +478,7 @@ impl StyleArgs {
             .into();
         }
         if let Some(v) = self.label_valign {
-            style.label_valign = match v {
+            style.fit.label_valign = match v {
                 LabelValignArg::Start => "start",
                 LabelValignArg::Center => "center",
                 LabelValignArg::End => "end",
@@ -486,42 +486,42 @@ impl StyleArgs {
             .into();
         }
         if let Some(v) = self.media_inset_mm {
-            style.media_inset_mm = v;
+            style.media_inset.media_inset_mm = v;
         }
         if let Some(v) = self.media_inset_horizontal_mm {
-            style.media_inset_horizontal_mm = Some(v);
+            style.media_inset.media_inset_horizontal_mm = Some(v);
         }
         if let Some(v) = self.media_inset_vertical_mm {
-            style.media_inset_vertical_mm = Some(v);
+            style.media_inset.media_inset_vertical_mm = Some(v);
         }
         if let Some(v) = self.media_inset_start_mm {
-            style.media_inset_start_mm = Some(v);
+            style.media_inset.media_inset_start_mm = Some(v);
         }
         if let Some(v) = self.media_inset_end_mm {
-            style.media_inset_end_mm = Some(v);
+            style.media_inset.media_inset_end_mm = Some(v);
         }
         if let Some(v) = self.media_inset_cross_start_mm {
-            style.media_inset_cross_start_mm = Some(v);
+            style.media_inset.media_inset_cross_start_mm = Some(v);
         }
         if let Some(v) = self.media_inset_cross_end_mm {
-            style.media_inset_cross_end_mm = Some(v);
+            style.media_inset.media_inset_cross_end_mm = Some(v);
         }
         style
     }
 
     fn fit_scale(&self, style: &StyleConfig) -> f64 {
         if let Some(raw) = &self.label_fit_scale {
-            parse_fit_scale(raw).unwrap_or(style.label_fit_scale)
+            parse_fit_scale(raw).unwrap_or(style.fit.label_fit_scale)
         } else {
-            style.label_fit_scale
+            style.fit.label_fit_scale
         }
     }
 
     fn font_scale(&self, style: &StyleConfig) -> f64 {
         if let Some(raw) = &self.font_fit_scale {
-            parse_fit_scale(raw).unwrap_or(style.font_fit_scale)
+            parse_fit_scale(raw).unwrap_or(style.fit.font_fit_scale)
         } else {
-            style.font_fit_scale
+            style.fit.font_fit_scale
         }
     }
 }
@@ -942,11 +942,11 @@ fn run_print(args: PrintArgs) -> Result<()> {
         )
     };
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
     let font_fit_scale = resolve_font_fit_scale(args.style.font_scale(&style_cfg));
 
@@ -964,17 +964,20 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     let opts = PipelineOptions {
         protocol,
-        media,
         supports_cut,
-        cut_mode,
-        copies,
-        batch_index: 0,
-        batch_total: 1,
-        density,
-        feed_lead_mm: args.feed_lead_mm,
-        feed_end_mm: args.feed_end_mm,
-        precut: if args.precut { Some(true) } else { None },
-        driver,
+        job: JobSpec {
+            media,
+            mode: OutputMode::Print,
+            cut_mode,
+            copies,
+            batch_index: 0,
+            batch_total: 1,
+            density,
+            feed_lead_mm: args.feed_lead_mm,
+            feed_end_mm: args.feed_end_mm,
+            precut: if args.precut { Some(true) } else { None },
+            driver,
+        },
         dither: Algorithm::parse(&dither)?,
         rotation,
         head_rotation,
@@ -985,12 +988,14 @@ fn run_print(args: PrintArgs) -> Result<()> {
         style,
         media_type,
         virtual_export_mode,
-        label_fit,
-        label_align,
-        label_valign,
-        label_fit_scale,
-        font_fit_scale,
-        media_inset,
+        layout: PipelineLayout {
+            label_fit,
+            label_align,
+            label_valign,
+            label_fit_scale,
+            font_fit_scale,
+            media_inset,
+        },
         encode_caps,
     };
 
@@ -1078,7 +1083,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
 
     let preprocess_input = job_input(
         label_count,
-        &opts.media,
+        &opts.job.media,
         opts.rotation,
         opts.supersample,
         matches!(backend, BackendArg::Sidecar),
@@ -1193,7 +1198,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
         label_count,
         copies,
         feed_dots: &feed_dots,
-        media: &opts.media,
+        media: &opts.job.media,
         rotation: opts.rotation,
         protocol,
         preprocess: &preprocess_input,
@@ -1373,11 +1378,11 @@ fn run_preview(args: PreviewArgs) -> Result<()> {
         args.media.dpi,
     )?;
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
     let label_fit_scale = resolve_label_fit_scale(args.style.fit_scale(&style_cfg));
     let font_fit_scale = resolve_font_fit_scale(args.style.font_scale(&style_cfg));
     let media_inset = resolve_media_inset(&style_cfg).to_px(args.media.dpi, PREVIEW_SUPERSAMPLE);
@@ -1930,7 +1935,7 @@ fn run_device_cut(args: DeviceCutArgs) -> Result<()> {
             .iter()
             .find(|p| p.matches_key(key))
             .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;
-        if !entry.supports_cut {
+        if !entry.capabilities.supports_cut {
             bail!("catalog printer '{key}' does not support cutting");
         }
     }
@@ -1959,7 +1964,7 @@ fn run_device_cut(args: DeviceCutArgs) -> Result<()> {
                 .iter()
                 .find(|p| p.matches_key(key))
                 .ok_or_else(|| anyhow!("unknown catalog printer '{key}'"))?;
-            width_mm = Some(entry.max_width_mm);
+            width_mm = Some(entry.capabilities.max_width_mm);
         }
     }
     if media_sku.is_none() && width_mm.is_none() {
@@ -1970,7 +1975,7 @@ fn run_device_cut(args: DeviceCutArgs) -> Result<()> {
         args.printer
             .as_deref()
             .and_then(|k| catalog.lookup_device(k))
-            .map(|e| e.dpi)
+            .map(|e| e.capabilities.dpi.0)
             .unwrap_or(180.0)
     });
     let media = resolve_media(

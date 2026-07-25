@@ -21,8 +21,8 @@ use lbl::pipeline::{
     frame_html_preview_stock, preview_stock_frame, resolve_font_fit_scale, resolve_label_align,
     resolve_label_fit, resolve_label_fit_scale, resolve_label_valign, resolve_media,
     resolve_media_inset, resolve_style, resolve_style_vector, transpile_label_html, AuthoringLabel,
-    PipelineOptions, PreviewFeedOverrides, PreviewStockFrameParams, Source, TemplateFormat,
-    VECTOR_CSS_DPI,
+    PipelineLayout, PipelineOptions, PreviewFeedOverrides, PreviewStockFrameParams, Source,
+    TemplateFormat, VECTOR_CSS_DPI,
 };
 #[cfg(feature = "chromium")]
 use lbl::pipeline::{
@@ -31,7 +31,7 @@ use lbl::pipeline::{
 };
 use lbl_catalog::{driver_settings, encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
-use lbl_core::job::CutMode;
+use lbl_core::job::{CutMode, JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{DeviceCapabilities, DeviceProfile, Protocol};
 use lbl_core::Rotation;
@@ -358,6 +358,20 @@ pub struct CutNowReq {
     /// Catalog device key for encode caps / handshake hints.
     #[serde(default)]
     printer: Option<String>,
+    #[serde(flatten)]
+    stock: CutNowStockReq,
+    /// Must be true (catalog/profile cutter). Defaults false.
+    #[serde(default)]
+    supports_cut: bool,
+    #[serde(default)]
+    dispatch_mode: DispatchMode,
+    #[serde(flatten)]
+    transport: TransportReq,
+}
+
+/// Media geometry for cut-now (optional DPI — catalog/profile may supply it).
+#[derive(Debug, Clone, Default, Deserialize)]
+struct CutNowStockReq {
     #[serde(default)]
     media: Option<String>,
     #[serde(default)]
@@ -366,11 +380,11 @@ pub struct CutNowReq {
     length_mm: Option<f64>,
     #[serde(default)]
     dpi: Option<f64>,
-    /// Must be true (catalog/profile cutter). Defaults false.
-    #[serde(default)]
-    supports_cut: bool,
-    #[serde(default)]
-    dispatch_mode: DispatchMode,
+}
+
+/// Transport target strings shared by print / cut-now requests.
+#[derive(Debug, Clone, Default, Deserialize)]
+struct TransportReq {
     #[serde(default)]
     network: Option<String>,
     #[serde(default)]
@@ -379,6 +393,84 @@ pub struct CutNowReq {
     serial: Option<String>,
     #[serde(default)]
     bluetooth: Option<String>,
+}
+
+/// Catalog media SKU / ad-hoc geometry for preview and print.
+#[derive(Debug, Clone, Deserialize)]
+struct StockReq {
+    #[serde(default)]
+    media: Option<String>,
+    #[serde(default)]
+    width_mm: Option<f64>,
+    #[serde(default)]
+    length_mm: Option<f64>,
+    #[serde(default = "default_dpi")]
+    dpi: f64,
+}
+
+impl Default for StockReq {
+    fn default() -> Self {
+        Self {
+            media: None,
+            width_mm: None,
+            length_mm: None,
+            dpi: default_dpi(),
+        }
+    }
+}
+
+/// Feed / cut / copies / density job preferences.
+#[derive(Debug, Clone, Deserialize)]
+struct FeedJobReq {
+    /// Legacy boolean cut flag; prefer `cut_mode`.
+    #[serde(default)]
+    cut: bool,
+    /// When to cut: `none`, `every`, or `end`.
+    #[serde(default)]
+    cut_mode: Option<String>,
+    #[serde(default)]
+    supports_cut: bool,
+    #[serde(default = "default_copies")]
+    copies: u32,
+    #[serde(default)]
+    density: Option<u8>,
+    #[serde(default)]
+    feed_lead_mm: Option<f64>,
+    #[serde(default)]
+    feed_end_mm: Option<f64>,
+    #[serde(default)]
+    precut: Option<bool>,
+    #[serde(default)]
+    driver: DriverOptionsReq,
+}
+
+impl Default for FeedJobReq {
+    fn default() -> Self {
+        Self {
+            cut: false,
+            cut_mode: None,
+            supports_cut: false,
+            copies: default_copies(),
+            density: None,
+            feed_lead_mm: None,
+            feed_end_mm: None,
+            precut: None,
+            driver: DriverOptionsReq::default(),
+        }
+    }
+}
+
+/// Reading-frame orientation / mirror.
+#[derive(Debug, Clone, Default, Deserialize)]
+struct OrientationReq {
+    #[serde(default)]
+    orientation: Option<lbl_core::Orientation>,
+    #[serde(default)]
+    rotate_cw: u32,
+    #[serde(default)]
+    rotate_ccw: u32,
+    #[serde(default)]
+    mirror: bool,
 }
 
 /// Encode a blank cut-now job and either return client bytes or dispatch on the host.
@@ -416,13 +508,13 @@ pub async fn profile_cut_now(
     if req.protocol.is_none() {
         req.protocol = Some(protocol_cli_name(profile.model.protocol).to_string());
     }
-    if req.media.is_none() && req.width_mm.is_none() {
-        req.media = profile.default_media.clone();
+    if req.stock.media.is_none() && req.stock.width_mm.is_none() {
+        req.stock.media = profile.default_media.clone();
     }
-    if req.media.is_none() && req.width_mm.is_none() {
+    if req.stock.media.is_none() && req.stock.width_mm.is_none() {
         let w = profile.model.capabilities.max_width_mm;
         if w > 0.0 {
-            req.width_mm = Some(w);
+            req.stock.width_mm = Some(w);
         }
     }
     if req.printer.is_none() {
@@ -439,8 +531,8 @@ pub async fn profile_cut_now(
             ..
         } = &profile.transport
         {
-            if req.usb.is_none() {
-                req.usb = Some(format!("{vendor_id:04x}:{product_id:04x}"));
+            if req.transport.usb.is_none() {
+                req.transport.usb = Some(format!("{vendor_id:04x}:{product_id:04x}"));
             }
             let connected = profile_is_connected(&profile, state.host_discovery_enabled);
             if !connected {
@@ -478,13 +570,13 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
         &state.catalog,
         req.printer.as_deref(),
         Some(protocol),
-        req.dpi.unwrap_or(0.0),
+        req.stock.dpi.unwrap_or(0.0),
     );
     let media = resolve_media(
         &state.catalog,
-        req.media.as_deref(),
-        req.width_mm,
-        req.length_mm,
+        req.stock.media.as_deref(),
+        req.stock.width_mm,
+        req.stock.length_mm,
         dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
@@ -494,10 +586,10 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
     let dispatch_mode = req.dispatch_mode;
-    let network = req.network.clone();
-    let usb = req.usb.clone();
-    let serial = req.serial.clone();
-    let bluetooth = req.bluetooth.clone();
+    let network = req.transport.network.clone();
+    let usb = req.transport.usb.clone();
+    let serial = req.transport.serial.clone();
+    let bluetooth = req.transport.bluetooth.clone();
 
     let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let registry =
@@ -673,7 +765,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
     let supersample = req.supersample;
-    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
+    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.stock.dpi);
     // Preview targets the human reading frame, not the print head. The optional
     // printer key only selects native DPI; layout/rotation still follow the
     // chosen orientation without the head quarter-turn applied at encode time.
@@ -681,26 +773,26 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let mut style_cfg = load_style_cfg(&state, &req.style);
     let media = resolve_media(
         &state.catalog,
-        req.media.as_deref(),
-        req.width_mm.or(Some(50.0)),
-        req.length_mm,
+        req.stock.media.as_deref(),
+        req.stock.width_mm.or(Some(50.0)),
+        req.stock.length_mm,
         dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
-    let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
-    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(style_cfg.fit.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.fit.font_fit_scale);
     let rotation = resolve_rotation(
         &state,
         &media,
-        req.orientation,
-        req.rotate_cw,
-        req.rotate_ccw,
+        req.orient.orientation,
+        req.orient.rotate_cw,
+        req.orient.rotate_ccw,
     );
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     let feed_overrides = enrich_feed_from_style(
@@ -733,33 +825,38 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
     let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
-        media: media.clone(),
         supports_cut: false,
-        cut_mode: feed_overrides.cut_mode,
-        copies: 1,
-        batch_index: 0,
-        batch_total: 1,
-        density: None,
-        feed_lead_mm: feed_overrides.feed_lead_mm,
-        feed_end_mm: feed_overrides.feed_end_mm,
-        precut: feed_overrides.precut,
-        driver: lbl_core::DriverOptions::default(),
+        job: JobSpec {
+            media: media.clone(),
+            mode: OutputMode::Print,
+            cut_mode: feed_overrides.cut_mode,
+            copies: 1,
+            batch_index: 0,
+            batch_total: 1,
+            density: None,
+            feed_lead_mm: feed_overrides.feed_lead_mm,
+            feed_end_mm: feed_overrides.feed_end_mm,
+            precut: feed_overrides.precut,
+            driver: lbl_core::DriverOptions::default(),
+        },
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
-        mirror: req.mirror,
+        mirror: req.orient.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,
         style,
         media_type: None,
         virtual_export_mode: VirtualExportMode::Raster,
-        label_fit,
-        label_align,
-        label_valign,
-        label_fit_scale,
-        font_fit_scale,
-        media_inset,
+        layout: PipelineLayout {
+            label_fit,
+            label_align,
+            label_valign,
+            label_fit_scale,
+            font_fit_scale,
+            media_inset,
+        },
         encode_caps: encode_caps.clone(),
     };
     let px_per_mm = dpi * supersample as f64 / 25.4;
@@ -777,7 +874,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                 let transpiled_html = raster.transpiled_html;
                 let head_pad = pad_preview_head_tape(
                     raster.image,
-                    &opts.media,
+                    &opts.job.media,
                     &encode_caps,
                     feed_along_width,
                 );
@@ -883,7 +980,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let source = req.source.into_source()?;
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     let count = labels.len();
-    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.dpi);
+    let dpi = resolve_request_dpi(&state.catalog, req.printer.as_deref(), None, req.stock.dpi);
     let mut style_cfg = load_style_cfg(&state, &req.style);
     let print_geometry = req.geometry == PreviewGeometry::Print;
     let supersample = if print_geometry {
@@ -894,26 +991,26 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let layout_dpi = if print_geometry { dpi } else { VECTOR_CSS_DPI };
     let media = resolve_media(
         &state.catalog,
-        req.media.as_deref(),
-        req.width_mm.or(Some(50.0)),
-        req.length_mm,
+        req.stock.media.as_deref(),
+        req.stock.width_mm.or(Some(50.0)),
+        req.stock.length_mm,
         dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
-    let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
-    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(style_cfg.fit.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.fit.font_fit_scale);
     let rotation = resolve_rotation(
         &state,
         &media,
-        req.orientation,
-        req.rotate_cw,
-        req.rotate_ccw,
+        req.orient.orientation,
+        req.orient.rotate_cw,
+        req.orient.rotate_ccw,
     );
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, false);
     feed_overrides = enrich_feed_from_style(
@@ -931,21 +1028,24 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
     let media_inset = resolve_media_inset(&style_cfg).to_px(layout_dpi, supersample);
     let opts = PipelineOptions {
         protocol: Protocol::Virtual,
-        media: media.clone(),
         supports_cut: false,
-        cut_mode: feed_overrides.cut_mode,
-        copies: 1,
-        batch_index: 0,
-        batch_total: 1,
-        density: None,
-        feed_lead_mm: feed_overrides.feed_lead_mm,
-        feed_end_mm: feed_overrides.feed_end_mm,
-        precut: feed_overrides.precut,
-        driver: lbl_core::DriverOptions::default(),
+        job: JobSpec {
+            media: media.clone(),
+            mode: OutputMode::Print,
+            cut_mode: feed_overrides.cut_mode,
+            copies: 1,
+            batch_index: 0,
+            batch_total: 1,
+            density: None,
+            feed_lead_mm: feed_overrides.feed_lead_mm,
+            feed_end_mm: feed_overrides.feed_end_mm,
+            precut: feed_overrides.precut,
+            driver: lbl_core::DriverOptions::default(),
+        },
         dither: Algorithm::Auto,
         rotation,
         head_rotation: rotation,
-        mirror: req.mirror,
+        mirror: req.orient.mirror,
         supersample,
         assets_base: AssetsBase::Cdn,
         // Inline faces so sandboxed / null-origin HTML previews do not need CDN CORS.
@@ -957,12 +1057,14 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
         } else {
             lbl_driver_file::VirtualExportMode::Vector
         },
-        label_fit,
-        label_align,
-        label_valign,
-        label_fit_scale,
-        font_fit_scale,
-        media_inset,
+        layout: PipelineLayout {
+            label_fit,
+            label_align,
+            label_valign,
+            label_fit_scale,
+            font_fit_scale,
+            media_inset,
+        },
         encode_caps: encode_caps.clone(),
     };
     let px_per_mm = layout_dpi * supersample as f64 / 25.4;
@@ -1131,49 +1233,49 @@ pub struct StyleReqOverrides {
 fn load_style_cfg(state: &AppState, overrides: &StyleReqOverrides) -> lbl_config::StyleConfig {
     let mut style = state.loader.load().map(|c| c.style).unwrap_or_default();
     if let Some(v) = overrides.padding_mm {
-        style.padding_mm = v;
+        style.padding.padding_mm = v;
     }
     if let Some(v) = overrides.padding_horizontal_mm {
-        style.padding_horizontal_mm = Some(v);
+        style.padding.padding_horizontal_mm = Some(v);
     }
     if let Some(v) = overrides.padding_vertical_mm {
-        style.padding_vertical_mm = Some(v);
+        style.padding.padding_vertical_mm = Some(v);
     }
     if let Some(v) = overrides.padding_top_mm {
-        style.padding_top_mm = Some(v);
+        style.padding.padding_top_mm = Some(v);
     }
     if let Some(v) = overrides.padding_right_mm {
-        style.padding_right_mm = Some(v);
+        style.padding.padding_right_mm = Some(v);
     }
     if let Some(v) = overrides.padding_bottom_mm {
-        style.padding_bottom_mm = Some(v);
+        style.padding.padding_bottom_mm = Some(v);
     }
     if let Some(v) = overrides.padding_left_mm {
-        style.padding_left_mm = Some(v);
+        style.padding.padding_left_mm = Some(v);
     }
     if let Some(v) = overrides.element_gap_mm {
-        style.element_gap_mm = v;
+        style.chrome.element_gap_mm = v;
     }
     if let Some(v) = overrides.border_width_mm {
-        style.border_width_mm = v;
+        style.chrome.border_width_mm = v;
     }
     if let Some(v) = overrides.corner_radius_mm {
-        style.corner_radius_mm = v;
+        style.chrome.corner_radius_mm = v;
     }
     if let Some(v) = overrides.font_size_mm {
-        style.font_size_mm = v;
+        style.typography.font_size_mm = v;
     }
     if let Some(v) = overrides.font_fit_scale {
-        style.font_fit_scale = v;
+        style.fit.font_fit_scale = v;
     }
     if let Some(v) = &overrides.label_fit {
-        style.label_fit = v.clone();
+        style.fit.label_fit = v.clone();
     }
     if let Some(v) = &overrides.label_align {
-        style.label_align = v.clone();
+        style.fit.label_align = v.clone();
     }
     if let Some(v) = &overrides.label_valign {
-        style.label_valign = v.clone();
+        style.fit.label_valign = v.clone();
     }
     style
 }
@@ -1193,27 +1295,13 @@ pub enum PreviewGeometry {
 pub struct PreviewReq {
     #[serde(flatten)]
     source: SourceReq,
-    media: Option<String>,
-    width_mm: Option<f64>,
-    length_mm: Option<f64>,
-    #[serde(default = "default_dpi")]
-    dpi: f64,
+    #[serde(flatten, default)]
+    stock: StockReq,
     /// Catalog printer key (e.g. `B1`) used to pick native DPI.
     #[serde(default)]
     printer: Option<String>,
-    /// Layout orientation (`portrait`|`landscape`). Falls back to the
-    /// configured default (landscape) when omitted.
-    #[serde(default)]
-    orientation: Option<lbl_core::Orientation>,
-    /// Extra clockwise quarter-turns, composed on top of the orientation.
-    #[serde(default)]
-    rotate_cw: u32,
-    /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
-    #[serde(default)]
-    rotate_ccw: u32,
-    /// Flip left↔right in the reading frame (Mirror print).
-    #[serde(default)]
-    mirror: bool,
+    #[serde(flatten, default)]
+    orient: OrientationReq,
     /// Render supersample factor (same default as print).
     #[serde(default = "default_supersample")]
     supersample: u32,
@@ -1251,50 +1339,22 @@ pub enum DispatchMode {
 pub struct PrintReq {
     #[serde(flatten)]
     source: SourceReq,
-    media: Option<String>,
-    width_mm: Option<f64>,
-    length_mm: Option<f64>,
-    #[serde(default = "default_dpi")]
-    dpi: f64,
+    #[serde(flatten, default)]
+    stock: StockReq,
     protocol: String,
     /// Catalog printer key for browser transport hints (e.g. `LabelWriter 550`).
     #[serde(default)]
     printer: Option<String>,
     #[serde(default)]
     dispatch_mode: DispatchMode,
-    /// Legacy boolean cut flag; prefer `cut_mode`.
-    #[serde(default)]
-    cut: bool,
-    /// When to cut: `none`, `every`, or `end`. Wins over `cut` when set.
-    #[serde(default)]
-    cut_mode: Option<String>,
-    #[serde(default)]
-    supports_cut: bool,
-    #[serde(default = "default_copies")]
-    copies: u32,
-    /// Optional print density / heat (driver-specific; typically 1–5).
-    #[serde(default)]
-    density: Option<u8>,
-    /// Requested feed lead padding (mm). Unset → cutter gap when known.
-    #[serde(default)]
-    feed_lead_mm: Option<f64>,
-    /// Requested feed end padding (mm).
-    #[serde(default)]
-    feed_end_mm: Option<f64>,
-    /// Opt-in pre-cut preference.
-    #[serde(default)]
-    precut: Option<bool>,
-    /// Protocol-specific options (each driver reads only its own bag).
-    #[serde(default)]
-    driver: DriverOptionsReq,
+    #[serde(flatten, default)]
+    job: FeedJobReq,
     #[serde(default = "default_supersample")]
     supersample: u32,
     #[serde(default = "default_dither")]
     dither: String,
-    network: Option<String>,
-    usb: Option<String>,
-    serial: Option<String>,
-    bluetooth: Option<String>,
+    #[serde(flatten, default)]
+    transport: TransportReq,
     #[serde(default)]
     use_sidecar: bool,
     /// For the virtual printer: output image format (png|bmp|tiff|gif|pbm).
@@ -1303,19 +1363,8 @@ pub struct PrintReq {
     /// For the virtual printer: `raster` (default) or `vector` (PDF).
     #[serde(default)]
     export_mode: Option<String>,
-    /// Layout orientation (`portrait`|`landscape`). Falls back to the
-    /// configured default (landscape) when omitted.
-    #[serde(default)]
-    orientation: Option<lbl_core::Orientation>,
-    /// Extra clockwise quarter-turns, composed on top of the orientation.
-    #[serde(default)]
-    rotate_cw: u32,
-    /// Extra counter-clockwise quarter-turns, composed on top of the orientation.
-    #[serde(default)]
-    rotate_ccw: u32,
-    /// Flip left↔right in the reading frame (Mirror print).
-    #[serde(default)]
-    mirror: bool,
+    #[serde(flatten, default)]
+    orient: OrientationReq,
     /// Optional batch subset (same fields as the CLI selection flags).
     #[serde(default)]
     selection: lbl_template::BatchSelection,
@@ -1333,9 +1382,9 @@ impl PrintReq {
         resolve_rotation(
             state,
             media,
-            self.orientation,
-            self.rotate_cw,
-            self.rotate_ccw,
+            self.orient.orientation,
+            self.orient.rotate_cw,
+            self.orient.rotate_ccw,
         )
     }
 }
@@ -1506,27 +1555,27 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         &state.catalog,
         req.printer.as_deref(),
         Some(protocol),
-        req.dpi,
+        req.stock.dpi,
     );
     let media = resolve_media(
         &state.catalog,
-        req.media.as_deref(),
-        req.width_mm,
-        req.length_mm,
+        req.stock.media.as_deref(),
+        req.stock.width_mm,
+        req.stock.length_mm,
         dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let mut style_cfg = load_style_cfg(&state, &req.style);
-    let cut_mode = resolve_cut_mode(req.cut, req.cut_mode.as_deref())?;
+    let cut_mode = resolve_cut_mode(req.job.cut, req.job.cut_mode.as_deref())?;
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
-    let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
-    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(style_cfg.fit.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.fit.font_fit_scale);
 
     if req.dispatch_mode == DispatchMode::Client
         && matches!(
@@ -1544,25 +1593,25 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let head_rotation = resolve_head_rotation(
         &state,
         &media,
-        req.orientation,
-        req.rotate_cw,
-        req.rotate_ccw,
+        req.orient.orientation,
+        req.orient.rotate_cw,
+        req.orient.rotate_ccw,
         protocol,
     );
     let encode_caps = resolve_encode_caps(
         &state.catalog,
         req.printer.as_deref(),
         &media,
-        req.supports_cut,
+        req.job.supports_cut,
     );
     let gaps = apply_virtual_feed_gaps(
         &mut style_cfg,
         &encode_caps,
         &PreviewFeedOverrides {
             cut_mode,
-            feed_lead_mm: req.feed_lead_mm,
-            feed_end_mm: req.feed_end_mm,
-            precut: req.precut,
+            feed_lead_mm: req.job.feed_lead_mm,
+            feed_end_mm: req.job.feed_end_mm,
+            precut: req.job.precut,
             ..Default::default()
         },
         rotation.swaps_axes(),
@@ -1574,34 +1623,39 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
-        media,
-        supports_cut: req.supports_cut,
-        cut_mode,
-        copies: req.copies,
-        batch_index: 0,
-        batch_total: 1,
-        density: req.density,
-        feed_lead_mm: gaps.feed_lead_mm.or(req.feed_lead_mm),
-        feed_end_mm: gaps.feed_end_mm.or(req.feed_end_mm),
-        precut: req.precut,
-        driver: resolve_driver_options(&req.driver)?,
+        supports_cut: req.job.supports_cut,
+        job: JobSpec {
+            media,
+            mode: OutputMode::Print,
+            cut_mode,
+            copies: req.job.copies,
+            batch_index: 0,
+            batch_total: 1,
+            density: req.job.density,
+            feed_lead_mm: gaps.feed_lead_mm.or(req.job.feed_lead_mm),
+            feed_end_mm: gaps.feed_end_mm.or(req.job.feed_end_mm),
+            precut: req.job.precut,
+            driver: resolve_driver_options(&req.job.driver)?,
+        },
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
         head_rotation,
-        mirror: req.mirror,
+        mirror: req.orient.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,
         style,
         media_type: None,
         virtual_export_mode: lbl_driver_file::VirtualExportMode::Raster,
-        label_fit,
-        label_align,
-        label_valign,
-        label_fit_scale,
-        font_fit_scale,
-        media_inset,
+        layout: PipelineLayout {
+            label_fit,
+            label_align,
+            label_valign,
+            label_fit_scale,
+            font_fit_scale,
+            media_inset,
+        },
         encode_caps,
     };
 
@@ -1613,10 +1667,10 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         }
     }
     let dispatch_mode = req.dispatch_mode;
-    let network = req.network.clone();
-    let usb = req.usb.clone();
-    let serial = req.serial.clone();
-    let bluetooth = req.bluetooth.clone();
+    let network = req.transport.network.clone();
+    let usb = req.transport.usb.clone();
+    let serial = req.transport.serial.clone();
+    let bluetooth = req.transport.bluetooth.clone();
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
     let renderer = state.renderer.clone();
@@ -1721,13 +1775,13 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         &state.catalog,
         req.printer.as_deref(),
         Some(protocol),
-        req.dpi,
+        req.stock.dpi,
     );
     let media = resolve_media(
         &state.catalog,
-        req.media.as_deref(),
-        req.width_mm,
-        req.length_mm,
+        req.stock.media.as_deref(),
+        req.stock.width_mm,
+        req.stock.length_mm,
         dpi,
     )
     .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
@@ -1770,62 +1824,67 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
         )
     };
     let label_fit = resolve_label_fit(
-        LabelFitSetting::parse(&style_cfg.label_fit).unwrap_or(LabelFitSetting::Auto),
+        LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
     );
-    let label_align = resolve_label_align(&style_cfg.label_align);
-    let label_valign = resolve_label_valign(&style_cfg.label_valign);
-    let label_fit_scale = resolve_label_fit_scale(style_cfg.label_fit_scale);
-    let font_fit_scale = resolve_font_fit_scale(style_cfg.font_fit_scale);
+    let label_align = resolve_label_align(&style_cfg.fit.label_align);
+    let label_valign = resolve_label_valign(&style_cfg.fit.label_valign);
+    let label_fit_scale = resolve_label_fit_scale(style_cfg.fit.label_fit_scale);
+    let font_fit_scale = resolve_font_fit_scale(style_cfg.fit.font_fit_scale);
 
     let rotation = req.rotation(&state, &media);
     let head_rotation = resolve_head_rotation(
         &state,
         &media,
-        req.orientation,
-        req.rotate_cw,
-        req.rotate_ccw,
+        req.orient.orientation,
+        req.orient.rotate_cw,
+        req.orient.rotate_ccw,
         protocol,
     );
     let encode_caps = resolve_encode_caps(
         &state.catalog,
         req.printer.as_deref(),
         &media,
-        req.supports_cut,
+        req.job.supports_cut,
     );
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
     let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
     let opts = PipelineOptions {
         protocol,
-        media,
-        supports_cut: req.supports_cut,
-        cut_mode: resolve_cut_mode(req.cut, req.cut_mode.as_deref())?,
-        copies: req.copies,
-        batch_index: 0,
-        batch_total: 1,
-        density: req.density,
-        feed_lead_mm: req.feed_lead_mm,
-        feed_end_mm: req.feed_end_mm,
-        precut: req.precut,
-        driver: resolve_driver_options(&req.driver)?,
+        supports_cut: req.job.supports_cut,
+        job: JobSpec {
+            media,
+            mode: OutputMode::Print,
+            cut_mode: resolve_cut_mode(req.job.cut, req.job.cut_mode.as_deref())?,
+            copies: req.job.copies,
+            batch_index: 0,
+            batch_total: 1,
+            density: req.job.density,
+            feed_lead_mm: req.job.feed_lead_mm,
+            feed_end_mm: req.job.feed_end_mm,
+            precut: req.job.precut,
+            driver: resolve_driver_options(&req.job.driver)?,
+        },
         dither: Algorithm::parse(&req.dither)
             .map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?,
         rotation,
         head_rotation,
-        mirror: req.mirror,
+        mirror: req.orient.mirror,
         supersample: req.supersample,
         assets_base: AssetsBase::Cdn,
         font_delivery,
         style,
         media_type,
         virtual_export_mode,
-        label_fit,
-        label_align,
-        label_valign,
-        label_fit_scale,
-        font_fit_scale,
-        media_inset,
+        layout: PipelineLayout {
+            label_fit,
+            label_align,
+            label_valign,
+            label_fit_scale,
+            font_fit_scale,
+            media_inset,
+        },
         encode_caps,
     };
 
@@ -2275,6 +2334,26 @@ mod browser_hints_tests {
         let detected = detected_media_from_catalog(&catalog, "11352").unwrap();
         assert_eq!(detected["sku"], "11352");
         assert!(detected["name"].as_str().unwrap().contains("11352"));
+    }
+}
+
+#[cfg(test)]
+mod preview_req_parse_tests {
+    use super::*;
+
+    #[test]
+    fn preview_req_geometry_vector_deserializes() {
+        let req: PreviewReq = serde_json::from_str(
+            r#"{"text":"Hi","geometry":"vector","media":"45013","printer":"LabelManager PnP","orientation":"landscape"}"#,
+        )
+        .unwrap();
+        assert_eq!(req.geometry, PreviewGeometry::Vector);
+        assert_eq!(
+            req.orient.orientation,
+            Some(lbl_core::Orientation::Landscape)
+        );
+        assert_eq!(req.stock.media.as_deref(), Some("45013"));
+        assert!((req.stock.dpi - 300.0).abs() < f64::EPSILON);
     }
 }
 

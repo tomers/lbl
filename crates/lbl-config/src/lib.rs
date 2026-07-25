@@ -25,7 +25,8 @@ mod profiles;
 pub use loader::{describe_sources, format_effective, Loader};
 pub use model::{
     CatalogConfig, Config, DriverPrintConfig, DymoPrintConfig, GeneralConfig, PrintConfig,
-    RenderConfig, StyleConfig,
+    RenderConfig, StyleBarcode, StyleChrome, StyleConfig, StyleFit, StyleMediaInset, StylePadding,
+    StyleQr, StyleTypography,
 };
 pub use paths::{describe_paths, format_paths_report, stdout_color, ConfigPaths, PathLine};
 pub use profiles::ProfileStore;
