@@ -83,29 +83,42 @@ fn placeholder(n: usize) -> String {
     format!("lblxdirectivexplaceholderx{n}xend")
 }
 
-/// Strip markdown link tails that rich-text editors append after lbl directives.
+/// Repair Markdown produced by rich-text editors before directive extraction.
 ///
-/// TipTap autolink can turn `[[qr:https://example.com]]` into
-/// `[[qr:https://example.com]]](https://example.com]]`, leaving stray link
-/// syntax outside the directive.
+/// 1. TipTap's Markdown serializer escapes every `[` / `]`, so
+///    `[[font:arimo:Hi]]` becomes `\[\[font:arimo:Hi\]\]`. Those fences must be
+///    restored or directives are left as literal text after pulldown-cmark
+///    unescapes them for display.
+/// 2. TipTap autolink can turn `[[qr:https://example.com]]` into
+///    `[[qr:https://example.com]]](https://example.com]]`, leaving stray link
+///    syntax outside the directive.
 fn normalize_editor_artifacts(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
+    let unescaped = unescape_tiptap_directive_fences(input);
+    let mut out = String::with_capacity(unescaped.len());
     let mut i = 0;
 
-    while i < input.len() {
-        if input[i..].starts_with("[[") {
-            if let Some((_, end)) = scan_directive_at(input, i) {
-                out.push_str(&input[i..end]);
-                i = skip_link_artifact_suffix(input, end);
+    while i < unescaped.len() {
+        if unescaped[i..].starts_with("[[") {
+            if let Some((_, end)) = scan_directive_at(&unescaped, i) {
+                out.push_str(&unescaped[i..end]);
+                i = skip_link_artifact_suffix(&unescaped, end);
                 continue;
             }
         }
-        let ch = input[i..].chars().next().unwrap();
+        let ch = unescaped[i..].chars().next().unwrap();
         out.push(ch);
         i += ch.len_utf8();
     }
 
     out
+}
+
+/// Restore `[[` / `]]` fences TipTap escapes one bracket at a time.
+///
+/// TipTap emits `\[\[…\]\]` (backslash before every bracket). A lone `\[` for a
+/// literal `[` is left alone.
+fn unescape_tiptap_directive_fences(input: &str) -> String {
+    input.replace(r"\[\[", "[[").replace(r"\]\]", "]]")
 }
 
 /// After a closing `]]`, skip a spurious `](url…)` tail from editor autolink.
@@ -290,6 +303,30 @@ mod tests {
             html.contains("Hello, <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span data-lbl-font=\"roboto\">World</span></span></span>!"),
             "{html}"
         );
+    }
+
+    #[test]
+    fn tiptap_escaped_font_directive_is_restored() {
+        // TipTap Markdown serializes each bracket: [[font:…]] -> \[\[font:…\]\]
+        let doc = MarkdownDocument::parse(r"Ship fast \[\[font:arimo:Text\]\]");
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains("data-lbl-font=\"arimo\""),
+            "escaped font directive not applied: {html}"
+        );
+        assert!(html.contains(">Text</span>"), "{html}");
+        assert!(
+            !html.contains("[[font:arimo:Text]]"),
+            "literal directive leaked: {html}"
+        );
+    }
+
+    #[test]
+    fn tiptap_escaped_nested_directives_are_restored() {
+        let doc = MarkdownDocument::parse(r"\[\[font:roboto:Hi \[\[qr:https://x\]\]\]\]");
+        let html = doc.to_authoring_html();
+        assert!(html.contains("data-lbl-font=\"roboto\""), "{html}");
+        assert!(html.contains("<qr>https://x</qr>"), "{html}");
     }
 
     #[test]
