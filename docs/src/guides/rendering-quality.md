@@ -57,12 +57,14 @@ HTML all grow with `supersample`. The high-res Chromium viewport matches those
 pixel sizes; after downscaling, elements land on the correct physical size on
 the printed label.
 
-**Important for template authors:** raw CSS `mm`/`cm`/`in` units inside your
-HTML follow the **browser’s reference pixel density** (~96 DPI), *not* this
-scale. Prefer `em` (relative to the label’s configured font size), percentages,
-or the `<qr>` / `<barcode>` elements and style config instead of hard-coded `mm`
-in inline styles. See the identity-card fixture under `crates/lbl/tests/fixtures/`
-for an example.
+Absolute CSS lengths (`mm`, `cm`, `in`, `pt`, `pc`, `Q`) in authoring inline
+`style` attributes are rewritten to layout `px` using the same
+`px_per_mm` formula, so hard-coded font sizes and strokes print at true
+physical size under supersample. Prefer `em` (relative to the label’s
+configured font size), percentages, or the `<qr>` / `<barcode>` elements and
+style config when you want sizes relative to the label rather than a fixed
+physical length. See the identity-card fixture under
+`crates/lbl/tests/fixtures/` for an example.
 
 ## Defaults
 

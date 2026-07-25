@@ -691,6 +691,15 @@ static BARCODE_HEIGHT_ATTR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)\bheight\s*=\s*"([^"]*)""#).expect("barcode height attr regex"));
 static BODY_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?is)<body\b[^>]*>(.*)</body>").expect("body regex"));
+/// Inline `style="..."` / `style='...'` on authoring elements.
+static STYLE_ATTR_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"(?i)(\bstyle\s*=\s*)(?:"([^"]*)"|'([^']*)')"#).expect("style attr regex")
+});
+/// Absolute CSS lengths that follow the browser's ~96 DPI reference pixel, not
+/// the label layout density. Converted to layout `px` via `px_per_mm`.
+static CSS_ABS_LENGTH_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(-?\d*\.?\d+)(mm|cm|in|pt|pc|q)\b").expect("css abs length regex")
+});
 
 /// Transpile authoring HTML into a browser-ready document.
 pub fn transpile(input: &str, opts: &TranspileOptions) -> String {
@@ -698,6 +707,10 @@ pub fn transpile(input: &str, opts: &TranspileOptions) -> String {
 
     let mut features = Features::default();
     let px_per_mm = opts.style.qr_size_px / opts.style.qr_size_mm.max(f64::EPSILON);
+    // Authoring often uses CSS `mm`/`cm`/… for fonts and strokes. Chromium
+    // resolves those at ~96 DPI; rewrite to layout px so supersampled print
+    // geometry keeps true physical size after downscale.
+    let body = rewrite_css_absolute_lengths(&body, px_per_mm);
     let body = rewrite_qr(&body, &mut features, px_per_mm);
     let body = rewrite_barcode(&body, &mut features);
 
@@ -722,6 +735,53 @@ fn extract_body(input: &str) -> String {
         Some(caps) => caps[1].trim().to_string(),
         None => input.trim().to_string(),
     }
+}
+
+/// Convert CSS absolute length units to millimetres.
+fn css_abs_unit_to_mm(value: f64, unit: &str) -> f64 {
+    match unit.to_ascii_lowercase().as_str() {
+        "mm" => value,
+        "cm" => value * 10.0,
+        "in" => value * 25.4,
+        "pt" => value * 25.4 / 72.0,
+        "pc" => value * 25.4 / 6.0,
+        "q" => value * 0.25,
+        _ => value,
+    }
+}
+
+/// Rewrite absolute CSS lengths inside a single `style` attribute value.
+fn rewrite_style_abs_lengths(style: &str, px_per_mm: f64) -> String {
+    CSS_ABS_LENGTH_RE
+        .replace_all(style, |caps: &regex::Captures| {
+            let value: f64 = caps[1].parse().unwrap_or(0.0);
+            let mm = css_abs_unit_to_mm(value, &caps[2]);
+            format!("{:.2}px", mm * px_per_mm)
+        })
+        .into_owned()
+}
+
+/// Rewrite absolute CSS lengths in inline `style` attributes to layout pixels.
+///
+/// Leaves `%`/`em`/`rem`/`px` and other relative units unchanged. Does not
+/// touch `<style>` blocks or assembler-injected `@page` rules (those are added
+/// after this pass).
+fn rewrite_css_absolute_lengths(body: &str, px_per_mm: f64) -> String {
+    if !px_per_mm.is_finite() || px_per_mm <= 0.0 {
+        return body.to_string();
+    }
+    STYLE_ATTR_RE
+        .replace_all(body, |caps: &regex::Captures| {
+            let prefix = &caps[1];
+            let (quote, style) = if let Some(m) = caps.get(2) {
+                ('"', m.as_str())
+            } else {
+                ('\'', caps.get(3).map(|m| m.as_str()).unwrap_or(""))
+            };
+            let rewritten = rewrite_style_abs_lengths(style, px_per_mm);
+            format!("{prefix}{quote}{rewritten}{quote}")
+        })
+        .into_owned()
 }
 
 fn rewrite_qr(body: &str, features: &mut Features, px_per_mm: f64) -> String {
@@ -1891,5 +1951,101 @@ mod tests {
         // Only one body should remain (no nesting of original head/body).
         assert_eq!(out.matches("<body>").count(), 1);
         assert!(out.contains("data-qr=\"z\""));
+    }
+
+    fn style_at(dpi: f64, supersample: u32) -> LabelStyle {
+        LabelStyle::from_mm(
+            3.0,
+            15.0,
+            12.0,
+            0.33,
+            CascadingInsetMm::uniform(2.0),
+            2.0,
+            0.0,
+            2.0,
+            dpi,
+            supersample,
+        )
+    }
+
+    #[test]
+    fn inline_css_mm_font_size_uses_layout_dpi() {
+        // 5mm at 300dpi, supersample 1 → 5 * 300 / 25.4 ≈ 59.06px.
+        let opts = TranspileOptions {
+            style: style_at(300.0, 1),
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-text" style="font-size:5mm">x</div>"#,
+            &opts,
+        );
+        assert!(out.contains("font-size:59.06px"), "{out}");
+        assert!(!out.contains("font-size:5mm"), "{out}");
+    }
+
+    #[test]
+    fn inline_css_mm_font_size_scales_with_supersample() {
+        // 5mm at 300dpi, supersample 3 → 5 * 900 / 25.4 ≈ 177.17px.
+        let opts = TranspileOptions {
+            style: style_at(300.0, 3),
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-text" style="font-size:5mm">x</div>"#,
+            &opts,
+        );
+        assert!(out.contains("font-size:177.17px"), "{out}");
+    }
+
+    #[test]
+    fn inline_css_mm_mixed_declaration_converts_lengths_only() {
+        let opts = TranspileOptions {
+            style: style_at(300.0, 1),
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div style="border:0.5mm solid #000;font-size:3mm;width:100%"></div>"#,
+            &opts,
+        );
+        // 0.5mm → 5.91px, 3mm → 35.43px at 300dpi ss=1.
+        assert!(out.contains("border:5.91px solid #000"), "{out}");
+        assert!(out.contains("font-size:35.43px"), "{out}");
+        assert!(out.contains("width:100%"), "{out}");
+    }
+
+    #[test]
+    fn inline_css_leaves_relative_units_alone() {
+        let opts = TranspileOptions {
+            style: style_at(300.0, 1),
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div style="width:100%;font-size:1.2em;padding:8px">x</div>"#,
+            &opts,
+        );
+        assert!(out.contains("width:100%"), "{out}");
+        assert!(out.contains("font-size:1.2em"), "{out}");
+        assert!(out.contains("padding:8px"), "{out}");
+    }
+
+    #[test]
+    fn page_size_mm_in_at_page_is_not_rewritten() {
+        let opts = TranspileOptions {
+            style: style_at(300.0, 1),
+            page_size: Some(PageSizeMm {
+                width_mm: 40.0,
+                height_mm: Some(30.0),
+            }),
+            ..Default::default()
+        };
+        let out = transpile(
+            r#"<div class="lbl-text" style="font-size:5mm">x</div>"#,
+            &opts,
+        );
+        assert!(
+            out.contains("@page{size:40.0000mm 30.0000mm;margin:0}"),
+            "{out}"
+        );
+        assert!(out.contains("font-size:59.06px"), "{out}");
     }
 }
