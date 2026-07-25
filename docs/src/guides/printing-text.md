@@ -36,8 +36,12 @@ lbl-text "[[vertical:ABC]]"
   require the caller to supply face rules via `FontDelivery`. Unknown empty
   specs stay literal.
 - `[[vertical:text]]` — stack upright glyphs via `.lbl-vertical` (alias:
-  `vert`; CSS `writing-mode: vertical-rl; text-orientation: upright;
-  line-height: 1`)
+  `vert`). Optional `lh=` / `spacing=` / `line-height=` before the colon
+  (e.g. `[[vertical lh=1.25:ABC]]`) sets **letter-spacing** between glyphs
+  (`(value - 1) × 1em`; default `1` = no extra gap). In `vertical-rl`, CSS
+  `line-height` would thicken the column horizontally — so spacing uses
+  `letter-spacing` on the inline (vertical) axis instead. Auto-fit sizes
+  letters from the tight stack, so changing spacing does not shrink/grow glyphs.
 
 Unrecognized `[[…]]` is left as literal text, and `{{ … }}` is never touched —
 those braces belong to the templating layer (`lbl-template`), so directives and

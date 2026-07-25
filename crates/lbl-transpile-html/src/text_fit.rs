@@ -11,7 +11,7 @@ static ANY_TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?is)<[^>]+>").expect
 /// Line height for lone-text auto-fit (must match [`crate::assets::LABEL_FIT_TEXT_CSS`]).
 pub const LINE_HEIGHT: f64 = 1.1;
 
-/// Line height on `.lbl-vertical` (must match [`crate::assets::BASE_CSS`]).
+/// Default line height on `.lbl-vertical` when unset (must match CSS fallback).
 pub const VERTICAL_LINE_HEIGHT: f64 = 1.0;
 
 /// Nominal em width of one upright vertical glyph column.
@@ -255,16 +255,16 @@ fn horizontal_advance_em(text: &str) -> f64 {
         .sum()
 }
 
-fn vertical_stack_height_em(text: &str) -> f64 {
+fn vertical_stack_height_em(text: &str, vertical_lh: f64) -> f64 {
     let n = text.chars().filter(|c| !c.is_control()).count().max(1);
-    n as f64 * VERTICAL_LINE_HEIGHT
+    n as f64 * vertical_lh
 }
 
 /// Measure authoring text HTML for auto-fit. Plain text keeps wrapping-aware
 /// [`max_fit_font_px`]; `.lbl-vertical` runs are one column wide and N glyphs tall.
-pub(crate) fn text_html_em_metrics(inner: &str) -> TextHtmlEmMetrics {
+pub(crate) fn text_html_em_metrics(inner: &str, _vertical_lh: f64) -> TextHtmlEmMetrics {
     static VERTICAL_RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r#"(?is)<span\s+class="lbl-vertical"[^>]*>(.*?)</span>"#)
+        Regex::new(r#"(?is)<span\s+[^>]*\bclass="lbl-vertical"[^>]*>(.*?)</span>"#)
             .expect("lbl-vertical regex")
     });
 
@@ -304,7 +304,12 @@ pub(crate) fn text_html_em_metrics(inner: &str) -> TextHtmlEmMetrics {
         let vertical_text = html_to_plain_text(caps.get(1).map(|m| m.as_str()).unwrap_or(""));
         width_em += VERTICAL_COL_EM;
         advance_em += VERTICAL_COL_EM;
-        height_em = height_em.max(vertical_stack_height_em(&vertical_text));
+        // Fit glyphs from the tight stack. Per-span `--lbl-vertical-spacing`
+        // is CSS letter-spacing only — including it here would shrink/grow letters.
+        height_em = height_em.max(vertical_stack_height_em(
+            &vertical_text,
+            VERTICAL_LINE_HEIGHT,
+        ));
         last = full.end();
     }
 
@@ -323,11 +328,16 @@ pub(crate) fn text_html_em_metrics(inner: &str) -> TextHtmlEmMetrics {
 }
 
 /// Largest font that fits `inner` HTML into the box (vertical-aware).
-pub(crate) fn max_fit_font_px_html(width_px: f64, height_px: f64, inner: &str) -> f64 {
+pub(crate) fn max_fit_font_px_html(
+    width_px: f64,
+    height_px: f64,
+    inner: &str,
+    vertical_lh: f64,
+) -> f64 {
     if !inner.contains("lbl-vertical") {
         return max_fit_font_px(width_px, height_px, &html_to_plain_text(inner));
     }
-    let metrics = text_html_em_metrics(inner);
+    let metrics = text_html_em_metrics(inner, vertical_lh);
     if metrics.width_em <= f64::EPSILON || metrics.height_em <= f64::EPSILON {
         return 1.0;
     }
@@ -346,18 +356,19 @@ pub(crate) fn max_fit_font_px_html(width_px: f64, height_px: f64, inner: &str) -
     lo.max(1.0)
 }
 
-pub(crate) fn text_html_advance_width_px(inner: &str, font_px: f64) -> f64 {
+pub(crate) fn text_html_advance_width_px(inner: &str, font_px: f64, vertical_lh: f64) -> f64 {
     if !inner.contains("lbl-vertical") {
         return text_advance_width_px(&html_to_plain_text(inner), font_px);
     }
-    text_html_em_metrics(inner).advance_em * font_px.max(0.0)
+    text_html_em_metrics(inner, vertical_lh).advance_em * font_px.max(0.0)
 }
 
-pub(crate) fn text_html_feed_content_width_px(inner: &str, font_px: f64) -> f64 {
+pub(crate) fn text_html_feed_content_width_px(inner: &str, font_px: f64, vertical_lh: f64) -> f64 {
     if !inner.contains("lbl-vertical") {
         return text_feed_content_width_px(&html_to_plain_text(inner), font_px);
     }
-    text_html_advance_width_px(inner, font_px) + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
+    text_html_advance_width_px(inner, font_px, vertical_lh)
+        + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
 }
 
 fn char_width_em(c: char) -> f64 {
@@ -480,7 +491,7 @@ mod tests {
     fn vertical_span_metrics_are_tall_and_narrow() {
         let inner =
             r#"<span class="lbl-text-inlines"><span class="lbl-vertical">ABC</span>abcde</span>"#;
-        let metrics = text_html_em_metrics(inner);
+        let metrics = text_html_em_metrics(inner, VERTICAL_LINE_HEIGHT);
         assert!(
             (metrics.height_em - 3.0 * VERTICAL_LINE_HEIGHT).abs() < 0.01,
             "height_em={}",
@@ -502,7 +513,7 @@ mod tests {
     fn vertical_mixed_fit_is_height_limited_not_flattened_width() {
         let inner = r#"<span class="lbl-vertical">ABC</span>abcde"#;
         let flat = max_fit_font_px(354.0, 142.0, "ABCabcde");
-        let vertical = max_fit_font_px_html(354.0, 142.0, inner);
+        let vertical = max_fit_font_px_html(354.0, 142.0, inner, VERTICAL_LINE_HEIGHT);
         // Three upright glyphs need ~3em of height; font should approach box_h/3.
         assert!(
             (vertical - 142.0 / 3.0).abs() < 1.0,
@@ -513,6 +524,18 @@ mod tests {
         assert!(
             (flat - vertical).abs() > 1.0,
             "flat={flat} vertical={vertical}"
+        );
+    }
+
+    #[test]
+    fn vertical_line_height_style_does_not_change_fit_font() {
+        let tight = r#"<span class="lbl-vertical">ABC</span>"#;
+        let loose = r#"<span class="lbl-vertical" style="--lbl-vertical-spacing:1.5">ABC</span>"#;
+        let tight_font = max_fit_font_px_html(354.0, 142.0, tight, VERTICAL_LINE_HEIGHT);
+        let loose_font = max_fit_font_px_html(354.0, 142.0, loose, VERTICAL_LINE_HEIGHT);
+        assert!(
+            (loose_font - tight_font).abs() < 0.01,
+            "loose={loose_font} tight={tight_font}"
         );
     }
 

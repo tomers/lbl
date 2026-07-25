@@ -88,7 +88,7 @@ html,body{margin:0;padding:0}
 .lbl-grow{flex:1 1 auto}
 .lbl-wrap{flex-wrap:wrap}
 .lbl-frame{border:1px solid currentColor;padding:0.5em;box-sizing:border-box}
-.lbl-vertical{writing-mode:vertical-rl;text-orientation:upright;display:inline-block;vertical-align:middle;line-height:1}
+.lbl-vertical{writing-mode:vertical-rl;text-orientation:upright;display:inline-block;vertical-align:middle;line-height:1;letter-spacing:calc((var(--lbl-vertical-spacing,1) - 1) * 1em)}
 .lbl-qr,.lbl-barcode{display:inline-flex;align-items:center;justify-content:center}
 .lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
@@ -406,7 +406,8 @@ mod tests {
         assert!(BASE_CSS.contains("writing-mode:vertical-rl"));
         assert!(BASE_CSS.contains("text-orientation:upright"));
         assert!(BASE_CSS.contains("vertical-align:middle"));
-        assert!(BASE_CSS.contains("line-height:1"));
+        assert!(BASE_CSS.contains("--lbl-vertical-spacing"));
+        assert!(BASE_CSS.contains("letter-spacing:"));
     }
 
     #[test]

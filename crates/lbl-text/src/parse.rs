@@ -67,6 +67,9 @@ pub enum Block {
     Vertical {
         /// Inline content rendered vertically (may include nested directives).
         content: Vec<Block>,
+        /// Optional spacing multiplier (`[[vertical lh=1.25:…]]` / `spacing=`);
+        /// maps to CSS `letter-spacing: (value - 1) * 1em`. `None` = default `1`.
+        line_height: Option<f64>,
     },
     /// A QR code carrying the given payload and optional overrides.
     Qr {
@@ -132,10 +135,18 @@ impl Block {
                 escape(color),
                 inline_blocks_html(content)
             )),
-            Block::Vertical { content } => wrap_lbl_text_inlines(&format!(
-                "<span class=\"lbl-vertical\">{}</span>",
-                inline_blocks_html(content)
-            )),
+            Block::Vertical {
+                content,
+                line_height,
+            } => {
+                let style = line_height
+                    .map(|lh| format!(" style=\"--lbl-vertical-spacing:{}\"", fmt_vertical_lh(lh)))
+                    .unwrap_or_default();
+                wrap_lbl_text_inlines(&format!(
+                    "<span class=\"lbl-vertical\"{style}>{}</span>",
+                    inline_blocks_html(content)
+                ))
+            }
             Block::Qr { payload, options } => {
                 format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
             }
@@ -183,10 +194,18 @@ impl Block {
                 escape(color),
                 inline_blocks_html(content)
             ),
-            Block::Vertical { content } => format!(
-                "<span class=\"lbl-vertical\">{}</span>",
-                inline_blocks_html(content)
-            ),
+            Block::Vertical {
+                content,
+                line_height,
+            } => {
+                let style = line_height
+                    .map(|lh| format!(" style=\"--lbl-vertical-spacing:{}\"", fmt_vertical_lh(lh)))
+                    .unwrap_or_default();
+                format!(
+                    "<span class=\"lbl-vertical\"{style}>{}</span>",
+                    inline_blocks_html(content)
+                )
+            }
             Block::Stamp { kind, format } => format!(
                 "<stamp kind=\"{}\" format=\"{}\"></stamp>",
                 kind.as_str(),
@@ -597,12 +616,15 @@ pub fn parse_directive(inner: &str) -> Option<Block> {
 }
 
 fn directive_from_inner(inner: &str) -> Option<Block> {
-    let (kind, rest) = inner.split_once(':')?;
-    let kind = kind.trim().to_ascii_lowercase();
+    let (head, rest) = inner.split_once(':')?;
+    let head = head.trim();
     let rest = rest.trim();
     if rest.is_empty() {
         return None;
     }
+    let mut head_parts = head.split_whitespace();
+    let kind = head_parts.next()?.to_ascii_lowercase();
+    let attrs: Vec<&str> = head_parts.collect();
     match kind.as_str() {
         "barcode" => Some(barcode_from_spec(rest)),
         "color" | "fg" | "foreground" | "tc" | "text-color" => color_from_spec(rest),
@@ -620,15 +642,60 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
                 options: QrOptions::default(),
             })
         }
-        "vert" | "vertical" => vertical_from_spec(rest),
+        "vert" | "vertical" => vertical_from_spec(rest, &attrs),
         _ => None,
     }
 }
 
 /// Parse a vertical-text spec `TEXT` (e.g. `ABC`) into a [`Block::Vertical`].
-fn vertical_from_spec(spec: &str) -> Option<Block> {
+/// Optional head attrs: `lh=1.25`, `spacing=1.25`, `line-height=1.25`.
+fn vertical_from_spec(spec: &str, attrs: &[&str]) -> Option<Block> {
     let content = inline_content_from_spec(spec)?;
-    Some(Block::Vertical { content })
+    let line_height = parse_vertical_line_height_attrs(attrs);
+    Some(Block::Vertical {
+        content,
+        line_height,
+    })
+}
+
+fn parse_vertical_line_height_attrs(attrs: &[&str]) -> Option<f64> {
+    for attr in attrs {
+        let Some((key, value)) = attr.split_once('=') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase();
+        if matches!(
+            key.as_str(),
+            "lh" | "spacing" | "line-height" | "line_height"
+        ) {
+            let lh = value
+                .trim()
+                .trim_matches(|c| c == '"' || c == '\'')
+                .parse::<f64>()
+                .ok()
+                .filter(|v| v.is_finite() && *v >= 0.5 && *v <= 2.0)?;
+            return Some(lh);
+        }
+    }
+    None
+}
+
+fn fmt_vertical_lh(lh: f64) -> String {
+    let rounded = (lh * 10_000.0).round() / 10_000.0;
+    let mut s = format!("{rounded}");
+    if s.contains('.') {
+        while s.ends_with('0') {
+            s.pop();
+        }
+        if s.ends_with('.') {
+            s.pop();
+        }
+    }
+    if s.is_empty() {
+        "0".into()
+    } else {
+        s
+    }
 }
 
 fn stamp_from_spec(kind: &str, format: &str) -> Option<Block> {
@@ -999,13 +1066,15 @@ mod tests {
             vec![
                 Block::Text("Hello, ".to_string()),
                 Block::Vertical {
-                    content: vec![Block::Text("ABC".to_string())]
+                    content: vec![Block::Text("ABC".to_string())],
+                    line_height: None,
                 },
             ]
         );
         let html = doc.to_authoring_html();
         assert!(html.contains(r#"class="lbl-vertical""#), "{html}");
         assert!(html.contains(">ABC</span>"), "{html}");
+        assert!(!html.contains("--lbl-vertical-spacing"), "{html}");
     }
 
     #[test]
@@ -1014,7 +1083,37 @@ mod tests {
         assert_eq!(
             doc.blocks,
             vec![Block::Vertical {
-                content: vec![Block::Text("Cable".to_string())]
+                content: vec![Block::Text("Cable".to_string())],
+                line_height: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn vertical_line_height_attr() {
+        let doc = Document::parse("[[vertical lh=1.25:ABC]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Vertical {
+                content: vec![Block::Text("ABC".to_string())],
+                line_height: Some(1.25),
+            }]
+        );
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(r#"style="--lbl-vertical-spacing:1.25""#),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn vertical_spacing_alias() {
+        let doc = Document::parse("[[vert spacing=1.5:Hi]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Vertical {
+                content: vec![Block::Text("Hi".to_string())],
+                line_height: Some(1.5),
             }]
         );
     }
@@ -1031,7 +1130,8 @@ mod tests {
                         color: "#ff0000".to_string(),
                         content: vec![Block::Text("X".to_string())]
                     },
-                ]
+                ],
+                line_height: None,
             }]
         );
         let html = doc.to_authoring_html();
