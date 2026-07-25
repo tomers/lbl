@@ -310,6 +310,12 @@ Preview must not invent vendor opcodes.
   to `precut`, default on; help text states the empty-scrap tradeoff (§2.1).
   When print is blocked by \(G < D_x\) with pre-cut off, show a warning callout
   with an **Enable pre-cut** action (do not auto-flip from padding alone).
+- When mechanical gap exceeds virtual padding (end floored to \(D_x\) on cut;
+  start when small lead cannot be honored and pre-cut is unavailable), show a
+  subtle info callout. Offer **Rotate 180°** only when swapping start/end pad
+  roles would clear the end floor (larger pad moves to end ≥ \(D_x\); new start
+  printable via pre-cut). Do not suggest rotate when it would leave a similar
+  floor callout (e.g. equal small pads on both sides).
 - Measurements: show **virtual Start** and mechanical **Lead** guides (coincide
   when \(G \le D_x\); diverge when remainder is content inset). With pre-cut,
   keep the kept-label lead guide plus the ejected-scrap band.
