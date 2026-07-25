@@ -24,6 +24,9 @@ const WEIGHT_QR: f64 = 1.0;
 const ROW_FIT_SAFETY: f64 = 0.90;
 /// Extra ascender/descender allowance for row text beside codes (serif glyphs).
 const ROW_TEXT_INK_FACTOR: f64 = 1.08;
+/// Continuous content-fit: 1D barcode feed width as a multiple of head height when
+/// the payload length is not available on the layout child (scannable, not stamp-sized).
+const CONTINUOUS_BARCODE_FEED_ASPECT: f64 = 2.75;
 
 static DATA_WIDTH_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"\bdata-width\s*=\s*"(\d+)""#).expect("data-width regex"));
@@ -227,14 +230,24 @@ fn fit_lone(
             }
         }
         Child::Barcode { height_mode, is_2d } => {
+            let bar_w = if row_main_axis_unbounded(opts) {
+                continuous_mark_feed_px(box_h, *is_2d, opts)
+            } else {
+                box_w
+            };
             let (w, bar_h, _total_h, caption_font) =
-                barcode_fit_dims(box_w, box_h, None, *height_mode, *is_2d, opts);
+                barcode_fit_dims(bar_w, box_h, None, *height_mode, *is_2d, opts);
+            let feed = w + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
+            let mut css = format!(
+                ".lbl-label>.lbl-barcode:only-child{{width:{w:.2}px;{}}}\n",
+                barcode_container_css()
+            );
+            if claim_ink_bearings {
+                css.push_str(&format!(".lbl-label{{--lbl-feed-px:{feed:.2}}}\n"));
+            }
             LayoutFit {
                 body: patch_nth_code(body, "lbl-barcode", 0, w, bar_h, caption_font),
-                css: format!(
-                    ".lbl-label>.lbl-barcode:only-child{{width:{w:.2}px;{}}}\n",
-                    barcode_container_css()
-                ),
+                css,
                 font_px: None,
             }
         }
@@ -246,9 +259,16 @@ fn fit_lone(
                 };
             }
             let s = scaled_fit_px(box_w.min(box_h), opts);
+            let mut css =
+                format!(".lbl-label>.lbl-qr:only-child{{width:{s:.2}px;height:{s:.2}px}}\n");
+            if claim_ink_bearings {
+                let feed =
+                    s + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
+                css.push_str(&format!(".lbl-label{{--lbl-feed-px:{feed:.2}}}\n"));
+            }
             LayoutFit {
                 body: patch_nth_code(body, "lbl-qr", 0, s, s, None),
-                css: format!(".lbl-label>.lbl-qr:only-child{{width:{s:.2}px;height:{s:.2}px}}\n"),
+                css,
                 font_px: None,
             }
         }
@@ -256,11 +276,12 @@ fn fit_lone(
             // Same box as lone QR: fill the shorter printable axis so icons and
             // logos are visible on continuous tape (intrinsic SVG is often 24px).
             let s = scaled_fit_px(box_w.min(box_h), opts);
+            let feed = s + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
             LayoutFit {
                 body: body.to_string(),
                 css: format!(
                     ".lbl-label>img:only-child{{width:{s:.2}px;height:{s:.2}px;object-fit:contain;display:block}}\n\
-                     .lbl-label{{--lbl-feed-px:{s:.2}}}\n"
+                     .lbl-label{{--lbl-feed-px:{feed:.2}}}\n"
                 ),
                 font_px: None,
             }
@@ -281,6 +302,27 @@ fn fit_lone(
     }
 }
 
+/// Landscape continuous: feed (width) unknown, head (height) known. Fill-style
+/// row allocation must not treat [`crate::text_fit::fit_box_px`]'s unbounded
+/// sentinel as a real box to share — text would claim ~1e6px and preview collapses.
+fn row_main_axis_unbounded(opts: &TranspileOptions) -> bool {
+    match opts.viewport.as_ref() {
+        Some(v) => {
+            v.width.filter(|w| *w > f64::EPSILON).is_none()
+                && v.height.filter(|h| *h > f64::EPSILON).is_some()
+        }
+        None => false,
+    }
+}
+
+fn continuous_mark_feed_px(box_h: f64, is_2d: bool, opts: &TranspileOptions) -> f64 {
+    if is_2d {
+        scaled_fit_px(box_h, opts)
+    } else {
+        scaled_fit_px(box_h * CONTINUOUS_BARCODE_FEED_ASPECT, opts)
+    }
+}
+
 fn fit_row(
     row_kids: &[Child],
     body: &str,
@@ -295,6 +337,10 @@ fn fit_row(
             body: body.to_string(),
             ..Default::default()
         };
+    }
+
+    if row_main_axis_unbounded(opts) {
+        return fit_row_continuous_feed(row_kids, body, box_h, gap, opts, forced_font);
     }
 
     let n_gaps = (row_kids.len() - 1) as f64;
@@ -370,6 +416,177 @@ fn fit_row(
             Child::Other | Child::Row { .. } => {}
         }
     }
+
+    LayoutFit {
+        body: patched,
+        css,
+        font_px,
+    }
+}
+
+/// Content-head row on landscape continuous media: size each cell from ink /
+/// head budget, then pin `--lbl-feed-px` to the sum (plus gaps and chrome).
+fn fit_row_continuous_feed(
+    row_kids: &[Child],
+    body: &str,
+    box_h: f64,
+    gap: f64,
+    opts: &TranspileOptions,
+    forced_font: Option<f64>,
+) -> LayoutFit {
+    let text_budget_h = box_h * LINE_HEIGHT / ROW_TEXT_LINE_HEIGHT;
+    let mut font_px = forced_font;
+    if font_px.is_none() {
+        for kid in row_kids {
+            let Child::Text { inner } = kid else {
+                continue;
+            };
+            if !is_fit_measurable_html(inner) {
+                continue;
+            }
+            let text = html_to_plain_text(inner);
+            if text.trim().is_empty() {
+                continue;
+            }
+            // Feed is free: font is limited by the known head axis (same as lone text).
+            let px = scaled_fit_px(max_fit_font_px(1.0e6, text_budget_h, &text), opts);
+            font_px = Some(match font_px {
+                Some(cur) => cur.min(px),
+                None => px,
+            });
+        }
+    }
+
+    if let Some(fp) = font_px.filter(|_| forced_font.is_none() && row_has_barcode(row_kids)) {
+        // Height-only shrink (feed widths are content-sized, not a shared box).
+        let budget_h = box_h * ROW_FIT_SAFETY;
+        let mut fp = fp;
+        for _ in 0..16 {
+            let mut content_h = fp * ROW_TEXT_LINE_HEIGHT * ROW_TEXT_INK_FACTOR;
+            for kid in row_kids {
+                match kid {
+                    Child::Barcode { height_mode, is_2d } => {
+                        let w = continuous_mark_feed_px(box_h, *is_2d, opts);
+                        let (_, bar_h, total_h, caption) =
+                            barcode_fit_dims(w, box_h, Some(fp), *height_mode, *is_2d, opts);
+                        let total = if *is_2d {
+                            total_h
+                        } else {
+                            caption
+                                .map(|f| jsbarcode_svg_height(bar_h, f))
+                                .unwrap_or(bar_h)
+                        };
+                        content_h = content_h.max(total);
+                    }
+                    Child::Qr {
+                        explicit_size: false,
+                        ..
+                    }
+                    | Child::Img => {
+                        content_h = content_h.max(scaled_fit_px(box_h, opts));
+                    }
+                    _ => {}
+                }
+            }
+            if content_h <= budget_h * 1.001 {
+                break;
+            }
+            fp = (fp * budget_h / content_h).max(1.0);
+        }
+        font_px = Some(fp);
+    }
+
+    let mark_s = scaled_fit_px(box_h, opts);
+    let mut widths: Vec<f64> = Vec::with_capacity(row_kids.len());
+    for kid in row_kids {
+        let w = match kid {
+            Child::Text { inner } => {
+                let text = html_to_plain_text(inner);
+                let fp = font_px.unwrap_or(mark_s);
+                text_feed_content_width_px(&text, fp)
+            }
+            Child::Img => mark_s,
+            Child::Qr {
+                explicit_size: true,
+                attrs,
+                ..
+            } => qr_explicit_width(attrs, opts.style.qr_size_px),
+            Child::Qr { .. } => mark_s,
+            Child::Barcode { is_2d, .. } => continuous_mark_feed_px(box_h, *is_2d, opts),
+            Child::Other | Child::Row { .. } => mark_s,
+        };
+        widths.push(w.max(1.0));
+    }
+
+    let mut css = String::new();
+    if let Some(px) = font_px {
+        css.push_str(&format!(".lbl-row>.lbl-text{{font-size:{px:.2}px}}\n"));
+    }
+
+    let mut patched = body.to_string();
+    let mut barcode_n = 0usize;
+    let mut qr_n = 0usize;
+    let mut feed_sum = 0.0;
+    let n_gaps = row_kids.len().saturating_sub(1) as f64;
+
+    for (i, kid) in row_kids.iter().enumerate() {
+        let w = widths[i];
+        feed_sum += w;
+        match kid {
+            Child::Barcode { height_mode, is_2d } => {
+                let (fw, bar_h, _total_h, caption_font) =
+                    barcode_fit_dims(w, box_h, font_px, *height_mode, *is_2d, opts);
+                // Keep feed pin in sync if barcode_fit_dims clamps width.
+                feed_sum += fw - w;
+                patched =
+                    patch_nth_code(&patched, "lbl-barcode", barcode_n, fw, bar_h, caption_font);
+                css.push_str(&format!(
+                    ".lbl-row>.lbl-barcode:nth-child({}){{width:{fw:.2}px;{};flex:0 0 auto}}\n",
+                    i + 1,
+                    barcode_container_css()
+                ));
+                barcode_n += 1;
+            }
+            Child::Qr {
+                explicit_size: false,
+                ..
+            } => {
+                let s = scaled_fit_px(w.min(box_h), opts);
+                feed_sum += s - w;
+                patched = patch_nth_code(&patched, "lbl-qr", qr_n, s, s, None);
+                css.push_str(&format!(
+                    ".lbl-row>.lbl-qr:nth-child({}){{width:{s:.2}px;height:{s:.2}px;flex:0 0 auto}}\n",
+                    i + 1
+                ));
+                qr_n += 1;
+            }
+            Child::Qr {
+                explicit_size: true,
+                ..
+            } => {
+                qr_n += 1;
+            }
+            Child::Text { .. } => {
+                css.push_str(&format!(
+                    ".lbl-row>.lbl-text:nth-child({}){{width:{w:.2}px;flex:0 0 auto;text-align:center;white-space:nowrap}}\n",
+                    i + 1
+                ));
+            }
+            Child::Img => {
+                let s = scaled_fit_px(w.min(box_h), opts);
+                feed_sum += s - w;
+                css.push_str(&format!(
+                    ".lbl-row>img:nth-child({}){{width:{s:.2}px;height:{s:.2}px;object-fit:contain;flex:0 0 auto}}\n",
+                    i + 1
+                ));
+            }
+            Child::Other | Child::Row { .. } => {}
+        }
+    }
+
+    feed_sum +=
+        gap * n_gaps + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
+    css.push_str(&format!(".lbl-label{{--lbl-feed-px:{feed_sum:.2}}}\n"));
 
     LayoutFit {
         body: patched,
@@ -1164,6 +1381,109 @@ mod tests {
             fit.css
         );
         assert!(fit.css.contains("object-fit:contain"), "css={}", fit.css);
+    }
+
+    fn continuous_content_opts() -> TranspileOptions {
+        TranspileOptions {
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: None,
+                height: Some(170.0),
+            }),
+            style: LabelStyle::from_mm(
+                2.0,
+                15.0,
+                12.0,
+                0.33,
+                CascadingInsetMm::uniform(2.0),
+                2.0,
+                0.0,
+                2.0,
+                180.0,
+                2,
+            ),
+            ..Default::default()
+        }
+    }
+
+    fn feed_px_from_css(css: &str) -> f64 {
+        css.split("--lbl-feed-px:")
+            .nth(1)
+            .and_then(|s| s.split('}').next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0)
+    }
+
+    fn text_cell_width_from_css(css: &str) -> f64 {
+        css.split(".lbl-row>.lbl-text:nth-child(1){width:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0)
+    }
+
+    #[test]
+    fn content_head_fit_sizes_text_image_row_on_landscape_continuous() {
+        let opts = continuous_content_opts();
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><span class="lbl-text"><span class="lbl-text-inlines">a</span></span><img src="https://api.iconify.design/lucide/a-arrow-up.svg?color=black" /></div></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        let feed = feed_px_from_css(&fit.css);
+        let text_w = text_cell_width_from_css(&fit.css);
+        assert!(
+            fit.css.contains(".lbl-row>img:nth-child(2){width:"),
+            "css={}",
+            fit.css
+        );
+        assert!(
+            feed > 10.0 && feed < 2_000.0,
+            "feed must be content-sized, not unbounded sentinel: feed={feed} css={}",
+            fit.css
+        );
+        assert!(
+            text_w > 1.0 && text_w < 2_000.0,
+            "text cell must not claim ~1e6px feed: text_w={text_w} css={}",
+            fit.css
+        );
+        let font = fit.font_px.unwrap_or(0.0);
+        assert!(font > 20.0 && font < 400.0, "font={font} css={}", fit.css);
+    }
+
+    #[test]
+    fn content_head_fit_sizes_text_qr_row_on_landscape_continuous() {
+        let opts = continuous_content_opts();
+        let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><span class="lbl-text"><span class="lbl-text-inlines">a</span></span><div class="lbl-qr" data-qr="hi"></div></div></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        let feed = feed_px_from_css(&fit.css);
+        let text_w = text_cell_width_from_css(&fit.css);
+        assert!(feed > 10.0 && feed < 2_000.0, "feed={feed} css={}", fit.css);
+        assert!(
+            text_w > 1.0 && text_w < 2_000.0,
+            "text_w={text_w} css={}",
+            fit.css
+        );
+        assert!(
+            fit.css.contains(".lbl-row>.lbl-qr:nth-child(2){width:"),
+            "css={}",
+            fit.css
+        );
+    }
+
+    #[test]
+    fn content_head_fit_sizes_lone_barcode_on_landscape_continuous() {
+        let opts = continuous_content_opts();
+        let body = r#"<div class="lbl-label"><div class="lbl-barcode" data-symbology="CODE128" data-value="123"></div></div>"#;
+        let fit = apply_content_head_text_fit(body, &opts);
+        let feed = feed_px_from_css(&fit.css);
+        assert!(
+            feed > 10.0 && feed < 2_000.0,
+            "lone barcode feed must not use unbounded axis: feed={feed} css={}",
+            fit.css
+        );
+        assert!(
+            !fit.body.contains("data-fit-width=\"1000000\""),
+            "body={}",
+            fit.body
+        );
     }
 
     #[test]
