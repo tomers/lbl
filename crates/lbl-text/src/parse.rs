@@ -63,6 +63,11 @@ pub enum Block {
         /// Inline content in this color (may include nested directives).
         content: Vec<Block>,
     },
+    /// Stacked upright glyphs via `.lbl-vertical` (`writing-mode: vertical-rl`).
+    Vertical {
+        /// Inline content rendered vertically (may include nested directives).
+        content: Vec<Block>,
+    },
     /// A QR code carrying the given payload and optional overrides.
     Qr {
         /// Encoded QR payload.
@@ -127,6 +132,10 @@ impl Block {
                 escape(color),
                 inline_blocks_html(content)
             )),
+            Block::Vertical { content } => wrap_lbl_text_inlines(&format!(
+                "<span class=\"lbl-vertical\">{}</span>",
+                inline_blocks_html(content)
+            )),
             Block::Qr { payload, options } => {
                 format!("<qr{}>{}</qr>", options.to_attrs(), escape(payload))
             }
@@ -172,6 +181,10 @@ impl Block {
             Block::Color { color, content } => format!(
                 "<span style=\"color:{}\">{}</span>",
                 escape(color),
+                inline_blocks_html(content)
+            ),
+            Block::Vertical { content } => format!(
+                "<span class=\"lbl-vertical\">{}</span>",
                 inline_blocks_html(content)
             ),
             Block::Stamp { kind, format } => format!(
@@ -518,6 +531,7 @@ fn is_inline_flow_block(block: &Block) -> bool {
         Block::Sized { .. }
         | Block::Font { .. }
         | Block::Color { .. }
+        | Block::Vertical { .. }
         | Block::Stamp { .. }
         | Block::Qr { .. }
         | Block::Barcode { .. }
@@ -534,6 +548,7 @@ fn is_text_run_piece_group(pieces: &[LayoutPiece]) -> bool {
                     | Block::Sized { .. }
                     | Block::Font { .. }
                     | Block::Color { .. }
+                    | Block::Vertical { .. }
                     | Block::Stamp { .. }
             )
         )
@@ -605,8 +620,15 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
                 options: QrOptions::default(),
             })
         }
+        "vert" | "vertical" => vertical_from_spec(rest),
         _ => None,
     }
+}
+
+/// Parse a vertical-text spec `TEXT` (e.g. `ABC`) into a [`Block::Vertical`].
+fn vertical_from_spec(spec: &str) -> Option<Block> {
+    let content = inline_content_from_spec(spec)?;
+    Some(Block::Vertical { content })
 }
 
 fn stamp_from_spec(kind: &str, format: &str) -> Option<Block> {
@@ -967,6 +989,64 @@ mod tests {
         let html = doc.to_authoring_html();
         assert!(html.contains("font-size:1.5em"), "{html}");
         assert!(html.contains(">World</span>"), "{html}");
+    }
+
+    #[test]
+    fn inline_vertical_directive_is_parsed() {
+        let doc = Document::parse("Hello, [[vertical:ABC]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![
+                Block::Text("Hello, ".to_string()),
+                Block::Vertical {
+                    content: vec![Block::Text("ABC".to_string())]
+                },
+            ]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"class="lbl-vertical""#), "{html}");
+        assert!(html.contains(">ABC</span>"), "{html}");
+    }
+
+    #[test]
+    fn vertical_accepts_vert_alias() {
+        let doc = Document::parse("[[vert:Cable]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Vertical {
+                content: vec![Block::Text("Cable".to_string())]
+            }]
+        );
+    }
+
+    #[test]
+    fn vertical_nested_color_directive() {
+        let doc = Document::parse("[[vertical:Hi [[color:#ff0000:X]]]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Vertical {
+                content: vec![
+                    Block::Text("Hi ".to_string()),
+                    Block::Color {
+                        color: "#ff0000".to_string(),
+                        content: vec![Block::Text("X".to_string())]
+                    },
+                ]
+            }]
+        );
+        let html = doc.to_authoring_html();
+        assert!(html.contains(r#"class="lbl-vertical""#), "{html}");
+        assert!(html.contains(r#"style="color:#ff0000""#), "{html}");
+        assert!(html.contains(">X</span>"), "{html}");
+    }
+
+    #[test]
+    fn empty_vertical_is_kept_literal() {
+        let doc = Document::parse("a [[vertical:]] b", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Text("a [[vertical:]] b".to_string())]
+        );
     }
 
     #[test]

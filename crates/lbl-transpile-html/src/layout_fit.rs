@@ -11,9 +11,9 @@ use lbl_text::BarcodeHeightMode;
 
 use crate::assets::ROW_TEXT_LINE_HEIGHT;
 use crate::text_fit::{
-    fit_box_px, html_to_plain_text, is_fit_measurable_html, max_fit_font_px, scaled_fit_px,
-    text_advance_width_px, text_feed_content_width_px, text_line_width_px, INK_SIDE_BEARING_EM,
-    LINE_HEIGHT,
+    fit_box_px, html_to_plain_text, is_fit_measurable_html, max_fit_font_px, max_fit_font_px_html,
+    scaled_fit_px, text_html_advance_width_px, text_html_feed_content_width_px, text_line_width_px,
+    INK_SIDE_BEARING_EM, LINE_HEIGHT,
 };
 use crate::transpile::TranspileOptions;
 
@@ -189,13 +189,12 @@ fn fit_lone(
                     ..Default::default()
                 };
             }
-            let text = html_to_plain_text(inner);
-            let font_px = scaled_fit_px(max_fit_font_px(box_w, box_h, &text), opts);
+            let font_px = scaled_fit_px(max_fit_font_px_html(box_w, box_h, inner), opts);
             let text_w = if claim_ink_bearings {
-                text_feed_content_width_px(&text, font_px)
+                text_html_feed_content_width_px(inner, font_px)
             } else {
                 // Fill/fixed: VISUAL_WIDTH_MARGIN already keeps ink inside the box.
-                text_advance_width_px(&text, font_px)
+                text_html_advance_width_px(inner, font_px)
             };
             let content_w =
                 text_w + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
@@ -449,7 +448,7 @@ fn fit_row_continuous_feed(
                 continue;
             }
             // Feed is free: font is limited by the known head axis (same as lone text).
-            let px = scaled_fit_px(max_fit_font_px(1.0e6, text_budget_h, &text), opts);
+            let px = scaled_fit_px(max_fit_font_px_html(1.0e6, text_budget_h, inner), opts);
             font_px = Some(match font_px {
                 Some(cur) => cur.min(px),
                 None => px,
@@ -501,9 +500,8 @@ fn fit_row_continuous_feed(
     for kid in row_kids {
         let w = match kid {
             Child::Text { inner } => {
-                let text = html_to_plain_text(inner);
                 let fp = font_px.unwrap_or(mark_s);
-                text_feed_content_width_px(&text, fp)
+                text_html_feed_content_width_px(inner, fp)
             }
             Child::Img => mark_s,
             Child::Qr {
@@ -705,7 +703,7 @@ fn row_text_fit_font_px(
         if w <= f64::EPSILON || text.trim().is_empty() {
             continue;
         }
-        let px = scaled_fit_px(max_fit_font_px(w, text_budget_h, &text), opts);
+        let px = scaled_fit_px(max_fit_font_px_html(w, text_budget_h, inner), opts);
         font_px = Some(match font_px {
             Some(cur) => cur.min(px),
             None => px,

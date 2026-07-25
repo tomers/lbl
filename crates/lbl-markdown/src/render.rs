@@ -343,6 +343,18 @@ mod tests {
     }
 
     #[test]
+    fn vertical_directive_renders_inline() {
+        let doc = MarkdownDocument::parse("Ship [[vertical:ABC]]");
+        let html = doc.to_authoring_html();
+        assert!(
+            html.contains(
+                "Ship <span class=\"lbl-text\"><span class=\"lbl-text-inlines\"><span class=\"lbl-vertical\">ABC</span></span></span>"
+            ),
+            "{html}"
+        );
+    }
+
+    #[test]
     fn size_directive_inside_heading() {
         let doc = MarkdownDocument::parse("# Order [[size:2:#42]]");
         let html = doc.to_authoring_html();

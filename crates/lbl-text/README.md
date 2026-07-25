@@ -16,6 +16,7 @@ echo "piped text" | lbl-text
 - `[[barcode:CODE128:12345]]` — a barcode (symbology optional: `[[barcode:12345]]`)
 - `[[image:./photo.jpg]]` — an image (local path or remote URL)
 - `[[size:1.5:World]]` — text at 1.5× the base font size
+- `[[vertical:ABC]]` — stacked upright glyphs (`.lbl-vertical`; alias `vert`)
 
 ```bash
 lbl-text "ship to [[qr:https://example.com/order/42]]"

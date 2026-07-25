@@ -11,6 +11,7 @@ lbl-text "SKU [[barcode:EAN13:4006381333931]]"
 lbl-text "Photo [[image:./logo.png]] next to text"
 lbl-text "Total [[size:2:$42.00]]"
 lbl-text "Prep [[date:%Y-%m-%d]] [[time:%H:%M]]"
+lbl-text "[[vertical:ABC]]"
 ```
 
 - `[[qr:…]]` — QR code (payload only; the entire value after `:` is encoded)
@@ -34,6 +35,9 @@ lbl-text "Prep [[date:%Y-%m-%d]] [[time:%H:%M]]"
   `ff`). System stacks `sans` / `serif` / `mono` need no faces; other slugs
   require the caller to supply face rules via `FontDelivery`. Unknown empty
   specs stay literal.
+- `[[vertical:text]]` — stack upright glyphs via `.lbl-vertical` (alias:
+  `vert`; CSS `writing-mode: vertical-rl; text-orientation: upright;
+  line-height: 1`)
 
 Unrecognized `[[…]]` is left as literal text, and `{{ … }}` is never touched —
 those braces belong to the templating layer (`lbl-template`), so directives and
