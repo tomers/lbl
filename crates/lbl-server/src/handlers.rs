@@ -1135,11 +1135,13 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             "height_px": height_px,
         });
         if let Some(stock) = stock {
+            // Always publish axis mapping — clients must not guess (defaulting
+            // true mislabels wide-first page stock reading frames).
+            label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
             if stock.head_pad_before_px > 0 || stock.head_pad_after_px > 0 {
                 label_json["head_pad_before_px"] =
                     serde_json::Value::from(stock.head_pad_before_px);
                 label_json["head_pad_after_px"] = serde_json::Value::from(stock.head_pad_after_px);
-                label_json["head_along_height"] = serde_json::Value::from(stock.head_along_height);
             }
             if stock.lead_feed_px > 0
                 || stock.trail_feed_px > 0
