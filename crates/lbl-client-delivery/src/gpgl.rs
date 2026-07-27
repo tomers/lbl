@@ -14,8 +14,12 @@ use crate::{DeliveryAction, Event, Handshake};
 
 /// Bulk-IN drain length for a GPGL status packet.
 const STATUS_READ_LEN: usize = 64;
-/// Advisory status read timeout (ms).
+/// Advisory status read timeout (ms) for ready-wait polls.
 const STATUS_TIMEOUT_MS: u32 = 6_000;
+/// Soft-drain timeout after init / firmware writes. Those replies are optional;
+/// a long wait on a silent cutter leaves a pending bulk-IN that poisons the
+/// next status poll on transports that cannot cancel URBs (WebUSB).
+const SOFT_DRAIN_TIMEOUT_MS: u32 = 500;
 /// Nominal poll cadence used to bound ready-wait iterations.
 const READY_POLL_MS: u32 = 100;
 /// Ready-wait budget before the first cut (init + firmware phases).
@@ -103,19 +107,25 @@ impl Handshake for Gpgl {
         match (self.phase, event) {
             (Phase::InitSent, Event::SendComplete) => {
                 self.phase = Phase::InitDrain;
-                vec![DeliveryAction::recv(STATUS_READ_LEN, STATUS_TIMEOUT_MS)]
+                vec![DeliveryAction::recv(STATUS_READ_LEN, SOFT_DRAIN_TIMEOUT_MS)]
             }
             // The init/firmware replies are soft drains; content is ignored.
             (Phase::InitDrain, Event::Rx(_)) => {
-                vec![self.begin_ready_wait(ReadyNext::QueryFirmware, READY_TIMEOUT_MS)]
+                vec![
+                    DeliveryAction::progress("handshake"),
+                    self.begin_ready_wait(ReadyNext::QueryFirmware, READY_TIMEOUT_MS),
+                ]
             }
             (Phase::FirmwareSent, Event::SendComplete) => {
                 self.phase = Phase::FirmwareDrain;
-                vec![DeliveryAction::recv(STATUS_READ_LEN, STATUS_TIMEOUT_MS)]
+                vec![DeliveryAction::recv(STATUS_READ_LEN, SOFT_DRAIN_TIMEOUT_MS)]
             }
             (Phase::FirmwareDrain, Event::Rx(_)) => {
                 // 10 s ready wait before the cut in the reference client.
-                vec![self.begin_ready_wait(ReadyNext::SendCut, 10_000)]
+                vec![
+                    DeliveryAction::progress("handshake"),
+                    self.begin_ready_wait(ReadyNext::SendCut, 10_000),
+                ]
             }
             (Phase::ReadyQuerySent { next }, Event::SendComplete) => {
                 self.phase = Phase::ReadyRecv { next };
@@ -204,9 +214,11 @@ mod tests {
         let action = session.on_send_complete().unwrap();
         assert_eq!(
             action,
-            DeliveryAction::recv(STATUS_READ_LEN, STATUS_TIMEOUT_MS)
+            DeliveryAction::recv(STATUS_READ_LEN, SOFT_DRAIN_TIMEOUT_MS)
         );
         let action = session.feed_rx(&[]).unwrap();
+        assert!(matches!(action, DeliveryAction::Progress { .. })); // handshake
+        let action = session.tick().unwrap();
         assert_eq!(expect_send(action), STATUS_QUERY.to_vec());
 
         // Ready → firmware query.
@@ -219,9 +231,11 @@ mod tests {
         let action = session.on_send_complete().unwrap();
         assert_eq!(
             action,
-            DeliveryAction::recv(STATUS_READ_LEN, STATUS_TIMEOUT_MS)
+            DeliveryAction::recv(STATUS_READ_LEN, SOFT_DRAIN_TIMEOUT_MS)
         );
         let action = session.feed_rx(&[]).unwrap();
+        assert!(matches!(action, DeliveryAction::Progress { .. })); // handshake
+        let action = session.tick().unwrap();
         assert_eq!(expect_send(action), STATUS_QUERY.to_vec());
 
         // Moving once, then ready → cut job write.
@@ -252,8 +266,9 @@ mod tests {
             ClientDeliverySession::start(ClientHandshake::Gpgl, None, &cut).unwrap();
         session.tick().unwrap(); // init progress → ESC D
         let _ = action;
-        session.on_send_complete().unwrap(); // drain recv
-        session.feed_rx(&[]).unwrap(); // → first ready query
+        session.on_send_complete().unwrap(); // soft-drain recv
+        session.feed_rx(&[]).unwrap(); // handshake progress
+        session.tick().unwrap(); // → first ready query
 
         let action = poll_once(&mut session, b"2\x03");
         assert!(matches!(action, DeliveryAction::Status { .. }));
