@@ -1,8 +1,10 @@
 //! Fill-mode layout allocation: share the printable box among text, barcodes, QR, and images.
 //!
-//! Uses the existing flex row/column structure from authoring HTML (`.lbl-row` with
-//! sibling `.lbl-text` / `.lbl-barcode` / `.lbl-qr` / `img` children). Transpile-time sizing
-//! sets font sizes and `data-fit-*` dimensions so headless rendering is deterministic.
+//! Uses the existing flex row/column structure from authoring HTML (`.lbl-row` /
+//! `.lbl-col` with sibling `.lbl-text` / `.lbl-barcode` / `.lbl-qr` / `img` children).
+//! Nested columns inside rows are first-class: each col shares row width, then its
+//! children share the col height. Transpile-time sizing sets font sizes and
+//! `data-fit-*` dimensions so headless rendering is deterministic.
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -45,6 +47,12 @@ pub const LABEL_FIT_ROW_CHILD_CSS: &str = r#"
   flex:0 0 auto;
   align-self:center;
   overflow:visible;
+}
+.lbl-row>.lbl-col{
+  flex:0 0 auto;
+  align-self:stretch;
+  min-width:0;
+  min-height:0;
 }
 "#;
 
@@ -111,7 +119,7 @@ pub fn apply_layout_fit(body: &str, opts: &TranspileOptions) -> LayoutFit {
     {
         fit_row(row_kids, body, box_w, box_h, gap, opts, None)
     } else {
-        fit_column(&children, body, box_w, box_h, gap, opts)
+        fit_column(&children, body, box_w, box_h, gap, opts, ".lbl-label")
     };
 
     css.push_str(&result.css);
@@ -297,6 +305,15 @@ fn fit_lone(
             opts,
             None,
         ),
+        Child::Col { children } => fit_column(
+            children,
+            body,
+            box_w,
+            box_h,
+            opts.style.element_gap_px.max(0.0),
+            opts,
+            ".lbl-label>.lbl-col:only-child",
+        ),
         Child::Other => LayoutFit {
             body: body.to_string(),
             ..Default::default()
@@ -415,6 +432,18 @@ fn fit_row(
                     i + 1
                 ));
             }
+            Child::Col { children: col_kids } => {
+                css.push_str(&format!(
+                    ".lbl-row>.lbl-col:nth-child({}){{width:{w:.2}px;flex:0 0 auto;align-self:stretch;min-width:0;min-height:0}}\n",
+                    i + 1
+                ));
+                let parent = format!(".lbl-row>.lbl-col:nth-child({})", i + 1);
+                let nested = fit_column(col_kids, &patched, w, box_h, gap, opts, &parent);
+                patched = nested.body;
+                css.push_str(&nested.css);
+                barcode_n += count_codes(col_kids, "barcode");
+                qr_n += count_codes(col_kids, "qr");
+            }
             Child::Other | Child::Row { .. } => {}
         }
     }
@@ -517,6 +546,16 @@ fn fit_row_continuous_feed(
             } => qr_explicit_width(attrs, opts.style.qr_size_px),
             Child::Qr { .. } => mark_s,
             Child::Barcode { is_2d, .. } => continuous_mark_feed_px(box_h, *is_2d, opts),
+            Child::Col { children } => children
+                .iter()
+                .map(|c| match c {
+                    Child::Text { inner } => {
+                        let fp = font_px.unwrap_or(mark_s);
+                        text_html_feed_content_width_px(inner, fp, VERTICAL_LINE_HEIGHT)
+                    }
+                    _ => mark_s,
+                })
+                .fold(1.0_f64, f64::max),
             Child::Other | Child::Row { .. } => mark_s,
         };
         widths.push(w.max(1.0));
@@ -584,6 +623,18 @@ fn fit_row_continuous_feed(
                     i + 1
                 ));
             }
+            Child::Col { children: col_kids } => {
+                css.push_str(&format!(
+                    ".lbl-row>.lbl-col:nth-child({}){{width:{w:.2}px;flex:0 0 auto;align-self:stretch;min-width:0;min-height:0}}\n",
+                    i + 1
+                ));
+                let parent = format!(".lbl-row>.lbl-col:nth-child({})", i + 1);
+                let nested = fit_column(col_kids, &patched, w, box_h, gap, opts, &parent);
+                patched = nested.body;
+                css.push_str(&nested.css);
+                barcode_n += count_codes(col_kids, "barcode");
+                qr_n += count_codes(col_kids, "qr");
+            }
             Child::Other | Child::Row { .. } => {}
         }
     }
@@ -641,7 +692,7 @@ fn row_width_layout(
             Child::Text { .. } => grow.push((i, WEIGHT_TEXT)),
             Child::Barcode { .. } => grow.push((i, WEIGHT_BARCODE)),
             Child::Qr { .. } => grow.push((i, WEIGHT_QR)),
-            Child::Row { .. } => grow.push((i, WEIGHT_TEXT)),
+            Child::Row { .. } | Child::Col { .. } => grow.push((i, WEIGHT_TEXT)),
         }
     }
 
@@ -750,6 +801,7 @@ fn column_unified_font(
             } => {
                 font = font.min(row_max_font_px(row_kids, box_w, slot_h, gap, opts));
             }
+            // Nested cols size their own children when visited in `fit_column`.
             _ => {}
         }
     }
@@ -760,6 +812,27 @@ fn column_unified_font(
     }
 }
 
+fn column_slot_css(parent_sel: &str) -> String {
+    if parent_sel == ".lbl-label" {
+        return String::from(LABEL_FIT_COLUMN_CSS);
+    }
+    format!(
+        "{parent_sel}>:not(:only-child){{\
+           flex:1 1 0;\
+           min-height:0;\
+         }}\n\
+         {parent_sel}>.lbl-text{{\
+           display:flex;\
+           flex-direction:column;\
+           justify-content:center;\
+           align-items:center;\
+           overflow:hidden;\
+           line-height:1.1;\
+           text-align:center;\
+         }}\n"
+    )
+}
+
 fn fit_column(
     children: &[Child],
     body: &str,
@@ -767,13 +840,14 @@ fn fit_column(
     box_h: f64,
     gap: f64,
     opts: &TranspileOptions,
+    parent_sel: &str,
 ) -> LayoutFit {
     let visual_rows = column_visual_row_count(children).max(1);
     let n_gaps = (visual_rows - 1) as f64;
     let slot_h = ((box_h - gap * n_gaps) / visual_rows as f64).max(1.0);
     let unified_font = column_unified_font(children, box_w, slot_h, gap, opts);
 
-    let mut css = String::from(LABEL_FIT_COLUMN_CSS);
+    let mut css = column_slot_css(parent_sel);
     let mut patched = body.to_string();
     let mut barcode_n = 0usize;
     let mut qr_n = 0usize;
@@ -791,7 +865,7 @@ fn fit_column(
                     });
                     font_px = Some(px);
                     css.push_str(&format!(
-                        ".lbl-label>.lbl-text:nth-child({}){{font-size:{px:.2}px}}\n",
+                        "{parent_sel}>.lbl-text:nth-child({}){{font-size:{px:.2}px}}\n",
                         i + 1
                     ));
                 }
@@ -802,7 +876,7 @@ fn fit_column(
                 patched =
                     patch_nth_code(&patched, "lbl-barcode", barcode_n, fw, bar_h, caption_font);
                 css.push_str(&format!(
-                    ".lbl-label>.lbl-barcode:nth-child({}){{width:{fw:.2}px;{}}}\n",
+                    "{parent_sel}>.lbl-barcode:nth-child({}){{width:{fw:.2}px;{}}}\n",
                     i + 1,
                     barcode_container_css()
                 ));
@@ -815,7 +889,7 @@ fn fit_column(
                 let s = scaled_fit_px(box_w.min(slot_h), opts);
                 patched = patch_nth_code(&patched, "lbl-qr", qr_n, s, s, None);
                 css.push_str(&format!(
-                    ".lbl-label>.lbl-qr:nth-child({}){{width:{s:.2}px;height:{s:.2}px}}\n",
+                    "{parent_sel}>.lbl-qr:nth-child({}){{width:{s:.2}px;height:{s:.2}px}}\n",
                     i + 1
                 ));
                 qr_n += 1;
@@ -838,10 +912,24 @@ fn fit_column(
                 barcode_n += count_codes(row_kids, "barcode");
                 qr_n += count_codes(row_kids, "qr");
             }
+            Child::Col {
+                children: col_kids, ..
+            } => {
+                let nested_parent = format!("{parent_sel}>.lbl-col:nth-child({})", i + 1);
+                let nested =
+                    fit_column(col_kids, &patched, box_w, slot_h, gap, opts, &nested_parent);
+                patched = nested.body;
+                css.push_str(&nested.css);
+                if nested.font_px.is_some() {
+                    font_px = nested.font_px;
+                }
+                barcode_n += count_codes(col_kids, "barcode");
+                qr_n += count_codes(col_kids, "qr");
+            }
             Child::Img => {
                 let s = scaled_fit_px(box_w.min(slot_h), opts);
                 css.push_str(&format!(
-                    ".lbl-label>img:nth-child({}){{width:{s:.2}px;height:{s:.2}px;object-fit:contain;display:block}}\n",
+                    "{parent_sel}>img:nth-child({}){{width:{s:.2}px;height:{s:.2}px;object-fit:contain;display:block}}\n",
                     i + 1
                 ));
             }
@@ -858,13 +946,13 @@ fn fit_column(
 
 fn count_codes(kids: &[Child], kind: &str) -> usize {
     kids.iter()
-        .filter(|k| {
-            matches!(
-                (kind, k),
-                ("barcode", Child::Barcode { .. }) | ("qr", Child::Qr { .. })
-            )
+        .map(|k| match (kind, k) {
+            ("barcode", Child::Barcode { .. }) => 1,
+            ("qr", Child::Qr { .. }) => 1,
+            (_, Child::Row { children } | Child::Col { children }) => count_codes(children, kind),
+            _ => 0,
         })
-        .count()
+        .sum()
 }
 
 fn barcode_fit_dims(
@@ -1073,6 +1161,9 @@ enum Child {
     Row {
         children: Vec<Child>,
     },
+    Col {
+        children: Vec<Child>,
+    },
     Other,
 }
 
@@ -1105,16 +1196,11 @@ fn parse_top_children(inner: &str) -> Vec<Child> {
 }
 
 fn parse_one_element(html: &str) -> Option<(usize, Child)> {
-    if html.starts_with("<div class=\"lbl-row") || html.starts_with("<div class='lbl-row") {
-        let (_end, inner_start) = find_open_tag_end(html)?;
-        let inner = balanced_element_inner_ref(&html[inner_start..], "div")?;
-        let total = inner_start + inner.len() + "</div>".len();
-        return Some((
-            total,
-            Child::Row {
-                children: parse_top_children(inner),
-            },
-        ));
+    if let Some((total, children)) = parse_flex_container(html, "lbl-row") {
+        return Some((total, Child::Row { children }));
+    }
+    if let Some((total, children)) = parse_flex_container(html, "lbl-col") {
+        return Some((total, Child::Col { children }));
     }
 
     for tag in ["span", "div"] {
@@ -1184,6 +1270,19 @@ fn parse_one_element(html: &str) -> Option<(usize, Child)> {
     }
 
     html.find('>').map(|end| (end + 1, Child::Other))
+}
+
+/// Parse a balanced `.lbl-row` / `.lbl-col` flex container (class may have utilities).
+fn parse_flex_container(html: &str, class_prefix: &str) -> Option<(usize, Vec<Child>)> {
+    let dq = format!("<div class=\"{class_prefix}");
+    let sq = format!("<div class='{class_prefix}");
+    if !(html.starts_with(&dq) || html.starts_with(&sq)) {
+        return None;
+    }
+    let (_end, inner_start) = find_open_tag_end(html)?;
+    let inner = balanced_element_inner_ref(&html[inner_start..], "div")?;
+    let total = inner_start + inner.len() + "</div>".len();
+    Some((total, parse_top_children(inner)))
 }
 
 fn rest_is_empty_element(html: &str, open_end: usize, close: &str) -> bool {
@@ -1765,6 +1864,116 @@ mod tests {
         assert!(
             (row_font - line1_font).abs() < row_font * 0.05,
             "stacked lines and row text should share font: row={row_font} line1={line1_font}"
+        );
+    }
+
+    #[test]
+    fn nested_col_in_row_fits_col_texts() {
+        // Row[ Col[text, text], text ] — the shape Layout mode authors for a
+        // stacked left cell beside a right sibling. Nested col texts must get
+        // fill fonts; previously `.lbl-col` was parsed as Other and left at base size.
+        let body = r#"<div class="lbl-label lbl-justify-center lbl-items-center"><div class="lbl-row lbl-justify-start lbl-items-center"><div class="lbl-col lbl-justify-start lbl-items-center"><div class="lbl-text" style="text-align:center">R1C2</div><div class="lbl-text" style="text-align:center">R1C1</div></div><div class="lbl-text" style="text-align:center">R2</div></div></div>"#;
+        let fit = apply_layout_fit(body, &fill_opts());
+        assert!(
+            fit.css.contains(".lbl-row>.lbl-col:nth-child(1){width:"),
+            "col must share row width: {}",
+            fit.css
+        );
+        let col_font_1: f64 = fit
+            .css
+            .split(".lbl-row>.lbl-col:nth-child(1)>.lbl-text:nth-child(1){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let col_font_2: f64 = fit
+            .css
+            .split(".lbl-row>.lbl-col:nth-child(1)>.lbl-text:nth-child(2){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let row_font: f64 = fit
+            .css
+            .split(".lbl-row>.lbl-text{font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        assert!(
+            col_font_1 > 20.0,
+            "nested col text 1 should fill its slot: font={col_font_1} css={}",
+            fit.css
+        );
+        assert!(
+            col_font_2 > 20.0,
+            "nested col text 2 should fill its slot: font={col_font_2} css={}",
+            fit.css
+        );
+        assert!(
+            (col_font_1 - col_font_2).abs() < 1.0,
+            "col siblings should share a unified font: {col_font_1} vs {col_font_2}"
+        );
+        assert!(
+            row_font > 20.0,
+            "direct row text should still fill: font={row_font} css={}",
+            fit.css
+        );
+        // Nested texts share half the col height, so they stay below the full-height sibling.
+        assert!(
+            col_font_1 < row_font * 1.05,
+            "stacked col texts should not exceed the full-height sibling: col={col_font_1} row={row_font}"
+        );
+    }
+
+    #[test]
+    fn lone_col_under_label_fits_stacked_texts() {
+        let body = r#"<div class="lbl-label"><div class="lbl-col lbl-justify-start lbl-items-stretch"><div class="lbl-text">Top</div><div class="lbl-text">Bottom</div></div></div>"#;
+        let fit = apply_layout_fit(body, &fill_opts());
+        let top: f64 = fit
+            .css
+            .split(".lbl-label>.lbl-col:only-child>.lbl-text:nth-child(1){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        let bottom: f64 = fit
+            .css
+            .split(".lbl-label>.lbl-col:only-child>.lbl-text:nth-child(2){font-size:")
+            .nth(1)
+            .and_then(|s| s.split("px").next())
+            .and_then(|s| s.trim().parse().ok())
+            .unwrap_or(0.0);
+        assert!(top > 20.0, "top font={top} css={}", fit.css);
+        assert!(bottom > 20.0, "bottom font={bottom} css={}", fit.css);
+        assert!((top - bottom).abs() < 1.0, "top={top} bottom={bottom}");
+    }
+
+    #[test]
+    fn parse_col_does_not_flatten_into_row() {
+        let body = r#"<div class="lbl-label"><div class="lbl-row"><div class="lbl-col"><div class="lbl-text">a</div><div class="lbl-text">b</div></div><div class="lbl-text">c</div></div></div>"#;
+        let fit = apply_layout_fit(body, &fill_opts());
+        // Col must be a real row child (not open-tag-only Other that flattens
+        // nested texts into the row's sibling list).
+        assert!(
+            fit.css.contains(".lbl-row>.lbl-col:nth-child(1){width:"),
+            "{}",
+            fit.css
+        );
+        assert!(
+            !fit.css.contains(".lbl-row>.lbl-text:nth-child(1){width:"),
+            "first row child is the col, not a text: {}",
+            fit.css
+        );
+        assert!(
+            fit.css.contains(".lbl-row>.lbl-text:nth-child(2){width:"),
+            "right sibling text is row child 2: {}",
+            fit.css
+        );
+        assert!(
+            !fit.css.contains(".lbl-row>.lbl-text:nth-child(3){width:"),
+            "col texts must not appear as extra row siblings: {}",
+            fit.css
         );
     }
 }
