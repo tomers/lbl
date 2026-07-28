@@ -33,6 +33,16 @@ impl LetraTagAdStatus {
             "ready"
         }
     }
+
+    /// Whether the device can accept a new print job.
+    pub fn readiness(self) -> crate::PrintReadiness {
+        let token = self.state();
+        if token == "ready" {
+            crate::PrintReadiness::ready()
+        } else {
+            crate::PrintReadiness::not_ready(token)
+        }
+    }
 }
 
 /// Parse the 3-byte LetraTag advertising manufacturer payload.

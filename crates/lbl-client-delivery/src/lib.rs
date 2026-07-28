@@ -155,6 +155,13 @@ pub enum DeliveryError {
     #[error("empty label payload")]
     EmptyPayload,
 
+    /// Live status says the device cannot accept a job right now.
+    #[error("printer not ready to print{}", .reason.as_ref().map(|r| format!(": {r}")).unwrap_or_default())]
+    NotReady {
+        /// Machine-stable reason token (`cover_open`, `no_media`, …).
+        reason: Option<String>,
+    },
+
     /// The encoded job could not be parsed for this handshake.
     #[error("{protocol} job is malformed: {message}")]
     Malformed {
@@ -177,6 +184,18 @@ pub enum DeliveryError {
     /// was pending, or any call after the session finished).
     #[error("invalid session call: {0}")]
     Usage(String),
+}
+
+/// Options for [`ClientDeliverySession::start_with`].
+#[derive(Debug, Clone, Default)]
+pub struct DeliveryOptions {
+    /// Skip the readiness gate (operator override).
+    pub force: bool,
+    /// Recent live status used to refuse dispatch when not ready.
+    pub status: Option<PrintStatus>,
+    /// Pre-extracted readiness (e.g. from cached JSON hosts). Takes precedence
+    /// over [`Self::status`] when both are set.
+    pub readiness: Option<lbl_status::PrintReadiness>,
 }
 
 /// An external event fed to a [`Handshake`] machine.
@@ -234,13 +253,41 @@ impl ClientDeliverySession {
     /// `driver_variant` is an opaque per-handshake selector (only NIIMBOT uses
     /// it, for `standard` / `v4` / `b1`). Returns the session and the first
     /// [`DeliveryAction`] to perform.
+    ///
+    /// Does not consult live status. Prefer [`Self::start_with`] when a recent
+    /// [`PrintStatus`] is available so not-ready devices are refused before any
+    /// bytes are sent.
     pub fn start(
         handshake: ClientHandshake,
         driver_variant: Option<&str>,
         label_bytes: &[u8],
     ) -> Result<(Self, DeliveryAction), DeliveryError> {
+        Self::start_with(
+            handshake,
+            driver_variant,
+            label_bytes,
+            DeliveryOptions::default(),
+        )
+    }
+
+    /// Like [`Self::start`], but refuses when `opts.status` reports
+    /// `ready_to_print == false` unless `opts.force` is set.
+    pub fn start_with(
+        handshake: ClientHandshake,
+        driver_variant: Option<&str>,
+        label_bytes: &[u8],
+        opts: DeliveryOptions,
+    ) -> Result<(Self, DeliveryAction), DeliveryError> {
         if label_bytes.is_empty() {
             return Err(DeliveryError::EmptyPayload);
+        }
+        let readiness = opts
+            .readiness
+            .clone()
+            .or_else(|| opts.status.as_ref().and_then(|s| s.readiness()));
+        if let Some(readiness) = readiness.as_ref() {
+            lbl_status::ensure_ready(readiness, opts.force)
+                .map_err(|e| DeliveryError::NotReady { reason: e.reason })?;
         }
         let machine: Box<dyn Handshake> = match handshake {
             ClientHandshake::FireAndForget => {
@@ -359,6 +406,64 @@ mod tests {
     fn empty_payload_is_rejected() {
         let err = ClientDeliverySession::start(ClientHandshake::FireAndForget, None, &[]);
         assert_eq!(err.err(), Some(DeliveryError::EmptyPayload));
+    }
+
+    #[test]
+    fn not_ready_status_blocks_unless_forced() {
+        let status = PrintStatus::Gpgl(lbl_status::GpglStatusView {
+            state: lbl_status::GpglHostStatus::Unloaded,
+            readiness: lbl_status::PrintReadiness::not_ready("unloaded"),
+        });
+        let err = ClientDeliverySession::start_with(
+            ClientHandshake::FireAndForget,
+            None,
+            &[1, 2, 3],
+            DeliveryOptions {
+                force: false,
+                status: Some(status.clone()),
+                readiness: None,
+            },
+        )
+        .err();
+        assert!(matches!(
+            err,
+            Some(DeliveryError::NotReady {
+                reason: Some(ref r)
+            }) if r == "unloaded"
+        ));
+
+        let ok = ClientDeliverySession::start_with(
+            ClientHandshake::FireAndForget,
+            None,
+            &[1, 2, 3],
+            DeliveryOptions {
+                force: true,
+                status: Some(status),
+                readiness: None,
+            },
+        );
+        assert!(ok.is_ok());
+    }
+
+    #[test]
+    fn not_ready_readiness_blocks_without_full_status() {
+        let err = ClientDeliverySession::start_with(
+            ClientHandshake::FireAndForget,
+            None,
+            &[1, 2, 3],
+            DeliveryOptions {
+                force: false,
+                status: None,
+                readiness: Some(lbl_status::PrintReadiness::not_ready("no_media")),
+            },
+        )
+        .err();
+        assert!(matches!(
+            err,
+            Some(DeliveryError::NotReady {
+                reason: Some(ref r)
+            }) if r == "no_media"
+        ));
     }
 
     #[test]

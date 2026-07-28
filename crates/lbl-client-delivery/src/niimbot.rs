@@ -136,7 +136,7 @@ impl Handshake for NiimbotPoll {
                         let complete =
                             status.progress1 >= 100 && status.progress2 >= 100 && self.saw_activity;
                         let note = DeliveryAction::status(PrintStatus::Niimbot(
-                            NiimbotLiveStatus::from(status),
+                            NiimbotLiveStatus::from(status).into(),
                         ));
                         if complete {
                             self.finish(vec![note])

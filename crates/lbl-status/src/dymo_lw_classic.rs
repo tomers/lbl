@@ -36,6 +36,15 @@ impl DymoLwClassicStatus {
             "not_ready"
         }
     }
+
+    /// Whether the device can accept a new print job.
+    pub fn readiness(self) -> crate::PrintReadiness {
+        if self.ready && !self.no_paper && !self.paper_jam && !self.printer_error {
+            crate::PrintReadiness::ready()
+        } else {
+            crate::PrintReadiness::not_ready(self.state())
+        }
+    }
 }
 
 /// Parse a classic LW status reply (first byte).

@@ -11,6 +11,18 @@ use std::time::{Duration, Instant};
 use lbl_core::printer::Protocol;
 use lbl_device::{format_dispatch_failure, DeviceError, Transport, TransportTarget};
 use lbl_spool::{SpoolReport, Spooler};
+use lbl_status::{ensure_ready_to_print, PrintStatus};
+
+/// Refuse dispatch when `status` reports not ready, unless `force`.
+///
+/// When `status` is `None` (query unavailable / unsupported), this is a no-op —
+/// incomplete status must not block fire-and-forget targets.
+pub fn ensure_ready_for_dispatch(status: Option<&PrintStatus>, force: bool) -> Result<(), String> {
+    let Some(status) = status else {
+        return Ok(());
+    };
+    ensure_ready_to_print(status, force).map_err(|e| e.to_string())
+}
 
 /// Brother PT/QL multi-label batches must be one continuous raster job. Sending
 /// each label as its own invalidate/init/`0x1A` job ejects the head-to-cutter

@@ -660,6 +660,11 @@ struct PrintArgs {
     #[arg(long, action = clap::ArgAction::SetTrue)]
     precut: bool,
 
+    /// Send the job even when live status reports the printer is not ready
+    /// (no media, cover open, …).
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    force: bool,
+
     /// Protocol-specific option override (`dymo.output_mode=graphics`).
     /// Repeatable. Overrides `[print.driver]` / `LBL_PRINT__DRIVER__*`.
     #[arg(long = "driver-opt", value_name = "KEY=VALUE")]
@@ -1207,31 +1212,40 @@ fn run_print(args: PrintArgs) -> Result<()> {
     dispatch(
         encoded,
         protocol,
-        network,
-        usb,
-        serial,
-        bluetooth,
+        DispatchTarget {
+            network,
+            usb,
+            serial,
+            bluetooth,
+            force: args.force,
+        },
         Some(summary),
     )
+}
+
+struct DispatchTarget {
+    network: Option<String>,
+    usb: Option<String>,
+    serial: Option<String>,
+    bluetooth: Option<String>,
+    force: bool,
 }
 
 fn dispatch(
     encoded: Vec<(String, Vec<u8>)>,
     protocol: Protocol,
-    network: Option<String>,
-    usb: Option<String>,
-    serial: Option<String>,
-    bluetooth: Option<String>,
+    target: DispatchTarget,
     summary: Option<PrintSummaryInput<'_>>,
 ) -> Result<()> {
-    if let Some(target) = network {
-        let (host, port) = target
+    let force = target.force;
+    if let Some(dest) = target.network {
+        let (host, port) = dest
             .rsplit_once(':')
             .ok_or_else(|| anyhow!("network target must be host:port"))?;
         let mut t = lbl_device::NetworkTransport::new(host, port.parse()?);
         dispatch_with(encoded, protocol, &mut t, None, summary)
-    } else if let Some(target) = usb {
-        let (vid, pid) = target
+    } else if let Some(dest) = target.usb {
+        let (vid, pid) = dest
             .split_once(':')
             .ok_or_else(|| anyhow!("usb target must be vid:pid"))?;
         let vendor_id = u16::from_str_radix(vid, 16)?;
@@ -1241,6 +1255,13 @@ fn dispatch(
             product_id,
         });
         let usb = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+        let status = if lbl_device::status_supported(protocol) {
+            lbl_device::query_print_status(protocol, &usb).ok()
+        } else {
+            None
+        };
+        lbl::dispatch::ensure_ready_for_dispatch(status.as_ref(), force)
+            .map_err(anyhow::Error::msg)?;
         if protocol == Protocol::DymoLw {
             let mut t = lbl_device::DymoLwUsbTransport::new(usb);
             dispatch_with(encoded, protocol, &mut t, target_info, summary)
@@ -1248,8 +1269,8 @@ fn dispatch(
             let mut t = usb;
             dispatch_with(encoded, protocol, &mut t, target_info, summary)
         }
-    } else if let Some(target) = serial {
-        let (path, baud) = lbl::dispatch::parse_serial_target(&target);
+    } else if let Some(dest) = target.serial {
+        let (path, baud) = lbl::dispatch::parse_serial_target(&dest);
         let mut t = lbl_device::SerialTransport::new(path.clone(), baud);
         dispatch_with(
             encoded,
@@ -1258,8 +1279,8 @@ fn dispatch(
             Some(lbl_device::TransportTarget::Serial { path }),
             summary,
         )
-    } else if let Some(target) = bluetooth {
-        dispatch_bluetooth(encoded, protocol, target, summary)
+    } else if let Some(dest) = target.bluetooth {
+        dispatch_bluetooth(encoded, protocol, dest, summary)
     } else {
         bail!("no target; pass --network, --usb, --serial, --bluetooth, --file, or --out-dir");
     }

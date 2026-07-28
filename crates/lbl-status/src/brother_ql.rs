@@ -10,6 +10,7 @@ use crate::brother::{
     collect_error_bits, summary_from_parts, BrotherPhaseType, BrotherStatusSummary,
     BrotherStatusType,
 };
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// Length of a Brother QL status reply on bulk IN.
@@ -126,6 +127,8 @@ pub struct BrotherQlStatus {
     pub errors: Vec<BrotherQlError>,
     /// Derived readiness summary (state token + severity).
     pub summary: BrotherStatusSummary,
+    /// Whether the device can accept a new print job (independent of chip severity).
+    pub readiness: PrintReadiness,
 }
 
 const MODEL_CODES: &[(u8, &str)] = &[
@@ -173,6 +176,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherQlStatus, StatusError> {
     let media_width_mm = status[10];
     let media_present = media_width_mm > 0 && media_type.is_present();
     let summary = summary_from_parts(&errors, status_type, phase_type, media_present);
+    let readiness = summary.readiness();
 
     Ok(BrotherQlStatus {
         status_type,
@@ -194,6 +198,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherQlStatus, StatusError> {
         two_color_roll: status[25] & 0x80 != 0,
         errors,
         summary,
+        readiness,
     })
 }
 

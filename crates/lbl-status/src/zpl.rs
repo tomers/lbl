@@ -57,6 +57,32 @@ pub struct ZplHostStatus {
     pub corrupt_ram: bool,
     /// Raw STX/ETX-stripped lines from the response (up to 3).
     pub raw_lines: Vec<String>,
+    /// Whether the device can accept a new print job.
+    pub readiness: crate::PrintReadiness,
+}
+
+impl ZplHostStatus {
+    /// Dispatch readiness from the fault flags on this snapshot.
+    pub fn readiness_from_flags(
+        paper_out: bool,
+        pause: bool,
+        head_open: bool,
+        corrupt_ram: bool,
+    ) -> crate::PrintReadiness {
+        if paper_out {
+            return crate::PrintReadiness::not_ready("paper_out");
+        }
+        if head_open {
+            return crate::PrintReadiness::not_ready("head_open");
+        }
+        if corrupt_ram {
+            return crate::PrintReadiness::not_ready("corrupt_ram");
+        }
+        if pause {
+            return crate::PrintReadiness::not_ready("paused");
+        }
+        crate::PrintReadiness::ready()
+    }
 }
 
 /// Extract STX/ETX-framed segments from `buf`, returning them in order.
@@ -103,12 +129,18 @@ pub fn parse_host_status(buf: &[u8]) -> Result<ZplHostStatus, StatusError> {
     let line1 = String::from_utf8_lossy(&framed[0]);
     let fields: Vec<&str> = line1.split(',').collect();
 
+    let paper_out = field(&fields, 1) != 0;
+    let pause = field(&fields, 2) != 0;
+    let head_open = field(&fields, 11) != 0;
+    let corrupt_ram = field(&fields, 9) != 0;
+
     Ok(ZplHostStatus {
-        paper_out: field(&fields, 1) != 0,
-        pause: field(&fields, 2) != 0,
-        head_open: field(&fields, 11) != 0,
-        corrupt_ram: field(&fields, 9) != 0,
+        paper_out,
+        pause,
+        head_open,
+        corrupt_ram,
         raw_lines,
+        readiness: ZplHostStatus::readiness_from_flags(paper_out, pause, head_open, corrupt_ram),
     })
 }
 
@@ -155,6 +187,13 @@ mod tests {
         assert!(status.paper_out);
         assert!(status.pause);
         assert!(status.head_open);
+    }
+
+    #[test]
+    fn pause_blocks_dispatch() {
+        let r = ZplHostStatus::readiness_from_flags(false, true, false, false);
+        assert!(!r.ready_to_print);
+        assert_eq!(r.reason.as_deref(), Some("paused"));
     }
 
     #[test]

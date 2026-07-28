@@ -48,6 +48,15 @@ impl DymoD1Status {
             "ready"
         }
     }
+
+    /// Whether the device can accept a new print job.
+    pub fn readiness(self) -> crate::PrintReadiness {
+        if self.ready() {
+            crate::PrintReadiness::ready()
+        } else {
+            crate::PrintReadiness::not_ready(self.state())
+        }
+    }
 }
 
 /// Parse a D1 status reply (uses the first byte when longer buffers are drained).

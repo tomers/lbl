@@ -1963,6 +1963,7 @@ dependencies = [
  "lbl-pattern",
  "lbl-render",
  "lbl-spool",
+ "lbl-status",
  "lbl-template",
  "lbl-text",
  "lbl-transpile-html",

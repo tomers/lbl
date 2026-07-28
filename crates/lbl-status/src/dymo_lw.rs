@@ -281,6 +281,9 @@ pub struct Lw550PrintStatusView {
     pub firmware_date: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usb_pid: Option<u16>,
+    /// Whether the device can accept a new print job.
+    #[serde(default)]
+    pub readiness: crate::PrintReadiness,
 }
 
 impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
@@ -304,6 +307,7 @@ impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
             firmware_kind: status.firmware_kind.clone(),
             firmware_date: status.firmware_date.clone(),
             usb_pid: status.usb_pid,
+            readiness: status.readiness(),
         }
     }
 }
@@ -313,6 +317,80 @@ impl Lw550PrintStatus {
     pub fn to_view(&self) -> Lw550PrintStatusView {
         Lw550PrintStatusView::from(self)
     }
+
+    /// Whether the device can accept a new print job.
+    pub fn readiness(&self) -> crate::PrintReadiness {
+        readiness_from_fields(
+            self.print_status,
+            self.print_head_status,
+            self.main_bay_status,
+            self.print_head_voltage,
+            self.error_id,
+        )
+    }
+}
+
+impl Lw550PrintStatusView {
+    /// Recompute dispatch readiness from the fields on this view.
+    pub fn recompute_readiness(&mut self) {
+        self.readiness = readiness_from_fields(
+            self.print_status,
+            self.print_head_status,
+            self.main_bay_status,
+            self.print_head_voltage,
+            self.error_id,
+        );
+    }
+}
+
+fn readiness_from_fields(
+    print_status: Lw550PrintEngineStatus,
+    print_head_status: Lw550PrintHeadStatus,
+    main_bay_status: Lw550MainBayStatus,
+    print_head_voltage: Lw550PrintHeadVoltage,
+    error_id: u32,
+) -> crate::PrintReadiness {
+    use Lw550MainBayStatus as Bay;
+    use Lw550PrintEngineStatus as Eng;
+    use Lw550PrintHeadStatus as Head;
+    use Lw550PrintHeadVoltage as Volt;
+
+    // In-progress jobs are healthy enough for status purposes; hosts still
+    // serialize dispatch with their own print mutex.
+    if matches!(print_status, Eng::Printing | Eng::Busy) {
+        return crate::PrintReadiness::ready();
+    }
+    if matches!(print_status, Eng::Error | Eng::Cancel) {
+        return crate::PrintReadiness::not_ready(print_status.as_str());
+    }
+    if print_head_status != Head::Ok {
+        return crate::PrintReadiness::not_ready(print_head_status.as_str());
+    }
+    match main_bay_status {
+        Bay::NoMedia => return crate::PrintReadiness::not_ready("no_media"),
+        Bay::MediaEmpty => return crate::PrintReadiness::not_ready("media_empty"),
+        Bay::MediaJammed => return crate::PrintReadiness::not_ready("media_jammed"),
+        Bay::MediaCounterfeit => return crate::PrintReadiness::not_ready("media_counterfeit"),
+        Bay::BayOpen => return crate::PrintReadiness::not_ready("bay_open"),
+        Bay::MediaNotInsertedProperly => {
+            return crate::PrintReadiness::not_ready("media_not_inserted_properly")
+        }
+        // media_low / critically_low / ok / present_unknown: still printable
+        _ => {}
+    }
+    if matches!(
+        print_head_voltage,
+        Volt::TooLowForPrinting | Volt::CriticallyLow
+    ) {
+        return crate::PrintReadiness::not_ready(print_head_voltage.as_str());
+    }
+    if error_id != 0 {
+        return crate::PrintReadiness::not_ready("error");
+    }
+    if print_status == Eng::NoLock {
+        return crate::PrintReadiness::not_ready("no_lock");
+    }
+    crate::PrintReadiness::ready()
 }
 
 /// Whether the bay byte indicates media is likely loaded (gate for `ESC U`).
@@ -799,28 +877,30 @@ pub fn merge_dymo_lw_status_view(
     );
 
     let carry_engine = next.hardware_version.is_none() && next.firmware_version.is_none();
-    if !carry_engine {
-        return Lw550PrintStatusView {
+    let mut merged = if !carry_engine {
+        Lw550PrintStatusView {
             label_total,
             sku_info,
             ..next
-        };
-    }
-
-    Lw550PrintStatusView {
-        label_total,
-        sku_info,
-        hardware_version: next
-            .hardware_version
-            .or_else(|| prior.hardware_version.clone()),
-        firmware_version: next
-            .firmware_version
-            .or_else(|| prior.firmware_version.clone()),
-        firmware_kind: next.firmware_kind.or_else(|| prior.firmware_kind.clone()),
-        firmware_date: next.firmware_date.or_else(|| prior.firmware_date.clone()),
-        usb_pid: next.usb_pid.or(prior.usb_pid),
-        ..next
-    }
+        }
+    } else {
+        Lw550PrintStatusView {
+            label_total,
+            sku_info,
+            hardware_version: next
+                .hardware_version
+                .or_else(|| prior.hardware_version.clone()),
+            firmware_version: next
+                .firmware_version
+                .or_else(|| prior.firmware_version.clone()),
+            firmware_kind: next.firmware_kind.or_else(|| prior.firmware_kind.clone()),
+            firmware_date: next.firmware_date.or_else(|| prior.firmware_date.clone()),
+            usb_pid: next.usb_pid.or(prior.usb_pid),
+            ..next
+        }
+    };
+    merged.recompute_readiness();
+    merged
 }
 
 #[cfg(test)]

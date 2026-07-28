@@ -15,6 +15,7 @@ pub mod dymo_lw;
 mod dymo_lw_classic;
 mod error;
 mod letratag;
+mod readiness;
 mod session;
 mod zpl;
 
@@ -50,8 +51,9 @@ pub use dymo_lw_classic::{
     parse_status as parse_dymo_lw_classic_status, DymoLwClassicStatus,
     STATUS_REQUEST as DYMO_LW_CLASSIC_STATUS_REQUEST,
 };
-pub use error::StatusError;
+pub use error::{NotReadyError, StatusError};
 pub use letratag::{parse_advertising_status as parse_letratag_ad_status, LetraTagAdStatus};
+pub use readiness::{ensure_ready, ensure_ready_to_print, PrintReadiness};
 pub use session::{
     ClientStatusSession, StatusAction, StatusSessionContext, StatusSessionContextView,
     StatusSessionError,
@@ -63,6 +65,49 @@ pub use zpl::{parse_host_status as parse_zpl_host_status, ZplHostStatus, HOST_ST
 /// through the unified status facade.
 pub use lbl_driver_niimbot::live_status as niimbot;
 pub use lbl_driver_niimbot::live_status::NiimbotLiveStatus;
+
+/// NIIMBOT live status with dispatch readiness for JSON hosts.
+///
+/// Flattens [`NiimbotLiveStatus`] so existing field names stay stable, and adds
+/// optional [`PrintReadiness`] when heartbeat/progress is enough to decide.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct NiimbotStatusView {
+    #[serde(flatten)]
+    pub status: NiimbotLiveStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readiness: Option<PrintReadiness>,
+}
+
+impl From<NiimbotLiveStatus> for NiimbotStatusView {
+    fn from(status: NiimbotLiveStatus) -> Self {
+        let readiness = Self::readiness_from_live(&status);
+        Self { status, readiness }
+    }
+}
+
+impl NiimbotStatusView {
+    /// `None` when there is not enough heartbeat/progress data to decide.
+    pub fn readiness_from_live(status: &NiimbotLiveStatus) -> Option<PrintReadiness> {
+        if let Some(ps) = &status.print_status {
+            if ps.progress1 > 0 && ps.progress1 < 100 {
+                return Some(PrintReadiness::ready());
+            }
+        }
+        let Some(hb) = &status.heartbeat else {
+            return None;
+        };
+        if hb.lid_closed == Some(false) {
+            return Some(PrintReadiness::not_ready("lid_open"));
+        }
+        if hb.paper_inserted == Some(false) {
+            return Some(PrintReadiness::not_ready("no_paper"));
+        }
+        if hb.lid_closed.is_none() && hb.paper_inserted.is_none() {
+            return None;
+        }
+        Some(PrintReadiness::ready())
+    }
+}
 
 /// Unified, protocol-tagged print-engine status for APIs and WASM JSON.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -89,13 +134,30 @@ pub enum PrintStatus {
     /// NIIMBOT live status (`niimbot`): RFID, heartbeat, print progress, media,
     /// and device info.
     #[serde(rename = "niimbot")]
-    Niimbot(NiimbotLiveStatus),
+    Niimbot(NiimbotStatusView),
     /// Graphtec / Silhouette GPGL cutter (`gpgl`).
     #[serde(rename = "gpgl")]
     Gpgl(GpglStatusView),
     /// DYMO LetraTag advertising-data status (`letratag`).
     #[serde(rename = "letratag")]
     LetraTag(LetraTagAdStatus),
+}
+
+impl PrintStatus {
+    /// Dispatch readiness for this snapshot (`None` when incomplete/unknown).
+    pub fn readiness(&self) -> Option<PrintReadiness> {
+        match self {
+            Self::BrotherPt(s) => Some(s.readiness.clone()),
+            Self::BrotherQl(s) => Some(s.readiness.clone()),
+            Self::DymoLw(s) => Some(s.readiness.clone()),
+            Self::Dymo(s) => Some(s.readiness()),
+            Self::DymoLwClassic(s) => Some(s.readiness()),
+            Self::Zpl(s) => Some(s.readiness.clone()),
+            Self::Niimbot(s) => s.readiness.clone(),
+            Self::Gpgl(s) => Some(s.readiness.clone()),
+            Self::LetraTag(s) => Some(s.readiness()),
+        }
+    }
 }
 
 /// GPGL cutter status snapshot.
@@ -105,15 +167,20 @@ pub enum PrintStatus {
 /// can only fold the tag into a variant that serializes as a map, so a variant
 /// wrapping a plain string-valued enum would fail to serialize. The `state`
 /// field keeps the tagged JSON well-formed (`{ "protocol": "gpgl", "state": "ready" }`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct GpglStatusView {
     /// Cutter motion / load state.
     pub state: GpglHostStatus,
+    /// Whether the cutter can accept a new cut job.
+    pub readiness: PrintReadiness,
 }
 
 impl From<GpglHostStatus> for GpglStatusView {
     fn from(state: GpglHostStatus) -> Self {
-        Self { state }
+        Self {
+            state,
+            readiness: state.readiness(),
+        }
     }
 }
 
@@ -124,6 +191,16 @@ pub enum GpglHostStatus {
     Ready,
     Moving,
     Unloaded,
+}
+
+impl GpglHostStatus {
+    /// Whether the cutter can accept a new cut job.
+    pub fn readiness(self) -> PrintReadiness {
+        match self {
+            Self::Ready | Self::Moving => PrintReadiness::ready(),
+            Self::Unloaded => PrintReadiness::not_ready("unloaded"),
+        }
+    }
 }
 
 impl From<lbl_driver_gpgl::GpglStatus> for GpglHostStatus {
@@ -221,7 +298,7 @@ pub fn parse_status(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, Sta
         Protocol::BrotherPt => Ok(PrintStatus::BrotherPt(parse_brother_pt_status(bytes)?)),
         Protocol::Zpl => Ok(PrintStatus::Zpl(parse_zpl_host_status(bytes)?)),
         Protocol::Niimbot => lbl_driver_niimbot::parse_status(bytes)
-            .map(|s| PrintStatus::Niimbot(NiimbotLiveStatus::from(s)))
+            .map(|s| PrintStatus::Niimbot(NiimbotLiveStatus::from(s).into()))
             .ok_or_else(|| StatusError::Parse("no NIIMBOT print-status reply in buffer".into())),
         Protocol::Gpgl => lbl_driver_gpgl::parse_status(bytes)
             .map(|s| PrintStatus::Gpgl(GpglHostStatus::from(s).into()))
@@ -249,7 +326,7 @@ pub fn media_key_hint(status: &PrintStatus) -> Option<String> {
         PrintStatus::BrotherQl(s) => brother_ql_media_key_hint(s),
         PrintStatus::BrotherPt(s) => brother_pt_media_key_hint(s),
         PrintStatus::DymoLw(s) => s.sku.clone(),
-        PrintStatus::Niimbot(s) => niimbot_media_key_hint(s),
+        PrintStatus::Niimbot(s) => niimbot_media_key_hint(&s.status),
         PrintStatus::LetraTag(s) if s.cassette_id > 0 => Some(match s.cassette_id {
             1 => "6".into(),
             2 => "9".into(),
@@ -307,7 +384,7 @@ mod tests {
             None,
             None,
         );
-        let value = serde_json::to_value(PrintStatus::Niimbot(live)).unwrap();
+        let value = serde_json::to_value(PrintStatus::Niimbot(live.into())).unwrap();
         assert_eq!(value["protocol"], "niimbot");
         assert_eq!(value["media_width_mm"], 50);
         assert_eq!(value["media_length_mm"], 30);
@@ -315,6 +392,7 @@ mod tests {
         assert_eq!(value["heartbeat"]["battery_level"], 3);
         assert!(value["print_status"].is_null());
         assert!(value["device_info"].is_null());
+        assert_eq!(value["readiness"]["ready_to_print"], true);
     }
 
     #[test]
@@ -333,7 +411,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            media_key_hint(&PrintStatus::Niimbot(with_barcode)).as_deref(),
+            media_key_hint(&PrintStatus::Niimbot(with_barcode.into())).as_deref(),
             Some("02282280")
         );
 
@@ -343,7 +421,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            media_key_hint(&PrintStatus::Niimbot(dims_only)).as_deref(),
+            media_key_hint(&PrintStatus::Niimbot(dims_only.into())).as_deref(),
             Some("50x30")
         );
     }
@@ -356,5 +434,12 @@ mod tests {
         let value = serde_json::to_value(&status).unwrap();
         assert_eq!(value["protocol"], "gpgl");
         assert_eq!(value["state"], "ready");
+    }
+
+    #[test]
+    fn gpgl_unloaded_blocks_dispatch() {
+        let r = GpglHostStatus::Unloaded.readiness();
+        assert!(!r.ready_to_print);
+        assert_eq!(r.reason.as_deref(), Some("unloaded"));
     }
 }

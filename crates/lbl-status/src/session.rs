@@ -566,7 +566,7 @@ impl ClientStatusSession {
                     },
                 );
                 return Ok(vec![StatusAction::Done {
-                    status: Box::new(PrintStatus::Niimbot(live)),
+                    status: Box::new(PrintStatus::Niimbot(live.into())),
                     context: StatusSessionContextView::from(&self.context),
                 }]);
             }

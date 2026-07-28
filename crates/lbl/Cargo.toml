@@ -46,6 +46,7 @@ lbl-driver-niimbot  = { workspace = true }
 lbl-driver-letratag = { workspace = true }
 lbl-device          = { workspace = true }
 lbl-spool           = { workspace = true }
+lbl-status          = { workspace = true }
 
 serde              = { workspace = true }
 serde_json         = { workspace = true }

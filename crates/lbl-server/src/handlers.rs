@@ -367,6 +367,9 @@ pub struct CutNowReq {
     dispatch_mode: DispatchMode,
     #[serde(flatten)]
     transport: TransportReq,
+    /// Send even when live status reports the printer is not ready.
+    #[serde(default)]
+    force: bool,
 }
 
 /// Media geometry for cut-now (optional DPI — catalog/profile may supply it).
@@ -590,6 +593,7 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
     let usb = req.transport.usb.clone();
     let serial = req.transport.serial.clone();
     let bluetooth = req.transport.bluetooth.clone();
+    let force = req.force;
 
     let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let registry =
@@ -600,14 +604,17 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
         if dispatch_mode == DispatchMode::Client {
             build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
         } else {
-            dispatch(encoded, protocol, network, usb, serial, bluetooth)
+            dispatch(encoded, protocol, network, usb, serial, bluetooth, force)
         }
     })
     .await
     .map_err(fail_internal)?
     .map_err(|e| {
         let msg = format!("{e:#}");
-        if msg.contains("no print target") || msg.contains("cut now is not supported") {
+        if msg.contains("no print target")
+            || msg.contains("cut now is not supported")
+            || msg.contains("printer not ready")
+        {
             bad_request(msg)
         } else {
             warn!(error = %msg, "cut-now failed");
@@ -1375,6 +1382,9 @@ pub struct PrintReq {
     /// Also build the HTML pipeline debug report.
     #[serde(default)]
     debug: bool,
+    /// Send even when live status reports the printer is not ready.
+    #[serde(default)]
+    force: bool,
 }
 
 impl PrintReq {
@@ -1673,6 +1683,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     let usb = req.transport.usb.clone();
     let serial = req.transport.serial.clone();
     let bluetooth = req.transport.bluetooth.clone();
+    let force = req.force;
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
     let renderer = state.renderer.clone();
@@ -1706,7 +1717,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
         if dispatch_mode == DispatchMode::Client {
             build_client_print_response(&catalog, protocol, printer_key.as_deref(), encoded)
         } else {
-            dispatch(encoded, protocol, network, usb, serial, bluetooth)
+            dispatch(encoded, protocol, network, usb, serial, bluetooth, force)
         }
     })
     .await
@@ -1716,7 +1727,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
     })?
     .map_err(|e| {
         let msg = format!("{e:#}");
-        if msg.contains("no print target") {
+        if msg.contains("no print target") || msg.contains("printer not ready") {
             warn!(error = ?e, "print rejected");
             bad_request(msg)
         } else {
@@ -2005,6 +2016,7 @@ fn dispatch(
     usb: Option<String>,
     serial: Option<String>,
     bluetooth: Option<String>,
+    force: bool,
 ) -> anyhow::Result<serde_json::Value> {
     use lbl::dispatch::{dispatch_encoded, parse_serial_target};
     let total = encoded.len();
@@ -2022,6 +2034,13 @@ fn dispatch(
         let vendor_id = u16::from_str_radix(vid, 16)?;
         let product_id = u16::from_str_radix(pid, 16)?;
         let usb = lbl_device::UsbTransport::new(vendor_id, product_id, None);
+        let status = if lbl_device::status_supported(protocol) {
+            lbl_device::query_print_status(protocol, &usb).ok()
+        } else {
+            None
+        };
+        lbl::dispatch::ensure_ready_for_dispatch(status.as_ref(), force)
+            .map_err(anyhow::Error::msg)?;
         if protocol == Protocol::DymoLw {
             let mut t = lbl_device::DymoLwUsbTransport::new(usb);
             dispatch_encoded(encoded, protocol, &mut t)
@@ -2110,6 +2129,7 @@ pub fn browser_transport_hints(
             ConnectionHint::Usb {
                 vendor_id,
                 product_id,
+                ..
             } => {
                 let mut filter = json!({ "vendorId": vendor_id });
                 if let Some(pid) = product_id {

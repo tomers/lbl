@@ -10,6 +10,7 @@ use crate::brother::{
     collect_error_bits, summary_from_parts, BrotherPhaseType, BrotherStatusSummary,
     BrotherStatusType,
 };
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// Length of a Brother PT status reply on bulk IN.
@@ -183,6 +184,8 @@ pub struct BrotherPtStatus {
     pub errors: Vec<BrotherPtError>,
     /// Derived readiness summary (state token + severity).
     pub summary: BrotherStatusSummary,
+    /// Whether the device can accept a new print job (independent of chip severity).
+    pub readiness: PrintReadiness,
 }
 
 const MODEL_CODES: &[(u8, &str)] = &[
@@ -296,6 +299,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
     });
     let media_present = media_width_mm > 0 && media_type.is_present();
     let summary = summary_from_parts(&errors, status_type, phase_type, media_present);
+    let readiness = summary.readiness();
 
     Ok(BrotherPtStatus {
         status_type,
@@ -322,6 +326,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
         text_color_id: status[25],
         errors,
         summary,
+        readiness,
     })
 }
 
@@ -379,6 +384,8 @@ mod tests {
         assert!(status.errors.is_empty());
         assert_eq!(media_key_hint(&status).as_deref(), Some("12"));
         assert_eq!(status_summary(&status).state, "ready");
+        assert!(status.readiness.ready_to_print);
+        assert!(status.readiness.reason.is_none());
     }
 
     #[test]
@@ -449,6 +456,8 @@ mod tests {
         let status = parse_status(&s).unwrap();
         assert_eq!(status.errors, vec![BrotherPtError::NoMedia]);
         assert_eq!(status_summary(&status).state, "no_media");
+        assert!(!status.readiness.ready_to_print);
+        assert_eq!(status.readiness.reason.as_deref(), Some("no_media"));
     }
 
     #[test]

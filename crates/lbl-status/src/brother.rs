@@ -89,6 +89,19 @@ pub struct BrotherStatusSummary {
     pub severity: BrotherSeverity,
 }
 
+impl BrotherStatusSummary {
+    /// Dispatch gate from this summary.
+    ///
+    /// Chip `severity` stays a UI concern (`no_media` is warning there); dispatch
+    /// still blocks on that state.
+    pub fn readiness(&self) -> crate::PrintReadiness {
+        match self.state.as_str() {
+            "ready" | "printing" | "print_complete" => crate::PrintReadiness::ready(),
+            other => crate::PrintReadiness::not_ready(other),
+        }
+    }
+}
+
 pub(crate) fn collect_error_bits<E: Copy>(defs: &[(u8, E)], bits: u8) -> Vec<E> {
     defs.iter()
         .filter(|(bit, _)| bits & (1 << bit) != 0)
@@ -133,5 +146,41 @@ pub(crate) fn summary_from_parts(
             state: "ready".into(),
             severity: BrotherSeverity::Success,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_media_blocks_even_when_warning_severity() {
+        let summary = BrotherStatusSummary {
+            state: "no_media".into(),
+            severity: BrotherSeverity::Warning,
+        };
+        let r = summary.readiness();
+        assert!(!r.ready_to_print);
+        assert_eq!(r.reason.as_deref(), Some("no_media"));
+    }
+
+    #[test]
+    fn ready_and_printing_are_ready() {
+        assert!(
+            BrotherStatusSummary {
+                state: "ready".into(),
+                severity: BrotherSeverity::Success,
+            }
+            .readiness()
+            .ready_to_print
+        );
+        assert!(
+            BrotherStatusSummary {
+                state: "printing".into(),
+                severity: BrotherSeverity::Primary,
+            }
+            .readiness()
+            .ready_to_print
+        );
     }
 }
