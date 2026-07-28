@@ -23,6 +23,6 @@ lbl-cli    = { workspace = true }
 anyhow     = { workspace = true }
 reqwest    = { workspace = true }
 minijinja  = { version = "2", features = ["loader"] }
-base64     = "0.22"
+base64     = "0.23"
 regex      = "1"
 mime_guess = "2"

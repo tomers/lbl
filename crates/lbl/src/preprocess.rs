@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use lbl_core::media::Media;
 use lbl_core::Rotation;
+use sysinfo::System;
 
 /// On a reference machine (4 cores, 8 GiB RAM), warn before starting when the
 /// adjusted weight reaches this level (~8–15 s of preprocessing for a typical job).
@@ -99,10 +100,9 @@ pub fn machine_capacity_factor() -> f64 {
 }
 
 fn read_machine_capacity_factor() -> f64 {
-    let mut sys = sysinfo::System::new();
+    let mut sys = System::new();
     sys.refresh_memory();
-    let cpus = sys
-        .physical_core_count()
+    let cpus = System::physical_core_count()
         .unwrap_or_else(|| sys.cpus().len())
         .max(1);
     let mem_gb = (sys.total_memory() as f64 / (1024.0 * 1024.0 * 1024.0)).clamp(0.5, 64.0);
