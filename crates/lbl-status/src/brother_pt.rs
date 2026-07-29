@@ -74,14 +74,14 @@ impl BrotherPtMediaType {
     }
 }
 
-/// Decoded PT fault tokens from error-info bitmasks, extended-error codes,
-/// notification number, and media/phase cues.
-///
-/// Bit meanings follow the PT-P900 / P900W / P950NW / P910BT Raster Command
-/// Reference (cross-checked via thermal-label PT protocol docs). Extended-error
-/// codes and notification numbers are documented for the 560-pin family; the
-/// 128-pin PT-P710BT family shares the same notification table and may report
-/// `status_type = error` with empty bitmasks when the fault is elsewhere.
+/// Bit meanings follow the PT-E550W / P750W / P710BT Raster Command Reference
+/// for the 128-pin family (cross-checked against the H500 / P700 / E500 manual).
+/// The 560-pin PT-P900 family shares the same bit 0/2/3/6 layout on error-info 1
+/// and adds end-of-media on bit 1 plus a richer error-info 2 table — see
+/// [`ERROR1_P900`] / [`ERROR2_P900`]. Extended-error codes and notification
+/// numbers are documented for the 560-pin family; the 128-pin PT-P710BT family
+/// shares the same notification table and may report `status_type = error`
+/// with empty bitmasks when the fault is elsewhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BrotherPtError {
@@ -138,7 +138,24 @@ impl AsRef<str> for BrotherPtError {
     }
 }
 
-const ERROR1: &[(u8, BrotherPtError)] = &[
+const ERROR1_P700: &[(u8, BrotherPtError)] = &[
+    (0, BrotherPtError::NoMedia),
+    // Bit 1 is unused on the 128-pin family (H500 / P700 / E500 / E550W /
+    // P750W / P710BT).
+    (2, BrotherPtError::CutterJam),
+    (3, BrotherPtError::WeakBatteries),
+    (6, BrotherPtError::HighVoltageAdapter),
+];
+
+const ERROR2_P700: &[(u8, BrotherPtError)] = &[
+    (0, BrotherPtError::ReplaceMedia),
+    // Bits 1–3 unused on 128-pin.
+    (4, BrotherPtError::CoverOpen),
+    (5, BrotherPtError::Overheating),
+    // Bits 6–7 unused on 128-pin.
+];
+
+const ERROR1_P900: &[(u8, BrotherPtError)] = &[
     (0, BrotherPtError::NoMedia),
     (1, BrotherPtError::EndOfMedia),
     (2, BrotherPtError::CutterJam),
@@ -146,7 +163,7 @@ const ERROR1: &[(u8, BrotherPtError)] = &[
     (6, BrotherPtError::HighVoltageAdapter),
 ];
 
-const ERROR2: &[(u8, BrotherPtError)] = &[
+const ERROR2_P900: &[(u8, BrotherPtError)] = &[
     (0, BrotherPtError::ReplaceMedia),
     (1, BrotherPtError::ExpansionBufferFull),
     (2, BrotherPtError::CommunicationError),
@@ -168,7 +185,9 @@ pub struct BrotherPtStatus {
     pub media_length_mm: u8,
     /// Model identity derived from the firmware model byte (e.g. `PT-P700`).
     pub model_code: String,
-    /// Battery / power byte (offset 6); meaning is model-family specific.
+    /// Battery / power byte (offset 6). On 560-pin AC models: `0x00`–`0x03`
+    /// charge steps, `0x04` AC adapter, `0xFF` unknown. The 128-pin P750W
+    /// manual marks this reserved/`00h`, but field units report `0x04` on AC.
     pub battery_level: u8,
     /// Extended error code (offset 7), or `0` when none.
     pub extended_error: u8,
@@ -191,16 +210,28 @@ pub struct BrotherPtStatus {
 const MODEL_CODES: &[(u8, &str)] = &[
     (b'd', "PT-H500"),
     (b'e', "PT-E500"),
+    (b'f', "PT-E550W"),
     (b'g', "PT-P700"),
+    (b'h', "PT-P750W"),
     (b'q', "PT-P900"),
     (b'o', "PT-P900W"),
     (b'p', "PT-P950NW"),
     (b'x', "PT-P910BT"),
 ];
 
-fn decode_error_bits(error1: u8, error2: u8) -> Vec<BrotherPtError> {
-    let mut out = collect_error_bits(ERROR1, error1);
-    out.extend(collect_error_bits(ERROR2, error2));
+/// 560-pin model codes use the richer P900 error-info tables.
+fn is_p900_family(model_byte: u8) -> bool {
+    matches!(model_byte, b'q' | b'o' | b'p' | b'x')
+}
+
+fn decode_error_bits(model_byte: u8, error1: u8, error2: u8) -> Vec<BrotherPtError> {
+    let (e1, e2) = if is_p900_family(model_byte) {
+        (ERROR1_P900, ERROR2_P900)
+    } else {
+        (ERROR1_P700, ERROR2_P700)
+    };
+    let mut out = collect_error_bits(e1, error1);
+    out.extend(collect_error_bits(e2, error2));
     out
 }
 
@@ -225,6 +256,7 @@ fn push_unique(out: &mut Vec<BrotherPtError>, err: BrotherPtError) {
 }
 
 struct ErrorCues {
+    model_byte: u8,
     error1: u8,
     error2: u8,
     extended_error: u8,
@@ -238,7 +270,7 @@ struct ErrorCues {
 /// Fold bitmask, extended-error, notification, phase, and media cues into one
 /// fault list so hosts never see a bare `status_type = error` with no tokens.
 fn collect_errors(cues: ErrorCues) -> Vec<BrotherPtError> {
-    let mut out = decode_error_bits(cues.error1, cues.error2);
+    let mut out = decode_error_bits(cues.model_byte, cues.error1, cues.error2);
     if let Some(err) = decode_extended_error(cues.extended_error) {
         push_unique(&mut out, err);
     }
@@ -288,6 +320,7 @@ pub fn parse_status(status: &[u8]) -> Result<BrotherPtStatus, StatusError> {
     let phase_number = u16::from_be_bytes([status[20], status[21]]);
     let media_width_mm = status[10];
     let errors = collect_errors(ErrorCues {
+        model_byte,
         error1: status[8],
         error2: status[9],
         extended_error,
@@ -458,6 +491,44 @@ mod tests {
         assert_eq!(status_summary(&status).state, "no_media");
         assert!(!status.readiness.ready_to_print);
         assert_eq!(status.readiness.reason.as_deref(), Some("no_media"));
+    }
+
+    #[test]
+    fn parses_p750w_model_and_weak_batteries_bit() {
+        // Captured from a PT-P750W (`04f9:2062`) stuck after a two-label batch
+        // that used P900-style page index `2` on the final page.
+        let mut s = [0u8; 32];
+        s[0] = 0x80;
+        s[1] = 0x20;
+        s[2] = b'B';
+        s[3] = b'0';
+        s[4] = b'h'; // PT-P750W
+        s[5] = b'0';
+        s[6] = 0x04; // AC (observed; 128-pin manual says reserved)
+        s[8] = 1 << 3; // weak batteries
+        s[10] = 24;
+        s[11] = 0x01;
+        s[18] = 0x02;
+        s[19] = 0x01;
+        s[24] = 0x01;
+        s[25] = 0x08;
+        let status = parse_status(&s).unwrap();
+        assert_eq!(status.model_code, "PT-P750W");
+        assert_eq!(status.errors, vec![BrotherPtError::WeakBatteries]);
+        assert_eq!(status.status_type, BrotherStatusType::Error);
+        assert!(!status.readiness.ready_to_print);
+    }
+
+    #[test]
+    fn p700_family_ignores_p900_only_error2_bits() {
+        let mut s = sample_ready_12mm();
+        s[9] = 1 << 2; // communication error on P900 only
+        s[18] = 0x02;
+        let status = parse_status(&s).unwrap();
+        // Bit is unused on 128-pin — do not invent a P900 fault token.
+        assert!(status.errors.is_empty());
+        // status_type=error with media present and empty bits → bare error summary
+        assert_eq!(status.summary.state, "error");
     }
 
     #[test]

@@ -318,12 +318,27 @@ impl BrotherPtDriver {
         out.extend_from_slice(row);
     }
 
-    fn page_index(first: bool, last: bool) -> u8 {
-        match (first, last) {
-            (true, true) => 2,  // single-page job
-            (true, false) => 0, // first of multi
-            (false, true) => 2, // last of multi
-            (false, false) => 1,
+    /// `ESC i z` page-index byte (`n9`).
+    ///
+    /// P900-class manuals use `0` / `1` / `2` (first / middle / last-or-single).
+    /// The PT-E550W / P750W / P710BT (and H500 / P700 / E500) Raster Command
+    /// Reference only documents `0` = starting page and `1` = other pages —
+    /// including the last page and a single-page job. Sending `2` on those
+    /// chassis is undefined; on a PT-P750W a two-label batch with `n9=2` on
+    /// the final page latched `status_type=error` with error-info-1 bit 3
+    /// ("weak batteries") until power-cycle.
+    fn page_index(first: bool, last: bool, wide_head: bool) -> u8 {
+        if wide_head {
+            match (first, last) {
+                (true, true) => 2,  // single-page job
+                (true, false) => 0, // first of multi
+                (false, true) => 2, // last of multi
+                (false, false) => 1,
+            }
+        } else if first {
+            0
+        } else {
+            1
         }
     }
 
@@ -402,7 +417,7 @@ impl BrotherPtDriver {
         out.push(geom.tape_width_mm);
         out.push(0x00);
         out.extend_from_slice(&0u32.to_le_bytes()); // zero raster lines
-        out.push(Self::page_index(true, true));
+        out.push(Self::page_index(true, true, head.bytes_per_row > 16));
         out.push(0x00);
         out.extend_from_slice(&[ESC, b'i', b'M', 1 << 6]); // auto-cut
         out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
@@ -466,7 +481,11 @@ impl BrotherPtDriver {
         out.push(geom.tape_width_mm);
         out.push(0x00); // continuous TZe — length unused
         out.extend_from_slice(&raster_lines.to_le_bytes());
-        out.push(Self::page_index(first_page, last_page));
+        out.push(Self::page_index(
+            first_page,
+            last_page,
+            head.bytes_per_row > 16,
+        ));
         out.push(0x00);
 
         // ESC i M bit 6 = auto cut. ESC i A = cut each N when auto-cut.
@@ -636,13 +655,13 @@ mod tests {
         assert!(bytes.windows(3).any(|w| w == [ESC, b'i', b'z']));
         assert!(bytes.windows(3).any(|w| w == [RASTER_OPCODE, 16, 0x00]));
         assert_eq!(*bytes.last().unwrap(), 0x1A);
-        // Single-page page index is 2.
+        // P700-class single-page page index is 0 (starting page).
         let z = bytes
             .windows(3)
             .position(|w| w == [ESC, b'i', b'z'])
             .unwrap();
         assert_eq!(bytes[z + 4], MEDIA_LAMINATED);
-        assert_eq!(bytes[z + 11], 2);
+        assert_eq!(bytes[z + 11], 0);
     }
 
     #[test]
@@ -704,8 +723,8 @@ mod tests {
             .filter(|(_, w)| *w == [ESC, b'i', b'z'])
             .map(|(i, _)| i)
             .collect();
-        assert_eq!(bytes[z_positions[0] + 11], 0); // first page
-        assert_eq!(bytes[z_positions[1] + 11], 2); // last page
+        assert_eq!(bytes[z_positions[0] + 11], 0); // first / starting page
+        assert_eq!(bytes[z_positions[1] + 11], 1); // other pages (incl. last)
     }
 
     #[test]
@@ -739,6 +758,33 @@ mod tests {
         combined.extend_from_slice(&second);
         assert_eq!(combined.iter().filter(|&&b| b == 0x1A).count(), 1);
         assert_eq!(combined.iter().filter(|&&b| b == 0x0C).count(), 1);
+
+        let z0 = first
+            .windows(3)
+            .position(|w| w == [ESC, b'i', b'z'])
+            .unwrap();
+        let z1 = second
+            .windows(3)
+            .position(|w| w == [ESC, b'i', b'z'])
+            .unwrap();
+        assert_eq!(first[z0 + 11], 0); // starting page
+        assert_eq!(second[z1 + 11], 1); // other / last page on 128-pin
+    }
+
+    #[test]
+    fn p900_page_index_uses_last_or_single_value_two() {
+        let (job, caps) = ctx_job(36.0, 2, CutMode::End, 360.0, 36.0);
+        let ctx = EncodeContext::new(&job, &caps);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        let z_positions: Vec<_> = bytes
+            .windows(3)
+            .enumerate()
+            .filter(|(_, w)| *w == [ESC, b'i', b'z'])
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(bytes[z_positions[0] + 11], 0);
+        assert_eq!(bytes[z_positions[1] + 11], 2);
     }
 
     #[test]

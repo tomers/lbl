@@ -31,6 +31,18 @@ requires it, end intermediate pages with `0x0C`, and end the job with `0x1A`.
 Wrapping every label in invalidate + no-chain + `0x1A` feeds an empty leader
 cut before each real label (head-to-cutter scrap).
 
+## `ESC i z` page index (`n9`)
+
+| Chassis | Values | Notes |
+|---------|--------|--------|
+| P700 / P750W / E550W / P710BT (128-dot) | `0` starting, `1` other | Official manuals only document these two. Single-page and last page both use `0` / `1` respectively — **not** `2`. |
+| P900 / P900W / P950NW / P910BT (560-dot) | `0` first, `1` middle, `2` last-or-single | P900 Raster Command Reference. |
+
+Sending `2` on a PT-P750W as the final page of a multi-label job has been
+observed to latch `status_type=error` with error-info-1 bit 3 ("weak
+batteries") until the printer is power-cycled — even when running on the AC
+adapter with no batteries installed.
+
 ## Head-to-cutter leader (~23–25 mm)
 
 The print head sits roughly one inch **before** the cutter so TZe can laminate.
