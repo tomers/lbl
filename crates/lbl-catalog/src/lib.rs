@@ -805,7 +805,7 @@ mod tests {
     #[test]
     fn printer_maturity_is_catalogued() {
         let catalog = Catalog::bundled().unwrap();
-        // Hardware-exercised on hand: LW 550, LM 280, B1, D110.
+        // Hardware-exercised on hand: LW 550, LM 280, B1, D110, PT-P750W.
         assert_eq!(
             catalog.lookup_device("LabelWriter 550").unwrap().maturity,
             Maturity::Verified
@@ -820,6 +820,10 @@ mod tests {
         );
         assert_eq!(
             catalog.lookup_device("D110").unwrap().maturity,
+            Maturity::Verified
+        );
+        assert_eq!(
+            catalog.lookup_device("PT-P750W").unwrap().maturity,
             Maturity::Verified
         );
         // Same protocol as on-hand hardware → supported.
@@ -890,6 +894,7 @@ mod tests {
                 "D110",
                 "D11",
                 "B1",
+                "PT-P750W",
                 "PT-P710BT",
             ]
         );

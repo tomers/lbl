@@ -5703,7 +5703,7 @@ name = "Brother PT-P750W"
 support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
 protocol = "brotherpt"
 supports_packbits = true
-maturity = "supported"
+maturity = "verified"
 reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
