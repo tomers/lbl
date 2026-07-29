@@ -13,9 +13,10 @@ use lbl_text::BarcodeHeightMode;
 
 use crate::assets::ROW_TEXT_LINE_HEIGHT;
 use crate::text_fit::{
-    fit_box_px, html_to_plain_text, is_fit_measurable_html, max_fit_font_px, max_fit_font_px_html,
-    scaled_fit_px, text_html_advance_width_px, text_html_feed_content_width_px, text_line_width_px,
-    INK_SIDE_BEARING_EM, LINE_HEIGHT, VERTICAL_LINE_HEIGHT,
+    fit_box_px, fit_text_font_px, fit_text_font_px_html, html_to_plain_text,
+    is_fit_measurable_html, scaled_fit_px, text_html_advance_width_px,
+    text_html_feed_content_width_px, text_line_width_px, INK_SIDE_BEARING_EM, LINE_HEIGHT,
+    VERTICAL_LINE_HEIGHT,
 };
 use crate::transpile::TranspileOptions;
 
@@ -197,10 +198,9 @@ fn fit_lone(
                     ..Default::default()
                 };
             }
-            let font_px = scaled_fit_px(
-                max_fit_font_px_html(box_w, box_h, inner, VERTICAL_LINE_HEIGHT),
-                opts,
-            );
+            let fit =
+                fit_text_font_px_html(box_w, box_h, inner, VERTICAL_LINE_HEIGHT, opts, LINE_HEIGHT);
+            let font_px = fit.font_px;
             let text_w = if claim_ink_bearings {
                 text_html_feed_content_width_px(inner, font_px, VERTICAL_LINE_HEIGHT)
             } else {
@@ -209,18 +209,18 @@ fn fit_lone(
             };
             let content_w =
                 text_w + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
-            // Match text_fit::LINE_HEIGHT (1.1). Base .lbl-label uses 1.3, which
-            // would clip head-fitted glyphs. nowrap keeps continuous feed text on
-            // one line so a narrow preview iframe cannot re-wrap and overflow.
-            // --lbl-feed-px is for iframe sizing; do not set min-width or the tape
-            // grows a hollow feed gap.
+            // Match text_fit line-height (tightens above 100% scale). Base
+            // `.lbl-label` uses 1.3, which would clip head-fitted glyphs. nowrap
+            // keeps continuous feed text on one line so a narrow preview iframe
+            // cannot re-wrap and overflow. --lbl-feed-px is for iframe sizing;
+            // do not set min-width or the tape grows a hollow feed gap.
             let text_css = if claim_ink_bearings {
                 format!(
                     ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};\
                      white-space:nowrap;padding-inline:{bearing:.4}em}}\n\
                      .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
                     font_px = font_px,
-                    lh = LINE_HEIGHT,
+                    lh = fit.line_height,
                     bearing = INK_SIDE_BEARING_EM,
                     content_w = content_w,
                 )
@@ -229,7 +229,7 @@ fn fit_lone(
                     ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};white-space:nowrap}}\n\
                      .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
                     font_px = font_px,
-                    lh = LINE_HEIGHT,
+                    lh = fit.line_height,
                     content_w = content_w,
                 )
             };
@@ -366,7 +366,14 @@ fn fit_row(
     let (widths, avail, grow_len) = row_width_layout(row_kids, box_w, gap, n_gaps, opts);
 
     let mut css = String::new();
-    let mut font_px = forced_font.or_else(|| row_text_fit_font_px(row_kids, &widths, box_h, opts));
+    let mut text_lh = ROW_TEXT_LINE_HEIGHT;
+    let mut font_px = forced_font;
+    if font_px.is_none() {
+        if let Some((px, lh)) = row_text_fit_font_px(row_kids, &widths, box_h, opts) {
+            font_px = Some(px);
+            text_lh = lh;
+        }
+    }
 
     font_px = font_px.map(|fp| {
         if forced_font.is_some() {
@@ -379,7 +386,9 @@ fn fit_row(
     });
 
     if let Some(px) = font_px {
-        css.push_str(&format!(".lbl-row>.lbl-text{{font-size:{px:.2}px}}\n"));
+        css.push_str(&format!(
+            ".lbl-row>.lbl-text{{font-size:{px:.2}px;line-height:{text_lh}}}\n"
+        ));
     }
 
     let mut patched = body.to_string();
@@ -465,8 +474,8 @@ fn fit_row_continuous_feed(
     opts: &TranspileOptions,
     forced_font: Option<f64>,
 ) -> LayoutFit {
-    let text_budget_h = box_h * LINE_HEIGHT / ROW_TEXT_LINE_HEIGHT;
     let mut font_px = forced_font;
+    let mut text_lh = ROW_TEXT_LINE_HEIGHT;
     if font_px.is_none() {
         for kid in row_kids {
             let Child::Text { inner } = kid else {
@@ -480,13 +489,18 @@ fn fit_row_continuous_feed(
                 continue;
             }
             // Feed is free: font is limited by the known head axis (same as lone text).
-            let px = scaled_fit_px(
-                max_fit_font_px_html(1.0e6, text_budget_h, inner, VERTICAL_LINE_HEIGHT),
+            let fit = fit_text_font_px_html(
+                1.0e6,
+                box_h,
+                inner,
+                VERTICAL_LINE_HEIGHT,
                 opts,
+                ROW_TEXT_LINE_HEIGHT,
             );
+            text_lh = fit.line_height;
             font_px = Some(match font_px {
-                Some(cur) => cur.min(px),
-                None => px,
+                Some(cur) => cur.min(fit.font_px),
+                None => fit.font_px,
             });
         }
     }
@@ -496,7 +510,7 @@ fn fit_row_continuous_feed(
         let budget_h = box_h * ROW_FIT_SAFETY;
         let mut fp = fp;
         for _ in 0..16 {
-            let mut content_h = fp * ROW_TEXT_LINE_HEIGHT * ROW_TEXT_INK_FACTOR;
+            let mut content_h = fp * text_lh * ROW_TEXT_INK_FACTOR;
             for kid in row_kids {
                 match kid {
                     Child::Barcode { height_mode, is_2d } => {
@@ -563,7 +577,9 @@ fn fit_row_continuous_feed(
 
     let mut css = String::new();
     if let Some(px) = font_px {
-        css.push_str(&format!(".lbl-row>.lbl-text{{font-size:{px:.2}px}}\n"));
+        css.push_str(&format!(
+            ".lbl-row>.lbl-text{{font-size:{px:.2}px;line-height:{text_lh}}}\n"
+        ));
     }
 
     let mut patched = body.to_string();
@@ -734,6 +750,7 @@ fn row_max_font_px(
         finalize_row_font_px(hi, box_h, row_kids, &widths, avail, grow_len, opts)
     } else {
         row_text_fit_font_px(row_kids, &widths, box_h, opts)
+            .map(|(px, _)| px)
             .unwrap_or((box_h / ROW_TEXT_LINE_HEIGHT).max(1.0))
     }
 }
@@ -743,9 +760,9 @@ fn row_text_fit_font_px(
     widths: &[Option<f64>],
     box_h: f64,
     opts: &TranspileOptions,
-) -> Option<f64> {
-    let text_budget_h = box_h * LINE_HEIGHT / ROW_TEXT_LINE_HEIGHT;
+) -> Option<(f64, f64)> {
     let mut font_px: Option<f64> = None;
+    let mut text_lh = ROW_TEXT_LINE_HEIGHT;
     for (i, kid) in row_kids.iter().enumerate() {
         let Child::Text { inner } = kid else {
             continue;
@@ -760,16 +777,21 @@ fn row_text_fit_font_px(
         if w <= f64::EPSILON || text.trim().is_empty() {
             continue;
         }
-        let px = scaled_fit_px(
-            max_fit_font_px_html(w, text_budget_h, inner, VERTICAL_LINE_HEIGHT),
+        let fit = fit_text_font_px_html(
+            w,
+            box_h,
+            inner,
+            VERTICAL_LINE_HEIGHT,
             opts,
+            ROW_TEXT_LINE_HEIGHT,
         );
+        text_lh = fit.line_height;
         font_px = Some(match font_px {
-            Some(cur) => cur.min(px),
-            None => px,
+            Some(cur) => cur.min(fit.font_px),
+            None => fit.font_px,
         });
     }
-    font_px
+    font_px.map(|px| (px, text_lh))
 }
 
 fn text_sample_line(inner: &str) -> String {
@@ -794,7 +816,8 @@ fn column_unified_font(
         match child {
             Child::Text { inner } if is_fit_measurable_html(inner) => {
                 let sample = text_sample_line(inner);
-                font = font.min(max_fit_font_px(box_w, slot_h, &sample));
+                font =
+                    font.min(fit_text_font_px(box_w, slot_h, &sample, opts, LINE_HEIGHT).font_px);
             }
             Child::Row {
                 children: row_kids, ..
@@ -806,7 +829,7 @@ fn column_unified_font(
         }
     }
     if font.is_finite() {
-        Some(scaled_fit_px(font.max(1.0), opts))
+        Some(font.max(1.0))
     } else {
         None
     }
@@ -858,10 +881,8 @@ fn fit_column(
             Child::Text { inner } => {
                 if is_fit_measurable_html(inner) {
                     let px = unified_font.unwrap_or_else(|| {
-                        scaled_fit_px(
-                            max_fit_font_px(box_w, slot_h, &text_sample_line(inner)),
-                            opts,
-                        )
+                        fit_text_font_px(box_w, slot_h, &text_sample_line(inner), opts, LINE_HEIGHT)
+                            .font_px
                     });
                     font_px = Some(px);
                     css.push_str(&format!(

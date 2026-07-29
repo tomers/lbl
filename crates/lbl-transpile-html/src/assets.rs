@@ -146,6 +146,10 @@ html,body{height:100%;width:100%;margin:0}
 /// printable area on fixed die-cut labels. Cross/main-axis alignment is injected
 /// at transpile time from [`LabelAlign`] / [`LabelValign`].
 ///
+/// The `font-size` calc is an unscaled fallback only — layout_fit injects the
+/// authoritative `font-size:…px` (including `font_fit_scale`) later in the
+/// cascade. Do not multiply by a CSS scale var here (that reintroduced overflow).
+///
 /// Inline styling (`color`, `font-size`, …) lives in `.lbl-text-inlines` so flex
 /// layout does not treat each styled span as its own column item.
 pub const LABEL_FIT_TEXT_CSS: &str = r#"
@@ -156,7 +160,7 @@ pub const LABEL_FIT_TEXT_CSS: &str = r#"
   flex-direction:column;
   width:100%;
   line-height:1.1;
-  font-size:calc(min(calc(100cqh / 1.1), 100cqw) * var(--lbl-font-fit-scale, 1));
+  font-size:calc(min(calc(100cqh / 1.1), 100cqw));
   overflow:hidden;
 }
 .lbl-label>.lbl-text:only-child .lbl-text-inlines{

@@ -636,7 +636,8 @@ pub struct TranspileOptions {
     pub label_valign: LabelValign,
     /// Fraction of the viewport used by the fit box in fill mode (`1.0` = 100%).
     pub label_fit_scale: f64,
-    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = maximum).
+    /// Auto-fit text scale in fill mode (`1.0` = comfortable max; above `1.0`
+    /// spends width safety margin and tightens line-height so ink can grow).
     pub font_fit_scale: f64,
     /// Inset from the physical media edge (calibration margin).
     pub media_inset: MediaInsetPx,
@@ -928,10 +929,6 @@ fn assemble(body: &str, features: Features, opts: &TranspileOptions, fill_css: &
     head.push_str(&opts.style.to_css());
     head.push_str(&font_assets_for_body(body, &opts.font_delivery));
     if opts.label_fit == LabelFit::Fill {
-        head.push_str(&format!(
-            ".lbl-label{{--lbl-font-fit-scale:{:.4}}}\n",
-            opts.font_fit_scale.clamp(0.01, 5.0)
-        ));
         head.push_str(assets::LABEL_FIT_FILL_CSS);
         head.push_str(assets::LABEL_FIT_ROW_CSS);
         head.push_str(assets::LABEL_FIT_TEXT_CSS);
@@ -1515,6 +1512,60 @@ mod tests {
         assert!(
             out.contains(".lbl-label>.lbl-text:only-child{font-size:64."),
             "{out}"
+        );
+    }
+
+    #[test]
+    fn fill_mode_font_fit_scale_150_stays_within_viewport() {
+        let height = 142.0;
+        let opts = TranspileOptions {
+            label_fit: LabelFit::Fill,
+            viewport: Some(ViewportPx {
+                width: Some(354.0),
+                height: Some(height),
+            }),
+            style: LabelStyle {
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
+                ..Default::default()
+            },
+            font_fit_scale: 1.5,
+            ..Default::default()
+        };
+        let out = transpile(
+            "<div class=\"lbl-label\"><div class=\"lbl-text\">#1</div></div>",
+            &opts,
+        );
+        assert!(
+            !out.contains("--lbl-font-fit-scale"),
+            "scale must not be a second CSS path: {out}"
+        );
+        let font = crate::text_fit::injected_fit_font_px(&out).expect("injected font");
+        assert!(
+            out.contains(&format!(
+                "line-height:{}",
+                crate::text_fit::LINE_HEIGHT / 1.5
+            )),
+            "expected tightened line-height: {out}"
+        );
+        let at_100 = transpile(
+            "<div class=\"lbl-label\"><div class=\"lbl-text\">#1</div></div>",
+            &TranspileOptions {
+                font_fit_scale: 1.0,
+                ..opts
+            },
+        );
+        let font_100 = crate::text_fit::injected_fit_font_px(&at_100).expect("100% font");
+        // Height-bound short text: 150% grows ~1.5×; line box still fits.
+        assert!(
+            (font - font_100 * 1.5).abs() < 0.5,
+            "font_150={font} font_100={font_100}"
+        );
+        assert!(
+            font * (crate::text_fit::LINE_HEIGHT / 1.5) <= height + 0.5,
+            "font={font} line box overflows height {height}"
         );
     }
 

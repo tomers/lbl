@@ -229,8 +229,10 @@ pub struct StyleFit {
     pub label_valign: String,
     /// Fit-box scale in fill mode (`1.0` = 100%; also accepts `0.8` or `80%`).
     pub label_fit_scale: f64,
-    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = grow to
-    /// fill; `0.8` = 80% of the computed maximum).
+    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = comfortable
+    /// max fill with width safety margin and line-height 1.1; `0.8` = 80% of that;
+    /// values above `1.0` spend width margin and tighten line-height so glyph ink
+    /// can grow into the box without overflowing the line box).
     pub font_fit_scale: f64,
 }
 
