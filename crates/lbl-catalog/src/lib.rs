@@ -27,7 +27,7 @@ pub use driver_settings::{
 };
 pub use model::{
     encode_capabilities_for, CatalogEntry, ConnectionHint, DeviceEntry, DeviceRole, DeviceSupport,
-    ImageInfo, Maturity, MediaSpec, ResolvedTransport,
+    ImageInfo, Maturity, MediaSpec, ResolvedTransport, UsbConnectionMode,
 };
 pub use validate::{validate_catalog_geometry, CatalogGeometryError};
 
@@ -336,6 +336,7 @@ impl Catalog {
                             ConnectionHint::Usb {
                                 vendor_id: vid,
                                 product_id: None,
+                                ..
                             } if *vid == vendor_id
                         )
                     })
@@ -953,6 +954,7 @@ mod tests {
                 ConnectionHint::Usb {
                     vendor_id: 0x1203,
                     product_id: None,
+                    ..
                 }
             )
         }));
@@ -1081,7 +1083,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x1504,
-                product_id: Some(0x0008)
+                product_id: Some(0x0008),
+                ..
             }
         )));
     }
@@ -1113,7 +1116,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x0828,
-                product_id: None
+                product_id: None,
+                ..
             }
         )));
     }
@@ -1133,7 +1137,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x0b0b,
-                product_id: None
+                product_id: None,
+                ..
             }
         )));
     }
@@ -1153,7 +1158,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x08bd,
-                product_id: Some(0x0208)
+                product_id: Some(0x0208),
+                ..
             }
         )));
         let s631 = catalog.lookup_device("CL-S631").unwrap();
@@ -1163,7 +1169,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x1d90,
-                product_id: Some(0x2037)
+                product_id: Some(0x2037),
+                ..
             }
         )));
         let s700 = catalog.lookup_device("CL-S700").unwrap();
@@ -1171,7 +1178,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x2730,
-                product_id: Some(0x0fff)
+                product_id: Some(0x0fff),
+                ..
             }
         )));
         let s621 = catalog.lookup_device("CL-S621").unwrap();
@@ -1180,7 +1188,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x2730,
-                product_id: Some(0x0fff)
+                product_id: Some(0x0fff),
+                ..
             }
         )));
         let e720 = catalog.lookup_device("CL-E720").unwrap();
@@ -1211,7 +1220,8 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x08a6,
-                product_id: Some(0x0051)
+                product_id: Some(0x0051),
+                ..
             }
         )));
         // Shared encode: desktop + industrial families on `tpcl`.
@@ -1245,9 +1255,36 @@ mod tests {
             c,
             ConnectionHint::Usb {
                 vendor_id: 0x04f9,
-                product_id: Some(0x2060)
+                product_id: Some(0x2060),
+                ..
             }
         )));
+        let p750 = catalog.lookup_device("PT-P750W").unwrap();
+        assert_eq!(p750.protocol, Protocol::BrotherPt);
+        assert_eq!(
+            p750.usb_connection_mode(0x04f9, 0x2062),
+            Some(UsbConnectionMode::Printer)
+        );
+        assert_eq!(
+            p750.usb_connection_mode(0x04f9, 0x2065),
+            Some(UsbConnectionMode::MassStorage)
+        );
+        assert_eq!(
+            catalog.match_usb(0x04f9, 0x2065).unwrap().canonical_key(),
+            "PT-P750W"
+        );
+        assert_eq!(p750.default_transport().usb.as_deref(), Some("04f9:2062"));
+        let p700 = catalog.lookup_device("PT-P700").unwrap();
+        assert_eq!(
+            p700.usb_connection_mode(0x04f9, 0x2064),
+            Some(UsbConnectionMode::MassStorage)
+        );
+        let lm_pnp = catalog.lookup_device("LabelManager PnP").unwrap();
+        assert_eq!(
+            lm_pnp.usb_connection_mode(0x0922, 0x1001),
+            Some(UsbConnectionMode::MassStorage)
+        );
+        assert_eq!(lm_pnp.default_transport().usb.as_deref(), Some("0922:1002"));
         // Documented unknowns — still empty (no guessed PIDs).
         assert!(catalog
             .lookup_device("ZT231")

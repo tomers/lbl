@@ -2378,7 +2378,7 @@ supported_media = [
 ]
 connections = [
   # Mass-storage / modeswitch default, then printer interface.
-  { kind = "usb", vendor_id = 0x0922, product_id = 0x1001 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1001, mode = "mass_storage" },
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1002 },
 ]
 
@@ -2423,7 +2423,7 @@ supported_media = [
   "18053",
 ]
 connections = [
-  { kind = "usb", vendor_id = 0x0922, product_id = 0x1005 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1005, mode = "mass_storage" },
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1006 },
 ]
 
@@ -2484,7 +2484,7 @@ supported_media = [
 ]
 connections = [
   # Mass-storage / modeswitch default, then printer interface.
-  { kind = "usb", vendor_id = 0x0922, product_id = 0x1003 },
+  { kind = "usb", vendor_id = 0x0922, product_id = 0x1003, mode = "mass_storage" },
   { kind = "usb", vendor_id = 0x0922, product_id = 0x1004 },
 ]
 
@@ -5690,7 +5690,11 @@ supported_media = [
   "TZe-SE4",
   "TZe-SE5",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2061 }]
+connections = [
+  # Printer interface, then Editor Lite / RemovableDisk sibling (libptouch FLAG_PLITE).
+  { kind = "usb", vendor_id = 0x04f9, product_id = 0x2061 },
+  { kind = "usb", vendor_id = 0x04f9, product_id = 0x2064, mode = "mass_storage" },
+]
 
 [[devices]]
 brand = "Brother"
@@ -5731,7 +5735,11 @@ supported_media = [
   "TZe-SE4",
   "TZe-SE5",
 ]
-connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2062 }]
+connections = [
+  # Printer interface (libptouch), then Editor Lite mass-storage sibling (field dmesg 04f9:2065).
+  { kind = "usb", vendor_id = 0x04f9, product_id = 0x2062 },
+  { kind = "usb", vendor_id = 0x04f9, product_id = 0x2065, mode = "mass_storage" },
+]
 
 [[devices]]
 brand = "Brother"

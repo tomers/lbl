@@ -30,6 +30,13 @@ P900 layout).
 
 Quit P-touch Editor first so WebUSB can claim the device.
 
+### Editor Lite / software disk
+
+PT-P700 and PT-P750W may enumerate as a USB mass-storage drive (bundled Editor
+Lite) under sibling PIDs `04f9:2064` / `04f9:2065`. That mode is not printable.
+If Studio warns about software-disk mode: hold **Editor Lite** until the green
+lamp goes off, then select USB again (`04f9:2061` / `04f9:2062`).
+
 ## Cube / Bluetooth Classic (P710BT, P300BT)
 
 These models use **Bluetooth Classic SPP**, not BLE. Web Bluetooth cannot talk

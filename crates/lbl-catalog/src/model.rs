@@ -118,9 +118,30 @@ impl CatalogEntry {
     }
 }
 
-/// How to reach a printer model. The first entry is the preferred default when
-/// no explicit transport flag is passed on the CLI. USB entries also identify
-/// the model during device discovery.
+/// USB presentation mode for dual-PID chassis (printer vs mass-storage / Editor Lite).
+///
+/// Some Brother / DYMO units re-enumerate under a sibling product ID that exposes
+/// a removable disk (bundled software / Editor Lite), not a printable interface.
+/// Catalog both PIDs so discovery can identify the device, and gate pairing on
+/// [`UsbConnectionMode::MassStorage`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsbConnectionMode {
+    /// Printable USB interface (default when omitted in catalog TOML).
+    #[default]
+    Printer,
+    /// Mass-storage / Editor Lite / modeswitch identity — not printable.
+    MassStorage,
+}
+
+fn usb_mode_is_printer(mode: &UsbConnectionMode) -> bool {
+    matches!(mode, UsbConnectionMode::Printer)
+}
+
+/// How to reach a printer model. The first **printable** entry is the preferred
+/// default when no explicit transport flag is passed on the CLI (mass-storage
+/// USB siblings are skipped). USB entries also identify the model during device
+/// discovery.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConnectionHint {
@@ -143,6 +164,9 @@ pub enum ConnectionHint {
         /// USB product id.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         product_id: Option<u16>,
+        /// Printer vs mass-storage sibling identity (defaults to printer).
+        #[serde(default, skip_serializing_if = "usb_mode_is_printer")]
+        mode: UsbConnectionMode,
     },
     /// Raw TCP socket (typically port 9100).
     Network {
@@ -175,6 +199,7 @@ impl ConnectionHint {
             Self::Usb {
                 vendor_id,
                 product_id,
+                ..
             } => {
                 out.usb = Some(match product_id {
                     Some(pid) => format!("{vendor_id:04x}:{pid:04x}"),
@@ -192,8 +217,28 @@ impl ConnectionHint {
             Self::Usb {
                 vendor_id: vid,
                 product_id: Some(pid),
+                ..
             } if *vid == vendor_id && *pid == product_id
         )
+    }
+
+    /// True when this USB hint is a mass-storage / Editor Lite sibling PID.
+    pub fn is_mass_storage_usb(&self) -> bool {
+        matches!(
+            self,
+            Self::Usb {
+                mode: UsbConnectionMode::MassStorage,
+                ..
+            }
+        )
+    }
+
+    /// USB connection mode when this hint is USB; `None` for other kinds.
+    pub fn usb_mode(&self) -> Option<UsbConnectionMode> {
+        match self {
+            Self::Usb { mode, .. } => Some(*mode),
+            _ => None,
+        }
     }
 }
 
@@ -362,13 +407,37 @@ impl DeviceEntry {
         self.capabilities.clone()
     }
 
-    /// Build transport targets from the first catalog connection hint.
+    /// Build transport targets from the first printable catalog connection hint.
+    ///
+    /// Mass-storage USB siblings are skipped so CLI defaults prefer a printable
+    /// PID when both are catalogued.
     pub fn default_transport(&self) -> ResolvedTransport {
         let mut out = ResolvedTransport::default();
-        if let Some(conn) = self.connections.first() {
+        let preferred = self
+            .connections
+            .iter()
+            .find(|c| !c.is_mass_storage_usb())
+            .or_else(|| self.connections.first());
+        if let Some(conn) = preferred {
             conn.apply_to(&mut out);
         }
         out
+    }
+
+    /// USB connection mode for an exact VID/PID match on this device, if any.
+    pub fn usb_connection_mode(
+        &self,
+        vendor_id: u16,
+        product_id: u16,
+    ) -> Option<UsbConnectionMode> {
+        self.connections.iter().find_map(|c| match c {
+            ConnectionHint::Usb {
+                vendor_id: vid,
+                product_id: Some(pid),
+                mode,
+            } if *vid == vendor_id && *pid == product_id => Some(*mode),
+            _ => None,
+        })
     }
 }
 
