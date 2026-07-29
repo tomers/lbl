@@ -49,13 +49,11 @@ The print head sits roughly one inch **before** the cutter so TZe can laminate.
 Brother documents this as unavoidable waste on a fully cut job:
 
 - **Large lead** (\(p \ge D_x\)): blank nose stays **on** the kept label; no pre-cut.
-- **Small lead** + **opt-in pre-cut** (`FeedPlan.precut`): encoder emits a
-  zero-raster prologue before the first content page. **Full** pre-cut
-  (`precut_cut_kind = full`): auto-cut + no-chain + `0x1A` ejects ≈ \(D_x\) as
-  scrap. **Half** pre-cut (default when `supports_half_cut`): half-cut bit only
-  and form-feed (`0x0C`) so the peel tab stays on the backing — not `0x1A`,
-  which always full-cuts. Content uses `ESC i d` from
-  `feed_plan.lead_mm`.
+- **Small lead** + **opt-in pre-cut** (`FeedPlan.precut`): **Full** pre-cut
+  emits a zero-raster prologue (`0x1A` ejects ≈ \(D_x\) scrap). **Half** pre-cut
+  does not emit a prologue page — content uses auto-cut + half-cut so firmware
+  can score the residual as a peel tab (a separate half+`0x0C` page produced two
+  peels on P750W). Content lead uses `ESC i d` from `feed_plan.lead_mm`.
 - **Small lead** without pre-cut: encode rejects (`lead_padding_below_cutter_gap`).
 - **Cut depth / chain:** `JobSpec.cut_kind` sets `ESC i K` bit 2 (half-cut).
   `JobSpec.chain_print` suppresses no-chain on the last page so the strip stays
@@ -88,19 +86,23 @@ M …
 
 **Half** (peel tab; default when `supports_half_cut`):
 
+No separate prologue. Device evidence (P750W): one half bit on a blank+`0x0C`
+prologue page still yielded two peel scores (~ \(D_x\) then ~lead) before
+content. Encoder instead uses a single content page:
+
 ```text
-ESC i z …   raster line count = 0; page index = first of multi
-ESC i M …   0 (no auto-cut)
-ESC i K …   half-cut bit only
-ESC i d …
+ESC i z …   content raster lines; first/last page index as usual
+ESC i M …   auto-cut
+ESC i A 01
+ESC i K …   half-cut | no-chain (on last page)
+ESC i d …   margin from feed_plan.lead_mm
 M …
-0x0C        form-feed → half-cut without eject
-(then normal content page(s); job still ends with 0x1A)
+[content rows…]
+0x1A        print-and-feed → full cut at job end (`0x1A` overrides half)
 ```
 
-`0x1A` always performs a full cut (and ejects) even when the half-cut bit is
-set. Half pre-cut must end the prologue page with `0x0C` so content follows as
-the next page of the same job.
+`FeedPlan.precut` still authorizes lead \(< D_x\); only the wire shape differs
+from full pre-cut.
 
 ## `ESC i z` media type (`n2`)
 
