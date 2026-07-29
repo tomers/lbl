@@ -56,8 +56,14 @@ Brother documents this as unavoidable waste on a fully cut job:
   peels on P750W). Content lead uses `ESC i d` from `feed_plan.lead_mm`.
 - **Small lead** without pre-cut: encode rejects (`lead_padding_below_cutter_gap`).
 - **Cut depth / chain:** `JobSpec.cut_kind` sets `ESC i K` bit 2 (half-cut).
-  `JobSpec.chain_print` suppresses no-chain on the last page so the strip stays
-  attached (finish later with cut-now / Feed&Cut).
+  With `CutMode::Every`, keep **auto-cut on** and set `ESC i A` (“cut each N”)
+  to the **job page count** (`batch_total × copies`) when half-cut is on —
+  Brother Editor Auto Cut + Half Cut: full auto-cut only after the last label,
+  half-cuts between. `ESC i A = 1` with the half bit still full-cuts every page
+  on P750W. `JobSpec.chain_print` suppresses no-chain on the last page so the
+  strip stays attached (finish later with cut-now / Feed&Cut).
+- **`CutMode::End`:** no mid-batch cuts (and no half-cuts between labels). Only
+  the final page gets no-chain/`0x1A`. That is not a substitute for half-cut.
 - **End clearance:** after the last inked row (still at the head), print-with-feed
   and cut leave ≈ \(D_x\) blank **after** content on the kept sticker.
   `resolve_feed_plan` floors `end_mm` to \(D_x\) when cutting so preview matches;

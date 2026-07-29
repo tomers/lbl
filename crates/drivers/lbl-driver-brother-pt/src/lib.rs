@@ -442,6 +442,7 @@ impl BrotherPtDriver {
     ) {
         let PageEncodeOpts {
             auto_cut,
+            cut_each_n,
             half_cut,
             no_chain,
             quality,
@@ -497,7 +498,7 @@ impl BrotherPtDriver {
         // ESC i M bit 6 = auto cut. ESC i A = cut each N when auto-cut.
         out.extend_from_slice(&[ESC, b'i', b'M', if auto_cut { 1 << 6 } else { 0 }]);
         if auto_cut {
-            out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
+            out.extend_from_slice(&[ESC, b'i', b'A', cut_each_n.max(1)]);
         }
         // ESC i K: bit2 half-cut, bit3 no-chain (last page only), bit6 high-res.
         // Setting no-chain on every page of a multi-label batch makes Cube-class
@@ -540,6 +541,10 @@ impl BrotherPtDriver {
 #[derive(Debug, Clone, Copy)]
 struct PageEncodeOpts {
     auto_cut: bool,
+    /// ESC i A — cut each N labels when [`Self::auto_cut`]. Full every-label
+    /// uses `1`. Auto+half uses the job page count so firmware full-cuts only
+    /// after the last page (Brother Editor Auto Cut + Half Cut).
+    cut_each_n: u8,
     /// ESC i K bit 2 — laminate-only cut when the chassis supports half-cut.
     half_cut: bool,
     /// ESC i K bit 3 — only on the true last page of the job (unless chain).
@@ -586,31 +591,29 @@ impl Driver for BrotherPtDriver {
         // label. CutMode::End: no auto-cut; no-chain on the last page only.
         // chain_print suppresses no-chain so the last label stays on the roll.
         //
+        // Half-cut (ESC i K bit 2) is orthogonal to auto-cut. Brother Editor
+        // Auto Cut + Half Cut keeps both on, but sets ESC i A (“cut each N”) to
+        // the job page count so full auto-cut fires only after the last label;
+        // intermediate pages half-cut. With A=1, P750W full-cuts every page
+        // even when the half bit is set.
+        //
         // Half pre-cut: do not emit a separate half+0x0C page. On P750W that
         // shape produced two peel scores (~Dx then ~lead) with only one half
         // bit in the job. Instead: one content page with auto-cut + half-cut
         // (Brother Editor “trim first part of left margin” / half leading tab);
-        // final 0x1A still full-cuts.
+        // final 0x1A still full-cuts. End+half-precut therefore enables
+        // auto-cut for that leading tab even though End normally leaves it off.
         let half_precut = ctx.feed_plan.precut && ctx.feed_plan.precut_cut_kind.is_half();
         let full_precut = ctx.feed_plan.precut && !ctx.feed_plan.precut_cut_kind.is_half();
         let half_cut = ctx.cut_kind().is_half() || half_precut;
         let (auto_cut, want_no_chain) = match ctx.cut_mode() {
             CutMode::None => (false, false),
-            CutMode::Every => {
-                if half_precut {
-                    (true, !ctx.chain_print())
-                } else {
-                    (!half_cut, !ctx.chain_print())
-                }
-            }
-            CutMode::End => {
-                if half_precut {
-                    (true, !ctx.chain_print())
-                } else {
-                    (false, !ctx.chain_print())
-                }
-            }
+            CutMode::Every => (true, !ctx.chain_print()),
+            CutMode::End => (half_precut, !ctx.chain_print()),
         };
+        // Job pages across batch segments × copies (ESC i A is 1..=99).
+        let job_pages = ctx.job.batch_total().saturating_mul(copies).clamp(1, 99) as u8;
+        let cut_each_n = if auto_cut && half_cut { job_pages } else { 1 };
 
         let mut out = Vec::with_capacity(
             invalidate_bytes
@@ -637,6 +640,7 @@ impl Driver for BrotherPtDriver {
                 geom,
                 PageEncodeOpts {
                     auto_cut,
+                    cut_each_n,
                     half_cut,
                     no_chain: want_no_chain && last_page,
                     quality: self.quality_priority,
@@ -747,12 +751,49 @@ mod tests {
         let ctx = EncodeContext::new(&job, &caps);
         let bmp = MonoBitmap::new(8, 1);
         let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
-        // Half (bit2) + no-chain (bit3). Auto-cut must be off — it overrides half-cut.
+        // Auto Cut + Half Cut: ESC i M auto-cut, ESC i K half+no-chain, A=1 for
+        // a single-page job.
         assert!(bytes
             .windows(4)
             .any(|w| w == [ESC, b'i', b'K', (1 << 2) | (1 << 3)]));
-        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
-        assert!(!bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
+    }
+
+    #[test]
+    fn every_half_batch_cut_each_equals_job_pages() {
+        let (mut job0, mut caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job0.cut_kind = CutKind::Half;
+        job0.batch_index = 0;
+        job0.batch_total = 2;
+        caps.supports_half_cut = true;
+        let (mut job1, _) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job1.cut_kind = CutKind::Half;
+        job1.batch_index = 1;
+        job1.batch_total = 2;
+        let bmp = MonoBitmap::new(8, 1);
+        let first = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job0, &caps))
+            .unwrap();
+        let second = BrotherPtDriver::new()
+            .encode(&bmp, &EncodeContext::new(&job1, &caps))
+            .unwrap();
+
+        // Auto+half multi-page: cut each N = job pages (2), not 1 — otherwise
+        // firmware full-cuts between labels.
+        assert!(first.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(first.windows(4).any(|w| w == [ESC, b'i', b'A', 0x02]));
+        assert!(first.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 2]));
+        assert!(!first
+            .windows(4)
+            .any(|w| w[0..3] == [ESC, b'i', b'K'] && w[3] & (1 << 3) != 0));
+        assert_eq!(*first.last().unwrap(), 0x0C);
+
+        assert!(second.windows(4).any(|w| w == [ESC, b'i', b'A', 0x02]));
+        assert!(second
+            .windows(4)
+            .any(|w| w == [ESC, b'i', b'K', (1 << 2) | (1 << 3)]));
+        assert_eq!(*second.last().unwrap(), 0x1A);
     }
 
     #[test]
