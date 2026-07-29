@@ -1255,6 +1255,11 @@ mod tests {
         assert_eq!(xp.protocol, Protocol::Tspl);
         assert_eq!(xp.brand, "Xprinter");
         let e550 = catalog.lookup_device("PT-E550W").unwrap();
+        assert!(e550.capabilities.supports_half_cut);
+        assert!(e550.capabilities.supports_precut);
+        let p710 = catalog.lookup_device("PT-P710BT").unwrap();
+        assert!(!p710.capabilities.supports_half_cut);
+        assert!(p710.capabilities.supports_precut);
         assert_eq!(e550.protocol, Protocol::BrotherPt);
         assert!(e550.connections.iter().any(|c| matches!(
             c,
@@ -1266,6 +1271,10 @@ mod tests {
         )));
         let p750 = catalog.lookup_device("PT-P750W").unwrap();
         assert_eq!(p750.protocol, Protocol::BrotherPt);
+        assert!(p750.capabilities.supports_cut);
+        assert!(p750.capabilities.supports_half_cut);
+        assert!(p750.capabilities.supports_precut);
+        assert_eq!(p750.capabilities.feed_trail_mm, Some(24.0));
         assert_eq!(
             p750.usb_connection_mode(0x04f9, 0x2062),
             Some(UsbConnectionMode::Printer)

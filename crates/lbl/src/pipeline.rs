@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Context, Result};
 use image::RgbaImage;
 use lbl_catalog::{Catalog, ConnectionHint, DeviceEntry};
-use lbl_core::job::{CutMode, JobSpec, OutputMode};
+use lbl_core::job::{CutKind, CutMode, JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{DeviceCapabilities, Protocol};
 use lbl_core::units::{Dpi, Millimeters, CSS_LAYOUT_REFERENCE_DPI};
@@ -949,6 +949,8 @@ pub struct PreviewStockFrame {
     pub trail_feed_px: u32,
     pub content_feed_end_px: u32,
     pub precut: bool,
+    /// Depth for the pre-cut prologue when [`Self::precut`] (full ejects; half peels).
+    pub precut_cut_kind: CutKind,
     /// User-facing virtual start gap (lead + feed-start content inset), layout px.
     pub virtual_feed_start_px: u32,
     /// User-facing virtual end gap (end margin + feed-end content inset), layout px.
@@ -972,6 +974,7 @@ pub struct PreviewFeedOverrides {
     pub feed_lead_mm: Option<f64>,
     pub feed_end_mm: Option<f64>,
     pub precut: Option<bool>,
+    pub precut_cut_kind: Option<CutKind>,
     /// Virtual start gap \(G\) before first ink (mm); when set, exposed as marker px.
     pub virtual_feed_start_mm: Option<f64>,
     /// Virtual end gap after last ink (mm).
@@ -989,6 +992,7 @@ pub fn preview_feed_plan(
         feed.feed_lead_mm,
         feed.feed_end_mm,
         feed.precut,
+        feed.precut_cut_kind,
     ) {
         Ok(plan) => plan,
         Err(_) => preview_resolve_feed_plan(
@@ -997,6 +1001,7 @@ pub fn preview_feed_plan(
             feed.feed_lead_mm,
             feed.feed_end_mm,
             Some(false),
+            None,
         )
         .unwrap_or_default(),
     }
@@ -1057,6 +1062,7 @@ pub fn preview_stock_frame(params: PreviewStockFrameParams<'_>) -> PreviewStockF
     let (lead_feed, end_margin, dx) = preview_feed_margins_from_plan(&plan, layout_dpi);
     let trail_feed = if plan.precut || dx > 0 { dx } else { 0 };
     let precut = plan.precut;
+    let precut_cut_kind = plan.precut_cut_kind;
     let virtual_start = feed
         .virtual_feed_start_mm
         .filter(|v| v.is_finite() && *v > 0.0)
@@ -1112,6 +1118,7 @@ pub fn preview_stock_frame(params: PreviewStockFrameParams<'_>) -> PreviewStockF
         trail_feed_px: trail_feed,
         content_feed_end_px: content_feed_end,
         precut,
+        precut_cut_kind,
         virtual_feed_start_px: virtual_start,
         virtual_feed_end_px: virtual_end,
         feed_reversed,
@@ -1362,12 +1369,14 @@ pub fn preview_resolve_feed_plan(
     feed_lead_mm: Option<f64>,
     feed_end_mm: Option<f64>,
     precut: Option<bool>,
+    precut_cut_kind: Option<CutKind>,
 ) -> Result<lbl_core::FeedPlan, lbl_core::FeedPlanError> {
     let mut job = JobSpec::new(Media::continuous(caps.max_width_mm.max(1.0), caps.dpi));
     job.cut_mode = cut_mode;
     job.feed_lead_mm = feed_lead_mm;
     job.feed_end_mm = feed_end_mm;
     job.precut = precut;
+    job.precut_cut_kind = precut_cut_kind;
     lbl_core::resolve_feed_plan(caps, &job)
 }
 
@@ -1395,8 +1404,10 @@ pub struct PreviewFeedPad {
     pub trail_feed_px: u32,
     /// Blank tape before content on the kept label.
     pub lead_feed_px: u32,
-    /// Whether pre-cut ejects [`Self::trail_feed_px`] as scrap before the label.
+    /// Whether pre-cut separates [`Self::trail_feed_px`] before the label.
     pub precut: bool,
+    /// Full ejects scrap; half leaves a peel tab on the backing.
+    pub precut_cut_kind: CutKind,
 }
 
 /// Extend a preview raster with encode feed margins for tape printers.
@@ -1406,7 +1417,8 @@ pub fn pad_preview_encode_feed(
     feed_along_width: bool,
 ) -> PreviewFeedPad {
     // Caps-only preview: no cut → allow any lead (including catalog small lead).
-    let plan = preview_resolve_feed_plan(caps, CutMode::None, None, None, None).unwrap_or_default();
+    let plan =
+        preview_resolve_feed_plan(caps, CutMode::None, None, None, None, None).unwrap_or_default();
     pad_preview_encode_feed_plan(image, &plan, caps.dpi.0, feed_along_width, false)
 }
 
@@ -1436,6 +1448,7 @@ pub fn pad_preview_encode_feed_plan(
             trail_feed_px: if plan.precut { cutter_gap } else { 0 },
             lead_feed_px: 0,
             precut: plan.precut,
+            precut_cut_kind: plan.precut_cut_kind,
         };
     }
 
@@ -1464,6 +1477,7 @@ pub fn pad_preview_encode_feed_plan(
             trail_feed_px,
             lead_feed_px: preview_lead,
             precut: plan.precut,
+            precut_cut_kind: plan.precut_cut_kind,
         }
     } else {
         let (w, h) = image.dimensions();
@@ -1476,6 +1490,7 @@ pub fn pad_preview_encode_feed_plan(
             trail_feed_px,
             lead_feed_px: preview_lead,
             precut: plan.precut,
+            precut_cut_kind: plan.precut_cut_kind,
         }
     }
 }
@@ -1864,6 +1879,8 @@ mod tests {
                 media: Media::fixed(12.0, 40.0, Dpi(203.0)),
                 mode: OutputMode::Print,
                 cut_mode: CutMode::None,
+                cut_kind: CutKind::Full,
+                chain_print: false,
                 copies: 1,
                 batch_index: 0,
                 batch_total: 1,
@@ -1871,6 +1888,7 @@ mod tests {
                 feed_lead_mm: None,
                 feed_end_mm: None,
                 precut: None,
+                precut_cut_kind: None,
                 driver: lbl_core::DriverOptions::default(),
             },
             dither: Algorithm::Threshold(128),
@@ -2186,6 +2204,11 @@ mod tests {
         assert_eq!(frame.trail_feed_px, dx);
         assert_eq!(frame.feed_end_margin_px, dx, "cut floors unset end to Dx");
         assert!(frame.precut);
+        assert_eq!(
+            frame.precut_cut_kind,
+            CutKind::Full,
+            "without supports_half_cut, pre-cut depth clamps to full"
+        );
     }
 
     #[test]
@@ -2217,6 +2240,7 @@ mod tests {
             lead_mm: 2.0,
             end_mm: 0.0,
             precut: true,
+            precut_cut_kind: CutKind::Full,
             cutter_gap_mm: 24.0,
         };
         let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true, false);
@@ -2226,6 +2250,7 @@ mod tests {
         assert_eq!(padded.feed_end_margin_px, 0);
         assert_eq!(padded.trail_feed_px, dx);
         assert!(padded.precut);
+        assert_eq!(padded.precut_cut_kind, CutKind::Full);
         assert_eq!(padded.image.width(), 10 + lead);
     }
 
@@ -2239,6 +2264,7 @@ mod tests {
             lead_mm: 2.0,
             end_mm: 0.0,
             precut: false,
+            precut_cut_kind: CutKind::Full,
             cutter_gap_mm: 24.0,
         };
         let padded = pad_preview_encode_feed_plan(image, &plan, 180.0, true, false);
@@ -2535,6 +2561,8 @@ mod tests {
                 media: Media::continuous(58.0, Dpi(203.0)),
                 mode: OutputMode::Print,
                 cut_mode: CutMode::None,
+                cut_kind: CutKind::Full,
+                chain_print: false,
                 copies: 1,
                 batch_index: 0,
                 batch_total: 1,
@@ -2542,6 +2570,7 @@ mod tests {
                 feed_lead_mm: None,
                 feed_end_mm: None,
                 precut: None,
+                precut_cut_kind: None,
                 driver: lbl_core::DriverOptions::default(),
             },
             dither: Algorithm::Threshold(128),
@@ -2582,6 +2611,8 @@ mod tests {
                 media: Media::continuous(12.0, Dpi(180.0)),
                 mode: OutputMode::Print,
                 cut_mode: CutMode::None,
+                cut_kind: CutKind::Full,
+                chain_print: false,
                 copies: 1,
                 batch_index: 0,
                 batch_total: 1,
@@ -2589,6 +2620,7 @@ mod tests {
                 feed_lead_mm: None,
                 feed_end_mm: None,
                 precut: None,
+                precut_cut_kind: None,
                 driver: lbl_core::DriverOptions::default(),
             },
             dither: Algorithm::Auto,
@@ -2629,6 +2661,8 @@ mod tests {
                 media: Media::fixed(12.0, 30.0, Dpi(203.0)),
                 mode: OutputMode::Print,
                 cut_mode: CutMode::None,
+                cut_kind: CutKind::Full,
+                chain_print: false,
                 copies: 1,
                 batch_index: 0,
                 batch_total: 1,
@@ -2636,6 +2670,7 @@ mod tests {
                 feed_lead_mm: None,
                 feed_end_mm: None,
                 precut: None,
+                precut_cut_kind: None,
                 driver: lbl_core::DriverOptions::default(),
             },
             dither: Algorithm::Auto,

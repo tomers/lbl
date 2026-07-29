@@ -19,6 +19,7 @@ pub enum OutputMode {
 ///
 /// Matches the Brother P-touch cut matrix and maps sensibly onto other cutters:
 /// cut after every label, only after the last label/copy, or not at all.
+/// Orthogonal to [`CutKind`] (full vs half) and [`JobSpec::chain_print`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CutMode {
@@ -55,6 +56,36 @@ impl CutMode {
             Self::Every => true,
             Self::End => index + 1 == copies,
         }
+    }
+}
+
+/// How deep the cutter should cut (full through backing vs laminate-only half cut).
+///
+/// Honored only when [`crate::printer::DeviceCapabilities::supports_half_cut`].
+/// Orthogonal to [`CutMode`] (when) and [`JobSpec::chain_print`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CutKind {
+    /// Cut through label and backing (separate the piece).
+    #[default]
+    Full,
+    /// Cut only the label film; leave the backing intact (easy peel).
+    Half,
+}
+
+impl CutKind {
+    /// Parse a CLI/API-friendly name (`full`, `half`).
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.to_ascii_lowercase().as_str() {
+            "full" | "through" | "auto" => Some(Self::Full),
+            "half" | "half-cut" | "half_cut" | "shallow" => Some(Self::Half),
+            _ => None,
+        }
+    }
+
+    /// Whether this is a laminate-only half cut.
+    pub fn is_half(self) -> bool {
+        matches!(self, Self::Half)
     }
 }
 
@@ -219,6 +250,15 @@ pub struct JobSpec {
     /// When to cut (honored only if the printer supports cutting).
     #[serde(default)]
     pub cut_mode: CutMode,
+    /// Full vs half cut for label cuts (honored only if `supports_half_cut`).
+    #[serde(default)]
+    pub cut_kind: CutKind,
+    /// Leave the last label attached to the roll (suppress the final separating cut).
+    ///
+    /// Finish later with cut-now / the printer's Feed&Cut. Orthogonal to
+    /// [`Self::cut_mode`] and [`Self::cut_kind`].
+    #[serde(default)]
+    pub chain_print: bool,
     /// Number of copies.
     #[serde(default = "one")]
     pub copies: u32,
@@ -254,6 +294,10 @@ pub struct JobSpec {
     /// preference enables ejecting the cutter-gap scrap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub precut: Option<bool>,
+    /// Full vs half for the pre-cut prologue. `None` → half when
+    /// `supports_half_cut`, else full.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precut_cut_kind: Option<CutKind>,
     /// Protocol-specific options (each driver reads only its own bag).
     #[serde(default, skip_serializing_if = "DriverOptions::is_empty")]
     pub driver: DriverOptions,
@@ -270,6 +314,8 @@ impl JobSpec {
             media,
             mode: OutputMode::Print,
             cut_mode: CutMode::None,
+            cut_kind: CutKind::Full,
+            chain_print: false,
             copies: 1,
             batch_index: 0,
             batch_total: 1,
@@ -277,6 +323,7 @@ impl JobSpec {
             feed_lead_mm: None,
             feed_end_mm: None,
             precut: None,
+            precut_cut_kind: None,
             driver: DriverOptions::default(),
         }
     }
@@ -325,6 +372,15 @@ mod tests {
         assert!(CutMode::Every.should_cut_after_copy(2, 3));
         assert!(!CutMode::End.should_cut_after_copy(0, 3));
         assert!(CutMode::End.should_cut_after_copy(2, 3));
+    }
+
+    #[test]
+    fn cut_kind_parse_aliases() {
+        assert_eq!(CutKind::parse("full"), Some(CutKind::Full));
+        assert_eq!(CutKind::parse("half"), Some(CutKind::Half));
+        assert_eq!(CutKind::parse("half-cut"), Some(CutKind::Half));
+        assert_eq!(CutKind::parse("shallow"), Some(CutKind::Half));
+        assert_eq!(CutKind::parse("bogus"), None);
     }
 
     #[test]

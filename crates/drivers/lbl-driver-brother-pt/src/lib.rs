@@ -18,7 +18,7 @@
 //!   ESC i z …             print information (TZe width + raster line count)
 //!   ESC i M …             various mode (auto-cut)
 //!   ESC i A …             cut every N (when auto-cut)
-//!   ESC i K …             advanced mode (no-chain / high-res)
+//!   ESC i K …             advanced mode (half-cut / no-chain / high-res)
 //!   ESC i d …             margin / feed amount
 //!   M 0x00 | M 0x02       compression off or TIFF PackBits
 //!   per row:
@@ -45,7 +45,7 @@
 //!
 //! `lbl` is not affiliated with Brother; see the repository disclaimer.
 
-use lbl_core::job::CutMode;
+use lbl_core::job::{CutKind, CutMode};
 use lbl_driver_api::{
     is_blank_row, packbits_encode, Driver, DriverError, EncodeContext, MonoBitmap, Protocol,
 };
@@ -395,21 +395,26 @@ impl BrotherPtDriver {
         Self::mm_to_feed_dots(encode_mm, ctx.capabilities.dpi.0) as u32
     }
 
-    /// Zero-raster page + auto-cut + no-chain + `0x1A` (eject head-to-cutter scrap).
+    /// Zero-raster page for head-to-cutter clearance before content.
     ///
-    /// Matches nbuchwitz/ptouch `precut()` — only when [`FeedPlan::precut`] is set.
+    /// Full: auto-cut + no-chain + `0x1A` (eject scrap). Half: half-cut bit,
+    /// no auto-cut, mid-job page ending in `0x0C` — `0x1A` always full-cuts even
+    /// with the half-cut bit set, so a peel-tab pre-cut must use form-feed.
+    /// Only when [`FeedPlan::precut`] is set.
     fn push_precut_page(
         out: &mut Vec<u8>,
         head: HeadProfile,
         geom: MediaGeometry,
         feed_margin: u16,
         packbits: bool,
+        cut_kind: CutKind,
     ) {
         let media_type = if head.bytes_per_row > 16 {
             MEDIA_LAM_NONLAM_P900
         } else {
             MEDIA_LAMINATED
         };
+        let wide_head = head.bytes_per_row > 16;
         // PI_RECOVER | PI_KIND | PI_WIDTH
         let flags: u8 = 0x80 | 0x02 | 0x04;
         out.extend_from_slice(&[ESC, b'i', b'z', flags]);
@@ -417,15 +422,27 @@ impl BrotherPtDriver {
         out.push(geom.tape_width_mm);
         out.push(0x00);
         out.extend_from_slice(&0u32.to_le_bytes()); // zero raster lines
-        out.push(Self::page_index(true, true, head.bytes_per_row > 16));
+                                                    // Full scrap eject is a single-page mini-job (`0x1A`). Half peel is the
+                                                    // first page of a multi-page job so content follows after `0x0C`.
+        let last_page = matches!(cut_kind, CutKind::Full);
+        out.push(Self::page_index(true, last_page, wide_head));
         out.push(0x00);
-        out.extend_from_slice(&[ESC, b'i', b'M', 1 << 6]); // auto-cut
-        out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
-        out.extend_from_slice(&[ESC, b'i', b'K', 1 << 3]); // no-chain
+        match cut_kind {
+            CutKind::Full => {
+                out.extend_from_slice(&[ESC, b'i', b'M', 1 << 6]); // auto-cut
+                out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
+                out.extend_from_slice(&[ESC, b'i', b'K', 1 << 3]); // no-chain
+            }
+            CutKind::Half => {
+                out.extend_from_slice(&[ESC, b'i', b'M', 0]);
+                // Half-cut (bit 2); leave on roll (no no-chain).
+                out.extend_from_slice(&[ESC, b'i', b'K', 1 << 2]);
+            }
+        }
         out.extend_from_slice(&[ESC, b'i', b'd']);
         out.extend_from_slice(&feed_margin.to_le_bytes());
         out.extend_from_slice(&[b'M', if packbits { 0x02 } else { 0x00 }]);
-        out.push(0x1A);
+        out.push(if last_page { 0x1A } else { 0x0C });
     }
 
     fn push_page(
@@ -437,6 +454,7 @@ impl BrotherPtDriver {
     ) {
         let PageEncodeOpts {
             auto_cut,
+            half_cut,
             no_chain,
             quality,
             high_res,
@@ -493,11 +511,17 @@ impl BrotherPtDriver {
         if auto_cut {
             out.extend_from_slice(&[ESC, b'i', b'A', 0x01]);
         }
-        // ESC i K: bit3 no-chain (last page only), bit6 high-res.
+        // ESC i K: bit2 half-cut, bit3 no-chain (last page only), bit6 high-res.
         // Setting no-chain on every page of a multi-label batch makes Cube-class
         // devices feed/cut the head-to-cutter gap as an empty leader before each
         // label when each page is sent as its own job.
-        let mut advanced: u8 = if no_chain { 1 << 3 } else { 0 };
+        let mut advanced: u8 = 0;
+        if half_cut {
+            advanced |= 1 << 2;
+        }
+        if no_chain {
+            advanced |= 1 << 3;
+        }
         if high_res {
             advanced |= 1 << 6;
         }
@@ -528,7 +552,9 @@ impl BrotherPtDriver {
 #[derive(Debug, Clone, Copy)]
 struct PageEncodeOpts {
     auto_cut: bool,
-    /// ESC i K bit 3 — only on the true last page of the job.
+    /// ESC i K bit 2 — laminate-only cut when the chassis supports half-cut.
+    half_cut: bool,
+    /// ESC i K bit 3 — only on the true last page of the job (unless chain).
     no_chain: bool,
     quality: bool,
     high_res: bool,
@@ -570,10 +596,12 @@ impl Driver for BrotherPtDriver {
         // CutMode::Every: auto-cut (+ cut-each) on every page; no-chain only on
         // the last page so multi-label batches do not eject a leader scrap per
         // label. CutMode::End: no auto-cut; no-chain on the last page only.
+        // chain_print suppresses no-chain so the last label stays on the roll.
+        let half_cut = ctx.cut_kind().is_half();
         let (auto_cut, want_no_chain) = match ctx.cut_mode() {
             CutMode::None => (false, false),
-            CutMode::Every => (true, true),
-            CutMode::End => (false, true),
+            CutMode::Every => (true, !ctx.chain_print()),
+            CutMode::End => (false, !ctx.chain_print()),
         };
 
         let mut out = Vec::with_capacity(
@@ -587,7 +615,14 @@ impl Driver for BrotherPtDriver {
             out.extend_from_slice(&[ESC, b'@']);
             out.extend_from_slice(&[ESC, b'i', b'a', 0x01]);
             if ctx.feed_plan.precut {
-                Self::push_precut_page(&mut out, head, geom, feed_margin, packbits);
+                Self::push_precut_page(
+                    &mut out,
+                    head,
+                    geom,
+                    feed_margin,
+                    packbits,
+                    ctx.feed_plan.precut_cut_kind,
+                );
             }
         }
 
@@ -601,6 +636,7 @@ impl Driver for BrotherPtDriver {
                 geom,
                 PageEncodeOpts {
                     auto_cut,
+                    half_cut,
                     no_chain: want_no_chain && last_page,
                     quality: self.quality_priority,
                     high_res,
@@ -619,7 +655,7 @@ impl Driver for BrotherPtDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::job::{CutMode, JobSpec};
+    use lbl_core::job::{CutKind, CutMode, JobSpec};
     use lbl_core::media::Media;
     use lbl_core::printer::DeviceCapabilities;
     use lbl_core::units::Dpi;
@@ -700,6 +736,66 @@ mod tests {
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'A', 0x01]));
         assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+    }
+
+    #[test]
+    fn half_cut_sets_advanced_bit() {
+        let (mut job, mut caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job.cut_kind = CutKind::Half;
+        caps.supports_half_cut = true;
+        let ctx = EncodeContext::new(&job, &caps);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        // Half (bit2) + no-chain (bit3).
+        assert!(bytes
+            .windows(4)
+            .any(|w| w == [ESC, b'i', b'K', (1 << 2) | (1 << 3)]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+    }
+
+    #[test]
+    fn half_cut_clamped_without_cap() {
+        let (mut job, caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job.cut_kind = CutKind::Half;
+        let ctx = EncodeContext::new(&job, &caps);
+        assert_eq!(ctx.cut_kind(), CutKind::Full);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+        assert!(!bytes
+            .windows(4)
+            .any(|w| w[0..3] == [ESC, b'i', b'K'] && w[3] & (1 << 2) != 0));
+    }
+
+    #[test]
+    fn chain_print_suppresses_no_chain() {
+        let (mut job, caps) = ctx_job(18.0, 2, CutMode::Every, 180.0, 24.0);
+        job.chain_print = true;
+        let ctx = EncodeContext::new(&job, &caps);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        let k_flags: Vec<u8> = bytes
+            .windows(4)
+            .filter(|w| w[..3] == [ESC, b'i', b'K'])
+            .map(|w| w[3])
+            .collect();
+        assert!(k_flags.iter().all(|&f| f & (1 << 3) == 0));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+    }
+
+    #[test]
+    fn every_half_chain_sets_half_without_no_chain() {
+        let (mut job, mut caps) = ctx_job(18.0, 1, CutMode::Every, 180.0, 24.0);
+        job.cut_kind = CutKind::Half;
+        job.chain_print = true;
+        caps.supports_half_cut = true;
+        let ctx = EncodeContext::new(&job, &caps);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 2]));
+        assert!(!bytes
+            .windows(4)
+            .any(|w| w[0..3] == [ESC, b'i', b'K'] && w[3] & (1 << 3) != 0));
     }
 
     #[test]
@@ -880,10 +976,13 @@ mod tests {
         let (mut job, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
         job.feed_lead_mm = Some(2.0);
         job.precut = Some(true);
+        // Explicit full so this fixture stays independent of half-cut defaults.
+        job.precut_cut_kind = Some(CutKind::Full);
         caps.supports_precut = true;
         caps.feed_trail_mm = Some(24.0);
         let plan = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
         assert!(plan.precut);
+        assert_eq!(plan.precut_cut_kind, CutKind::Full);
         let ctx = EncodeContext::with_feed_plan(&job, &caps, plan);
         let bmp = MonoBitmap::new(8, 2);
         let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
@@ -901,11 +1000,49 @@ mod tests {
         assert_eq!(&bytes[z0 + 7..z0 + 11], &[0, 0, 0, 0]);
         assert_eq!(bytes.iter().filter(|&&b| b == 0x1A).count(), 2);
 
+        // Full precut: auto-cut + no-chain.
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert!(bytes.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 3]));
+
         // ESC i d follows lead ≈ 2 mm at 180 dpi → 14 dots
         let expected_feed = BrotherPtDriver::mm_to_feed_dots(2.0, 180.0);
         assert!(bytes.windows(5).any(|w| {
             w[0..3] == [ESC, b'i', b'd'] && u16::from_le_bytes([w[3], w[4]]) == expected_feed
         }));
+    }
+
+    #[test]
+    fn precut_half_sets_half_cut_bit() {
+        let (mut job, mut caps) = ctx_job(12.0, 1, CutMode::Every, 180.0, 24.0);
+        job.feed_lead_mm = Some(2.0);
+        job.precut = Some(true);
+        caps.supports_precut = true;
+        caps.supports_half_cut = true;
+        caps.feed_trail_mm = Some(24.0);
+        let plan = lbl_core::resolve_feed_plan(&caps, &job).unwrap();
+        assert_eq!(plan.precut_cut_kind, CutKind::Half);
+        let ctx = EncodeContext::with_feed_plan(&job, &caps, plan);
+        let bmp = MonoBitmap::new(8, 1);
+        let bytes = BrotherPtDriver::new().encode(&bmp, &ctx).unwrap();
+
+        // Precut page uses half-cut without auto-cut / no-chain, ended with
+        // form-feed (`0x0C`). `0x1A` would full-cut and eject even with half-cut.
+        // Do not scan for bare `0x0C` — 12 mm tape width is also `0x0C`.
+        let z_positions: Vec<_> = bytes
+            .windows(3)
+            .enumerate()
+            .filter(|(_, w)| *w == [ESC, b'i', b'z'])
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(z_positions.len(), 2);
+        let precut = &bytes[z_positions[0]..z_positions[1]];
+        assert!(precut.windows(4).any(|w| w == [ESC, b'i', b'M', 0]));
+        assert!(precut.windows(4).any(|w| w == [ESC, b'i', b'K', 1 << 2]));
+        assert!(!precut.windows(4).any(|w| w == [ESC, b'i', b'M', 1 << 6]));
+        assert_eq!(*precut.last().unwrap(), 0x0C);
+        assert!(!precut.contains(&0x1A));
+        // Content page still ends the job with print-and-feed.
+        assert_eq!(*bytes.last().unwrap(), 0x1A);
     }
 
     #[test]

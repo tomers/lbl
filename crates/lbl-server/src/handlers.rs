@@ -31,7 +31,7 @@ use lbl::pipeline::{
 };
 use lbl_catalog::{driver_settings, encode_capabilities_for, Catalog, ConnectionHint, DeviceEntry};
 use lbl_config::ConfigError;
-use lbl_core::job::{CutMode, JobSpec, OutputMode};
+use lbl_core::job::{CutKind, CutMode, JobSpec, OutputMode};
 use lbl_core::media::Media;
 use lbl_core::printer::{DeviceCapabilities, DeviceProfile, Protocol};
 use lbl_core::Rotation;
@@ -363,6 +363,9 @@ pub struct CutNowReq {
     /// Must be true (catalog/profile cutter). Defaults false.
     #[serde(default)]
     supports_cut: bool,
+    /// Cut depth: `full` (default) or `half`.
+    #[serde(default)]
+    cut_kind: Option<String>,
     #[serde(default)]
     dispatch_mode: DispatchMode,
     #[serde(flatten)]
@@ -431,6 +434,12 @@ struct FeedJobReq {
     /// When to cut: `none`, `every`, or `end`.
     #[serde(default)]
     cut_mode: Option<String>,
+    /// Cut depth: `full` or `half`.
+    #[serde(default)]
+    cut_kind: Option<String>,
+    /// Leave the last label attached (suppress final separating cut).
+    #[serde(default)]
+    chain_print: bool,
     #[serde(default)]
     supports_cut: bool,
     #[serde(default = "default_copies")]
@@ -443,6 +452,9 @@ struct FeedJobReq {
     feed_end_mm: Option<f64>,
     #[serde(default)]
     precut: Option<bool>,
+    /// Pre-cut depth: `full` or `half`. Unset → engine default from caps.
+    #[serde(default)]
+    precut_cut_kind: Option<String>,
     #[serde(default)]
     driver: DriverOptionsReq,
 }
@@ -452,12 +464,15 @@ impl Default for FeedJobReq {
         Self {
             cut: false,
             cut_mode: None,
+            cut_kind: None,
+            chain_print: false,
             supports_cut: false,
             copies: default_copies(),
             density: None,
             feed_lead_mm: None,
             feed_end_mm: None,
             precut: None,
+            precut_cut_kind: None,
             driver: DriverOptionsReq::default(),
         }
     }
@@ -586,6 +601,22 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
 
     let encode_caps = resolve_encode_caps(&state.catalog, req.printer.as_deref(), &media, true);
 
+    let cut_kind = match req.cut_kind.as_deref() {
+        None | Some("") => CutKind::Full,
+        Some(name) => CutKind::parse(name).ok_or_else(|| {
+            ApiError(
+                StatusCode::BAD_REQUEST,
+                format!("unknown cut_kind '{name}' (expected full|half)"),
+            )
+        })?,
+    };
+    if cut_kind.is_half() && !encode_caps.supports_half_cut {
+        return Err(ApiError(
+            StatusCode::BAD_REQUEST,
+            "printer does not support half-cut".into(),
+        ));
+    }
+
     let catalog = state.catalog.clone();
     let printer_key = req.printer.clone();
     let dispatch_mode = req.dispatch_mode;
@@ -598,7 +629,7 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
     let report = spawn_blocking(move || -> anyhow::Result<serde_json::Value> {
         let registry =
             Registry::with_builtin_drivers().with_printer_key(protocol, printer_key.as_deref());
-        let bytes = lbl_encode::encode_cut_now(&registry, protocol, &media, &encode_caps)
+        let bytes = lbl_encode::encode_cut_now(&registry, protocol, &media, &encode_caps, cut_kind)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         let encoded = vec![("cut-now.bin".to_string(), bytes)];
         if dispatch_mode == DispatchMode::Client {
@@ -614,6 +645,7 @@ async fn run_cut_now(state: &AppState, protocol: Protocol, req: &CutNowReq) -> A
         if msg.contains("no print target")
             || msg.contains("cut now is not supported")
             || msg.contains("printer not ready")
+            || msg.contains("does not support half-cut")
         {
             bad_request(msg)
         } else {
@@ -837,6 +869,8 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             media: media.clone(),
             mode: OutputMode::Print,
             cut_mode: feed_overrides.cut_mode,
+            cut_kind: CutKind::Full,
+            chain_print: false,
             copies: 1,
             batch_index: 0,
             batch_total: 1,
@@ -844,6 +878,7 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
             feed_lead_mm: feed_overrides.feed_lead_mm,
             feed_end_mm: feed_overrides.feed_end_mm,
             precut: feed_overrides.precut,
+            precut_cut_kind: feed_overrides.precut_cut_kind,
             driver: lbl_core::DriverOptions::default(),
         },
         dither: Algorithm::Auto,
@@ -942,6 +977,9 @@ pub async fn preview(State(state): State<AppState>, Json(req): Json<PreviewReq>)
                     label_json["virtual_feed_end_px"] = serde_json::Value::from(virtual_end_px);
                     if padded.precut {
                         label_json["precut"] = serde_json::Value::Bool(true);
+                        label_json["precut_cut_kind"] =
+                            serde_json::to_value(padded.precut_cut_kind)
+                                .unwrap_or_else(|_| serde_json::Value::from("full"));
                     }
                 }
                 if let Some(mm) = computed_font_size_mm {
@@ -1040,6 +1078,8 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             media: media.clone(),
             mode: OutputMode::Print,
             cut_mode: feed_overrides.cut_mode,
+            cut_kind: CutKind::Full,
+            chain_print: false,
             copies: 1,
             batch_index: 0,
             batch_total: 1,
@@ -1047,6 +1087,7 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
             feed_lead_mm: feed_overrides.feed_lead_mm,
             feed_end_mm: feed_overrides.feed_end_mm,
             precut: feed_overrides.precut,
+            precut_cut_kind: feed_overrides.precut_cut_kind,
             driver: lbl_core::DriverOptions::default(),
         },
         dither: Algorithm::Auto,
@@ -1177,6 +1218,8 @@ pub async fn preview_html(State(state): State<AppState>, Json(req): Json<Preview
                     serde_json::Value::from(stock.virtual_feed_end_px);
                 if stock.precut {
                     label_json["precut"] = serde_json::Value::Bool(true);
+                    label_json["precut_cut_kind"] = serde_json::to_value(stock.precut_cut_kind)
+                        .unwrap_or_else(|_| serde_json::Value::from("full"));
                 }
             }
         }
@@ -1332,6 +1375,9 @@ pub struct PreviewReq {
     /// Opt-in pre-cut preference for preview scrap / lead layout.
     #[serde(default)]
     precut: Option<bool>,
+    /// Pre-cut depth for preview feed plan (`full` / `half`).
+    #[serde(default)]
+    precut_cut_kind: Option<String>,
     #[serde(flatten, default)]
     style: StyleReqOverrides,
 }
@@ -1488,12 +1534,37 @@ fn resolve_cut_mode(cut: bool, cut_mode: Option<&str>) -> Result<CutMode, ApiErr
     Ok(if cut { CutMode::Every } else { CutMode::None })
 }
 
+fn resolve_cut_kind(cut_kind: Option<&str>) -> Result<CutKind, ApiError> {
+    match cut_kind {
+        None | Some("") => Ok(CutKind::Full),
+        Some(name) => CutKind::parse(name).ok_or_else(|| {
+            ApiError(
+                StatusCode::BAD_REQUEST,
+                format!("unknown cut_kind '{name}' (expected full|half)"),
+            )
+        }),
+    }
+}
+
+fn resolve_optional_cut_kind(cut_kind: Option<&str>) -> Result<Option<CutKind>, ApiError> {
+    match cut_kind {
+        None | Some("") => Ok(None),
+        Some(name) => CutKind::parse(name).map(Some).ok_or_else(|| {
+            ApiError(
+                StatusCode::BAD_REQUEST,
+                format!("unknown precut_cut_kind '{name}' (expected full|half)"),
+            )
+        }),
+    }
+}
+
 fn preview_feed_overrides(req: &PreviewReq) -> Result<PreviewFeedOverrides, ApiError> {
     Ok(PreviewFeedOverrides {
         cut_mode: resolve_cut_mode(false, req.cut_mode.as_deref())?,
         feed_lead_mm: req.feed_lead_mm,
         feed_end_mm: req.feed_end_mm,
         precut: req.precut,
+        precut_cut_kind: resolve_optional_cut_kind(req.precut_cut_kind.as_deref())?,
         virtual_feed_start_mm: None,
         virtual_feed_end_mm: None,
     })
@@ -1580,6 +1651,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
 
     let mut style_cfg = load_style_cfg(&state, &req.style);
     let cut_mode = resolve_cut_mode(req.job.cut, req.job.cut_mode.as_deref())?;
+    let cut_kind = resolve_cut_kind(req.job.cut_kind.as_deref())?;
+    let precut_cut_kind = resolve_optional_cut_kind(req.job.precut_cut_kind.as_deref())?;
     let label_fit = resolve_label_fit(
         LabelFitSetting::parse(&style_cfg.fit.label_fit).unwrap_or(LabelFitSetting::Auto),
         &media,
@@ -1624,6 +1697,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             feed_lead_mm: req.job.feed_lead_mm,
             feed_end_mm: req.job.feed_end_mm,
             precut: req.job.precut,
+            precut_cut_kind,
             ..Default::default()
         },
         rotation.swaps_axes(),
@@ -1640,6 +1714,8 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             media,
             mode: OutputMode::Print,
             cut_mode,
+            cut_kind,
+            chain_print: req.job.chain_print,
             copies: req.job.copies,
             batch_index: 0,
             batch_total: 1,
@@ -1647,6 +1723,7 @@ pub async fn print(State(state): State<AppState>, Json(req): Json<PrintReq>) -> 
             feed_lead_mm: gaps.feed_lead_mm.or(req.job.feed_lead_mm),
             feed_end_mm: gaps.feed_end_mm.or(req.job.feed_end_mm),
             precut: req.job.precut,
+            precut_cut_kind,
             driver: resolve_driver_options(&req.job.driver)?,
         },
         dither: Algorithm::parse(&req.dither)
@@ -1863,13 +1940,18 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
     let labels = authoring_labels(source, &req.selection).map_err(authoring_error)?;
     // Vector PDF and raster both load HTML via Chromium data: URLs — inline faces.
     let font_delivery = inline_font_delivery_for_labels(&state, &labels).await?;
+    let cut_mode = resolve_cut_mode(req.job.cut, req.job.cut_mode.as_deref())?;
+    let cut_kind = resolve_cut_kind(req.job.cut_kind.as_deref())?;
+    let precut_cut_kind = resolve_optional_cut_kind(req.job.precut_cut_kind.as_deref())?;
     let opts = PipelineOptions {
         protocol,
         supports_cut: req.job.supports_cut,
         job: JobSpec {
             media,
             mode: OutputMode::Print,
-            cut_mode: resolve_cut_mode(req.job.cut, req.job.cut_mode.as_deref())?,
+            cut_mode,
+            cut_kind,
+            chain_print: req.job.chain_print,
             copies: req.job.copies,
             batch_index: 0,
             batch_total: 1,
@@ -1877,6 +1959,7 @@ pub async fn print_file(State(state): State<AppState>, Json(req): Json<PrintReq>
             feed_lead_mm: req.job.feed_lead_mm,
             feed_end_mm: req.job.feed_end_mm,
             precut: req.job.precut,
+            precut_cut_kind,
             driver: resolve_driver_options(&req.job.driver)?,
         },
         dither: Algorithm::parse(&req.dither)

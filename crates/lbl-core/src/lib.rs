@@ -28,7 +28,9 @@ pub use feed_plan::{
     VirtualFeedGaps, LEAD_PADDING_BELOW_CUTTER_GAP, LEAD_PADDING_BELOW_MIN,
 };
 pub use geometry::{Margins, Size};
-pub use job::{CutMode, DriverOptions, DymoLwOptions, JobSpec, LwOutputMode, LwSpeed, OutputMode};
+pub use job::{
+    CutKind, CutMode, DriverOptions, DymoLwOptions, JobSpec, LwOutputMode, LwSpeed, OutputMode,
+};
 pub use media::{Adhesive, Material, Media, MediaColor, MediaLength, MediaSense};
 pub use orientation::{Orientation, Rotation};
 pub use printer::{DeviceCapabilities, DeviceId, DeviceModel, DeviceProfile, Protocol, Transport};

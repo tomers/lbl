@@ -43,6 +43,10 @@ pub enum EncodeError {
     #[error("printer does not support cutting")]
     CutNotSupported,
 
+    /// Half-cut was requested but the printer lacks half-cut hardware.
+    #[error("printer does not support half-cut")]
+    HalfCutNotSupported,
+
     /// A driver failed to encode.
     #[error(transparent)]
     Driver(#[from] lbl_driver_api::DriverError),

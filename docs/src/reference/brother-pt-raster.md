@@ -16,7 +16,7 @@ per page:
   ESC i z …             print information (TZe width + raster line count)
   ESC i M …             various mode (auto-cut bit)
   ESC i A …             cut every N (when auto-cut)
-  ESC i K …             advanced mode (no-chain / high-res)
+  ESC i K …             advanced mode (half-cut / no-chain / high-res)
   ESC i d …             margin / feed amount
   M 0x00 | M 0x02       compression off or TIFF PackBits
   per row:
@@ -50,10 +50,16 @@ Brother documents this as unavoidable waste on a fully cut job:
 
 - **Large lead** (\(p \ge D_x\)): blank nose stays **on** the kept label; no pre-cut.
 - **Small lead** + **opt-in pre-cut** (`FeedPlan.precut`): encoder emits a
-  zero-raster page with auto-cut + no-chain + `0x1A` (nbuchwitz/ptouch-style)
-  before the first content page, ejecting ≈ \(D_x\) as scrap; content uses
-  `ESC i d` from `feed_plan.lead_mm`.
+  zero-raster prologue before the first content page. **Full** pre-cut
+  (`precut_cut_kind = full`): auto-cut + no-chain + `0x1A` ejects ≈ \(D_x\) as
+  scrap. **Half** pre-cut (default when `supports_half_cut`): half-cut bit only
+  and form-feed (`0x0C`) so the peel tab stays on the backing — not `0x1A`,
+  which always full-cuts. Content uses `ESC i d` from
+  `feed_plan.lead_mm`.
 - **Small lead** without pre-cut: encode rejects (`lead_padding_below_cutter_gap`).
+- **Cut depth / chain:** `JobSpec.cut_kind` sets `ESC i K` bit 2 (half-cut).
+  `JobSpec.chain_print` suppresses no-chain on the last page so the strip stays
+  attached (finish later with cut-now / Feed&Cut).
 - **End clearance:** after the last inked row (still at the head), print-with-feed
   and cut leave ≈ \(D_x\) blank **after** content on the kept sticker.
   `resolve_feed_plan` floors `end_mm` to \(D_x\) when cutting so preview matches;
@@ -66,6 +72,8 @@ Brother documents this as unavoidable waste on a fully cut job:
 
 ## Pre-cut prologue (when `feed_plan.precut`)
 
+**Full** (eject scrap):
+
 ```text
 (after invalidate + ESC @ + ESC i a)
 ESC i z …   raster line count = 0
@@ -77,6 +85,22 @@ M …
 0x1A        print-and-feed → eject scrap
 (then normal content page(s))
 ```
+
+**Half** (peel tab; default when `supports_half_cut`):
+
+```text
+ESC i z …   raster line count = 0; page index = first of multi
+ESC i M …   0 (no auto-cut)
+ESC i K …   half-cut bit only
+ESC i d …
+M …
+0x0C        form-feed → half-cut without eject
+(then normal content page(s); job still ends with 0x1A)
+```
+
+`0x1A` always performs a full cut (and ejects) even when the half-cut bit is
+set. Half pre-cut must end the prologue page with `0x0C` so content follows as
+the next page of the same job.
 
 ## `ESC i z` media type (`n2`)
 

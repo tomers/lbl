@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::job::{CutMode, JobSpec};
+use crate::job::{CutKind, CutMode, JobSpec};
 use crate::printer::DeviceCapabilities;
 
 /// Resolved feed margins and whether to emit a pre-cut prologue.
@@ -19,8 +19,13 @@ pub struct FeedPlan {
     pub lead_mm: f64,
     /// Blank after content before cut (mm).
     pub end_mm: f64,
-    /// Emit protocol pre-cut (eject ≈ [`Self::cutter_gap_mm`] scrap) before content.
+    /// Emit protocol pre-cut prologue before content.
+    ///
+    /// Full pre-cut ejects ≈ [`Self::cutter_gap_mm`] scrap; half pre-cut leaves
+    /// a peel tab on the backing (see [`Self::precut_cut_kind`]).
     pub precut: bool,
+    /// Cut depth for the pre-cut prologue when [`Self::precut`] is set.
+    pub precut_cut_kind: CutKind,
     /// Head-to-cutter distance \(D_x\) in mm (0 when unknown).
     pub cutter_gap_mm: f64,
 }
@@ -31,6 +36,7 @@ impl Default for FeedPlan {
             lead_mm: 0.0,
             end_mm: 0.0,
             precut: false,
+            precut_cut_kind: CutKind::Full,
             cutter_gap_mm: 0.0,
         }
     }
@@ -286,14 +292,37 @@ pub fn resolve_feed_plan(
         lead_mm,
         end_mm,
         precut,
+        precut_cut_kind: resolve_precut_cut_kind(caps, job, precut),
         cutter_gap_mm,
     })
+}
+
+/// Effective pre-cut depth: job override, else half when supported, else full.
+///
+/// When pre-cut is not active the kind is still resolved for callers that
+/// inspect the plan, but drivers ignore it unless [`FeedPlan::precut`].
+fn resolve_precut_cut_kind(caps: &DeviceCapabilities, job: &JobSpec, precut: bool) -> CutKind {
+    let requested = job.precut_cut_kind.unwrap_or({
+        if caps.supports_half_cut {
+            CutKind::Half
+        } else {
+            CutKind::Full
+        }
+    });
+    if !precut {
+        return requested;
+    }
+    if requested.is_half() && !caps.supports_half_cut {
+        CutKind::Full
+    } else {
+        requested
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::job::{CutMode, JobSpec};
+    use crate::job::{CutKind, CutMode, JobSpec};
     use crate::media::Media;
     use crate::printer::DeviceCapabilities;
     use crate::units::Dpi;
@@ -368,6 +397,37 @@ mod tests {
             .unwrap();
         assert!((plan.lead_mm - 2.0).abs() < 1e-9);
         assert!(plan.precut);
+        assert_eq!(plan.precut_cut_kind, CutKind::Full);
+    }
+
+    #[test]
+    fn precut_defaults_to_half_when_supported() {
+        let mut caps = pt_caps();
+        caps.supports_half_cut = true;
+        let plan =
+            resolve_feed_plan(&caps, &job_with(CutMode::Every, Some(2.0), Some(true))).unwrap();
+        assert!(plan.precut);
+        assert_eq!(plan.precut_cut_kind, CutKind::Half);
+    }
+
+    #[test]
+    fn precut_cut_kind_override_to_full() {
+        let mut caps = pt_caps();
+        caps.supports_half_cut = true;
+        let mut job = job_with(CutMode::Every, Some(2.0), Some(true));
+        job.precut_cut_kind = Some(CutKind::Full);
+        let plan = resolve_feed_plan(&caps, &job).unwrap();
+        assert!(plan.precut);
+        assert_eq!(plan.precut_cut_kind, CutKind::Full);
+    }
+
+    #[test]
+    fn half_precut_clamps_without_cap() {
+        let mut job = job_with(CutMode::Every, Some(2.0), Some(true));
+        job.precut_cut_kind = Some(CutKind::Half);
+        let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
+        assert!(plan.precut);
+        assert_eq!(plan.precut_cut_kind, CutKind::Full);
     }
 
     #[test]

@@ -105,6 +105,14 @@ fn validate_printer_printable_band(printer: &DeviceEntry, errors: &mut Vec<Catal
             });
         }
     }
+    if printer.capabilities.supports_half_cut && !printer.capabilities.supports_cut {
+        errors.push(CatalogGeometryError {
+            message: format!(
+                "printer `{}`: supports_half_cut requires supports_cut",
+                printer.canonical_key()
+            ),
+        });
+    }
     if let Some(band) = printer.capabilities.head_printable_height_mm {
         if !(band.is_finite() && band > 0.0) {
             errors.push(CatalogGeometryError {

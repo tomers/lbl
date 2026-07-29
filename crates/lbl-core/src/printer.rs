@@ -206,6 +206,11 @@ pub struct DeviceCapabilities {
     /// Whether the printer can cut between jobs/items.
     #[serde(default)]
     pub supports_cut: bool,
+    /// Whether the cutter can half-cut (laminate only, leave backing intact).
+    ///
+    /// Implies [`Self::supports_cut`]. Guillotine-only chassis leave this false.
+    #[serde(default)]
+    pub supports_half_cut: bool,
     /// Whether the printer deposits more than one ink color (full-color inkjet
     /// or dual-ink thermal). When set, the encode pipeline may supply a color
     /// PNG alongside the mono bitmap for drivers that register full-color
@@ -276,6 +281,7 @@ impl Default for DeviceCapabilities {
             dpi: Dpi(300.0),
             max_width_mm: 56.0,
             supports_cut: false,
+            supports_half_cut: false,
             supports_color: false,
             reports_media: false,
             feed_lead_mm: None,

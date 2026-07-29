@@ -5697,17 +5697,22 @@ connections = [
 ]
 
 [[devices]]
-brand = "Brother"
-keys = ["PT-P750W", "PTP750W", "P750W"]
-name = "Brother PT-P750W"
-support = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
-protocol = "brotherpt"
+brand             = "Brother"
+keys              = ["PT-P750W", "PTP750W", "P750W"]
+name              = "Brother PT-P750W"
+support           = { product_url = "https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=p750weus", brand_url = "https://support.brother.com/" }
+protocol          = "brotherpt"
 supports_packbits = true
-maturity = "verified"
-reports_media = true
-dpi = 180.0
-max_width_mm = 24.0
-supports_cut = true
+maturity          = "verified"
+reports_media     = true
+dpi               = 180.0
+max_width_mm      = 24.0
+supports_cut      = true
+supports_half_cut = true
+# Head-to-cutter gap (~24 mm on P700/P750W-class TZe); enables short-gap pre-cut.
+feed_trail_mm = 24.0
+supports_precut = true
+precut_default = true
 default_media = "TZe-231"
 supported_media = [
   "TZe-N201",
@@ -5837,6 +5842,10 @@ reports_media = true
 dpi = 180.0
 max_width_mm = 24.0
 supports_cut = true
+supports_half_cut = true
+feed_trail_mm = 24.0
+supports_precut = true
+precut_default = true
 default_media = "TZe-231"
 supported_media = [
   "TZe-N201",

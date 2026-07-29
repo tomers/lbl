@@ -22,7 +22,7 @@ use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, Prin
 use lbl::terminal::{highlight_json, stdout_color};
 use lbl_catalog::{encode_capabilities_for, Catalog};
 use lbl_config::StyleConfig;
-use lbl_core::job::{CutMode, JobSpec, OutputMode};
+use lbl_core::job::{CutKind, CutMode, JobSpec, OutputMode};
 use lbl_core::printer::Protocol;
 use lbl_core::{Orientation, Rotation};
 use lbl_dither::Algorithm;
@@ -634,6 +634,14 @@ struct PrintArgs {
     #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "cut_mode")]
     cut: bool,
 
+    /// Cut depth: `full` (default) or `half` (requires half-cut hardware).
+    #[arg(long, value_name = "KIND", default_value = "full")]
+    cut_kind: String,
+
+    /// Leave the last label attached (chain printing).
+    #[arg(long, action = clap::ArgAction::SetTrue)]
+    chain_print: bool,
+
     /// Mark target printer as cut-capable. Overrides config `[print]
     /// supports_cut` / `LBL_PRINT__SUPPORTS_CUT`.
     #[arg(long, action = clap::ArgAction::SetTrue)]
@@ -660,6 +668,10 @@ struct PrintArgs {
     /// Allow pre-cut when lead is below the head-to-cutter gap (ejects scrap).
     #[arg(long, action = clap::ArgAction::SetTrue)]
     precut: bool,
+
+    /// Pre-cut depth: `full` or `half`. Default half when the printer supports it.
+    #[arg(long, value_name = "KIND")]
+    precut_cut_kind: Option<String>,
 
     /// Send the job even when live status reports the printer is not ready
     /// (no media, cover open, …).
@@ -809,6 +821,15 @@ fn run_print(args: PrintArgs) -> Result<()> {
             .ok_or_else(|| anyhow!("unknown cut mode '{mode}' (expected none|every|end)"))?
     } else {
         CutMode::parse(&print_cfg.cut_mode).unwrap_or(CutMode::None)
+    };
+    let cut_kind = CutKind::parse(&args.cut_kind)
+        .ok_or_else(|| anyhow!("unknown cut kind '{}' (expected full|half)", args.cut_kind))?;
+    let precut_cut_kind = match args.precut_cut_kind.as_deref() {
+        None => None,
+        Some(name) => Some(
+            CutKind::parse(name)
+                .ok_or_else(|| anyhow!("unknown precut cut kind '{name}' (expected full|half)"))?,
+        ),
     };
     let supports_cut = args.supports_cut.unwrap_or(print_cfg.supports_cut);
     let copies = args.copies.unwrap_or(print_cfg.copies);
@@ -975,6 +996,8 @@ fn run_print(args: PrintArgs) -> Result<()> {
             media,
             mode: OutputMode::Print,
             cut_mode,
+            cut_kind,
+            chain_print: args.chain_print,
             copies,
             batch_index: 0,
             batch_total: 1,
@@ -982,6 +1005,7 @@ fn run_print(args: PrintArgs) -> Result<()> {
             feed_lead_mm: args.feed_lead_mm,
             feed_end_mm: args.feed_end_mm,
             precut: if args.precut { Some(true) } else { None },
+            precut_cut_kind,
             driver,
         },
         dither: Algorithm::parse(&dither)?,
@@ -1851,6 +1875,10 @@ struct DeviceCutArgs {
     /// Override DPI (otherwise catalog printer DPI).
     #[arg(long)]
     dpi: Option<f64>,
+
+    /// Cut depth: `full` (default) or `half` (requires `supports_half_cut`).
+    #[arg(long, default_value = "full")]
+    cut_kind: String,
 }
 
 fn run_device(args: DeviceArgs) -> Result<()> {
@@ -2011,8 +2039,14 @@ fn run_device_cut(args: DeviceCutArgs) -> Result<()> {
         true,
     );
 
+    let cut_kind = CutKind::parse(&args.cut_kind)
+        .ok_or_else(|| anyhow!("unknown cut kind '{}' (expected full|half)", args.cut_kind))?;
+    if cut_kind.is_half() && !caps.supports_half_cut {
+        bail!("catalog printer does not support half-cut");
+    }
+
     let registry = Registry::with_builtin_drivers();
-    let bytes = lbl_encode::encode_cut_now(&registry, target.protocol, &media, &caps)
+    let bytes = lbl_encode::encode_cut_now(&registry, target.protocol, &media, &caps, cut_kind)
         .map_err(|e| anyhow!("{e}"))?;
 
     let (vid, pid) = target

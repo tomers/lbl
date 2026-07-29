@@ -50,24 +50,22 @@ lead they did not ask for.
 6. **Generic across protocols**; **one pre-cut per job** when applicable, not
    per chained page.
 
-Non-goals for this delivery:
+Non-goals for the original delivery (now implemented separately):
 
-- Half-cut vs full-cut policy (separate).
+- ~~Half-cut vs full-cut policy~~ — see `CutKind` / `precut_cut_kind` /
+  `supports_half_cut` and [Brother PT raster](../reference/brother-pt-raster.md).
 - Inventing padding UI chrome beyond catalog/schema-driven fields.
 - Changing PackBits / raster opcode framing.
 - Auto-toggling the user’s pre-cut preference from padding changes.
 
----
-
-## 2.1 Tradeoffs (why opt-in, not silent)
-
-Pre-cut does **not** save tape versus a large lead. \(D_x\) of stock is still
-consumed either way; only **where** the blank goes changes.
+Half pre-cut leaves a peel tab on the backing; full pre-cut ejects ≈ \(D_x\) as
+scrap. Default when the device supports half-cut is **half**.
 
 | Approach | What the user gets | Tape / mechanism |
 | --- | --- | --- |
 | **Large lead** (\(p \ge D_x\)), no pre-cut | One sticker: long blank nose + content | \(\sim D_x\) (or \(p\)) blank stays **on the label** |
-| **Small lead** + **pre-cut on** | Short empty scrap drops first, then a short-lead label | \(\sim D_x\) blank ejected as **scrap**, then content with small \(p\) |
+| **Small lead** + **full pre-cut** | Short empty scrap drops first, then a short-lead label | \(\sim D_x\) blank ejected as **scrap**, then content with small \(p\) |
+| **Small lead** + **half pre-cut** | Peel tab + short-lead label on one backing strip | \(\sim D_x\) scored, stays attached |
 | **Small lead** + **pre-cut off** | Invalid — Print disabled / encode error | Nothing sent |
 
 So yes: the main tradeoff **is** that an empty piece falls off (waste you throw
@@ -287,7 +285,8 @@ own — only honor `feed_plan.precut`.
 Align `pad_preview_encode_feed` / layout CSS with `FeedPlan`:
 
 - When `precut`: show a discarded scrap marker of width \(D_x\) (dashed /
-  labeled “ejected” / scrap), then the kept label with lead \(p_{\mathrm{lead}}\).
+  labeled “ejected scrap” for full, “peel tab” for half — half stays on
+  backing), then the kept label with lead \(p_{\mathrm{lead}}\).
 - When `!precut` and \(p \ge D_x\): single strip, lead \(p\).
 - When cutting with known \(D_x\): paint \(p_{\mathrm{end}} \ge D_x\) on the kept
   sticker (post-print clearance). Measurement guides label it

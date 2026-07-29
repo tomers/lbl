@@ -13,7 +13,7 @@ pub mod packbits;
 
 pub use lbl_core::bitmap::MonoBitmap;
 pub use lbl_core::feed_plan::{resolve_feed_plan, FeedPlan};
-pub use lbl_core::job::{CutMode, JobSpec};
+pub use lbl_core::job::{CutKind, CutMode, JobSpec};
 pub use lbl_core::printer::{DeviceCapabilities, Protocol};
 pub use packbits::{compress as packbits_compress, encode as packbits_encode, is_blank_row};
 
@@ -110,6 +110,22 @@ impl<'a> EncodeContext<'a> {
         } else {
             CutMode::None
         }
+    }
+
+    /// Effective cut depth: clamped to full when half-cut is unsupported.
+    pub fn cut_kind(&self) -> CutKind {
+        if self.job.cut_kind.is_half() && self.capabilities.supports_half_cut {
+            CutKind::Half
+        } else {
+            CutKind::Full
+        }
+    }
+
+    /// Whether chain printing is requested (leave last label attached).
+    ///
+    /// Only meaningful when a cut is otherwise requested.
+    pub fn chain_print(&self) -> bool {
+        self.job.chain_print && self.cut_mode().requests_cut()
     }
 
     /// Whether any cut is requested and supported.
