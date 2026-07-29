@@ -154,14 +154,17 @@ fn select_records(root: &Value, each: Option<&str>) -> Result<Vec<Value>, Templa
     }
 }
 
-/// Build the per-record template context. `it`, `index`, `count`, and `data`
-/// are always bound; when the record is an object, its fields are exposed at
-/// the top level and take precedence over those bindings, so user data is
+/// Build the per-record template context. `it`, `index`, `serial`, `count`, and
+/// `data` are always bound; when the record is an object, its fields are exposed
+/// at the top level and take precedence over those bindings, so user data is
 /// never silently clobbered by a same-named convenience binding.
+///
+/// `index` is 0-based; `serial` is `index + 1` (human-facing label number).
 fn build_context(record: Value, index: usize, total: usize, root: &Value) -> Value {
     let mut ctx = Map::new();
     ctx.insert("it".to_string(), record.clone());
     ctx.insert("index".to_string(), Value::from(index));
+    ctx.insert("serial".to_string(), Value::from(index + 1));
     ctx.insert("count".to_string(), Value::from(total));
     ctx.insert("data".to_string(), root.clone());
     if let Value::Object(fields) = record {
@@ -216,20 +219,34 @@ mod tests {
     }
 
     #[test]
+    fn serial_is_one_based_index() {
+        let labels = Engine::new()
+            .render(
+                "<div>{{ serial }}:{{ name }}</div>",
+                Some(json!([{"name":"A"},{"name":"B"}])),
+                &RenderOptions::default(),
+            )
+            .unwrap();
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].html, "<div>1:A</div>");
+        assert_eq!(labels[1].html, "<div>2:B</div>");
+    }
+
+    #[test]
     fn record_fields_shadow_convenience_bindings() {
         let labels = Engine::new()
             .render(
-                "<div>{{ index }}/{{ count }}</div>",
+                "<div>{{ index }}/{{ count }}/{{ serial }}</div>",
                 Some(json!([
-                    {"index": "7", "count": "9"},
-                    {"index": "8", "count": "9"}
+                    {"index": "7", "count": "9", "serial": "X"},
+                    {"index": "8", "count": "9", "serial": "Y"}
                 ])),
                 &RenderOptions::default(),
             )
             .unwrap();
         assert_eq!(labels.len(), 2);
-        assert_eq!(labels[0].html, "<div>7/9</div>");
-        assert_eq!(labels[1].html, "<div>8/9</div>");
+        assert_eq!(labels[0].html, "<div>7/9/X</div>");
+        assert_eq!(labels[1].html, "<div>8/9/Y</div>");
     }
 
     #[test]
