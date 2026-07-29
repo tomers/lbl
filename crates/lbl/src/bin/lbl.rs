@@ -2146,7 +2146,6 @@ fn run_cut(args: CutArgs) -> Result<()> {
             force: args.force,
             mat: args.mat,
             tool_offset: 18,
-            landscape: false,
         },
     };
     let bytes = encode_cut(&paths, &job).map_err(|e| anyhow!("{e}"))?;

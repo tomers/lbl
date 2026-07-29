@@ -59,9 +59,6 @@ pub struct SilhouetteOptions {
     /// Blade cutter offset `FC` (≈18 for blade, 0 for pen).
     #[serde(default = "default_tool_offset")]
     pub tool_offset: u16,
-    /// Landscape (`true`) vs portrait for `FN`.
-    #[serde(default)]
-    pub landscape: bool,
 }
 
 fn default_speed() -> u8 {
@@ -81,7 +78,6 @@ impl Default for SilhouetteOptions {
             force: default_force(),
             mat: 1,
             tool_offset: default_tool_offset(),
-            landscape: false,
         }
     }
 }
