@@ -24,7 +24,7 @@ pub(crate) const VISUAL_WIDTH_MARGIN: f64 = 1.35;
 
 /// `font_fit_scale` at which text fit reaches the tight max (width margin
 /// spent + line-height tightened so glyph ink can grow into the box).
-const TIGHT_FIT_SCALE: f64 = 1.5;
+const TIGHT_FIT_SCALE: f64 = 2.0;
 
 /// Estimated em width of one terminal column at the transpiled font size.
 /// Used with [`VISUAL_WIDTH_MARGIN`] for fit checks inside a fixed box.
@@ -865,14 +865,14 @@ mod tests {
     #[test]
     fn font_fit_scale_above_one_spends_width_margin() {
         // Tall box + medium text: comfortable max is width-margin limited; tight
-        // width + tightened line-height allows a larger font at 150%.
+        // width + tightened line-height allows a larger font at 200%.
         let width = 200.0;
         let height = 500.0;
         let text = "Hello World";
         let comfortable =
             max_fit_font_px_with_margin_lh(width, height, text, VISUAL_WIDTH_MARGIN, LINE_HEIGHT);
-        let at_150_lh = LINE_HEIGHT / TIGHT_FIT_SCALE;
-        let tight = max_fit_font_px_with_margin_lh(width, height, text, 1.0, at_150_lh);
+        let at_max_lh = LINE_HEIGHT / TIGHT_FIT_SCALE;
+        let tight = max_fit_font_px_with_margin_lh(width, height, text, 1.0, at_max_lh);
         assert!(
             tight > comfortable + 0.5,
             "expected headroom: comfortable={comfortable} tight={tight}"
@@ -893,7 +893,7 @@ mod tests {
             height,
             text,
             &TranspileOptions {
-                font_fit_scale: 1.5,
+                font_fit_scale: TIGHT_FIT_SCALE,
                 ..Default::default()
             },
             LINE_HEIGHT,
@@ -909,7 +909,7 @@ mod tests {
             enlarged
         );
         assert!(
-            (enlarged.line_height - at_150_lh).abs() < 1e-9,
+            (enlarged.line_height - at_max_lh).abs() < 1e-9,
             "lh={}",
             enlarged.line_height
         );
@@ -923,7 +923,7 @@ mod tests {
     #[test]
     fn font_fit_scale_above_one_grows_height_bound_ink() {
         // Height-bound text: 100% fills the line box, but glyph ink sits short of
-        // the head. 150% grows the font ~1.5× and tightens line-height so the
+        // the head. 200% grows the font ~2× and tightens line-height so the
         // line box still fits (continuous tapes and short die-cut text).
         let width = 2000.0;
         let height = 100.0;
@@ -935,13 +935,13 @@ mod tests {
             height,
             text,
             &TranspileOptions {
-                font_fit_scale: 1.5,
+                font_fit_scale: TIGHT_FIT_SCALE,
                 ..Default::default()
             },
             LINE_HEIGHT,
         );
         assert!(
-            (enlarged.font_px - comfortable * 1.5).abs() < 0.5,
+            (enlarged.font_px - comfortable * TIGHT_FIT_SCALE).abs() < 0.5,
             "enlarged={:?} comfortable={comfortable}",
             enlarged
         );
@@ -990,7 +990,7 @@ mod tests {
     }
 
     #[test]
-    fn font_fit_scale_row_text_stays_within_box_at_150() {
+    fn font_fit_scale_row_text_stays_within_box_at_200() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
             viewport: Some(ViewportPx {
@@ -1006,7 +1006,7 @@ mod tests {
                 element_gap_px: 8.0,
                 ..Default::default()
             },
-            font_fit_scale: 1.5,
+            font_fit_scale: 2.0,
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
@@ -1024,12 +1024,12 @@ mod tests {
         let enlarged = parse_row_text_font_px(&enlarged_css);
         assert!(enlarged >= full - 0.05, "full={full} enlarged={enlarged}");
         assert!(
-            enlarged <= full * 1.5 + 0.05,
-            "full={full} enlarged={enlarged} should not exceed 1.5× comfortable"
+            enlarged <= full * 2.0 + 0.05,
+            "full={full} enlarged={enlarged} should not exceed 2× comfortable"
         );
         // Line box may use a tightened line-height; font alone can exceed height/1.1.
         assert!(
-            enlarged <= 142.0 / (ROW_TEXT_LINE_HEIGHT / 1.5) + 0.5,
+            enlarged <= 142.0 / (ROW_TEXT_LINE_HEIGHT / 2.0) + 0.5,
             "enlarged={enlarged} exceeds tightened row line-box budget"
         );
     }

@@ -1516,7 +1516,7 @@ mod tests {
     }
 
     #[test]
-    fn fill_mode_font_fit_scale_150_stays_within_viewport() {
+    fn fill_mode_font_fit_scale_200_stays_within_viewport() {
         let height = 142.0;
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
@@ -1531,7 +1531,7 @@ mod tests {
                 padding_left_px: 0.0,
                 ..Default::default()
             },
-            font_fit_scale: 1.5,
+            font_fit_scale: 2.0,
             ..Default::default()
         };
         let out = transpile(
@@ -1546,7 +1546,7 @@ mod tests {
         assert!(
             out.contains(&format!(
                 "line-height:{}",
-                crate::text_fit::LINE_HEIGHT / 1.5
+                crate::text_fit::LINE_HEIGHT / 2.0
             )),
             "expected tightened line-height: {out}"
         );
@@ -1558,13 +1558,13 @@ mod tests {
             },
         );
         let font_100 = crate::text_fit::injected_fit_font_px(&at_100).expect("100% font");
-        // Height-bound short text: 150% grows ~1.5×; line box still fits.
+        // Height-bound short text: 200% grows ~2×; line box still fits.
         assert!(
-            (font - font_100 * 1.5).abs() < 0.5,
-            "font_150={font} font_100={font_100}"
+            (font - font_100 * 2.0).abs() < 0.5,
+            "font_200={font} font_100={font_100}"
         );
         assert!(
-            font * (crate::text_fit::LINE_HEIGHT / 1.5) <= height + 0.5,
+            font * (crate::text_fit::LINE_HEIGHT / 2.0) <= height + 0.5,
             "font={font} line box overflows height {height}"
         );
     }
