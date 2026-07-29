@@ -8,6 +8,7 @@
 //! 550 Series Technical Reference* and
 //! <https://thermal-label.github.io/labelwriter/protocol/lw5-raster>.
 
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// ESC prefix byte for LW5 commands.
@@ -283,7 +284,7 @@ pub struct Lw550PrintStatusView {
     pub usb_pid: Option<u16>,
     /// Whether the device can accept a new print job.
     #[serde(default)]
-    pub readiness: crate::PrintReadiness,
+    pub readiness: PrintReadiness,
 }
 
 impl From<&Lw550PrintStatus> for Lw550PrintStatusView {
@@ -319,7 +320,7 @@ impl Lw550PrintStatus {
     }
 
     /// Whether the device can accept a new print job.
-    pub fn readiness(&self) -> crate::PrintReadiness {
+    pub fn readiness(&self) -> PrintReadiness {
         readiness_from_fields(
             self.print_status,
             self.print_head_status,
@@ -349,7 +350,7 @@ fn readiness_from_fields(
     main_bay_status: Lw550MainBayStatus,
     print_head_voltage: Lw550PrintHeadVoltage,
     error_id: u32,
-) -> crate::PrintReadiness {
+) -> PrintReadiness {
     use Lw550MainBayStatus as Bay;
     use Lw550PrintEngineStatus as Eng;
     use Lw550PrintHeadStatus as Head;
@@ -358,22 +359,22 @@ fn readiness_from_fields(
     // In-progress jobs are healthy enough for status purposes; hosts still
     // serialize dispatch with their own print mutex.
     if matches!(print_status, Eng::Printing | Eng::Busy) {
-        return crate::PrintReadiness::ready();
+        return PrintReadiness::ready();
     }
     if matches!(print_status, Eng::Error | Eng::Cancel) {
-        return crate::PrintReadiness::not_ready(print_status.as_str());
+        return PrintReadiness::not_ready(print_status.as_str());
     }
     if print_head_status != Head::Ok {
-        return crate::PrintReadiness::not_ready(print_head_status.as_str());
+        return PrintReadiness::not_ready(print_head_status.as_str());
     }
     match main_bay_status {
-        Bay::NoMedia => return crate::PrintReadiness::not_ready("no_media"),
-        Bay::MediaEmpty => return crate::PrintReadiness::not_ready("media_empty"),
-        Bay::MediaJammed => return crate::PrintReadiness::not_ready("media_jammed"),
-        Bay::MediaCounterfeit => return crate::PrintReadiness::not_ready("media_counterfeit"),
-        Bay::BayOpen => return crate::PrintReadiness::not_ready("bay_open"),
+        Bay::NoMedia => return PrintReadiness::not_ready("no_media"),
+        Bay::MediaEmpty => return PrintReadiness::not_ready("media_empty"),
+        Bay::MediaJammed => return PrintReadiness::not_ready("media_jammed"),
+        Bay::MediaCounterfeit => return PrintReadiness::not_ready("media_counterfeit"),
+        Bay::BayOpen => return PrintReadiness::not_ready("bay_open"),
         Bay::MediaNotInsertedProperly => {
-            return crate::PrintReadiness::not_ready("media_not_inserted_properly")
+            return PrintReadiness::not_ready("media_not_inserted_properly")
         }
         // media_low / critically_low / ok / present_unknown: still printable
         _ => {}
@@ -382,15 +383,15 @@ fn readiness_from_fields(
         print_head_voltage,
         Volt::TooLowForPrinting | Volt::CriticallyLow
     ) {
-        return crate::PrintReadiness::not_ready(print_head_voltage.as_str());
+        return PrintReadiness::not_ready(print_head_voltage.as_str());
     }
     if error_id != 0 {
-        return crate::PrintReadiness::not_ready("error");
+        return PrintReadiness::not_ready("error");
     }
     if print_status == Eng::NoLock {
-        return crate::PrintReadiness::not_ready("no_lock");
+        return PrintReadiness::not_ready("no_lock");
     }
-    crate::PrintReadiness::ready()
+    PrintReadiness::ready()
 }
 
 /// Whether the bay byte indicates media is likely loaded (gate for `ESC U`).

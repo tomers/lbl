@@ -5,6 +5,7 @@
 //! d1-core protocol docs. Hosts commonly read a full 64-byte max-packet block;
 //! only byte 0 is meaningful.
 
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// Bare `ESC A` status query.
@@ -50,11 +51,11 @@ impl DymoD1Status {
     }
 
     /// Whether the device can accept a new print job.
-    pub fn readiness(self) -> crate::PrintReadiness {
+    pub fn readiness(self) -> PrintReadiness {
         if self.ready() {
-            crate::PrintReadiness::ready()
+            PrintReadiness::ready()
         } else {
-            crate::PrintReadiness::not_ready(self.state())
+            PrintReadiness::not_ready(self.state())
         }
     }
 }

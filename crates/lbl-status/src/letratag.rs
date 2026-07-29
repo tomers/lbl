@@ -1,5 +1,6 @@
 //! DYMO LetraTag LT-200B advertising-data status (passive BLE scan).
 
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// 3-byte BLE advertising manufacturer payload.
@@ -35,12 +36,12 @@ impl LetraTagAdStatus {
     }
 
     /// Whether the device can accept a new print job.
-    pub fn readiness(self) -> crate::PrintReadiness {
+    pub fn readiness(self) -> PrintReadiness {
         let token = self.state();
         if token == "ready" {
-            crate::PrintReadiness::ready()
+            PrintReadiness::ready()
         } else {
-            crate::PrintReadiness::not_ready(token)
+            PrintReadiness::not_ready(token)
         }
     }
 }

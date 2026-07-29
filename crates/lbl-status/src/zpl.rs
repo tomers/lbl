@@ -36,6 +36,7 @@
 //! use slightly different field positions. The parser is therefore defensive:
 //! missing fields are treated as `0`.
 
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// `~HS` host-status query command bytes.
@@ -58,7 +59,7 @@ pub struct ZplHostStatus {
     /// Raw STX/ETX-stripped lines from the response (up to 3).
     pub raw_lines: Vec<String>,
     /// Whether the device can accept a new print job.
-    pub readiness: crate::PrintReadiness,
+    pub readiness: PrintReadiness,
 }
 
 impl ZplHostStatus {
@@ -68,20 +69,20 @@ impl ZplHostStatus {
         pause: bool,
         head_open: bool,
         corrupt_ram: bool,
-    ) -> crate::PrintReadiness {
+    ) -> PrintReadiness {
         if paper_out {
-            return crate::PrintReadiness::not_ready("paper_out");
+            return PrintReadiness::not_ready("paper_out");
         }
         if head_open {
-            return crate::PrintReadiness::not_ready("head_open");
+            return PrintReadiness::not_ready("head_open");
         }
         if corrupt_ram {
-            return crate::PrintReadiness::not_ready("corrupt_ram");
+            return PrintReadiness::not_ready("corrupt_ram");
         }
         if pause {
-            return crate::PrintReadiness::not_ready("paused");
+            return PrintReadiness::not_ready("paused");
         }
-        crate::PrintReadiness::ready()
+        PrintReadiness::ready()
     }
 }
 

@@ -5,7 +5,7 @@
 //! a transport (USB, BLE, network) map these errors onto their own error type
 //! at the I/O boundary.
 
-use crate::PrintReadiness;
+use crate::readiness::PrintReadiness;
 
 /// Errors produced while building status queries or parsing replies.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

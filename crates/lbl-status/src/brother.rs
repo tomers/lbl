@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::readiness::PrintReadiness;
+
 /// Status-type byte (offset 18) of the 32-byte `ESC i S` reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -94,10 +96,10 @@ impl BrotherStatusSummary {
     ///
     /// Chip `severity` stays a UI concern (`no_media` is warning there); dispatch
     /// still blocks on that state.
-    pub fn readiness(&self) -> crate::PrintReadiness {
+    pub fn readiness(&self) -> PrintReadiness {
         match self.state.as_str() {
-            "ready" | "printing" | "print_complete" => crate::PrintReadiness::ready(),
-            other => crate::PrintReadiness::not_ready(other),
+            "ready" | "printing" | "print_complete" => PrintReadiness::ready(),
+            other => PrintReadiness::not_ready(other),
         }
     }
 }

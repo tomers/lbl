@@ -19,6 +19,7 @@ use lbl::pipeline::{
     EncodeLabelsResult, PipelineLayout, PipelineOptions, Source, VECTOR_CSS_DPI,
 };
 use lbl::print_stats::{feed_dots_for_trace, LabelFeedDots, PrintRunTimings, PrintSummaryInput};
+use lbl::terminal::{highlight_json, stdout_color};
 use lbl_catalog::{encode_capabilities_for, Catalog};
 use lbl_config::StyleConfig;
 use lbl_core::job::{CutMode, JobSpec, OutputMode};
@@ -1761,9 +1762,9 @@ fn run_config(args: ConfigArgs) -> Result<()> {
         ConfigCommand::Show => {
             let cfg = loader.load()?;
             let json = serde_json::to_string_pretty(&cfg)?;
-            let color = lbl::terminal::stdout_color();
+            let color = stdout_color();
             if color {
-                print!("{}", lbl::terminal::highlight_json(&json, true));
+                print!("{}", highlight_json(&json, true));
             } else {
                 print!("{json}");
             }
@@ -1780,11 +1781,7 @@ fn run_config(args: ConfigArgs) -> Result<()> {
                 .unwrap_or_default();
             print!(
                 "{}",
-                lbl_config::format_paths_report(
-                    loader.paths(),
-                    &catalog_extra,
-                    lbl::terminal::stdout_color(),
-                )
+                lbl_config::format_paths_report(loader.paths(), &catalog_extra, stdout_color(),)
             );
         }
     }

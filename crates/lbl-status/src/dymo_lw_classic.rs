@@ -1,5 +1,6 @@
 //! DYMO LabelWriter classic (450-series) 1-byte status (`ESC A`) parsing.
 
+use crate::readiness::PrintReadiness;
 use crate::StatusError;
 
 /// `ESC A` status request.
@@ -38,11 +39,11 @@ impl DymoLwClassicStatus {
     }
 
     /// Whether the device can accept a new print job.
-    pub fn readiness(self) -> crate::PrintReadiness {
+    pub fn readiness(self) -> PrintReadiness {
         if self.ready && !self.no_paper && !self.paper_jam && !self.printer_error {
-            crate::PrintReadiness::ready()
+            PrintReadiness::ready()
         } else {
-            crate::PrintReadiness::not_ready(self.state())
+            PrintReadiness::not_ready(self.state())
         }
     }
 }
