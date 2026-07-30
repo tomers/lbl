@@ -5378,7 +5378,7 @@ keys = ["ITPP941", "941", "RW941", "ITPP941-WiFi", "941 WiFi", "941 AirPrint"]
 name = "Munbyn ITPP941"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5412,7 +5412,7 @@ keys = ["ITPP941B", "941B", "RW941B"]
 name = "Munbyn ITPP941B"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5447,7 +5447,7 @@ keys = ["ITPP941BP", "941BP", "RW941BP"]
 name = "Munbyn ITPP941BP"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 300.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5519,7 +5519,7 @@ keys = ["ITPP129", "RW129B", "129B", "P129"]
 name = "Munbyn ITPP129"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5554,7 +5554,7 @@ keys = ["RW402B", "402B"]
 name = "Munbyn RW402B"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5588,7 +5588,7 @@ keys = ["RW403B", "403B"]
 name = "Munbyn RW403B"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5623,7 +5623,7 @@ keys = ["RW405B", "405B"]
 name = "Munbyn RW405B"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
