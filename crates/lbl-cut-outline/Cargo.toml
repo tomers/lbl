@@ -1,0 +1,21 @@
+[package]
+name                   = "lbl-cut-outline"
+description            = "Convert shaped text runs to craft-cutter CutPath polylines (glyph outlines)."
+version.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+lbl-core   = { workspace = true }
+serde      = { workspace = true }
+thiserror  = { workspace = true }
+base64     = { workspace = true }
+rustybuzz  = "0.20"
+ttf-parser = "0.25"
+wuff       = { version = "0.2", default-features = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
