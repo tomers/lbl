@@ -5475,14 +5475,16 @@ supported_media = [
 ]
 connections = []
 
-# USB PID unconfirmed in public ID DBs — pair by model / network :9100.
+# RealWriter 130 / ITPP130B — USB `5958:0130` (YXWL, printer class).
+# BLE local-name prefix `ITPP130B-…`. Live status is USB Device ID identity
+# (`status_uses_usb_device_id`); bulk TSPL status polls are not implemented.
 [[devices]]
 brand = "Munbyn"
 keys = ["RW130B", "ITPP130", "ITPP130B", "130B", "P130B"]
 name = "Munbyn RW130B"
 support = { brand_url = "https://support.munbyn.com/hc/en-us" }
 protocol = "tspl"
-maturity = "experimental"
+maturity = "verified"
 dpi = 203.0
 max_width_mm = 108.0
 default_media = "102x152"
@@ -5508,7 +5510,7 @@ supported_media = [
   "z-perform-1000d-2x1",
   "tsc-50x25",
 ]
-connections = []
+connections = [{ kind = "usb", vendor_id = 0x5958, product_id = 0x0130 }, { kind = "ble", name = "ITPP130B" }]
 
 # Older portable (ITPP129 / RW129B). Vendor lists TSPL / TSPL2 (+ EPL2); we emit TSPL BITMAP.
 [[devices]]

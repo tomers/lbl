@@ -1027,6 +1027,17 @@ mod tests {
             .connections
             .iter()
             .any(|c| c.is_exact_usb_match(0x09c6, 0x0426)));
+        let rw130 = catalog.lookup_device("ITPP130B").unwrap();
+        assert_eq!(rw130.protocol, Protocol::Tspl);
+        assert_eq!(rw130.maturity, Maturity::Verified);
+        assert!(rw130
+            .connections
+            .iter()
+            .any(|c| c.is_exact_usb_match(0x5958, 0x0130)));
+        assert!(rw130.connections.iter().any(|c| matches!(
+            c,
+            ConnectionHint::Ble { name } if name == "ITPP130B"
+        )));
         let m110 = catalog.lookup_device("M110").unwrap();
         assert_eq!(m110.protocol, Protocol::PhomemoM110);
         assert_eq!(m110.capabilities.max_width_mm, 50.0);
