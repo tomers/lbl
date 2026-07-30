@@ -1176,19 +1176,54 @@ pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String
         } else {
             format!("height:{:.2}px", frame.height_px)
         };
-        // min-width/height:max-content beats transpile's min-*:100% so a warm
-        // iframe that still has the previous (larger) viewport can shrink when
-        // feed-end padding goes to 0 — otherwise measure sticks on the old size.
+        // Open-axis mins stay max-content so Studio can shrink/grow the feed.
+        // Fixed head axis must NOT use min-height:max-content: oversized glyphs
+        // with overflow:visible/clip-path still inflate max-content, the stock
+        // grows taller than the tape, and the warm frame (tape-height iframe)
+        // crops the bottom — preview shows only the top of the raster.
+        let (min_w, min_h) = match (open_width, open_height) {
+            (true, false) => ("min-width:max-content", "min-height:0"),
+            (false, true) => ("min-width:0", "min-height:max-content"),
+            (true, true) => ("min-width:max-content", "min-height:max-content"),
+            (false, false) => ("min-width:0", "min-height:0"),
+        };
+        // Head known, feed open: label is max-content wide (no horizontal clip)
+        // and fills tape height with overflow:hidden (vertical clip only in
+        // practice). Avoid overflow-y:hidden + overflow-x:visible (x→auto).
+        let label_head = if open_height {
+            "width:max-content;max-width:none;flex:0 0 auto".to_string()
+        } else if open_width {
+            "width:max-content;max-width:none;flex:0 0 auto;height:100%;max-height:100%;\
+             box-sizing:border-box;overflow:hidden"
+                .to_string()
+        } else {
+            "flex:0 0 auto;height:100%;max-height:100%;box-sizing:border-box;overflow:hidden"
+                .to_string()
+        };
+        let preview_clip = if open_height {
+            String::new()
+        } else {
+            ".lbl-preview{overflow:hidden;box-sizing:border-box}\n".to_string()
+        };
+        // Fixed head: clip inside the tape box. Feed width is max-content so
+        // overflow:hidden does not truncate glyphs horizontally. (Do not use
+        // overflow-y:hidden alone — CSS would force overflow-x to auto.)
+        let stock_overflow = if !open_height || !open_width {
+            "overflow:hidden"
+        } else {
+            "overflow:visible"
+        };
         format!(
             ".lbl-stock{{position:relative;{width_rule};{height_rule};box-sizing:border-box;\
              padding:{pad_top}px {pad_right}px {pad_bottom}px {pad_left}px;\
-             background:#fff;overflow:visible;align-self:flex-start;flex:0 0 auto;\
-             min-width:max-content;min-height:max-content}}\n\
+             background:#fff;{stock_overflow};align-self:flex-start;flex:0 0 auto;\
+             {min_w};{min_h}}}\n\
              .lbl-stock-print{{box-sizing:border-box;display:flex;flex-direction:column;\
              justify-content:center;{print_width};{print_height}}}\n\
              html,body{{margin:0;{width_rule};{height_rule};align-items:flex-start;\
-             min-width:max-content;min-height:max-content}}\n\
-             .lbl-label{{width:max-content;max-width:none;flex:0 0 auto}}\n",
+             {min_w};{min_h};overflow:hidden}}\n\
+             {preview_clip}\
+             .lbl-label{{{label_head}}}\n",
             width_rule = width_rule,
             height_rule = height_rule,
             print_width = if open_width {
@@ -1205,6 +1240,11 @@ pub fn frame_html_preview_stock(html: &str, frame: &PreviewStockFrame) -> String
             pad_right = pad_right,
             pad_bottom = pad_bottom,
             pad_left = pad_left,
+            preview_clip = preview_clip,
+            label_head = label_head,
+            stock_overflow = stock_overflow,
+            min_w = min_w,
+            min_h = min_h,
         )
     } else {
         format!(
@@ -2156,12 +2196,24 @@ mod tests {
             "zero pads must still wrap stock so label stays max-content: {framed}"
         );
         assert!(
-            framed.contains(".lbl-label{width:max-content;max-width:none;flex:0 0 auto}"),
-            "zero-pad continuous must not stretch label to the iframe: {framed}"
+            framed.contains("width:max-content;max-width:none"),
+            "zero-pad continuous must not stretch/clip label on the feed axis: {framed}"
         );
         assert!(
             framed.contains("min-width:max-content"),
-            "zero-pad continuous must keep shrinkable max-content mins: {framed}"
+            "open feed axis keeps max-content min: {framed}"
+        );
+        assert!(
+            framed.contains("min-height:0"),
+            "fixed head must not use min-height:max-content (inflates past tape): {framed}"
+        );
+        assert!(
+            !framed.contains("clip-path:"),
+            "clip-path must not replace overflow clip on continuous head: {framed}"
+        );
+        assert!(
+            framed.contains("overflow:hidden"),
+            "fixed head clips oversize glyphs inside the tape height: {framed}"
         );
     }
 
