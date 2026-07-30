@@ -645,8 +645,8 @@ pub struct TranspileOptions {
     pub label_valign: LabelValign,
     /// Fraction of the viewport used by the fit box in fill mode (`1.0` = 100%).
     pub label_fit_scale: f64,
-    /// Auto-fit text scale in fill mode (`1.0` = ink-tight printable max;
-    /// below shrinks; above multiplies past that max and may clip).
+    /// Auto-fit text scale in fill mode (`1.0` = largest clipping-safe fill;
+    /// below shrinks; above may clip; ≈133% is aggressive ink-tight).
     pub font_fit_scale: f64,
     /// Inset from the physical media edge (calibration margin).
     pub media_inset: MediaInsetPx,
@@ -1512,7 +1512,7 @@ mod tests {
                 padding_left_px: 0.0,
                 ..Default::default()
             },
-            // User 0.25 → internal 0.5 → half of mid-scale (padded) max.
+            // User 0.25 → internal 0.375 → 0.375× padded (internal-1.0) max.
             font_fit_scale: 0.25,
             ..Default::default()
         };
@@ -1521,7 +1521,7 @@ mod tests {
             &opts,
         );
         assert!(
-            out.contains(".lbl-label>.lbl-text:only-child{font-size:64."),
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:48."),
             "{out}"
         );
     }
@@ -1554,25 +1554,27 @@ mod tests {
             "scale must not be a second CSS path: {out}"
         );
         let font = injected_fit_font_px(&out).expect("injected font");
+        let full_lh = LINE_HEIGHT / 1.5; // user 1.0 → internal 1.5 → clipping-safe
         assert!(
-            out.contains(&format!("line-height:{}", LINE_HEIGHT / 2.0)),
-            "expected tightened line-height: {out}"
+            out.contains(&format!("line-height:{full_lh}")),
+            "expected clipping-safe 100% line-height: {out}"
         );
         let at_mid = transpile(
             "<div class=\"lbl-label\"><div class=\"lbl-text\">#1</div></div>",
             &TranspileOptions {
-                font_fit_scale: 0.5,
+                // internal 1.0 (padded mid) = user 1/1.5
+                font_fit_scale: 1.0 / 1.5,
                 ..opts
             },
         );
-        let font_mid = injected_fit_font_px(&at_mid).expect("50% font");
-        // Height-bound short text: 100% grows ~2× vs mid-scale; line box still fits.
+        let font_mid = injected_fit_font_px(&at_mid).expect("mid font");
+        // Height-bound short text: 100% grows ~1.5× vs padded mid; line box still fits.
         assert!(
-            (font - font_mid * 2.0).abs() < 0.5,
-            "font_100={font} font_50={font_mid}"
+            (font - font_mid * 1.5).abs() < 0.5,
+            "font_100={font} font_mid={font_mid}"
         );
         assert!(
-            font * (LINE_HEIGHT / 2.0) <= height + 0.5,
+            font * full_lh <= height + 0.5,
             "font={font} line box overflows height {height}"
         );
     }
@@ -1617,7 +1619,7 @@ mod tests {
             &opts,
         );
         assert!(
-            out.contains(".lbl-label>.lbl-text:only-child{font-size:258."),
+            out.contains(".lbl-label>.lbl-text:only-child{font-size:193."),
             "{out}"
         );
     }
@@ -1654,6 +1656,7 @@ mod tests {
             .and_then(|s| s.parse::<f64>().ok())
             .expect("computed lone-text font size");
         let tight_lh = LINE_HEIGHT / 2.0;
+        // Default 100% is clipping-safe (not fully ink-tight); still under tight budget.
         assert!(fit > 20.0 && fit < 142.0 / tight_lh, "fit={fit}");
     }
 
