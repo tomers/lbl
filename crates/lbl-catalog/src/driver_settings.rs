@@ -125,13 +125,69 @@ fn silhouette_schema() -> Value {
                     "speed": {
                         "type": "number",
                         "minimum": 1,
-                        "maximum": 10,
+                        "maximum": 30,
                         "default": 5
+                    },
+                    "depth": {
+                        "type": "number",
+                        "minimum": 1,
+                        "maximum": 10,
+                        "default": 1
+                    },
+                    "passes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10,
+                        "default": 1
+                    },
+                    "tool": {
+                        "type": "string",
+                        "enum": ["autoblade", "ratchet", "deep_cut", "pen"],
+                        "default": "autoblade"
+                    },
+                    "tool_holder": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2,
+                        "default": 1
+                    },
+                    "tool_offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 40,
+                        "default": 18
+                    },
+                    "track_enhance": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "acceleration": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3,
+                        "default": 3
+                    },
+                    "overcut_enabled": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "overcut_start_mm": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "multipleOf": 0.1,
+                        "default": 0.1
+                    },
+                    "overcut_end_mm": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "multipleOf": 0.1,
+                        "default": 0.1
                     },
                     "mat": {
                         "type": "integer",
-                        "minimum": 0,
-                        "maximum": 2,
+                        "enum": [0, 1, 2, 8, 9],
                         "default": 1
                     }
                 },
@@ -212,15 +268,17 @@ pub fn default_browser_api(protocol: Protocol) -> &'static str {
     }
 }
 
-/// Silhouette / GPGL mat index → cuttable sheet size in millimeters.
+/// Silhouette / GPGL `TG` mat code → cuttable sheet size in millimeters.
 ///
-/// Indices align with the `silhouette.mat` driver setting and catalog mat media.
+/// Codes match Graphtec / Studio: 0 none, 1 = 12×12, 2 = 12×24, 8 = 15×15,
+/// 9 = 24×24. Legacy contiguous indices 3/4 (from earlier app builds) map to
+/// 8/9 for sheet sizing so persisted values still pack correctly.
 pub fn cutter_mat_sheet_mm(mat: u32) -> (f64, f64) {
     match mat {
         0 | 1 => (304.8, 304.8),
         2 => (304.8, 609.6),
-        3 => (381.0, 381.0),
-        4 => (609.6, 609.6),
+        3 | 8 => (381.0, 381.0),
+        4 | 9 => (609.6, 609.6),
         _ => (304.8, 304.8),
     }
 }
@@ -288,15 +346,37 @@ mod tests {
     }
 
     #[test]
+    fn cutter_mat_sheet_mm_maps_tg_codes() {
+        assert_eq!(cutter_mat_sheet_mm(0), (304.8, 304.8));
+        assert_eq!(cutter_mat_sheet_mm(1), (304.8, 304.8));
+        assert_eq!(cutter_mat_sheet_mm(2), (304.8, 609.6));
+        assert_eq!(cutter_mat_sheet_mm(8), (381.0, 381.0));
+        assert_eq!(cutter_mat_sheet_mm(9), (609.6, 609.6));
+        // Legacy contiguous indices.
+        assert_eq!(cutter_mat_sheet_mm(3), (381.0, 381.0));
+        assert_eq!(cutter_mat_sheet_mm(4), (609.6, 609.6));
+    }
+
+    #[test]
     fn cutter_exposes_silhouette_schema() {
         let catalog = Catalog::bundled().unwrap();
         let schema = schema_for(device(&catalog, "cameo4")).unwrap();
         assert_no_presentation_keys(&schema);
         let silhouette = &schema["properties"]["silhouette"]["properties"];
         assert_eq!(silhouette["force"]["maximum"], json!(33));
-        assert_eq!(silhouette["speed"]["maximum"], json!(10));
+        assert_eq!(silhouette["speed"]["maximum"], json!(30));
+        assert_eq!(silhouette["depth"]["maximum"], json!(10));
+        assert_eq!(silhouette["passes"]["default"], json!(1));
+        assert_eq!(
+            silhouette["tool"]["enum"],
+            json!(["autoblade", "ratchet", "deep_cut", "pen"])
+        );
+        assert_eq!(silhouette["tool_holder"]["maximum"], json!(2));
         assert_eq!(silhouette["mat"]["type"], json!("integer"));
-        assert_eq!(silhouette["mat"]["maximum"], json!(2));
+        assert_eq!(silhouette["mat"]["enum"], json!([0, 1, 2, 8, 9]));
+        assert_eq!(silhouette["track_enhance"]["type"], json!("boolean"));
+        assert_eq!(silhouette["overcut_enabled"]["type"], json!("boolean"));
+        assert_eq!(silhouette["acceleration"]["default"], json!(3));
     }
 
     #[test]

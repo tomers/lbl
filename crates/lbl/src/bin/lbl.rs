@@ -97,12 +97,42 @@ struct CutArgs {
     /// Force (`FX`), typically 1–33.
     #[arg(long, default_value_t = 10)]
     force: u8,
-    /// Speed (`!`), typically 1–10.
+    /// Speed (`!`), Cameo-class 1–30.
     #[arg(long, default_value_t = 5)]
     speed: u8,
-    /// Mat preset (`TG`): 0 none, 1 = 12×12, …
+    /// Mat preset (`TG`): 0 none, 1 = 12×12, 2 = 12×24, 8 = 15×15, 9 = 24×24.
     #[arg(long, default_value_t = 1)]
     mat: u8,
+    /// Autoblade / recommended blade depth (`TF`), 1–10.
+    #[arg(long, default_value_t = 1)]
+    depth: u8,
+    /// Passes (path re-emit count; Studio "Passes").
+    #[arg(long, default_value_t = 1)]
+    passes: u8,
+    /// Tool: autoblade, ratchet, deep_cut, or pen.
+    #[arg(long, default_value = "autoblade")]
+    tool: String,
+    /// Tool holder / carriage (`J`), 1 or 2.
+    #[arg(long, default_value_t = 1)]
+    tool_holder: u8,
+    /// Cutter offset (`FC`); pens force 0.
+    #[arg(long, default_value_t = 18)]
+    tool_offset: u16,
+    /// Enable track enhancing (`FY0`).
+    #[arg(long, default_value_t = false)]
+    track_enhance: bool,
+    /// Acceleration (`TJ`), 0–3.
+    #[arg(long, default_value_t = 3)]
+    acceleration: u8,
+    /// Enable line-segment overcut (`FE`/`FF`).
+    #[arg(long, default_value_t = false)]
+    overcut: bool,
+    /// Overcut start extension in millimeters.
+    #[arg(long, default_value_t = 0.1)]
+    overcut_start_mm: f64,
+    /// Overcut end extension in millimeters.
+    #[arg(long, default_value_t = 0.1)]
+    overcut_end_mm: f64,
     /// Write encoded GPGL bytes to this file instead of USB.
     #[arg(long)]
     output: Option<std::path::PathBuf>,
@@ -2155,7 +2185,7 @@ fn main() -> Result<()> {
 }
 
 fn run_cut(args: CutArgs) -> Result<()> {
-    use lbl_core::{CutJobSpec, CutPath, SilhouetteOptions};
+    use lbl_core::{CutJobSpec, CutPath, SilhouetteOptions, SilhouetteTool};
     use lbl_driver_gpgl::{encode_cut, svg::cut_paths_from_svg};
 
     let paths: Vec<CutPath> = if let Some(svg_path) = &args.svg {
@@ -2170,6 +2200,14 @@ fn run_cut(args: CutArgs) -> Result<()> {
         bail!("provide --svg or --paths");
     };
 
+    let tool = match args.tool.to_ascii_lowercase().as_str() {
+        "autoblade" | "auto" => SilhouetteTool::Autoblade,
+        "ratchet" | "manual" => SilhouetteTool::Ratchet,
+        "deep_cut" | "deep-cut" | "deep" => SilhouetteTool::DeepCut,
+        "pen" | "sketch" => SilhouetteTool::Pen,
+        other => bail!("unknown --tool '{other}' (autoblade|ratchet|deep_cut|pen)"),
+    };
+
     let job = CutJobSpec {
         width_mm: args.width_mm,
         height_mm: args.height_mm,
@@ -2179,7 +2217,16 @@ fn run_cut(args: CutArgs) -> Result<()> {
             speed: args.speed,
             force: args.force,
             mat: args.mat,
-            tool_offset: 18,
+            tool_offset: args.tool_offset,
+            depth: args.depth,
+            passes: args.passes.max(1),
+            tool,
+            tool_holder: args.tool_holder.clamp(1, 2),
+            track_enhance: args.track_enhance,
+            acceleration: args.acceleration.min(3),
+            overcut_enabled: args.overcut,
+            overcut_start_mm: args.overcut_start_mm,
+            overcut_end_mm: args.overcut_end_mm,
         },
     };
     let bytes = encode_cut(&paths, &job).map_err(|e| anyhow!("{e}"))?;

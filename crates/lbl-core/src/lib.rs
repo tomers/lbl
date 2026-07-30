@@ -21,7 +21,7 @@ pub mod printer;
 pub mod units;
 
 pub use bitmap::MonoBitmap;
-pub use cut::{CutJobSpec, CutPath, CutPointMm, SilhouetteOptions};
+pub use cut::{CutJobSpec, CutPath, CutPointMm, SilhouetteOptions, SilhouetteTool};
 pub use error::{CoreError, Result};
 pub use feed_plan::{
     resolve_feed_plan, resolve_virtual_feed_gaps, FeedPlan, FeedPlanError, PaddingSidesMm,

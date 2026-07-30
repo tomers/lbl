@@ -14,7 +14,7 @@
 
 pub mod svg;
 
-use lbl_core::{CutJobSpec, CutPath, CutPointMm};
+use lbl_core::{CutJobSpec, CutPath, CutPointMm, SilhouetteOptions};
 
 /// Errors from GPGL encoding.
 #[derive(Debug, thiserror::Error)]
@@ -48,15 +48,35 @@ pub fn encode_cut(paths: &[CutPath], job: &CutJobSpec) -> Result<Vec<u8>, GpglEr
     let feed_u = mm_to_units(job.height_mm);
     let carriage_u = mm_to_units(job.width_mm);
     let copies = job.copies.max(1);
+    let passes = opt.passes.max(1);
+    let holder = opt.tool_holder.max(1);
 
     for _ in 0..copies {
         out.extend_from_slice(b"\x1b\x04");
         push_cmd(&mut out, "FN", &["0"]);
         push_cmd(&mut out, "TB50", &["0"]);
         push_cmd(&mut out, "TG", &[&opt.mat.to_string()]);
-        push_cmd(&mut out, "FX", &[&opt.force.to_string()]);
-        push_cmd(&mut out, "!", &[&opt.speed.to_string()]);
-        push_cmd(&mut out, "FC", &[&opt.tool_offset.to_string()]);
+        push_cmd(&mut out, "J", &[&holder.to_string()]);
+        push_tool_cmd(&mut out, "FX", &opt.force.to_string(), holder);
+        push_tool_cmd(&mut out, "!", &opt.speed.to_string(), holder);
+        push_fc(&mut out, opt, holder);
+        push_cmd(&mut out, "TJ", &["0"]);
+        if opt.acceleration > 0 {
+            push_cmd(&mut out, "TJ", &[&opt.acceleration.to_string()]);
+        }
+        if opt.emits_autoblade_depth() {
+            let depth = opt.depth.clamp(1, 10);
+            // Autoblade depth is only valid on tool holder 1.
+            push_cmd(&mut out, "TF", &[&depth.to_string(), "1"]);
+        }
+        if opt.track_enhance {
+            // FY0 = on (inverted sense in Graphtec docs).
+            push_cmd(&mut out, "FY", &["0"]);
+            push_cmd(&mut out, "FU", &[&format!("{feed_u:.0}")]);
+        } else {
+            push_cmd(&mut out, "FY", &["1"]);
+        }
+        push_overcut(&mut out, opt, holder);
         push_cmd(&mut out, "\\", &["0", "0"]);
         push_cmd(
             &mut out,
@@ -64,18 +84,53 @@ pub fn encode_cut(paths: &[CutPath], job: &CutJobSpec) -> Result<Vec<u8>, GpglEr
             &[&format!("{feed_u:.0}"), &format!("{carriage_u:.0}")],
         );
 
-        for path in paths {
-            encode_path(&mut out, path)?;
+        for _ in 0..passes {
+            for path in paths {
+                encode_path(&mut out, path)?;
+            }
         }
 
         push_cmd(&mut out, "L", &["0"]);
         push_cmd(&mut out, "\\", &["0", "0"]);
         push_cmd(&mut out, "M", &["0", "0"]);
+        push_cmd(&mut out, "J", &["0"]);
         push_cmd(&mut out, "FN", &["0"]);
         push_cmd(&mut out, "TB50", &["0"]);
     }
 
     Ok(out)
+}
+
+fn push_tool_cmd(out: &mut Vec<u8>, op: &str, value: &str, holder: u8) {
+    push_cmd(out, op, &[value, &holder.to_string()]);
+}
+
+/// Cameo 4 Studio form: `FC{offset},1,{holder}`.
+fn push_fc(out: &mut Vec<u8>, opt: &SilhouetteOptions, holder: u8) {
+    let offset = opt.effective_tool_offset();
+    push_cmd(out, "FC", &[&offset.to_string(), "1", &holder.to_string()]);
+}
+
+fn push_overcut(out: &mut Vec<u8>, opt: &SilhouetteOptions, holder: u8) {
+    let holder_s = holder.to_string();
+    if opt.overcut_enabled {
+        let start = mm_to_overcut_tenths(opt.overcut_start_mm);
+        let end = mm_to_overcut_tenths(opt.overcut_end_mm);
+        push_cmd(out, "FE", &["0", &holder_s]);
+        push_cmd(
+            out,
+            "FF",
+            &[&start.to_string(), &end.to_string(), &holder_s],
+        );
+    } else {
+        push_cmd(out, "FE", &["0", &holder_s]);
+        push_cmd(out, "FF", &["0", "0", &holder_s]);
+    }
+}
+
+/// Studio / Graphtec `FF` extents are in 0.1 mm units.
+fn mm_to_overcut_tenths(mm: f64) -> u32 {
+    ((mm.max(0.0) * 10.0).round() as u32).min(99)
 }
 
 fn encode_path(out: &mut Vec<u8>, path: &CutPath) -> Result<(), GpglError> {
@@ -155,7 +210,7 @@ pub enum GpglStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lbl_core::SilhouetteOptions;
+    use lbl_core::{SilhouetteOptions, SilhouetteTool};
 
     fn sample_job(width_mm: f64, height_mm: f64) -> CutJobSpec {
         CutJobSpec {
@@ -163,12 +218,7 @@ mod tests {
             height_mm,
             copies: 1,
             device_key: Some("cameo4".into()),
-            silhouette: SilhouetteOptions {
-                speed: 5,
-                force: 10,
-                mat: 1,
-                tool_offset: 18,
-            },
+            silhouette: SilhouetteOptions::default(),
         }
     }
 
@@ -177,13 +227,74 @@ mod tests {
         let path = CutPath::rect_mm(10.0, 20.0, 30.0, 40.0);
         let bytes = encode_cut(&[path], &sample_job(304.8, 304.8)).unwrap();
         let s = String::from_utf8_lossy(&bytes);
-        assert!(s.contains("FX10\u{3}"));
-        assert!(s.contains("!5\u{3}"));
-        assert!(s.contains("FC18\u{3}"));
+        assert!(s.contains("FX10,1\u{3}"));
+        assert!(s.contains("!5,1\u{3}"));
+        assert!(s.contains("FC18,1,1\u{3}"));
         assert!(s.contains("TG1\u{3}"));
+        assert!(s.contains("J1\u{3}"));
+        assert!(s.contains("TF1,1\u{3}"));
+        assert!(s.contains("TJ0\u{3}"));
+        assert!(s.contains("TJ3\u{3}"));
+        assert!(s.contains("FY1\u{3}"));
         assert!(s.contains('M'));
         assert!(s.contains('D'));
         assert!(bytes.contains(&0x03));
+    }
+
+    #[test]
+    fn autoblade_emits_tf_pen_skips_and_zero_offset() {
+        let path = CutPath::rect_mm(0.0, 0.0, 10.0, 10.0);
+        let mut job = sample_job(100.0, 100.0);
+        job.silhouette.tool = SilhouetteTool::Autoblade;
+        job.silhouette.depth = 4;
+        let bytes = encode_cut(std::slice::from_ref(&path), &job).unwrap();
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(s.contains("TF4,1\u{3}"));
+
+        job.silhouette.tool = SilhouetteTool::Pen;
+        job.silhouette.tool_offset = 18;
+        let bytes = encode_cut(&[path], &job).unwrap();
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(!s.contains("TF"));
+        assert!(s.contains("FC0,1,1\u{3}"));
+    }
+
+    #[test]
+    fn passes_repeat_path_geometry() {
+        let path = CutPath {
+            points: vec![
+                CutPointMm {
+                    x_mm: 0.0,
+                    y_mm: 0.0,
+                },
+                CutPointMm {
+                    x_mm: 5.0,
+                    y_mm: 0.0,
+                },
+            ],
+            closed: false,
+        };
+        let mut job = sample_job(100.0, 100.0);
+        job.silhouette.passes = 2;
+        let bytes = encode_cut(&[path], &job).unwrap();
+        let s = String::from_utf8_lossy(&bytes);
+        assert_eq!(s.matches("M0.00,0.00\u{3}").count(), 2);
+        assert_eq!(s.matches("D0.00,100.00\u{3}").count(), 2);
+    }
+
+    #[test]
+    fn track_enhance_and_overcut() {
+        let path = CutPath::rect_mm(0.0, 0.0, 10.0, 10.0);
+        let mut job = sample_job(304.8, 304.8);
+        job.silhouette.track_enhance = true;
+        job.silhouette.overcut_enabled = true;
+        job.silhouette.overcut_start_mm = 0.5;
+        job.silhouette.overcut_end_mm = 0.2;
+        let bytes = encode_cut(&[path], &job).unwrap();
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(s.contains("FY0\u{3}"));
+        assert!(s.contains("FU6096\u{3}"));
+        assert!(s.contains("FF5,2,1\u{3}"));
     }
 
     #[test]
