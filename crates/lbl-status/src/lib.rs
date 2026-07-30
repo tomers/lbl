@@ -17,6 +17,7 @@ mod error;
 mod letratag;
 mod readiness;
 mod session;
+pub mod usb_printer_id;
 mod zpl;
 
 use lbl_core::printer::Protocol;
@@ -57,6 +58,10 @@ pub use readiness::{ensure_ready, ensure_ready_to_print, PrintReadiness};
 pub use session::{
     ClientStatusSession, StatusAction, StatusSessionContext, StatusSessionContextView,
     StatusSessionError,
+};
+pub use usb_printer_id::{
+    meaningful_serial, parse_device_id as parse_usb_printer_device_id, UsbPrinterIdentity,
+    GET_DEVICE_ID_LENGTH, GET_DEVICE_ID_REQUEST,
 };
 pub use zpl::{parse_host_status as parse_zpl_host_status, ZplHostStatus, HOST_STATUS_CMD};
 
@@ -131,6 +136,11 @@ pub enum PrintStatus {
     /// Zebra ZPL (`zpl`).
     #[serde(rename = "zpl")]
     Zpl(ZplHostStatus),
+    /// USB Printer Class identity (`usb-printer-id`): IEEE 1284 Device ID + USB
+    /// strings. Produced when [`status_uses_usb_device_id`] is true for the
+    /// profile protocol. [`PrintStatus::readiness`] is always `None`.
+    #[serde(rename = "usb-printer-id")]
+    UsbPrinterId(UsbPrinterIdentity),
     /// NIIMBOT live status (`niimbot`): RFID, heartbeat, print progress, media,
     /// and device info.
     #[serde(rename = "niimbot")]
@@ -153,6 +163,7 @@ impl PrintStatus {
             Self::Dymo(s) => Some(s.readiness()),
             Self::DymoLwClassic(s) => Some(s.readiness()),
             Self::Zpl(s) => Some(s.readiness.clone()),
+            Self::UsbPrinterId(_) => None,
             Self::Niimbot(s) => s.readiness.clone(),
             Self::Gpgl(s) => Some(s.readiness.clone()),
             Self::LetraTag(s) => Some(s.readiness()),
@@ -223,10 +234,19 @@ pub fn status_supported(protocol: Protocol) -> bool {
             | Protocol::BrotherQl
             | Protocol::BrotherPt
             | Protocol::Zpl
+            | Protocol::Tspl
             | Protocol::Niimbot
             | Protocol::Gpgl
             | Protocol::LetraTag
     )
+}
+
+/// Whether status for `protocol` is USB Printer Class `GET_DEVICE_ID` identity.
+///
+/// When true, hosts must issue a class-control IN (not [`status_query_bytes`]
+/// over bulk). The snapshot is [`PrintStatus::UsbPrinterId`].
+pub fn status_uses_usb_device_id(protocol: Protocol) -> bool {
+    matches!(protocol, Protocol::Tspl)
 }
 
 /// Whether `protocol` supports a host soft-reboot of the print engine.
@@ -250,6 +270,10 @@ pub fn status_query_bytes(protocol: Protocol) -> Result<Vec<u8>, StatusError> {
         Protocol::BrotherQl => Ok(BROTHER_QL_STATUS_REQUEST.to_vec()),
         Protocol::BrotherPt => Ok(BROTHER_PT_STATUS_REQUEST.to_vec()),
         Protocol::Zpl => Ok(HOST_STATUS_CMD.to_vec()),
+        // TSPL identity uses USB Printer Class GET_DEVICE_ID (control), not bulk.
+        Protocol::Tspl => Err(StatusError::Parse(
+            "tspl identity uses USB GET_DEVICE_ID control transfer, not a bulk query".into(),
+        )),
         Protocol::Niimbot => Ok(lbl_driver_niimbot::status_query()),
         Protocol::Gpgl => Ok(lbl_driver_gpgl::STATUS_QUERY.to_vec()),
         Protocol::LetraTag => Ok(Vec::new()),
@@ -297,6 +321,9 @@ pub fn parse_status(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, Sta
         Protocol::BrotherQl => Ok(PrintStatus::BrotherQl(parse_brother_ql_status(bytes)?)),
         Protocol::BrotherPt => Ok(PrintStatus::BrotherPt(parse_brother_pt_status(bytes)?)),
         Protocol::Zpl => Ok(PrintStatus::Zpl(parse_zpl_host_status(bytes)?)),
+        Protocol::Tspl => Ok(PrintStatus::UsbPrinterId(parse_usb_printer_device_id(
+            bytes,
+        )?)),
         Protocol::Niimbot => lbl_driver_niimbot::parse_status(bytes)
             .map(|s| PrintStatus::Niimbot(NiimbotLiveStatus::from(s).into()))
             .ok_or_else(|| StatusError::Parse("no NIIMBOT print-status reply in buffer".into())),
@@ -338,6 +365,7 @@ pub fn media_key_hint(status: &PrintStatus) -> Option<String> {
         PrintStatus::Dymo(_)
         | PrintStatus::DymoLwClassic(_)
         | PrintStatus::Zpl(_)
+        | PrintStatus::UsbPrinterId(_)
         | PrintStatus::Gpgl(_)
         | PrintStatus::LetraTag(_) => None,
     }
