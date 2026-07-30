@@ -2069,12 +2069,12 @@ mod tests {
             "12 mm stock should pad the 8.2 mm printable band"
         );
         assert_eq!(
-            frame.lead_feed_px, dx,
-            "open continuous feed still shows head-to-cutter lead"
+            frame.lead_feed_px, 0,
+            "manual-tear unset lead stays 0 (Dx is tear clearance on end)"
         );
         assert_eq!(
-            frame.feed_end_margin_px, 0,
-            "unset end padding is 0 (lead absorbs Dx when precut is off)"
+            frame.feed_end_margin_px, dx,
+            "manual-tear floors unset end to Dx"
         );
         assert_eq!(frame.trail_feed_px, dx);
         assert_eq!(
@@ -2098,10 +2098,10 @@ mod tests {
         );
         assert!(
             framed.contains(&format!(
-                "padding:{}px 0px {}px {}px",
-                frame.head_pad_before_px, frame.head_pad_after_px, dx
+                "padding:{}px {}px {}px 0px",
+                frame.head_pad_before_px, dx, frame.head_pad_after_px
             )),
-            "stock must pad head laminate and feed lead, got: {framed}"
+            "stock must pad head laminate and feed end (Dx), got: {framed}"
         );
     }
 
@@ -2212,9 +2212,12 @@ mod tests {
     }
 
     #[test]
-    fn preview_shows_lead_from_cutter_gap_when_unset() {
+    fn preview_shows_end_from_cutter_gap_when_unset_on_manual_tear() {
         use image::Rgba;
 
+        // LabelManager-shaped caps: Dx known, no auto-cut. Unset feed → end = Dx
+        // (tear clearance), lead = 0 — not the old unset-lead→Dx preview that
+        // disagreed with DymoDriver's trail emit.
         let image = RgbaImage::from_pixel(10, 4, Rgba([0, 0, 0, 255]));
         let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
@@ -2223,10 +2226,10 @@ mod tests {
         };
         let padded = pad_preview_encode_feed(image, &caps, true);
         let dx = feed_margin_px(caps.feed_trail_mm, caps.dpi.0);
-        assert_eq!(padded.lead_feed_px, dx);
+        assert_eq!(padded.lead_feed_px, 0);
+        assert_eq!(padded.feed_end_margin_px, dx);
         assert_eq!(padded.trail_feed_px, dx);
-        assert_eq!(padded.content_feed_end_px, dx + 10);
-        assert_eq!(padded.feed_end_margin_px, 0);
+        assert_eq!(padded.content_feed_end_px, 10);
         assert_eq!(padded.image.width(), 10 + dx);
         assert!(!padded.precut);
     }

@@ -218,18 +218,28 @@ impl Driver for DymoDriver {
         }
 
         let dpi = ctx.capabilities.dpi.0;
-        let lead_cols = ctx
-            .capabilities
-            .feed_lead_mm
-            .map(|mm| Self::mm_to_feed_dots(mm, dpi))
-            .unwrap_or(0);
-        // One skip-line SYN advances one feed row; catalog feed_trail_mm is the
-        // full head-to-cutter gap (no ×2 inflation).
-        let trail_cols = ctx
-            .capabilities
-            .feed_trail_mm
-            .map(|mm| Self::mm_to_feed_dots(mm, dpi))
-            .unwrap_or(0);
+        // Honor FeedPlan (same contract as Brother PT). Catalog feed_*_mm alone
+        // used to ignore Studio padding and always trail Dx — preview/print
+        // disagreed on LabelManager (Dx on lead in preview, trail in encode).
+        let lead_cols = Self::mm_to_feed_dots(ctx.feed_plan.lead_mm, dpi);
+        let dx = if ctx.feed_plan.cutter_gap_mm > 0.0 {
+            ctx.feed_plan.cutter_gap_mm
+        } else {
+            ctx.capabilities
+                .feed_trail_mm
+                .filter(|d| d.is_finite() && *d > 0.0)
+                .unwrap_or(0.0)
+        };
+        let will_cut = ctx.capabilities.supports_cut && ctx.cut_mode().requests_cut();
+        // Auto-cut: ESC E advances ≈ Dx to the blade, so only emit surplus blank
+        // above Dx. Manual tear: ESC E is a no-op — emit the full planned end
+        // (already floored to Dx by resolve_feed_plan).
+        let encode_end_mm = if will_cut && dx > 0.0 {
+            (ctx.feed_plan.end_mm - dx).max(0.0)
+        } else {
+            ctx.feed_plan.end_mm
+        };
+        let trail_cols = Self::mm_to_feed_dots(encode_end_mm, dpi);
         let feed_reverse = ctx.capabilities.feed_reverse;
         let tape_mm = ctx.job.media.width_mm;
         let tape_type = esc_c_tape_type(ctx.job.media.color);
@@ -304,7 +314,7 @@ mod tests {
         bmp.set(0, 0, true);
         let caps = DeviceCapabilities {
             dpi: Dpi(180.0),
-            feed_trail_mm: Some(12.7), // ≈ 90 dots at 180 dpi
+            feed_trail_mm: Some(12.7), // ≈ 90 dots at 180 dpi; floors end for tear
             ..Default::default()
         };
         let job = ctx_job(1);
@@ -313,6 +323,29 @@ mod tests {
         assert!(bytes.windows(3).any(|w| w == [ESC, b'D', 0x00]));
         let syn_count = bytes.iter().filter(|&&b| b == SYN).count();
         assert_eq!(syn_count, 1 + 90);
+    }
+
+    #[test]
+    fn feed_plan_lead_and_end_drive_columns() {
+        let mut bmp = MonoBitmap::new(1, 8);
+        bmp.set(0, 0, true);
+        let caps = DeviceCapabilities {
+            dpi: Dpi(180.0),
+            feed_trail_mm: Some(8.1),
+            ..Default::default()
+        };
+        let mut job = ctx_job(1);
+        job.feed_lead_mm = Some(2.0); // ≈ 14 dots
+        job.feed_end_mm = Some(8.1); // tear clearance
+        let ctx = EncodeContext::new(&job, &caps);
+        assert!((ctx.feed_plan.lead_mm - 2.0).abs() < 1e-9);
+        assert!((ctx.feed_plan.end_mm - 8.1).abs() < 1e-9);
+        let bytes = DymoDriver::new().encode(&bmp, &ctx).unwrap();
+        let syn_count = bytes.iter().filter(|&&b| b == SYN).count();
+        // 14 lead (full columns) + 1 content + ≈57 trail skip-lines
+        let lead = ((2.0_f64 / 25.4) * 180.0).round() as usize;
+        let trail = ((8.1_f64 / 25.4) * 180.0).round() as usize;
+        assert_eq!(syn_count, lead + 1 + trail);
     }
 
     #[test]

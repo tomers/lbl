@@ -221,13 +221,14 @@ pub struct DeviceCapabilities {
     #[serde(default)]
     pub reports_media: bool,
     /// Blank feed before raster content when encoding. Some tape printers omit
-    /// this because the head already sits past the last cut; preview may still
-    /// show that offset using [`feed_trail_mm`] when lead is unset.
+    /// this because the head already sits past the last cut; unset lead then
+    /// defaults to [`feed_trail_mm`] when a cut will fire.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_lead_mm: Option<f64>,
-    /// Head-to-cutter distance along the feed (e.g. ~8.1 mm on DYMO LabelManager).
-    /// Preview can show symmetric head offset and content-boundary markers;
-    /// drivers may feed extra blank columns so the cut lands with matching margins.
+    /// Head-to-cutter (or tear-bar) distance along the feed (e.g. ~8.1 mm on
+    /// DYMO LabelManager). Preview paints post-content clearance from the
+    /// resolved [`crate::feed_plan::FeedPlan`]; drivers emit matching blank
+    /// columns / rows so cut or tear lands with the planned margins.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feed_trail_mm: Option<f64>,
     /// Mirror content along the feed axis when encoding (mechanical/orientation).

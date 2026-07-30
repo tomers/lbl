@@ -200,10 +200,17 @@ pub fn resolve_virtual_feed_gaps(
         }
 
         let will_cut = caps.supports_cut && cut_mode.requests_cut();
+        // Manual-tear chassis (Dx known, no auto-cut) still need ≥ Dx after last
+        // ink so the tear bar clears the print — same floor as a cut job.
+        let needs_exit_clearance = will_cut || !caps.supports_cut;
         if feed_end_mm.is_none() {
-            // End blank lives on tape (not content inset). When cutting, the
-            // chassis needs ≥ Dx after last ink — G_end below Dx is consumed.
-            feed_end_mm = Some(if will_cut { g_end.max(dx) } else { g_end });
+            // End blank lives on tape (not content inset). When exit clearance
+            // applies, G_end below Dx is consumed (not stacked).
+            feed_end_mm = Some(if needs_exit_clearance {
+                g_end.max(dx)
+            } else {
+                g_end
+            });
         }
         // Always clear feed-end content inset when Dx is known. Otherwise an
         // explicit feed_end_mm override (or a stale side pad) stacks on top of
@@ -232,10 +239,11 @@ pub fn resolve_virtual_feed_gaps(
 
 /// Resolve feed margins and pre-cut from job + capabilities.
 ///
-/// Unset lead → \(D_x\) when known, else `caps.feed_lead_mm`, else `0`.
-/// Unset end → `0`, then when a cut will fire and \(D_x > 0\) floor end to
-/// \(D_x\) (post-print head-to-cutter clearance on the kept sticker; no end-side
-/// pre-cut). Unset `job.precut` → `caps.precut_default`.
+/// Unset lead → \(D_x\) when a cut will fire and \(D_x\) is known (head already
+/// sits past the last cut), else `caps.feed_lead_mm`, else `0`.
+/// Unset end → `0`, then floor to \(D_x\) when exit clearance applies: a cut
+/// will fire, **or** the chassis has \(D_x\) but no auto-cut (manual tear —
+/// e.g. DYMO LabelManager). Unset `job.precut` → `caps.precut_default`.
 ///
 /// Never turns pre-cut on solely because padding is small.
 pub fn resolve_feed_plan(
@@ -244,9 +252,16 @@ pub fn resolve_feed_plan(
 ) -> Result<FeedPlan, FeedPlanError> {
     let cutter_gap_mm = cutter_gap_mm(caps);
 
+    let precut_enabled = job.precut.unwrap_or(caps.precut_default);
+    let will_cut = caps.supports_cut && job.cut_mode.requests_cut();
+    // Auto-cut and manual-tear both leave ≥ Dx blank after last ink on the
+    // kept sticker. Cutter-capable jobs with cut_mode=none skip the floor.
+    let needs_exit_clearance = will_cut || (!caps.supports_cut && cutter_gap_mm > 0.0);
+
     let lead_mm = match job.feed_lead_mm {
         Some(v) if v.is_finite() && v >= 0.0 => v,
-        _ if cutter_gap_mm > 0.0 => cutter_gap_mm,
+        // Only when cutting: next label starts with the head past the last cut.
+        _ if will_cut && cutter_gap_mm > 0.0 => cutter_gap_mm,
         _ => caps
             .feed_lead_mm
             .filter(|d| d.is_finite() && *d >= 0.0)
@@ -258,12 +273,7 @@ pub fn resolve_feed_plan(
         .filter(|d| d.is_finite() && *d >= 0.0)
         .unwrap_or(0.0);
 
-    let precut_enabled = job.precut.unwrap_or(caps.precut_default);
-    let will_cut = caps.supports_cut && job.cut_mode.requests_cut();
-
-    // Last ink prints at the head; the cutter sits \(D_x\) downstream. A cut
-    // therefore leaves at least \(D_x\) blank after content on the kept sticker.
-    if will_cut && cutter_gap_mm > 0.0 {
+    if needs_exit_clearance {
         end_mm = end_mm.max(cutter_gap_mm);
     }
 
@@ -389,6 +399,38 @@ mod tests {
         job.feed_end_mm = Some(0.0);
         let plan = resolve_feed_plan(&pt_caps(), &job).unwrap();
         assert!((plan.end_mm - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn manual_tear_floors_end_to_dx_without_default_lead() {
+        // LabelManager-class: Dx known, no auto-cut. Tear clearance lives on
+        // end; unset lead must not also become Dx (that would double-count).
+        let caps = DeviceCapabilities {
+            feed_trail_mm: Some(8.1),
+            ..Default::default()
+        };
+        let plan = resolve_feed_plan(&caps, &job_with(CutMode::None, None, None)).unwrap();
+        assert!((plan.lead_mm - 0.0).abs() < 1e-9);
+        assert!((plan.end_mm - 8.1).abs() < 1e-9);
+        assert!(!plan.precut);
+    }
+
+    #[test]
+    fn virtual_manual_tear_floors_end_to_dx() {
+        let caps = DeviceCapabilities {
+            feed_trail_mm: Some(8.1),
+            ..Default::default()
+        };
+        let pad = PaddingSidesMm {
+            left: 2.0,
+            right: 1.0,
+            ..Default::default()
+        };
+        let gaps = resolve_virtual_feed_gaps(&caps, CutMode::None, pad, true, false, None, None);
+        assert!((gaps.feed_lead_mm.unwrap() - 0.0).abs() < 1e-9);
+        assert!((gaps.padding.left - 2.0).abs() < 1e-9);
+        assert!((gaps.feed_end_mm.unwrap() - 8.1).abs() < 1e-9);
+        assert!((gaps.padding.right).abs() < 1e-9);
     }
 
     #[test]

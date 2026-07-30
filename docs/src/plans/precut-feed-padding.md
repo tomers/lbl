@@ -103,7 +103,8 @@ policy uses **only** \(p_{\mathrm{lead}}\).
 | --- | --- | --- |
 | Cut + \(G < D_x\) | \(G\) | 0 |
 | Cut + \(G \ge D_x\) | \(D_x\) | \(G - D_x\) |
-| No cut | 0 | \(G\) |
+| No cut (cutter-capable) | 0 | \(G\) |
+| Manual tear (\(D_x\), no `supports_cut`) | 0 | \(G\) |
 | No \(D_x\) | unset / 0 | \(G\) (unchanged) |
 
 With \(D_x\): feed-end content inset is always cleared (tape owns the end
@@ -112,7 +113,12 @@ gap). When a cut will fire, \(p_{\mathrm{end}} = \max(G_{\mathrm{end}}, D_x)\) �
 stacked on top). There is no end-side pre-cut; Studio preview paints this end
 clearance (and labels it under measurement guides). Brother PT encode emits
 trailing blank rasters only for surplus above \(D_x\) (`0x1A` already advances
-the clearance). Without a cut, \(p_{\mathrm{end}} = G_{\mathrm{end}}\) (no floor).
+the clearance). The same end floor applies to **manual-tear** chassis that
+publish \(D_x\) but not `supports_cut` (e.g. DYMO LabelManager): every finished
+label still needs ≥ \(D_x\) after last ink to clear the tear bar. Cutter-capable
+devices with `cut_mode=none` keep \(p_{\mathrm{end}} = G_{\mathrm{end}}\) (no
+floor). Unset lead defaults to \(D_x\) only when a cut will fire (not for
+manual-tear / cut-off jobs).
 
 **Decision rule (when cut will fire after this label / job):**
 
@@ -360,11 +366,14 @@ Done = all of the above green for PT; at least one non-PT driver documents
 
 ## 12. Open questions (resolved)
 
-1. **Default lead when unset:** \(D_x\) when `feed_trail_mm` is set; else
-   `caps.feed_lead_mm`; else `0`. No surprise scrap by default.
-2. **End padding vs cutter:** Independent of \(D_x\). Unset end → `0`. Brother
-   PT maps lead → `ESC i d`; end → trailing blank raster rows. Last-job
-   no-chain / mechanical after-cut gap unchanged.
+1. **Default lead when unset:** \(D_x\) when a cut will fire and
+   `feed_trail_mm` is set; else `caps.feed_lead_mm`; else `0`. Manual-tear
+   devices (Dx, no `supports_cut`) do **not** default lead to Dx.
+2. **End padding vs cutter / tear:** Unset end → `0`, then floor to \(D_x\) when
+   exit clearance applies (cut will fire, or manual-tear with Dx). Brother PT
+   maps lead → `ESC i d`; end surplus above Dx → trailing blank rows. DYMO
+   LabelManager maps end (incl. Dx floor) → skip-line trail (`ESC E` is no-op
+   on manual-cut chassis).
 3. **Profile vs job:** Catalog `precut_default = true` on capable devices. Studio
    persists `precut` in per-printer print settings (default on); virtual gap
    lives in Label style padding. Explicit job `feed_lead_mm` / `feed_end_mm`
