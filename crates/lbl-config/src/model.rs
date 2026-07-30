@@ -181,7 +181,7 @@ pub struct StylePadding {
 impl Default for StylePadding {
     fn default() -> Self {
         Self {
-            padding_mm: 2.0,
+            padding_mm: 0.0,
             padding_horizontal_mm: None,
             padding_vertical_mm: None,
             padding_top_mm: None,
@@ -229,9 +229,9 @@ pub struct StyleFit {
     pub label_valign: String,
     /// Fit-box scale in fill mode (`1.0` = 100%; also accepts `0.8` or `80%`).
     pub label_fit_scale: f64,
-    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = ink-tight
-    /// printable max; `0.5` ≈ padded mid-scale; above `1.0` grows past the max
-    /// and may clip).
+    /// Multiplier applied to auto-fit text size in fill mode (`1.0` = largest
+    /// clipping-safe fill; below shrinks; above may clip; ≈133% is aggressive
+    /// ink-tight printable max).
     pub font_fit_scale: f64,
 }
 

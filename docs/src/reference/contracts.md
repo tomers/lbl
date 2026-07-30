@@ -33,7 +33,7 @@ CSS fallback when viewport geometry is not known.
 
 | Key / flag | Default | Effect |
 | ---------- | ------- | ------ |
-| `padding_mm` / `--padding-mm` | 2.0 mm | Inner gutter between the label box and content (uniform base) |
+| `padding_mm` / `--padding-mm` | 0.0 mm | Inner gutter between the label box and content (uniform base) |
 | `padding_horizontal_mm` / `padding_vertical_mm` | — | Axis overrides (both sides) |
 | `padding_top_mm` / `padding_right_mm` / `padding_bottom_mm` / `padding_left_mm` | — | Per-side overrides |
 | `border_width_mm` / `--border-mm` | 0 | Optional border drawn around `.lbl-label` |
