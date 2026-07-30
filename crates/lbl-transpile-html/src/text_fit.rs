@@ -18,13 +18,19 @@ pub const VERTICAL_LINE_HEIGHT: f64 = 1.0;
 const VERTICAL_COL_EM: f64 = 1.0;
 
 /// Ink often extends past estimated advance width (diagonal strokes, serifs).
-/// Comfortable auto-fit (`font_fit_scale = 1`) uses this; scale above 1
-/// interpolates toward a tight max with margin `1.0`.
+/// Mid-scale auto-fit (`font_fit_scale ≈ 0.5`) uses this; at `1.0` fit
+/// interpolates to margin `1.0` (full printable width).
 pub(crate) const VISUAL_WIDTH_MARGIN: f64 = 1.35;
 
-/// `font_fit_scale` at which text fit reaches the tight max (width margin
-/// spent + line-height tightened so glyph ink can grow into the box).
-const TIGHT_FIT_SCALE: f64 = 2.0;
+/// Internal scale at which width margin is spent and line-height is fully
+/// tightened. User-facing `font_fit_scale = 1.0` maps here (ink-tight norm).
+const TIGHT_INTERNAL_SCALE: f64 = 2.0;
+
+/// Map user-facing scale in `(0, 1]` onto the mid→tight curve
+/// (`1.0` = full ink-tight fill). Values above `1.0` are handled separately.
+fn internal_fit_scale(user_scale: f64) -> f64 {
+    user_scale.clamp(0.01, 1.0) * TIGHT_INTERNAL_SCALE
+}
 
 /// Estimated em width of one terminal column at the transpiled font size.
 /// Used with [`VISUAL_WIDTH_MARGIN`] for fit checks inside a fixed box.
@@ -41,28 +47,27 @@ pub(crate) fn scaled_fit_px(px: f64, opts: &TranspileOptions) -> f64 {
     (px * opts.font_fit_scale.clamp(0.01, 1.0)).max(1.0)
 }
 
-/// Font size + CSS line-height from auto-fit (line-height may tighten above 100%).
+/// Font size + CSS line-height from auto-fit (line-height may tighten toward 100%;
+/// above 100% grows past the printable max and may clip).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct FitTextPx {
     pub font_px: f64,
     pub line_height: f64,
 }
 
-fn tight_fit_progress(scale: f64) -> f64 {
-    ((scale - 1.0) / (TIGHT_FIT_SCALE - 1.0)).clamp(0.0, 1.0)
+fn tight_fit_progress(internal_scale: f64) -> f64 {
+    ((internal_scale - 1.0) / (TIGHT_INTERNAL_SCALE - 1.0)).clamp(0.0, 1.0)
 }
 
 /// Auto-fit plain text with [`TranspileOptions::font_fit_scale`].
 ///
-/// `base_lh` is the comfortable CSS line-height ([`LINE_HEIGHT`] for lone text,
+/// `base_lh` is the mid-scale CSS line-height ([`LINE_HEIGHT`] for lone text,
 /// row text uses [`crate::assets::ROW_TEXT_LINE_HEIGHT`]).
 ///
-/// - `scale ≤ 1`: fraction of the comfortable max (width margin
-///   [`VISUAL_WIDTH_MARGIN`], line-height `base_lh`).
-/// - `scale > 1`: spend width safety margin and tighten line-height so the
-///   font (and glyph ink) can grow while the line box stays inside the
-///   printable height — reaching ~`scale`× on height-bound labels at
-///   [`TIGHT_FIT_SCALE`].
+/// - `scale ≤ 1`: fraction of the ink-tight max (at `1.0` width margin is spent
+///   and line-height is tightened so glyph ink fills the box).
+/// - `scale > 1`: multiply past that max (preview/print may clip on the head
+///   axis; continuous feed length grows with the rendered font).
 pub(crate) fn fit_text_font_px(
     width_px: f64,
     height_px: f64,
@@ -70,8 +75,27 @@ pub(crate) fn fit_text_font_px(
     opts: &TranspileOptions,
     base_lh: f64,
 ) -> FitTextPx {
-    let scale = opts.font_fit_scale.clamp(0.01, 5.0);
+    let user = opts.font_fit_scale.clamp(0.01, 5.0);
     let base_lh = base_lh.max(0.01);
+    let at_or_below =
+        fit_text_font_px_at_most_full(width_px, height_px, text, user.min(1.0), base_lh);
+    if user <= 1.0 {
+        return at_or_below;
+    }
+    FitTextPx {
+        font_px: (at_or_below.font_px * user).max(1.0),
+        line_height: at_or_below.line_height,
+    }
+}
+
+fn fit_text_font_px_at_most_full(
+    width_px: f64,
+    height_px: f64,
+    text: &str,
+    user_scale: f64,
+    base_lh: f64,
+) -> FitTextPx {
+    let scale = internal_fit_scale(user_scale);
     let comfortable =
         max_fit_font_px_with_margin_lh(width_px, height_px, text, VISUAL_WIDTH_MARGIN, base_lh);
     if scale <= 1.0 {
@@ -81,7 +105,7 @@ pub(crate) fn fit_text_font_px(
         };
     }
     let t = tight_fit_progress(scale);
-    let scale_for_lh = 1.0 + (TIGHT_FIT_SCALE - 1.0) * t;
+    let scale_for_lh = 1.0 + (TIGHT_INTERNAL_SCALE - 1.0) * t;
     let target_lh = base_lh / scale_for_lh;
     let width_margin = VISUAL_WIDTH_MARGIN + (1.0 - VISUAL_WIDTH_MARGIN) * t;
     let font = max_fit_font_px_with_margin_lh(width_px, height_px, text, width_margin, target_lh);
@@ -101,8 +125,34 @@ pub(crate) fn fit_text_font_px_html(
     opts: &TranspileOptions,
     base_lh: f64,
 ) -> FitTextPx {
-    let scale = opts.font_fit_scale.clamp(0.01, 5.0);
+    let user = opts.font_fit_scale.clamp(0.01, 5.0);
     let base_lh = base_lh.max(0.01);
+    let at_or_below = fit_text_font_px_html_at_most_full(
+        width_px,
+        height_px,
+        inner,
+        vertical_lh,
+        user.min(1.0),
+        base_lh,
+    );
+    if user <= 1.0 {
+        return at_or_below;
+    }
+    FitTextPx {
+        font_px: (at_or_below.font_px * user).max(1.0),
+        line_height: at_or_below.line_height,
+    }
+}
+
+fn fit_text_font_px_html_at_most_full(
+    width_px: f64,
+    height_px: f64,
+    inner: &str,
+    vertical_lh: f64,
+    user_scale: f64,
+    base_lh: f64,
+) -> FitTextPx {
+    let scale = internal_fit_scale(user_scale);
     let comfortable = max_fit_font_px_html_with_margin_lh(
         width_px,
         height_px,
@@ -118,7 +168,7 @@ pub(crate) fn fit_text_font_px_html(
         };
     }
     let t = tight_fit_progress(scale);
-    let scale_for_lh = 1.0 + (TIGHT_FIT_SCALE - 1.0) * t;
+    let scale_for_lh = 1.0 + (TIGHT_INTERNAL_SCALE - 1.0) * t;
     let target_lh = base_lh / scale_for_lh;
     let width_margin = VISUAL_WIDTH_MARGIN + (1.0 - VISUAL_WIDTH_MARGIN) * t;
     let font = max_fit_font_px_html_with_margin_lh(
@@ -149,9 +199,14 @@ pub fn injected_fit_font_px(html: &str) -> Option<f64> {
 }
 
 /// Parse continuous-feed length estimate pinned by content head-fit.
+///
+/// `--lbl-feed-px` may share the `.lbl-label{…}` rule with width/overflow pins
+/// (oversize font clip). Match it anywhere inside that rule — not only when it
+/// is the first property (a first-only regex returned `None` and print capture
+/// fell back to the 2048px iframe placeholder → meter-long blank D1 tape).
 pub fn injected_label_min_width_px(html: &str) -> Option<f64> {
     static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"\.lbl-label\{--lbl-feed-px:([\d.]+)\}").expect("label feed width regex")
+        Regex::new(r"\.lbl-label\{[^}]*--lbl-feed-px:([\d.]+)").expect("label feed width regex")
     });
     RE.captures(html)
         .and_then(|caps| caps.get(1))
@@ -276,9 +331,13 @@ pub(crate) fn text_advance_width_px(text: &str, font_px: f64) -> f64 {
         * font_px
 }
 
-/// Continuous feed content width: advance plus side bearings for ink overhang.
+/// Continuous feed content width: must cover real CSS ink, not the tight
+/// advance heuristic alone. [`text_advance_width_px`] uses a narrow em/column
+/// for fit binary-search; feed length uses [`text_line_width_px`] (wider em ×
+/// [`VISUAL_WIDTH_MARGIN`]) so continuous tape / print capture do not clip the
+/// trailing glyph (preview “C” half-cut, print missing “C”).
 pub(crate) fn text_feed_content_width_px(text: &str, font_px: f64) -> f64 {
-    text_advance_width_px(text, font_px) + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
+    text_line_width_px(text, font_px) + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
 }
 
 pub(crate) fn fit_box_px(opts: &TranspileOptions) -> Option<(f64, f64)> {
@@ -482,7 +541,7 @@ pub(crate) fn text_html_feed_content_width_px(inner: &str, font_px: f64, vertica
     if !inner.contains("lbl-vertical") {
         return text_feed_content_width_px(&html_to_plain_text(inner), font_px);
     }
-    text_html_advance_width_px(inner, font_px, vertical_lh)
+    text_html_em_metrics(inner, vertical_lh).advance_em * font_px.max(0.0) * VISUAL_WIDTH_MARGIN
         + 2.0 * INK_SIDE_BEARING_EM * font_px.max(0.0)
 }
 
@@ -601,15 +660,32 @@ mod tests {
     use crate::transpile::{LabelFit, LabelStyle, MediaInsetPx};
 
     #[test]
-    fn feed_content_width_includes_side_bearings() {
+    fn feed_content_width_covers_visual_margin_and_bearings() {
         let font = 100.0;
         let advance = text_advance_width_px("abc", font);
         let feed = text_feed_content_width_px("abc", font);
+        let expected = text_line_width_px("abc", font) + 2.0 * INK_SIDE_BEARING_EM * font;
         assert!(
-            (feed - advance - 2.0 * INK_SIDE_BEARING_EM * font).abs() < 1e-9,
-            "feed={feed} advance={advance}"
+            (feed - expected).abs() < 1e-9,
+            "feed={feed} expected={expected}"
         );
-        assert!(feed > advance);
+        assert!(
+            feed > advance * 1.2,
+            "feed must substantially exceed bare advance: feed={feed} advance={advance}"
+        );
+    }
+
+    #[test]
+    fn injected_label_min_width_reads_feed_when_first_property() {
+        let html = r#"<style>.lbl-label{--lbl-feed-px:123.45}</style>"#;
+        assert_eq!(injected_label_min_width_px(html), Some(123.45));
+    }
+
+    #[test]
+    fn injected_label_min_width_reads_feed_amid_width_pin() {
+        // Oversize clip pins width/max-width in the same rule as --lbl-feed-px.
+        let html = r#"<style>.lbl-label{width:200.00px;max-width:200.00px;--lbl-feed-px:200.00;overflow:hidden}</style>"#;
+        assert_eq!(injected_label_min_width_px(html), Some(200.0));
     }
 
     #[test]
@@ -856,28 +932,39 @@ mod tests {
             .unwrap()
             .parse()
             .unwrap();
+        let tight_lh = LINE_HEIGHT / TIGHT_INTERNAL_SCALE;
         assert!(
-            font > 20.0 && font <= 142.0 / LINE_HEIGHT + 0.01,
+            font > 20.0 && font <= 142.0 / tight_lh + 0.01,
             "font={font}"
         );
     }
 
     #[test]
-    fn font_fit_scale_above_one_spends_width_margin() {
-        // Tall box + medium text: comfortable max is width-margin limited; tight
-        // width + tightened line-height allows a larger font at 200%.
+    fn font_fit_scale_full_spends_width_margin() {
+        // Tall box + medium text: mid-scale (50%) is width-margin limited; 100%
+        // spends width margin and tightens line-height for a larger font.
         let width = 200.0;
         let height = 500.0;
         let text = "Hello World";
         let comfortable =
             max_fit_font_px_with_margin_lh(width, height, text, VISUAL_WIDTH_MARGIN, LINE_HEIGHT);
-        let at_max_lh = LINE_HEIGHT / TIGHT_FIT_SCALE;
+        let at_max_lh = LINE_HEIGHT / TIGHT_INTERNAL_SCALE;
         let tight = max_fit_font_px_with_margin_lh(width, height, text, 1.0, at_max_lh);
         assert!(
             tight > comfortable + 0.5,
             "expected headroom: comfortable={comfortable} tight={tight}"
         );
 
+        let mid = fit_text_font_px(
+            width,
+            height,
+            text,
+            &TranspileOptions {
+                font_fit_scale: 0.5,
+                ..Default::default()
+            },
+            LINE_HEIGHT,
+        );
         let full = fit_text_font_px(
             width,
             height,
@@ -888,94 +975,119 @@ mod tests {
             },
             LINE_HEIGHT,
         );
-        let enlarged = fit_text_font_px(
-            width,
-            height,
-            text,
-            &TranspileOptions {
-                font_fit_scale: TIGHT_FIT_SCALE,
-                ..Default::default()
-            },
-            LINE_HEIGHT,
+        assert!(
+            (mid.font_px - comfortable).abs() < 0.05,
+            "mid={:?} comfortable={comfortable}",
+            mid
         );
         assert!(
-            (full.font_px - comfortable).abs() < 0.05,
-            "full={:?} comfortable={comfortable}",
+            (full.font_px - tight).abs() < 0.05,
+            "full={:?} tight={tight}",
             full
         );
         assert!(
-            (enlarged.font_px - tight).abs() < 0.05,
-            "enlarged={:?} tight={tight}",
-            enlarged
-        );
-        assert!(
-            (enlarged.line_height - at_max_lh).abs() < 1e-9,
+            (full.line_height - at_max_lh).abs() < 1e-9,
             "lh={}",
-            enlarged.line_height
+            full.line_height
         );
         assert!(
-            enlarged.font_px * enlarged.line_height <= height + 0.5,
+            full.font_px * full.line_height <= height + 0.5,
             "line box overflows: {:?}",
-            enlarged
+            full
         );
     }
 
     #[test]
-    fn font_fit_scale_above_one_grows_height_bound_ink() {
-        // Height-bound text: 100% fills the line box, but glyph ink sits short of
-        // the head. 200% grows the font ~2× and tightens line-height so the
+    fn font_fit_scale_full_grows_height_bound_ink() {
+        // Height-bound text: at 50% the line box fills the head but glyph ink
+        // sits short; 100% grows the font ~2× and tightens line-height so the
         // line box still fits (continuous tapes and short die-cut text).
         let width = 2000.0;
         let height = 100.0;
         let text = "X";
         let comfortable =
             max_fit_font_px_with_margin_lh(width, height, text, VISUAL_WIDTH_MARGIN, LINE_HEIGHT);
-        let enlarged = fit_text_font_px(
+        let full = fit_text_font_px(
             width,
             height,
             text,
             &TranspileOptions {
-                font_fit_scale: TIGHT_FIT_SCALE,
+                font_fit_scale: 1.0,
                 ..Default::default()
             },
             LINE_HEIGHT,
         );
         assert!(
-            (enlarged.font_px - comfortable * TIGHT_FIT_SCALE).abs() < 0.5,
-            "enlarged={:?} comfortable={comfortable}",
-            enlarged
+            (full.font_px - comfortable * TIGHT_INTERNAL_SCALE).abs() < 0.5,
+            "full={:?} comfortable={comfortable}",
+            full
         );
         assert!(
-            enlarged.font_px * enlarged.line_height <= height + 0.5,
+            full.font_px * full.line_height <= height + 0.5,
             "line box overflows: {:?}",
-            enlarged
+            full
         );
-        assert!(enlarged.font_px > comfortable + 1.0);
+        assert!(full.font_px > comfortable + 1.0);
     }
 
     #[test]
-    fn font_fit_scale_shrinks_below_comfortable_max() {
+    fn font_fit_scale_above_full_multiplies_past_tight() {
+        let width = 2000.0;
+        let height = 100.0;
+        let text = "X";
+        let full = fit_text_font_px(
+            width,
+            height,
+            text,
+            &TranspileOptions {
+                font_fit_scale: 1.0,
+                ..Default::default()
+            },
+            LINE_HEIGHT,
+        );
+        let double = fit_text_font_px(
+            width,
+            height,
+            text,
+            &TranspileOptions {
+                font_fit_scale: 2.0,
+                ..Default::default()
+            },
+            LINE_HEIGHT,
+        );
+        assert!(
+            (double.font_px - full.font_px * 2.0).abs() < 0.05,
+            "full={:?} double={:?}",
+            full,
+            double
+        );
+        assert!((double.line_height - full.line_height).abs() < 1e-9);
+    }
+
+    #[test]
+    fn font_fit_scale_shrinks_below_mid_scale() {
+        // User 0.25 → internal 0.5 → half of the padded (mid-scale) max.
         let width = 354.0;
         let height = 142.0;
         let text = "#1";
         let comfortable =
             max_fit_font_px_with_margin_lh(width, height, text, VISUAL_WIDTH_MARGIN, LINE_HEIGHT);
-        let half = fit_text_font_px(
+        let quarter = fit_text_font_px(
             width,
             height,
             text,
             &TranspileOptions {
-                font_fit_scale: 0.5,
+                font_fit_scale: 0.25,
                 ..Default::default()
             },
             LINE_HEIGHT,
         );
         assert!(
-            (half.font_px - comfortable * 0.5).abs() < 0.05,
-            "half={:?} comfortable={comfortable}",
-            half
+            (quarter.font_px - comfortable * 0.5).abs() < 0.05,
+            "quarter={:?} comfortable={comfortable}",
+            quarter
         );
-        assert!((half.line_height - LINE_HEIGHT).abs() < 1e-9);
+        assert!((quarter.line_height - LINE_HEIGHT).abs() < 1e-9);
     }
 
     fn parse_row_text_font_px(css: &str) -> f64 {
@@ -990,7 +1102,7 @@ mod tests {
     }
 
     #[test]
-    fn font_fit_scale_row_text_stays_within_box_at_200() {
+    fn font_fit_scale_row_text_stays_within_box_at_full() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Fill,
             viewport: Some(ViewportPx {
@@ -1006,31 +1118,31 @@ mod tests {
                 element_gap_px: 8.0,
                 ..Default::default()
             },
-            font_fit_scale: 2.0,
+            font_fit_scale: 1.0,
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
         let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x"></div></div></div>"#;
-        let full_css = row_text_qr_fit_css(
+        let mid_css = row_text_qr_fit_css(
             body,
             &TranspileOptions {
-                font_fit_scale: 1.0,
+                font_fit_scale: 0.5,
                 ..opts.clone()
             },
         )
-        .expect("full css");
-        let enlarged_css = row_text_qr_fit_css(body, &opts).expect("enlarged css");
+        .expect("mid css");
+        let full_css = row_text_qr_fit_css(body, &opts).expect("full css");
+        let mid = parse_row_text_font_px(&mid_css);
         let full = parse_row_text_font_px(&full_css);
-        let enlarged = parse_row_text_font_px(&enlarged_css);
-        assert!(enlarged >= full - 0.05, "full={full} enlarged={enlarged}");
+        assert!(full >= mid - 0.05, "mid={mid} full={full}");
         assert!(
-            enlarged <= full * 2.0 + 0.05,
-            "full={full} enlarged={enlarged} should not exceed 2× comfortable"
+            full <= mid * 2.0 + 0.05,
+            "mid={mid} full={full} should not exceed 2× mid-scale"
         );
         // Line box may use a tightened line-height; font alone can exceed height/1.1.
         assert!(
-            enlarged <= 142.0 / (ROW_TEXT_LINE_HEIGHT / 2.0) + 0.5,
-            "enlarged={enlarged} exceeds tightened row line-box budget"
+            full <= 142.0 / (ROW_TEXT_LINE_HEIGHT / TIGHT_INTERNAL_SCALE) + 0.5,
+            "full={full} exceeds tightened row line-box budget"
         );
     }
 
@@ -1051,23 +1163,26 @@ mod tests {
                 element_gap_px: 8.0,
                 ..Default::default()
             },
-            font_fit_scale: 0.5,
+            font_fit_scale: 0.25,
             media_inset: MediaInsetPx::default(),
             ..Default::default()
         };
         let body = r#"<div class="lbl-label"><div class="lbl-row lbl-center"><div class="lbl-text">Hello</div><div class="lbl-qr" data-qr="x"></div></div></div>"#;
-        let full_css = row_text_qr_fit_css(
+        let mid_css = row_text_qr_fit_css(
             body,
             &TranspileOptions {
-                font_fit_scale: 1.0,
+                font_fit_scale: 0.5,
                 ..opts.clone()
             },
         )
-        .expect("full css");
-        let half_css = row_text_qr_fit_css(body, &opts).expect("half css");
-        let full = parse_row_text_font_px(&full_css);
-        let half = parse_row_text_font_px(&half_css);
-        assert!((half - full * 0.5).abs() < 0.05, "full={full} half={half}");
+        .expect("mid css");
+        let quarter_css = row_text_qr_fit_css(body, &opts).expect("quarter css");
+        let mid = parse_row_text_font_px(&mid_css);
+        let quarter = parse_row_text_font_px(&quarter_css);
+        assert!(
+            (quarter - mid * 0.5).abs() < 0.05,
+            "mid={mid} quarter={quarter}"
+        );
     }
 
     #[test]

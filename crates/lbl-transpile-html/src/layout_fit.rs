@@ -201,6 +201,9 @@ fn fit_lone(
             let fit =
                 fit_text_font_px_html(box_w, box_h, inner, VERTICAL_LINE_HEIGHT, opts, LINE_HEIGHT);
             let font_px = fit.font_px;
+            // Feed length tracks the rendered font (including oversize scale).
+            // `--lbl-feed-px` is a Studio sizing hint only — do not pin CSS
+            // width/max-width (that clipped "ABC" on the free feed axis).
             let text_w = if claim_ink_bearings {
                 text_html_feed_content_width_px(inner, font_px, VERTICAL_LINE_HEIGHT)
             } else {
@@ -209,11 +212,10 @@ fn fit_lone(
             };
             let content_w =
                 text_w + opts.style.padding_x_px() + 2.0 * opts.style.border_width_px.max(0.0);
-            // Match text_fit line-height (tightens above 100% scale). Base
+            // Match text_fit line-height (tightens toward 100% scale). Base
             // `.lbl-label` uses 1.3, which would clip head-fitted glyphs. nowrap
             // keeps continuous feed text on one line so a narrow preview iframe
-            // cannot re-wrap and overflow. --lbl-feed-px is for iframe sizing;
-            // do not set min-width or the tape grows a hollow feed gap.
+            // cannot re-wrap and overflow.
             let text_css = if claim_ink_bearings {
                 format!(
                     ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};\
@@ -226,7 +228,8 @@ fn fit_lone(
                 )
             } else {
                 format!(
-                    ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};white-space:nowrap}}\n\
+                    ".lbl-label>.lbl-text:only-child{{font-size:{font_px:.2}px;line-height:{lh};\
+                     white-space:nowrap}}\n\
                      .lbl-label{{--lbl-feed-px:{content_w:.2}}}\n",
                     font_px = font_px,
                     lh = fit.line_height,
@@ -1479,6 +1482,73 @@ mod tests {
     }
 
     #[test]
+    fn content_head_oversize_scale_grows_feed_with_font() {
+        let base = TranspileOptions {
+            label_fit: LabelFit::Content,
+            viewport: Some(ViewportPx {
+                width: None,
+                height: Some(170.0),
+            }),
+            style: LabelStyle {
+                padding_top_px: 0.0,
+                padding_right_px: 0.0,
+                padding_bottom_px: 0.0,
+                padding_left_px: 0.0,
+                ..Default::default()
+            },
+            media_inset: MediaInsetPx::default(),
+            font_fit_scale: 1.0,
+            ..Default::default()
+        };
+        let body = r#"<div class="lbl-label"><div class="lbl-text">Hello</div></div>"#;
+        let at_100 = apply_content_head_text_fit(body, &base);
+        let at_200 = apply_content_head_text_fit(
+            body,
+            &TranspileOptions {
+                font_fit_scale: 2.0,
+                ..base
+            },
+        );
+        let parse_feed = |css: &str| -> f64 {
+            css.split("--lbl-feed-px:")
+                .nth(1)
+                .unwrap()
+                .split(|c: char| !c.is_ascii_digit() && c != '.')
+                .next()
+                .unwrap()
+                .parse()
+                .unwrap()
+        };
+        let feed_100 = parse_feed(&at_100.css);
+        let feed_200 = parse_feed(&at_200.css);
+        let font_100 = at_100.font_px.unwrap();
+        let font_200 = at_200.font_px.unwrap();
+        assert!(
+            font_200 > font_100 * 1.5,
+            "rendered font should grow: 100%={font_100} 200%={font_200}"
+        );
+        assert!(
+            feed_200 > feed_100 * 1.5,
+            "continuous feed must grow with oversize font (not clip ABC): 100%={feed_100} 200%={feed_200}"
+        );
+        assert!(
+            at_200.css.contains(&format!("--lbl-feed-px:{feed_200:.2}")),
+            "css={}",
+            at_200.css
+        );
+        assert!(
+            !at_200.css.contains("--lbl-label-feed-width"),
+            "must not pin CSS width on the free feed axis: {}",
+            at_200.css
+        );
+        let styled = format!("<style>{}</style>", at_200.css);
+        assert_eq!(
+            crate::text_fit::injected_label_min_width_px(&styled),
+            Some(feed_200)
+        );
+    }
+
+    #[test]
     fn content_head_fit_sizes_lone_image_on_landscape_continuous() {
         let opts = TranspileOptions {
             label_fit: LabelFit::Content,
@@ -1536,8 +1606,8 @@ mod tests {
     fn feed_px_from_css(css: &str) -> f64 {
         css.split("--lbl-feed-px:")
             .nth(1)
-            .and_then(|s| s.split('}').next())
-            .and_then(|s| s.trim().parse().ok())
+            .and_then(|s| s.split(|c: char| !c.is_ascii_digit() && c != '.').next())
+            .and_then(|s| s.parse().ok())
             .unwrap_or(0.0)
     }
 
