@@ -1,8 +1,8 @@
 //! Protocol-specific print-engine status queries over USB.
 //!
-//! The tagged [`PrintStatus`] type and the `status_supported` /
-//! `soft_reboot_supported` predicates live in [`lbl_status`]; this module adds
-//! the USB transport wrappers for the protocols with a bulk-transfer query.
+//! Tagged [`PrintStatus`] and `status_supported` / `soft_reboot_supported` live
+//! in [`lbl_status`]. This module opens USB (bulk dialect I/O or class-control
+//! `GET_DEVICE_ID`) and returns the matching snapshot.
 
 pub use lbl_status::{soft_reboot_supported, status_supported, PrintStatus};
 
@@ -14,13 +14,13 @@ use crate::transport::{open_usb_bulk_session, UsbTransport};
 #[cfg(feature = "usb")]
 use crate::DeviceError;
 #[cfg(feature = "usb")]
-use crate::{brother_pt, brother_ql, dymo_lw, zpl};
+use crate::{brother_pt, brother_ql, dymo_lw, usb_printer_id, zpl};
 
 /// Query print-engine status for `protocol` over USB.
 ///
-/// Only the protocols with a USB bulk-transfer status query are handled here;
-/// serial/BLE-only protocols (e.g. NIIMBOT, GPGL) report `status_supported`
-/// but are queried through their own transports.
+/// Uses bulk dialect I/O or USB Printer Class `GET_DEVICE_ID` according to
+/// [`lbl_status::status_uses_usb_device_id`]. Serial/BLE-only protocols that
+/// report `status_supported` are queried on their own transports.
 #[cfg(feature = "usb")]
 pub fn query_print_status(
     protocol: Protocol,
@@ -58,6 +58,10 @@ pub fn query_print_status(
         Protocol::Zpl => {
             let status = zpl::query_status(usb)?;
             Ok(PrintStatus::Zpl(status))
+        }
+        Protocol::Tspl => {
+            let identity = usb_printer_id::query_identity(usb)?;
+            Ok(PrintStatus::UsbPrinterId(identity))
         }
         other => Err(DeviceError::Transport(format!(
             "print-engine status over USB not supported for protocol {other:?}"

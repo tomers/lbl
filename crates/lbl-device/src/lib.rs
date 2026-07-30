@@ -31,6 +31,8 @@ pub mod status;
 pub mod transport;
 pub mod troubleshoot;
 #[cfg(feature = "usb")]
+pub mod usb_printer_id;
+#[cfg(feature = "usb")]
 pub mod zpl;
 
 #[cfg(feature = "ble")]
@@ -68,6 +70,8 @@ pub use status::{
 };
 #[cfg(feature = "usb")]
 pub use transport::{open_usb_bulk_session, UsbBulkSession, UsbTransport};
+#[cfg(feature = "usb")]
+pub use usb_printer_id::{query_identity as query_usb_printer_identity, UsbPrinterIdentity};
 #[cfg(feature = "usb")]
 pub use zpl::{
     parse_host_status as parse_zpl_host_status, query_status as query_zpl_status, ZplHostStatus,
