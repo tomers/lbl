@@ -141,16 +141,21 @@ impl Handshake for Gpgl {
                         status_note(GpglStatus::Unloaded),
                         DeliveryAction::error("cutter reports media unloaded (status 2)"),
                     ],
-                    Some(GpglStatus::Moving) => {
+                    Some(GpglStatus::Cancelled) => vec![
+                        status_note(GpglStatus::Cancelled),
+                        DeliveryAction::error("cutter job was cancelled on the device (status 4)"),
+                    ],
+                    // Moving / on-device Pause: keep polling until ready or timeout.
+                    Some(status @ (GpglStatus::Moving | GpglStatus::Paused)) => {
                         if self.polls >= self.ready_cap {
                             vec![
-                                status_note(GpglStatus::Moving),
+                                status_note(status),
                                 DeliveryAction::error("timed out waiting for cutter ready"),
                             ]
                         } else {
                             self.phase = Phase::ReadyQuerySent { next };
                             vec![
-                                status_note(GpglStatus::Moving),
+                                status_note(status),
                                 DeliveryAction::send(STATUS_QUERY.to_vec()),
                             ]
                         }

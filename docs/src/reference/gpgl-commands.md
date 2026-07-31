@@ -19,7 +19,10 @@ Community reference:
 | Bytes / command | Role |
 | --- | --- |
 | `ESC D` (`1B 04`) | Initialize |
-| `ESC E` (`1B 05`) | Status: `0` ready, `1` moving, `2` unloaded |
+| `ESC E` (`1B 05`) | Status: `0` ready, `1` moving, `2` unloaded, `3` paused, `4` cancelled |
+| `ESC NUL mask` (`1B 00 xx`) | Simulate panel key (`01` down, `02` up, `04` right, `08` left, `00` release) |
+| `TT` | Home cutter |
+| `FO n` | Feed `n` device units (1/20 mm) |
 | `FG` | Firmware query |
 | `FN` / `TB50` | Orientation / regmark off for cut-only |
 | `TG` | Cutting mat preset (`0` none, `1` 12×12, `2` 12×24, `8` 15×15, `9` 24×24) |

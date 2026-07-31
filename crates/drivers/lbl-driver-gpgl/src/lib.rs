@@ -185,6 +185,34 @@ pub fn firmware_query() -> Vec<u8> {
     v
 }
 
+/// Panel-key simulation prefix (`ESC` + `NUL` + mask). Documented in
+/// inkscape-silhouette: down=`0x01`, up=`0x02`, right=`0x04`, left=`0x08`,
+/// none=`0x00`.
+pub const PANEL_KEY_NONE: u8 = 0x00;
+pub const PANEL_KEY_DOWN: u8 = 0x01;
+pub const PANEL_KEY_UP: u8 = 0x02;
+pub const PANEL_KEY_RIGHT: u8 = 0x04;
+pub const PANEL_KEY_LEFT: u8 = 0x08;
+
+/// Simulate a front-panel key press (or release with [`PANEL_KEY_NONE`]).
+pub fn panel_key(mask: u8) -> [u8; 3] {
+    [0x1b, 0x00, mask]
+}
+
+/// Home the cutter head (`TT`).
+pub fn home_cmd() -> Vec<u8> {
+    let mut v = b"TT".to_vec();
+    v.push(0x03);
+    v
+}
+
+/// Feed media by `units` (device units = 1/20 mm) via `FO`.
+pub fn feed_cmd(units: i32) -> Vec<u8> {
+    let mut v = format!("FO{units}").into_bytes();
+    v.push(0x03);
+    v
+}
+
 /// Parse a status response body (without requiring the trailing `\x03`).
 pub fn parse_status(resp: &[u8]) -> Option<GpglStatus> {
     let s = std::str::from_utf8(resp)
@@ -195,6 +223,9 @@ pub fn parse_status(resp: &[u8]) -> Option<GpglStatus> {
         '0' => Some(GpglStatus::Ready),
         '1' => Some(GpglStatus::Moving),
         '2' => Some(GpglStatus::Unloaded),
+        // On-device Pause / Cancel (Cameo 3+ captures; see inkscape-silhouette #72).
+        '3' => Some(GpglStatus::Paused),
+        '4' => Some(GpglStatus::Cancelled),
         _ => None,
     }
 }
@@ -205,6 +236,10 @@ pub enum GpglStatus {
     Ready,
     Moving,
     Unloaded,
+    /// Front-panel Pause is latched (`0x33` / ASCII `3`).
+    Paused,
+    /// Job cancelled on the device after pause (`0x34` / ASCII `4`).
+    Cancelled,
 }
 
 #[cfg(test)]
@@ -380,5 +415,15 @@ mod tests {
         assert_eq!(parse_status(b"0\x03"), Some(GpglStatus::Ready));
         assert_eq!(parse_status(b"1"), Some(GpglStatus::Moving));
         assert_eq!(parse_status(b"2\x03"), Some(GpglStatus::Unloaded));
+        assert_eq!(parse_status(b"3\x03"), Some(GpglStatus::Paused));
+        assert_eq!(parse_status(b"4"), Some(GpglStatus::Cancelled));
+    }
+
+    #[test]
+    fn panel_key_and_home_bytes() {
+        assert_eq!(panel_key(PANEL_KEY_UP), [0x1b, 0x00, 0x02]);
+        assert_eq!(panel_key(PANEL_KEY_NONE), [0x1b, 0x00, 0x00]);
+        assert_eq!(home_cmd(), b"TT\x03".to_vec());
+        assert_eq!(feed_cmd(100), b"FO100\x03".to_vec());
     }
 }

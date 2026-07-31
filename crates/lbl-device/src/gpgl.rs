@@ -38,7 +38,12 @@ pub fn wait_until_ready(
                         "cutter reports media unloaded (status 2)".into(),
                     ));
                 }
-                GpglStatus::Moving => {
+                GpglStatus::Cancelled => {
+                    return Err(DeviceError::Transport(
+                        "cutter job was cancelled on the device (status 4)".into(),
+                    ));
+                }
+                GpglStatus::Moving | GpglStatus::Paused => {
                     if Instant::now() >= deadline {
                         return Err(DeviceError::Transport(
                             "timed out waiting for cutter ready".into(),

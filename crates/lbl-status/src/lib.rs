@@ -202,6 +202,8 @@ pub enum GpglHostStatus {
     Ready,
     Moving,
     Unloaded,
+    Paused,
+    Cancelled,
 }
 
 impl GpglHostStatus {
@@ -210,6 +212,8 @@ impl GpglHostStatus {
         match self {
             Self::Ready | Self::Moving => PrintReadiness::ready(),
             Self::Unloaded => PrintReadiness::not_ready("unloaded"),
+            Self::Paused => PrintReadiness::not_ready("paused"),
+            Self::Cancelled => PrintReadiness::not_ready("cancelled"),
         }
     }
 }
@@ -220,6 +224,8 @@ impl From<lbl_driver_gpgl::GpglStatus> for GpglHostStatus {
             lbl_driver_gpgl::GpglStatus::Ready => Self::Ready,
             lbl_driver_gpgl::GpglStatus::Moving => Self::Moving,
             lbl_driver_gpgl::GpglStatus::Unloaded => Self::Unloaded,
+            lbl_driver_gpgl::GpglStatus::Paused => Self::Paused,
+            lbl_driver_gpgl::GpglStatus::Cancelled => Self::Cancelled,
         }
     }
 }
@@ -469,5 +475,19 @@ mod tests {
         let r = GpglHostStatus::Unloaded.readiness();
         assert!(!r.ready_to_print);
         assert_eq!(r.reason.as_deref(), Some("unloaded"));
+    }
+
+    #[test]
+    fn gpgl_paused_and_cancelled_block_dispatch() {
+        assert_eq!(
+            GpglHostStatus::Paused.readiness().reason.as_deref(),
+            Some("paused")
+        );
+        assert_eq!(
+            GpglHostStatus::Cancelled.readiness().reason.as_deref(),
+            Some("cancelled")
+        );
+        let value = serde_json::to_value(PrintStatus::Gpgl(GpglHostStatus::Paused.into())).unwrap();
+        assert_eq!(value["state"], "paused");
     }
 }
