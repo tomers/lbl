@@ -842,9 +842,22 @@ mod tests {
             catalog.lookup_device("LM500TS").unwrap().maturity,
             Maturity::Supported
         );
-        // GPGL cut path ready; hardware checklist tracked separately.
+        // GPGL cut path ready; family shares Cameo 4 protocol → supported.
+        // Hardware checklist (supported → verified) tracked separately.
         assert_eq!(
             catalog.lookup_device("cameo4").unwrap().maturity,
+            Maturity::Supported
+        );
+        assert_eq!(
+            catalog.lookup_device("cameo4-plus").unwrap().maturity,
+            Maturity::Supported
+        );
+        assert_eq!(
+            catalog.lookup_device("portrait1").unwrap().maturity,
+            Maturity::Supported
+        );
+        assert_eq!(
+            catalog.lookup_device("craft-robo-cc200").unwrap().maturity,
             Maturity::Supported
         );
         // Protocols never exercised on hand → experimental.
@@ -876,9 +889,10 @@ mod tests {
             catalog.lookup_device("X1038").unwrap().maturity,
             Maturity::Experimental
         );
+        // Munbyn/Rollo TSPL family shares the verified ITPP130B path.
         assert_eq!(
             catalog.lookup_device("ITPP941").unwrap().maturity,
-            Maturity::Experimental
+            Maturity::Supported
         );
         let verified: Vec<_> = catalog
             .devices()
@@ -894,6 +908,7 @@ mod tests {
                 "D110",
                 "D11",
                 "B1",
+                "RW130B",
                 "PT-P750W",
                 "PT-P710BT",
             ]
@@ -909,12 +924,17 @@ mod tests {
                     | Protocol::Niimbot
                     | Protocol::Gpgl
                     | Protocol::BrotherPt
+                    | Protocol::Tspl
             )));
         assert!(catalog.devices().iter().any(|p| {
             p.maturity == Maturity::Experimental
                 && !matches!(
                     p.protocol,
-                    Protocol::DymoLw | Protocol::Dymo | Protocol::Niimbot | Protocol::Gpgl
+                    Protocol::DymoLw
+                        | Protocol::Dymo
+                        | Protocol::Niimbot
+                        | Protocol::Gpgl
+                        | Protocol::Tspl
                 )
         }));
     }

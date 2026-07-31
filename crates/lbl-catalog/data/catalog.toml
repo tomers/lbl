@@ -7471,6 +7471,8 @@ media = { width_mm = 609.6, length = { kind = "fixed", mm = 609.6 }, material = 
 # --- Silhouette / Graphtec GPGL cutters ------------------------------------
 # USB IDs and cuttable widths from inkscape-silhouette DEVICE table.
 # dpi is a placeholder (vector GPGL; unused for raster encode).
+# Maturity: Cameo 4 is the validated GPGL path; other Silhouette/Craft Robo/SD
+# rows share that protocol and are catalogued as supported (not experimental).
 
 [[devices]]
 brand           = "Silhouette"
@@ -7494,7 +7496,7 @@ name            = "Silhouette Cameo 4 Plus"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 372.0
 supports_cut    = true
@@ -7509,7 +7511,7 @@ name = "Silhouette Cameo 4 Pro"
 role = "cutter"
 support = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol = "gpgl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 96.0
 max_width_mm = 600.0
 supports_cut = true
@@ -7530,7 +7532,7 @@ name            = "Silhouette Cameo 5"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 330.2
 supports_cut    = true
@@ -7545,7 +7547,7 @@ name            = "Silhouette Cameo 5 Plus"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 372.0
 supports_cut    = true
@@ -7560,7 +7562,7 @@ name = "Silhouette Cameo Pro Mk II"
 role = "cutter"
 support = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol = "gpgl"
-maturity = "experimental"
+maturity = "supported"
 dpi = 96.0
 max_width_mm = 609.0
 supports_cut = true
@@ -7581,7 +7583,7 @@ name            = "Silhouette Cameo 5 Alpha"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 330.2
 supports_cut    = true
@@ -7596,7 +7598,7 @@ name            = "Silhouette Cameo 5 Alpha Plus"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 372.0
 supports_cut    = true
@@ -7611,7 +7613,7 @@ name            = "Silhouette Cameo 1"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 304.0
 supports_cut    = true
@@ -7626,7 +7628,7 @@ name            = "Silhouette Cameo 2"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 304.0
 supports_cut    = true
@@ -7641,7 +7643,7 @@ name            = "Silhouette Cameo 3"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 304.8
 supports_cut    = true
@@ -7656,7 +7658,7 @@ name            = "Silhouette Portrait 1"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 206.0
 supports_cut    = true
@@ -7671,7 +7673,7 @@ name            = "Silhouette Portrait 2"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 203.0
 supports_cut    = true
@@ -7686,7 +7688,7 @@ name            = "Silhouette Portrait 3"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 203.0
 supports_cut    = true
@@ -7701,7 +7703,7 @@ name            = "Silhouette Portrait 4"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 216.0
 supports_cut    = true
@@ -7712,11 +7714,11 @@ connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x113F }]
 [[devices]]
 brand           = "Silhouette"
 keys            = ["craft-robo-cc200", "Craft Robo CC200", "CC200-20"]
-name            = "Craft Robo CC200 (deferred)"
+name            = "Craft Robo CC200"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 200.0
 supports_cut    = true
@@ -7727,11 +7729,11 @@ connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x110A }]
 [[devices]]
 brand           = "Silhouette"
 keys            = ["craft-robo-cc300", "Craft Robo CC300", "CC300-20"]
-name            = "Craft Robo CC300 (deferred)"
+name            = "Craft Robo CC300"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 200.0
 supports_cut    = true
@@ -7742,11 +7744,11 @@ connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x111A }]
 [[devices]]
 brand           = "Silhouette"
 keys            = ["silhouette-sd-1", "Silhouette SD 1", "SD 1"]
-name            = "Silhouette SD 1 (deferred)"
+name            = "Silhouette SD 1"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 200.0
 supports_cut    = true
@@ -7757,11 +7759,11 @@ connections     = [{ kind = "usb", vendor_id = 0x0B4D, product_id = 0x111C }]
 [[devices]]
 brand           = "Silhouette"
 keys            = ["silhouette-sd-2", "Silhouette SD 2", "SD 2"]
-name            = "Silhouette SD 2 (deferred)"
+name            = "Silhouette SD 2"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "experimental"
+maturity        = "supported"
 dpi             = 96.0
 max_width_mm    = 200.0
 supports_cut    = true
