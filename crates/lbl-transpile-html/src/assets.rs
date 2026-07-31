@@ -93,6 +93,14 @@ html,body{margin:0;padding:0}
 .lbl-qr canvas,.lbl-qr img,.lbl-qr svg{max-width:100%;max-height:100%;width:auto;height:auto;aspect-ratio:1}
 .lbl-barcode svg{display:block;max-width:100%;height:auto}
 .lbl-label>img,.lbl-row>img,.lbl-col>img,.lbl-slot>img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+/* Cut/print vectors: custom element is inline by default and collapses to a
+ * few CSS px, so continuous feed measures ~0 width and Selected piece shows a
+ * thin sliver. Size the SVG from the fixed head axis (height when landscape
+ * ribbon) so layout/measure match path fitting. */
+vector{display:block;line-height:0;max-width:100%;max-height:100%}
+vector>svg{display:block;max-width:100%;max-height:100%;width:auto;height:auto}
+.lbl-label>vector:only-child{flex:1 1 auto;align-self:stretch;min-height:0;height:100%;display:flex;align-items:center;justify-content:center}
+.lbl-label>vector:only-child>svg{height:100%;width:auto;max-height:100%;max-width:none}
 .lbl-label :is(h1,h2,h3,h4,h5,h6,p,ul,ol,blockquote,strong,b,em){margin:0}
 .lbl-label h1{font-size:1.35em;font-weight:700}
 .lbl-label h2{font-size:1.2em;font-weight:700}
@@ -402,6 +410,12 @@ mod tests {
         assert!(BASE_CSS.contains(".lbl-slot{"));
         assert!(BASE_CSS.contains(".lbl-frame{"));
         assert!(BASE_CSS.contains(".lbl-row>.lbl-slot"));
+    }
+
+    #[test]
+    fn base_css_sizes_vector_cut_graphics() {
+        assert!(BASE_CSS.contains("vector{display:block"));
+        assert!(BASE_CSS.contains(".lbl-label>vector:only-child>svg"));
     }
 
     #[test]

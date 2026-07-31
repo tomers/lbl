@@ -89,6 +89,8 @@ pub enum Block {
     },
     /// An image referenced by a local path or remote URL.
     Image(String),
+    /// Cut/print vector graphic: embedded SVG markup or a URI (`data:` / http).
+    Vector(String),
     /// A date/time stamp resolved to local wall-clock text at preview/print time.
     Stamp {
         /// Date, time, or datetime scope (Studio presets; format drives output).
@@ -167,6 +169,7 @@ impl Block {
                 )
             }
             Block::Image(uri) => format!("<img src=\"{}\" />", escape(uri)),
+            Block::Vector(body) => vector_to_authoring_html(body),
             Block::Stamp { kind, format } => wrap_lbl_text_inlines(&format!(
                 "<stamp kind=\"{}\" format=\"{}\"></stamp>",
                 kind.as_str(),
@@ -535,7 +538,7 @@ fn line_followed_by_inline_widget(pieces: &[LayoutPiece], line_index: usize) -> 
     matches!(
         pieces.get(line_index + 1),
         Some(LayoutPiece::Inline(
-            Block::Qr { .. } | Block::Barcode { .. } | Block::Image(_)
+            Block::Qr { .. } | Block::Barcode { .. } | Block::Image(_) | Block::Vector(_)
         ))
     )
 }
@@ -554,7 +557,8 @@ fn is_inline_flow_block(block: &Block) -> bool {
         | Block::Stamp { .. }
         | Block::Qr { .. }
         | Block::Barcode { .. }
-        | Block::Image(_) => true,
+        | Block::Image(_)
+        | Block::Vector(_) => true,
     }
 }
 
@@ -605,7 +609,7 @@ fn inline_content_from_spec(spec: &str) -> Option<Vec<Block>> {
 }
 
 /// Parse the inside of an inline `[[...]]` directive (e.g. `qr:https://x.y`,
-/// `barcode:EAN13:123`, `image:./a.png`) into a [`Block`].
+/// `barcode:EAN13:123`, `image:./a.png`, `vector:<svg>…`) into a [`Block`].
 ///
 /// Returns `None` for unrecognized or empty directives, so callers can leave
 /// the original text untouched. This is the same matcher used by the inline
@@ -632,6 +636,13 @@ fn directive_from_inner(inner: &str) -> Option<Block> {
         "ff" | "font" | "font-family" => font_from_spec(rest),
         "font-size" | "fs" | "size" => sized_from_spec(rest),
         "image" | "img" => Some(Block::Image(rest.to_string())),
+        "vector" | "svg" => {
+            let body = rest.trim();
+            if body.is_empty() {
+                return None;
+            }
+            Some(Block::Vector(body.to_string()))
+        }
         "qr" => {
             let payload = rest.trim();
             if payload.is_empty() {
@@ -797,6 +808,26 @@ fn fmt_scale(scale: f64) -> String {
 fn text_to_html(text: &str) -> String {
     let escaped = escape(text);
     escaped.replace('\n', "<br>")
+}
+
+fn vector_looks_like_uri(body: &str) -> bool {
+    let v = body.trim().to_ascii_lowercase();
+    v.starts_with("data:")
+        || v.starts_with("http://")
+        || v.starts_with("https://")
+        || v.starts_with("blob:")
+        || v.starts_with("./")
+        || v.starts_with('/')
+}
+
+/// Emit `<vector>…svg…</vector>` for markup, or `<img>` for URI payloads.
+fn vector_to_authoring_html(body: &str) -> String {
+    let trimmed = body.trim();
+    if trimmed.starts_with('<') && !vector_looks_like_uri(trimmed) {
+        format!("<vector>{trimmed}</vector>")
+    } else {
+        format!("<img src=\"{}\" />", escape(trimmed))
+    }
 }
 
 fn escape(s: &str) -> String {
@@ -1388,6 +1419,30 @@ mod tests {
                 Block::Image("./a.png".into()),
                 Block::Image("https://x/y.png".into()),
             ]
+        );
+    }
+
+    #[test]
+    fn vector_directive_embedded_svg() {
+        let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"1\"/></svg>";
+        let doc = Document::parse(&format!("[[vector:{svg}]]"), false);
+        assert_eq!(doc.blocks, vec![Block::Vector(svg.into())]);
+        assert_eq!(
+            doc.blocks[0].to_authoring_html(),
+            format!("<vector>{svg}</vector>")
+        );
+    }
+
+    #[test]
+    fn vector_directive_uri_emits_img() {
+        let doc = Document::parse("[[vector:data:image/svg+xml;base64,YQ==]]", false);
+        assert_eq!(
+            doc.blocks,
+            vec![Block::Vector("data:image/svg+xml;base64,YQ==".into())]
+        );
+        assert_eq!(
+            doc.blocks[0].to_authoring_html(),
+            "<img src=\"data:image/svg+xml;base64,YQ==\" />"
         );
     }
 
