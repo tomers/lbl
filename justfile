@@ -24,7 +24,6 @@ mod maintenance './justfiles/maintenance.just'
 serve *args: _ensure-mise
     cargo run -p lbl-server -- --bind 127.0.0.1:8787 {{ args }}
 
-
 # Run the lbl CLI (e.g. `just lbl catalog show 11352`).
 lbl *args: _ensure-mise
     cargo run -q -p lbl --bin lbl -- {{ args }}
