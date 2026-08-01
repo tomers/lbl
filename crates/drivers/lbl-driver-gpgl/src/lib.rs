@@ -242,9 +242,13 @@ pub fn panel_key(mask: u8) -> [u8; 3] {
     [0x1b, 0x00, mask]
 }
 
-/// Home the cutter head (`TT`).
+/// Mechanical home (`H`) — Graphtec GP-GL Home; returns head and media to origin.
+///
+/// Prefer this for the Studio pad “Home” control. Legacy Silhouette `TT` is a
+/// no-op on Cameo 4; the cut-job epilogue (`L0`/`\\0,0`/`M0,0`/…) only parks at
+/// the *logical* workspace origin and does not replace a panel home.
 pub fn home_cmd() -> Vec<u8> {
-    let mut v = b"TT".to_vec();
+    let mut v = b"H".to_vec();
     v.push(0x03);
     v
 }
@@ -488,7 +492,7 @@ mod tests {
     fn panel_key_and_home_bytes() {
         assert_eq!(panel_key(PANEL_KEY_UP), [0x1b, 0x00, 0x02]);
         assert_eq!(panel_key(PANEL_KEY_NONE), [0x1b, 0x00, 0x00]);
-        assert_eq!(home_cmd(), b"TT\x03".to_vec());
+        assert_eq!(home_cmd(), b"H\x03".to_vec());
         assert_eq!(feed_cmd(100), b"FO100\x03".to_vec());
     }
 

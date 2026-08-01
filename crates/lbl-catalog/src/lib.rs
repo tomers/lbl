@@ -842,11 +842,10 @@ mod tests {
             catalog.lookup_device("LM500TS").unwrap().maturity,
             Maturity::Supported
         );
-        // GPGL cut path ready; family shares Cameo 4 protocol → supported.
-        // Hardware checklist (supported → verified) tracked separately.
+        // Cameo 4 verified on-hand; family shares protocol → supported.
         assert_eq!(
             catalog.lookup_device("cameo4").unwrap().maturity,
-            Maturity::Supported
+            Maturity::Verified
         );
         assert_eq!(
             catalog.lookup_device("cameo4-plus").unwrap().maturity,
@@ -911,6 +910,7 @@ mod tests {
                 "RW130B",
                 "PT-P750W",
                 "PT-P710BT",
+                "cameo4",
             ]
         );
         assert!(catalog
@@ -946,7 +946,7 @@ mod tests {
         let cameo = catalog.lookup_device("cameo4").unwrap();
         assert_eq!(cameo.role, DeviceRole::Cutter);
         assert_eq!(cameo.protocol, Protocol::Gpgl);
-        assert_eq!(cameo.maturity, Maturity::Supported);
+        assert_eq!(cameo.maturity, Maturity::Verified);
         assert!(cameo
             .connections
             .iter()

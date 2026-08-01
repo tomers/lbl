@@ -7471,8 +7471,8 @@ media = { width_mm = 609.6, length = { kind = "fixed", mm = 609.6 }, material = 
 # --- Silhouette / Graphtec GPGL cutters ------------------------------------
 # USB IDs and cuttable widths from inkscape-silhouette DEVICE table.
 # dpi is a placeholder (vector GPGL; unused for raster encode).
-# Maturity: Cameo 4 is the validated GPGL path; other Silhouette/Craft Robo/SD
-# rows share that protocol and are catalogued as supported (not experimental).
+# Maturity: Cameo 4 is verified on-hand (Studio WebUSB cut + status + idle pad).
+# Other Silhouette/Craft Robo/SD rows share that protocol → supported.
 
 [[devices]]
 brand           = "Silhouette"
@@ -7481,7 +7481,7 @@ name            = "Silhouette Cameo 4"
 role            = "cutter"
 support         = { brand_url = "https://www.silhouetteamerica.com/support" }
 protocol        = "gpgl"
-maturity        = "supported"
+maturity        = "verified"
 dpi             = 96.0
 max_width_mm    = 304.8
 supports_cut    = true
