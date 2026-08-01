@@ -88,6 +88,9 @@ mod tests {
 
     #[test]
     fn status_bytes_roundtrip() {
-        assert_eq!(parse_status(b"0\x03"), Some(GpglStatus::Ready));
+        assert_eq!(
+            parse_status(lbl_driver_gpgl::STATUS_REPLY_READY),
+            Some(GpglStatus::Ready)
+        );
     }
 }

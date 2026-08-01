@@ -54,7 +54,9 @@ pub fn encode_cut(paths: &[CutPath], job: &CutJobSpec) -> Result<Vec<u8>, GpglEr
     for _ in 0..copies {
         out.extend_from_slice(b"\x1b\x04");
         push_cmd(&mut out, "FN", &["0"]);
-        push_cmd(&mut out, "TB50", &["0"]);
+        // Portrait. Opcode ends in digits — must be `TB50,0`, not `TB500`
+        // (push_cmd concatenates the first arg onto the mnemonic).
+        push_portrait(&mut out);
         push_cmd(&mut out, "TG", &[&opt.mat.to_string()]);
         push_cmd(&mut out, "J", &[&holder.to_string()]);
         push_tool_cmd(&mut out, "FX", &opt.force.to_string(), holder);
@@ -95,10 +97,17 @@ pub fn encode_cut(paths: &[CutPath], job: &CutJobSpec) -> Result<Vec<u8>, GpglEr
         push_cmd(&mut out, "M", &["0", "0"]);
         push_cmd(&mut out, "J", &["0"]);
         push_cmd(&mut out, "FN", &["0"]);
-        push_cmd(&mut out, "TB50", &["0"]);
+        push_portrait(&mut out);
     }
 
     Ok(out)
+}
+
+/// `TB50,0` — Cameo portrait. Not expressible via [`push_cmd`] alone because
+/// the mnemonic already ends in digits (`TB50` + `0` would become `TB500`).
+fn push_portrait(out: &mut Vec<u8>) {
+    out.extend_from_slice(b"TB50,0");
+    out.push(0x03);
 }
 
 fn push_tool_cmd(out: &mut Vec<u8>, op: &str, value: &str, holder: u8) {
@@ -164,6 +173,11 @@ fn mm_to_units(mm: f64) -> f64 {
     mm * UNITS_PER_MM
 }
 
+/// Append `op` + args joined by `,` + ETX.
+///
+/// First arg is concatenated directly onto `op` (Graphtec style: `FN0`, `TG1`,
+/// `FX10,1`). Mnemonics that already end in digits (e.g. `TB50`) must not use
+/// this for a following arg — see [`push_portrait`].
 fn push_cmd(out: &mut Vec<u8>, op: &str, args: &[&str]) {
     out.extend_from_slice(op.as_bytes());
     if !args.is_empty() {
@@ -177,6 +191,13 @@ pub const STATUS_QUERY: &[u8] = b"\x1b\x05";
 
 /// Initialize device (`ESC D` / EOT).
 pub const INIT_CMD: &[u8] = b"\x1b\x04";
+
+/// GPGL `ESC E` reply bodies (status digit + ETX), as devices typically send.
+pub const STATUS_REPLY_READY: &[u8] = b"0\x03";
+pub const STATUS_REPLY_MOVING: &[u8] = b"1\x03";
+pub const STATUS_REPLY_UNLOADED: &[u8] = b"2\x03";
+pub const STATUS_REPLY_PAUSED: &[u8] = b"3\x03";
+pub const STATUS_REPLY_CANCELLED: &[u8] = b"4\x03";
 
 /// Firmware query (`FG`).
 ///
@@ -241,13 +262,13 @@ pub fn parse_status(resp: &[u8]) -> Option<GpglStatus> {
         .ok()?
         .trim_end_matches('\x03')
         .trim();
-    match s.chars().next()? {
-        '0' => Some(GpglStatus::Ready),
-        '1' => Some(GpglStatus::Moving),
-        '2' => Some(GpglStatus::Unloaded),
+    match s.as_bytes().first()? {
+        b'0' => Some(GpglStatus::Ready),
+        b'1' => Some(GpglStatus::Moving),
+        b'2' => Some(GpglStatus::Unloaded),
         // On-device Pause / Cancel (Cameo 3+ captures; see inkscape-silhouette #72).
-        '3' => Some(GpglStatus::Paused),
-        '4' => Some(GpglStatus::Cancelled),
+        b'3' => Some(GpglStatus::Paused),
+        b'4' => Some(GpglStatus::Cancelled),
         _ => None,
     }
 }
@@ -262,6 +283,19 @@ pub enum GpglStatus {
     Paused,
     /// Job cancelled on the device after pause (`0x34` / ASCII `4`).
     Cancelled,
+}
+
+impl GpglStatus {
+    /// Wire reply body including trailing ETX (`STATUS_REPLY_*`).
+    pub const fn reply(self) -> &'static [u8] {
+        match self {
+            Self::Ready => STATUS_REPLY_READY,
+            Self::Moving => STATUS_REPLY_MOVING,
+            Self::Unloaded => STATUS_REPLY_UNLOADED,
+            Self::Paused => STATUS_REPLY_PAUSED,
+            Self::Cancelled => STATUS_REPLY_CANCELLED,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +327,10 @@ mod tests {
         assert!(s.contains("TJ0\u{3}"));
         assert!(s.contains("TJ3\u{3}"));
         assert!(s.contains("FY1\u{3}"));
+        // Portrait must be `TB50,0` — `push_cmd("TB50", ["0"])` wrongly emits `TB500`.
+        assert!(s.contains("TB50,0\u{3}"));
+        assert!(!s.contains("TB500\u{3}"));
+        assert_eq!(s.matches("TB50,0\u{3}").count(), 2);
         assert!(s.contains('M'));
         assert!(s.contains('D'));
         assert!(bytes.contains(&0x03));
@@ -434,11 +472,16 @@ mod tests {
 
     #[test]
     fn parse_status_ready() {
-        assert_eq!(parse_status(b"0\x03"), Some(GpglStatus::Ready));
+        assert_eq!(parse_status(STATUS_REPLY_READY), Some(GpglStatus::Ready));
         assert_eq!(parse_status(b"1"), Some(GpglStatus::Moving));
-        assert_eq!(parse_status(b"2\x03"), Some(GpglStatus::Unloaded));
-        assert_eq!(parse_status(b"3\x03"), Some(GpglStatus::Paused));
+        assert_eq!(
+            parse_status(STATUS_REPLY_UNLOADED),
+            Some(GpglStatus::Unloaded)
+        );
+        assert_eq!(parse_status(STATUS_REPLY_PAUSED), Some(GpglStatus::Paused));
         assert_eq!(parse_status(b"4"), Some(GpglStatus::Cancelled));
+        assert_eq!(GpglStatus::Ready.reply(), STATUS_REPLY_READY);
+        assert_eq!(GpglStatus::Moving.reply(), STATUS_REPLY_MOVING);
     }
 
     #[test]

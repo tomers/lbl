@@ -415,7 +415,9 @@ mod tests {
                 ..
             }
         ));
-        let action = session.feed_rx(b"0\x03").unwrap();
+        let action = session
+            .feed_rx(lbl_driver_gpgl::STATUS_REPLY_READY)
+            .unwrap();
         match action {
             StatusAction::Done { status, context } => {
                 match *status {
@@ -449,7 +451,9 @@ mod tests {
             other => panic!("unexpected {other:?}"),
         }
         let _ = session.on_send_complete().unwrap();
-        let action = session.feed_rx(b"0\x03").unwrap();
+        let action = session
+            .feed_rx(lbl_driver_gpgl::STATUS_REPLY_READY)
+            .unwrap();
         match action {
             StatusAction::Done { status, .. } => match *status {
                 PrintStatus::Gpgl(st) => {
@@ -481,7 +485,9 @@ mod tests {
             other => panic!("unexpected {other:?}"),
         }
         let _ = session.on_send_complete().unwrap();
-        let action = session.feed_rx(b"2\x03").unwrap();
+        let action = session
+            .feed_rx(lbl_driver_gpgl::STATUS_REPLY_UNLOADED)
+            .unwrap();
         match action {
             StatusAction::Done { status, context } => {
                 match *status {
