@@ -1468,6 +1468,44 @@ mod tests {
             .name
             .contains("Flexible"));
         assert!(catalog.lookup("TZe-SE4").unwrap().name.contains("Security"));
+        // International TZe matrix + regional aliases (JP brochure, EU/Farnell chart).
+        assert!(catalog
+            .lookup("TZe-M941")
+            .unwrap()
+            .name
+            .contains("Metallic"));
+        assert!(catalog
+            .lookup("TZe-M961")
+            .unwrap()
+            .name
+            .contains("Metallic"));
+        assert_eq!(
+            catalog.lookup("TZe-S231").unwrap().media.adhesive,
+            lbl_core::Adhesive::Strong
+        );
+        assert!(catalog
+            .lookup("TZe-FX651")
+            .unwrap()
+            .name
+            .contains("Flexible"));
+        assert!(catalog
+            .lookup("TZe-N231")
+            .unwrap()
+            .name
+            .contains("Non-laminated"));
+        assert!(catalog
+            .lookup("TZe-SL251")
+            .unwrap()
+            .name
+            .contains("Self-laminating"));
+        assert!(catalog.lookup("TZe-FA3").unwrap().name.contains("Fabric"));
+        assert!(catalog.lookup("TZeFA4").unwrap().matches_key("TZe-FA4B"));
+        assert!(catalog.lookup("TZe-231S").unwrap().matches_key("TZe-231"));
+        assert_eq!(catalog.lookup("TZe-B31").unwrap().media.width_mm, 12.0);
+        assert_eq!(catalog.lookup("TZe-661").unwrap().media.width_mm, 36.0);
+        assert!(catalog.supports_media("PT-P700", "TZe-S251"));
+        assert!(!catalog.supports_media("PT-P700", "TZe-261"));
+        assert!(catalog.supports_media("PT-P900", "TZe-261"));
         assert!(catalog.lookup("18051").unwrap().name.contains("Rhino"));
         assert!(catalog.lookup("30346").unwrap().name.contains("US"));
         assert_eq!(

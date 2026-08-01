@@ -1186,143 +1186,19 @@ purchase_url = "https://www.niimbot.com/"
 product_ids  = ["T50X30-Y"]
 media        = { width_mm = 50.0, length = { kind = "fixed", mm = 30.0 }, material = "paper", adhesive = "permanent", color = "yellow" }
 
-# --- Brother TZe laminated tapes (P-touch PT family) --------------------------
+# --- Brother TZe tapes (P-touch PT family) ------------------------------------
 # Cassette widths map to printable bands on the 128-dot (180 dpi) or 560-dot
-# (360 dpi / PT-P900) heads.
+# (360 dpi / PT-P900) heads. Coverage follows Brother JP tape charts plus the
+# international TZe matrix (standard, fluorescent, matt/pastel, metallic,
+# extra-strength, flexible ID, self-laminating, security, non-laminated, fabric).
+# Keys include hyphenated, compact, and common regional/value-pack aliases.
 
 [[entries]]
 brand        = "Brother"
-keys         = ["TZe-N201", "TZe-N211", "TZEN201", "tze-3.5"]
-name         = "Brother TZe 3.5mm Black on White Laminated Tape"
+keys         = ["TZe-161", "TZe161"]
+name         = "Brother TZe-161 36mm Black on Clear Laminated Tape"
 purchase_url = "https://www.brother.com/"
-media        = { width_mm = 3.5, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-211", "TZe211", "tze-6"]
-name         = "Brother TZe-211 6mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-221", "TZe221", "tze-9"]
-name         = "Brother TZe-221 9mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-231", "TZe231", "tze-12"]
-name         = "Brother TZe-231 12mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-131", "TZe131"]
-name         = "Brother TZe-131 12mm Black on Clear Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-241", "TZe241", "tze-18"]
-name         = "Brother TZe-241 18mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-251", "TZe251", "tze-24"]
-name         = "Brother TZe-251 24mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-261", "TZe261", "tze-36"]
-name         = "Brother TZe-261 36mm Black on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-334", "TZe334"]
-name         = "Brother TZe-334 12mm Gold on Black Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
-
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-232", "TZe232"]
-name         = "Brother TZe-232 12mm Red on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-233", "TZe233"]
-name         = "Brother TZe-233 12mm Blue on White Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-631", "TZe631"]
-name         = "Brother TZe-631 12mm Black on Yellow Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-641", "TZe641"]
-name         = "Brother TZe-641 18mm Black on Yellow Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-651", "TZe651"]
-name         = "Brother TZe-651 24mm Black on Yellow Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-421", "TZe421"]
-name         = "Brother TZe-421 9mm Black on Red Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-431", "TZe431"]
-name         = "Brother TZe-431 12mm Black on Red Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-325", "TZe325"]
-name         = "Brother TZe-325 9mm White on Black Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-335", "TZe335"]
-name         = "Brother TZe-335 12mm White on Black Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
-
-[[entries]]
-brand        = "Brother"
-keys         = ["TZe-141", "TZe141"]
-name         = "Brother TZe-141 18mm Black on Clear Laminated Tape"
-purchase_url = "https://www.brother.com/"
-media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
 
 [[entries]]
 brand        = "Brother"
@@ -1333,10 +1209,626 @@ media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "
 
 [[entries]]
 brand        = "Brother"
-keys         = ["TZe-FX231", "TZeFX231", "TZe-FX-231"]
-name         = "Brother TZe-FX231 12mm Flexible ID Black on White"
+keys         = ["TZe-141", "TZe141"]
+name         = "Brother TZe-141 18mm Black on Clear Laminated Tape"
 purchase_url = "https://www.brother.com/"
-media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-131", "TZe131"]
+name         = "Brother TZe-131 12mm Black on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-121", "TZe121"]
+name         = "Brother TZe-121 9mm Black on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-111", "TZe111"]
+name         = "Brother TZe-111 6mm Black on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-261", "TZe261", "TZe-261S", "TZe261S", "tze-36"]
+name         = "Brother TZe-261 36mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-251", "TZe251", "TZe-251S", "TZe251S", "tze-24"]
+name         = "Brother TZe-251 24mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-241", "TZe241", "TZe-241S", "TZe241S", "tze-18"]
+name         = "Brother TZe-241 18mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-231", "TZe231", "TZe-231S", "TZe231S", "tze-12"]
+name         = "Brother TZe-231 12mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-221", "TZe221", "TZe-221S", "TZe221S", "tze-9"]
+name         = "Brother TZe-221 9mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-211", "TZe211", "TZe-211S", "TZe211S", "tze-6"]
+name         = "Brother TZe-211 6mm Black on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-461", "TZe461"]
+name         = "Brother TZe-461 36mm Black on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-451", "TZe451"]
+name         = "Brother TZe-451 24mm Black on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-441", "TZe441"]
+name         = "Brother TZe-441 18mm Black on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-431", "TZe431", "TZe-431S", "TZe431S"]
+name         = "Brother TZe-431 12mm Black on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-421", "TZe421"]
+name         = "Brother TZe-421 9mm Black on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-561", "TZe561"]
+name         = "Brother TZe-561 36mm Black on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-551", "TZe551"]
+name         = "Brother TZe-551 24mm Black on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-541", "TZe541"]
+name         = "Brother TZe-541 18mm Black on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-531", "TZe531"]
+name         = "Brother TZe-531 12mm Black on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-521", "TZe521"]
+name         = "Brother TZe-521 9mm Black on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-661", "TZe661"]
+name         = "Brother TZe-661 36mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-651", "TZe651"]
+name         = "Brother TZe-651 24mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-641", "TZe641"]
+name         = "Brother TZe-641 18mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-631", "TZe631", "TZe-631S", "TZe631S"]
+name         = "Brother TZe-631 12mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-621", "TZe621"]
+name         = "Brother TZe-621 9mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-611", "TZe611"]
+name         = "Brother TZe-611 6mm Black on Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-751", "TZe751"]
+name         = "Brother TZe-751 24mm Black on Green Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-741", "TZe741"]
+name         = "Brother TZe-741 18mm Black on Green Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-731", "TZe731"]
+name         = "Brother TZe-731 12mm Black on Green Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-721", "TZe721"]
+name         = "Brother TZe-721 9mm Black on Green Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-B51", "TZeB51"]
+name         = "Brother TZe-B51 24mm Black on Fluorescent Orange Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-B41", "TZeB41"]
+name         = "Brother TZe-B41 18mm Black on Fluorescent Orange Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-B31", "TZeB31"]
+name         = "Brother TZe-B31 12mm Black on Fluorescent Orange Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-C51", "TZeC51"]
+name         = "Brother TZe-C51 24mm Black on Fluorescent Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-C31", "TZeC31"]
+name         = "Brother TZe-C31 12mm Black on Fluorescent Yellow Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-132", "TZe132"]
+name         = "Brother TZe-132 12mm Red on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-262", "TZe262"]
+name         = "Brother TZe-262 36mm Red on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-252", "TZe252"]
+name         = "Brother TZe-252 24mm Red on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-242", "TZe242"]
+name         = "Brother TZe-242 18mm Red on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-232", "TZe232"]
+name         = "Brother TZe-232 12mm Red on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-222", "TZe222"]
+name         = "Brother TZe-222 9mm Red on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-133", "TZe133"]
+name         = "Brother TZe-133 12mm Blue on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-263", "TZe263"]
+name         = "Brother TZe-263 36mm Blue on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-253", "TZe253"]
+name         = "Brother TZe-253 24mm Blue on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-243", "TZe243"]
+name         = "Brother TZe-243 18mm Blue on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-233", "TZe233"]
+name         = "Brother TZe-233 12mm Blue on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-223", "TZe223"]
+name         = "Brother TZe-223 9mm Blue on White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-354", "TZe354"]
+name         = "Brother TZe-354 24mm Gold on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-344", "TZe344"]
+name         = "Brother TZe-344 18mm Gold on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-334", "TZe334"]
+name         = "Brother TZe-334 12mm Gold on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-145", "TZe145"]
+name         = "Brother TZe-145 18mm White on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-135", "TZe135"]
+name         = "Brother TZe-135 12mm White on Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-365", "TZe365"]
+name         = "Brother TZe-365 36mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-355", "TZe355"]
+name         = "Brother TZe-355 24mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-345", "TZe345"]
+name         = "Brother TZe-345 18mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-335", "TZe335"]
+name         = "Brother TZe-335 12mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-325", "TZe325"]
+name         = "Brother TZe-325 9mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-315", "TZe315"]
+name         = "Brother TZe-315 6mm White on Black Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-435", "TZe435"]
+name         = "Brother TZe-435 12mm White on Red Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "red" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-535", "TZe535"]
+name         = "Brother TZe-535 12mm White on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-555", "TZe555"]
+name         = "Brother TZe-555 24mm White on Blue Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M261", "TZeM261"]
+name         = "Brother TZe-M261 36mm Black on Matte White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M251", "TZeM251"]
+name         = "Brother TZe-M251 24mm Black on Matte White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M231", "TZeM231"]
+name         = "Brother TZe-M231 12mm Black on Matte White Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M31", "TZeM31"]
+name         = "Brother TZe-M31 12mm Black on Matte Clear Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-MQL35", "TZeMQL35", "TZe-MQL-35"]
+name         = "Brother TZe-MQL35 12mm Black on Light Blue Pastel Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-MQP35", "TZeMQP35", "TZe-MQP-35"]
+name         = "Brother TZe-MQP35 12mm Black on Pink Pastel Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-MQG35", "TZeMQG35", "TZe-MQG-35"]
+name         = "Brother TZe-MQG35 12mm Black on Lime Green Pastel Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M961", "TZeM961"]
+name         = "Brother TZe-M961 36mm Black on Matte Silver Metallic Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M951", "TZeM951"]
+name         = "Brother TZe-M951 24mm Black on Matte Silver Metallic Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M941", "TZeM941"]
+name         = "Brother TZe-M941 18mm Black on Matte Silver Metallic Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M931", "TZeM931"]
+name         = "Brother TZe-M931 12mm Black on Matte Silver Metallic Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-M921", "TZeM921"]
+name         = "Brother TZe-M921 9mm Black on Matte Silver Metallic Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "other" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S261", "TZeS261"]
+name         = "Brother TZe-S261 36mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S251", "TZeS251"]
+name         = "Brother TZe-S251 24mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S241", "TZeS241"]
+name         = "Brother TZe-S241 18mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S231", "TZeS231"]
+name         = "Brother TZe-S231 12mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S221", "TZeS221"]
+name         = "Brother TZe-S221 9mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S211", "TZeS211"]
+name         = "Brother TZe-S211 6mm Black on White Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S151", "TZeS151"]
+name         = "Brother TZe-S151 24mm Black on Clear Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S141", "TZeS141"]
+name         = "Brother TZe-S141 18mm Black on Clear Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S131", "TZeS131"]
+name         = "Brother TZe-S131 12mm Black on Clear Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S121", "TZeS121"]
+name         = "Brother TZe-S121 9mm Black on Clear Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "transparent" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S651", "TZeS651"]
+name         = "Brother TZe-S651 24mm Black on Yellow Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S641", "TZeS641"]
+name         = "Brother TZe-S641 18mm Black on Yellow Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S631", "TZeS631"]
+name         = "Brother TZe-S631 12mm Black on Yellow Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-S621", "TZeS621"]
+name         = "Brother TZe-S621 9mm Black on Yellow Extra Strength Laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "strong", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX261", "TZeFX261", "TZe-FX-261"]
+name         = "Brother TZe-FX261 36mm Flexible ID Black on White"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX251", "TZeFX251", "TZe-FX-251"]
+name         = "Brother TZe-FX251 24mm Flexible ID Black on White"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
 
 [[entries]]
 brand        = "Brother"
@@ -1347,10 +1839,94 @@ media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "
 
 [[entries]]
 brand        = "Brother"
-keys         = ["TZe-FX251", "TZeFX251", "TZe-FX-251"]
-name         = "Brother TZe-FX251 24mm Flexible ID Black on White"
+keys         = ["TZe-FX231", "TZeFX231", "TZe-FX-231"]
+name         = "Brother TZe-FX231 12mm Flexible ID Black on White"
 purchase_url = "https://www.brother.com/"
-media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX221", "TZeFX221", "TZe-FX-221"]
+name         = "Brother TZe-FX221 9mm Flexible ID Black on White"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX211", "TZeFX211", "TZe-FX-211"]
+name         = "Brother TZe-FX211 6mm Flexible ID Black on White"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX661", "TZeFX661", "TZe-FX-661"]
+name         = "Brother TZe-FX661 36mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX651", "TZeFX651", "TZe-FX-651"]
+name         = "Brother TZe-FX651 24mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX641", "TZeFX641", "TZe-FX-641"]
+name         = "Brother TZe-FX641 18mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX631", "TZeFX631", "TZe-FX-631"]
+name         = "Brother TZe-FX631 12mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX621", "TZeFX621", "TZe-FX-621"]
+name         = "Brother TZe-FX621 9mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FX611", "TZeFX611", "TZe-FX-611"]
+name         = "Brother TZe-FX611 6mm Flexible ID Black on Yellow"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 6.0, length = { kind = "continuous" }, material = "nylon", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-SL251", "TZeSL251", "TZe-SL-251"]
+name         = "Brother TZe-SL251 24mm Self-laminating Black on White Cable Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-SL651", "TZeSL651", "TZe-SL-651"]
+name         = "Brother TZe-SL651 24mm Self-laminating Black on Yellow Cable Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-SL261", "TZeSL261", "TZe-SL-261"]
+name         = "Brother TZe-SL261 36mm Self-laminating Black on White Cable Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-SL661", "TZeSL661", "TZe-SL-661"]
+name         = "Brother TZe-SL661 36mm Self-laminating Black on Yellow Cable Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 36.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "yellow" }
 
 [[entries]]
 brand        = "Brother"
@@ -1365,6 +1941,55 @@ keys         = ["TZe-SE5", "TZeSE5", "TZe-SE-5"]
 name         = "Brother TZe-SE5 24mm Security Laminated Tape Black on White"
 purchase_url = "https://www.brother.com/"
 media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N251", "TZeN251"]
+name         = "Brother TZe-N251 24mm Black on White Non-laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 24.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N241", "TZeN241"]
+name         = "Brother TZe-N241 18mm Black on White Non-laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N231", "TZeN231"]
+name         = "Brother TZe-N231 12mm Black on White Non-laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N221", "TZeN221"]
+name         = "Brother TZe-N221 9mm Black on White Non-laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 9.0, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-N201", "TZeN201", "tze-3.5"]
+name         = "Brother TZe-N201 3.5mm Black on White Non-laminated Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 3.5, length = { kind = "continuous" }, material = "vinyl", adhesive = "permanent", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FA3", "TZeFA3", "TZe-FA-3"]
+name         = "Brother TZe-FA3 12mm Blue on White Fabric Iron-on Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 12.0, length = { kind = "continuous" }, material = "other", adhesive = "none", color = "white" }
+
+[[entries]]
+brand        = "Brother"
+keys         = ["TZe-FA4B", "TZeFA4B", "TZe-FA-4B", "TZe-FA4", "TZeFA4"]
+name         = "Brother TZe-FA4B 18mm Blue on White Fabric Iron-on Tape"
+purchase_url = "https://www.brother.com/"
+media        = { width_mm = 18.0, length = { kind = "continuous" }, material = "other", adhesive = "none", color = "white" }
 
 # --- Brother DK labels (QL-820 family, ≤ 62 mm) -------------------------------
 # Dimensions are marketed tape/label sizes. The brother-ql driver maps them to
@@ -5671,26 +6296,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [
   # Printer interface, then Editor Lite / RemovableDisk sibling (libptouch FLAG_PLITE).
@@ -5721,26 +6421,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [
   # Printer interface (libptouch), then Editor Lite mass-storage sibling (field dmesg 04f9:2065).
@@ -5766,26 +6541,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205e }]
 
@@ -5807,26 +6657,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x205f }]
 
@@ -5854,26 +6779,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2060 }]
 
@@ -5895,26 +6895,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2074 }]
 
@@ -5936,21 +7011,77 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
   "TZe-141",
-  "TZe-FX231",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
   "TZe-SE4",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2073 }]
 
@@ -5978,26 +7109,101 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 # USB bulk for Studio WebUSB; Bluetooth Classic SPP appears as a serial port
 # after OS pairing (not Web Bluetooth / BLE).
@@ -6022,15 +7228,55 @@ supported_media = [
   "TZe-221",
   "TZe-231",
   "TZe-131",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-421",
+  "TZe-121",
+  "TZe-111",
   "TZe-431",
-  "TZe-325",
+  "TZe-421",
+  "TZe-531",
+  "TZe-521",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B31",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-233",
+  "TZe-223",
+  "TZe-334",
+  "TZe-135",
   "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S631",
+  "TZe-S621",
   "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
 ]
 # Bluetooth Classic SPP only — pair in the OS, then use Web Serial / --serial
 # at 9600 baud (e.g. /dev/rfcomm0:9600).
@@ -6057,27 +7303,116 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
   "TZe-261",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
+  "TZe-161",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-461",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-561",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-661",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-262",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-263",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-365",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M261",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M961",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S261",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
+  "TZe-FX261",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX661",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
+  "TZe-SL261",
+  "TZe-SL661",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2083 }]
 
@@ -6100,27 +7435,116 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
   "TZe-261",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
+  "TZe-161",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-461",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-561",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-661",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-262",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-263",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-365",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M261",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M961",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S261",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
+  "TZe-FX261",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX661",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
+  "TZe-SL261",
+  "TZe-SL661",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2085 }]
 
@@ -6143,27 +7567,116 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
   "TZe-261",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
+  "TZe-161",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-461",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-561",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-661",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-262",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-263",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-365",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M261",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M961",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S261",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
+  "TZe-FX261",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX661",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
+  "TZe-SL261",
+  "TZe-SL661",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x2086 }]
 
@@ -6185,27 +7698,116 @@ supported_media = [
   "TZe-211",
   "TZe-221",
   "TZe-231",
-  "TZe-131",
   "TZe-241",
   "TZe-251",
   "TZe-261",
-  "TZe-334",
-  "TZe-232",
-  "TZe-233",
-  "TZe-631",
-  "TZe-641",
-  "TZe-651",
-  "TZe-421",
-  "TZe-431",
-  "TZe-325",
-  "TZe-335",
-  "TZe-141",
+  "TZe-161",
   "TZe-151",
-  "TZe-FX231",
-  "TZe-FX241",
+  "TZe-141",
+  "TZe-131",
+  "TZe-121",
+  "TZe-111",
+  "TZe-461",
+  "TZe-451",
+  "TZe-441",
+  "TZe-431",
+  "TZe-421",
+  "TZe-561",
+  "TZe-551",
+  "TZe-541",
+  "TZe-531",
+  "TZe-521",
+  "TZe-661",
+  "TZe-651",
+  "TZe-641",
+  "TZe-631",
+  "TZe-621",
+  "TZe-611",
+  "TZe-751",
+  "TZe-741",
+  "TZe-731",
+  "TZe-721",
+  "TZe-B51",
+  "TZe-B41",
+  "TZe-B31",
+  "TZe-C51",
+  "TZe-C31",
+  "TZe-132",
+  "TZe-262",
+  "TZe-252",
+  "TZe-242",
+  "TZe-232",
+  "TZe-222",
+  "TZe-133",
+  "TZe-263",
+  "TZe-253",
+  "TZe-243",
+  "TZe-233",
+  "TZe-223",
+  "TZe-354",
+  "TZe-344",
+  "TZe-334",
+  "TZe-145",
+  "TZe-135",
+  "TZe-365",
+  "TZe-355",
+  "TZe-345",
+  "TZe-335",
+  "TZe-325",
+  "TZe-315",
+  "TZe-435",
+  "TZe-535",
+  "TZe-555",
+  "TZe-M261",
+  "TZe-M251",
+  "TZe-M231",
+  "TZe-M31",
+  "TZe-MQL35",
+  "TZe-MQP35",
+  "TZe-MQG35",
+  "TZe-M961",
+  "TZe-M951",
+  "TZe-M941",
+  "TZe-M931",
+  "TZe-M921",
+  "TZe-S261",
+  "TZe-S251",
+  "TZe-S241",
+  "TZe-S231",
+  "TZe-S221",
+  "TZe-S211",
+  "TZe-S151",
+  "TZe-S141",
+  "TZe-S131",
+  "TZe-S121",
+  "TZe-S651",
+  "TZe-S641",
+  "TZe-S631",
+  "TZe-S621",
+  "TZe-FX261",
   "TZe-FX251",
+  "TZe-FX241",
+  "TZe-FX231",
+  "TZe-FX221",
+  "TZe-FX211",
+  "TZe-FX661",
+  "TZe-FX651",
+  "TZe-FX641",
+  "TZe-FX631",
+  "TZe-FX621",
+  "TZe-FX611",
+  "TZe-SL251",
+  "TZe-SL651",
+  "TZe-SL261",
+  "TZe-SL661",
   "TZe-SE4",
   "TZe-SE5",
+  "TZe-N251",
+  "TZe-N241",
+  "TZe-N231",
+  "TZe-N221",
+  "TZe-FA3",
+  "TZe-FA4B",
 ]
 # USB bulk preferred; Bluetooth Classic SPP via OS serial (9600 baud).
 connections = [{ kind = "usb", vendor_id = 0x04f9, product_id = 0x20c7 }, { kind = "serial" }]
