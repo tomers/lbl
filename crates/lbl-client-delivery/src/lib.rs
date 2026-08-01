@@ -401,6 +401,7 @@ impl ClientDeliverySession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lbl_status::GpglHostStatus;
 
     #[test]
     fn empty_payload_is_rejected() {
@@ -410,10 +411,7 @@ mod tests {
 
     #[test]
     fn not_ready_status_blocks_unless_forced() {
-        let status = PrintStatus::Gpgl(lbl_status::GpglStatusView {
-            state: lbl_status::GpglHostStatus::Unloaded,
-            readiness: lbl_status::PrintReadiness::not_ready("unloaded"),
-        });
+        let status = PrintStatus::Gpgl(GpglHostStatus::Unloaded.into());
         let err = ClientDeliverySession::start_with(
             ClientHandshake::FireAndForget,
             None,

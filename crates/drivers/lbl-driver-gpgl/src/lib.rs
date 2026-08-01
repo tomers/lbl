@@ -178,11 +178,33 @@ pub const STATUS_QUERY: &[u8] = b"\x1b\x05";
 /// Initialize device (`ESC D` / EOT).
 pub const INIT_CMD: &[u8] = b"\x1b\x04";
 
-/// Firmware query.
+/// Firmware query (`FG`).
+///
+/// Reply is an ASCII string terminated by ETX, e.g. `"CAMEO V1.10 \x03"`.
 pub fn firmware_query() -> Vec<u8> {
     let mut v = b"FG".to_vec();
     v.push(0x03);
     v
+}
+
+/// Device name query (`TI`); newer Silhouette firmware.
+pub fn device_name_query() -> Vec<u8> {
+    let mut v = b"TI".to_vec();
+    v.push(0x03);
+    v
+}
+
+/// Trim trailing ETX / whitespace from an ASCII identity reply (`FG` / `TI`).
+pub fn parse_identity_reply(resp: &[u8]) -> Option<String> {
+    let s = std::str::from_utf8(resp)
+        .ok()?
+        .trim_end_matches('\x03')
+        .trim();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
 }
 
 /// Panel-key simulation prefix (`ESC` + `NUL` + mask). Documented in
@@ -425,5 +447,26 @@ mod tests {
         assert_eq!(panel_key(PANEL_KEY_NONE), [0x1b, 0x00, 0x00]);
         assert_eq!(home_cmd(), b"TT\x03".to_vec());
         assert_eq!(feed_cmd(100), b"FO100\x03".to_vec());
+    }
+
+    #[test]
+    fn identity_query_bytes() {
+        assert_eq!(firmware_query(), b"FG\x03".to_vec());
+        assert_eq!(device_name_query(), b"TI\x03".to_vec());
+    }
+
+    #[test]
+    fn parse_identity_reply_trims_etx_and_whitespace() {
+        assert_eq!(
+            parse_identity_reply(b"CAMEO V1.10    \x03").as_deref(),
+            Some("CAMEO V1.10")
+        );
+        assert_eq!(
+            parse_identity_reply(b"Silhouette Cameo 4\x03").as_deref(),
+            Some("Silhouette Cameo 4")
+        );
+        assert_eq!(parse_identity_reply(b"\x03"), None);
+        assert_eq!(parse_identity_reply(b""), None);
+        assert_eq!(parse_identity_reply(&[0xff, 0xfe]), None);
     }
 }

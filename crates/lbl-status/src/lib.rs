@@ -178,12 +178,21 @@ impl PrintStatus {
 /// can only fold the tag into a variant that serializes as a map, so a variant
 /// wrapping a plain string-valued enum would fail to serialize. The `state`
 /// field keeps the tagged JSON well-formed (`{ "protocol": "gpgl", "state": "ready" }`).
+///
+/// Optional identity fields come from once-per-connection `FG` / `TI` probes
+/// (see [`ClientStatusSession`]); delivery status notes leave them unset.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct GpglStatusView {
     /// Cutter motion / load state.
     pub state: GpglHostStatus,
     /// Whether the cutter can accept a new cut job.
     pub readiness: PrintReadiness,
+    /// Firmware string from `FG` (e.g. `"CAMEO V1.10"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware_version: Option<String>,
+    /// Device name from `TI` (newer firmware).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_name: Option<String>,
 }
 
 impl From<GpglHostStatus> for GpglStatusView {
@@ -191,6 +200,8 @@ impl From<GpglHostStatus> for GpglStatusView {
         Self {
             state,
             readiness: state.readiness(),
+            firmware_version: None,
+            device_name: None,
         }
     }
 }
@@ -468,6 +479,21 @@ mod tests {
         let value = serde_json::to_value(&status).unwrap();
         assert_eq!(value["protocol"], "gpgl");
         assert_eq!(value["state"], "ready");
+        assert!(value.get("firmware_version").is_none());
+        assert!(value.get("device_name").is_none());
+    }
+
+    #[test]
+    fn gpgl_status_serializes_identity_fields() {
+        let status = PrintStatus::Gpgl(GpglStatusView {
+            state: GpglHostStatus::Ready,
+            readiness: GpglHostStatus::Ready.readiness(),
+            firmware_version: Some("CAMEO V1.10".into()),
+            device_name: Some("Cameo 4".into()),
+        });
+        let value = serde_json::to_value(&status).unwrap();
+        assert_eq!(value["firmware_version"], "CAMEO V1.10");
+        assert_eq!(value["device_name"], "Cameo 4");
     }
 
     #[test]

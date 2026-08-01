@@ -75,10 +75,7 @@ mod tests {
 
     #[test]
     fn ensure_ready_respects_force() {
-        let status = PrintStatus::Gpgl(crate::GpglStatusView {
-            state: GpglHostStatus::Unloaded,
-            readiness: PrintReadiness::not_ready("unloaded"),
-        });
+        let status = PrintStatus::Gpgl(GpglHostStatus::Unloaded.into());
         let err = ensure_ready_to_print(&status, false).unwrap_err();
         assert_eq!(err.reason.as_deref(), Some("unloaded"));
         assert!(ensure_ready_to_print(&status, true).is_ok());

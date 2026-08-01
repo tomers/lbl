@@ -1,8 +1,8 @@
 //! Transport-agnostic multi-probe status sessions.
 //!
-//! Bidirectional status flows (DYMO `ESC V`/`A`/`U`, NIIMBOT RFID/heartbeat
-//! probes) are usually orchestrated in a specific transport. This module factors
-//! the *probe plan* out of the *transport* the same way
+//! Bidirectional status flows (DYMO `ESC V`/`A`/`U`, NIIMBOT RFID/heartbeat,
+//! GPGL `FG`/`TI` + status) are usually orchestrated in a specific transport.
+//! This module factors the *probe plan* out of the *transport* the same way
 //! `lbl-client-delivery` factors print handshakes.
 //!
 //! The session never blocks and never measures wall-clock time (`wasm32`-safe).
@@ -17,13 +17,20 @@ use lbl_driver_niimbot::live_status::{
 
 use crate::dymo_lw::{self, apply_engine_version, apply_sku_info, Lw550EngineVersion};
 use crate::{
-    parse_brother_pt_status, parse_brother_ql_status, parse_status, parse_zpl_host_status,
-    status_query_bytes, status_reply_len, PrintStatus, StatusError,
-    DYMO_LW_ENGINE_VERSION_REPLY_LEN, DYMO_LW_SKU_INFO_REPLY_LEN, DYMO_LW_STATUS_REPLY_LEN,
+    parse_brother_pt_status, parse_brother_ql_status, parse_zpl_host_status, status_query_bytes,
+    status_reply_len, PrintStatus, StatusError, DYMO_LW_ENGINE_VERSION_REPLY_LEN,
+    DYMO_LW_SKU_INFO_REPLY_LEN, DYMO_LW_STATUS_REPLY_LEN,
 };
 
 const STATUS_IO_TIMEOUT_MS: u32 = 6_000;
 const NIIMBOT_QUERY_TIMEOUT_MS: u32 = 2_500;
+/// `FG` firmware query — we need the reply for device info (inkscape-silhouette
+/// waits up to 10s). Do **not** reuse the cut-handshake 500ms soft-drain: that
+/// path discards FG content and is too short for a real read on WebUSB.
+const GPGL_FIRMWARE_TIMEOUT_MS: u32 = STATUS_IO_TIMEOUT_MS;
+/// Optional `TI` name query. Newer firmware replies; older stays silent — keep
+/// this shorter so a missing name does not dominate the first status poll.
+const GPGL_NAME_TIMEOUT_MS: u32 = 1_500;
 
 const RFID_INFO_RESPONSE: u8 = 0x1b;
 const RFID_INFO2_RESPONSE: u8 = 0x1d;
@@ -52,6 +59,18 @@ pub struct StatusSessionContext {
     /// Cached NIIMBOT device info.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cached_device_info: Option<NiimbotDeviceInfo>,
+    /// Cached GPGL `FG` firmware string for this connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_gpgl_firmware: Option<String>,
+    /// Skip `FG` (prior silence / failure this session).
+    #[serde(default)]
+    pub skip_gpgl_firmware: bool,
+    /// Cached GPGL `TI` device name for this connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_gpgl_device_name: Option<String>,
+    /// Skip `TI` (prior silence / failure this session).
+    #[serde(default)]
+    pub skip_gpgl_device_name: bool,
 }
 
 /// An instruction from the status session to the transport-owning caller.
@@ -80,7 +99,7 @@ pub enum StatusAction {
         status: Box<PrintStatus>,
         /// Updated context to persist on the connection handle.
         #[serde(skip_serializing_if = "status_context_is_default")]
-        context: StatusSessionContextView,
+        context: Box<StatusSessionContextView>,
     },
     /// Status query failed.
     Error {
@@ -89,11 +108,17 @@ pub enum StatusAction {
     },
 }
 
-fn status_context_is_default(ctx: &StatusSessionContextView) -> bool {
+// serde `skip_serializing_if` passes `&Field`; Field is `Box<_>`.
+#[allow(clippy::borrowed_box)]
+fn status_context_is_default(ctx: &Box<StatusSessionContextView>) -> bool {
     ctx.engine_version.is_none()
         && ctx.model_id.is_none()
         && ctx.device_info.is_none()
         && !ctx.skip_engine_version
+        && ctx.gpgl_firmware.is_none()
+        && ctx.gpgl_device_name.is_none()
+        && !ctx.skip_gpgl_firmware
+        && !ctx.skip_gpgl_device_name
 }
 
 /// Serializable subset of [`StatusSessionContext`] returned on [`StatusAction::Done`].
@@ -107,6 +132,14 @@ pub struct StatusSessionContextView {
     pub model_id: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device_info: Option<NiimbotDeviceInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpgl_firmware: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skip_gpgl_firmware: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpgl_device_name: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skip_gpgl_device_name: bool,
 }
 
 impl From<&StatusSessionContext> for StatusSessionContextView {
@@ -116,6 +149,10 @@ impl From<&StatusSessionContext> for StatusSessionContextView {
             skip_engine_version: ctx.skip_engine_version,
             model_id: ctx.cached_model_id,
             device_info: ctx.cached_device_info.clone(),
+            gpgl_firmware: ctx.cached_gpgl_firmware.clone(),
+            skip_gpgl_firmware: ctx.skip_gpgl_firmware,
+            gpgl_device_name: ctx.cached_gpgl_device_name.clone(),
+            skip_gpgl_device_name: ctx.skip_gpgl_device_name,
         }
     }
 }
@@ -144,6 +181,11 @@ enum Kind {
         skip_engine: bool,
         esc_a: Option<Vec<u8>>,
     },
+    Gpgl {
+        phase: GpglPhase,
+        firmware: Option<String>,
+        device_name: Option<String>,
+    },
     Niimbot {
         phase: NiimbotPhase,
         is_b1: bool,
@@ -165,6 +207,16 @@ enum DymoPhase {
     StatusRecv,
     SkuSent,
     SkuRecv,
+}
+
+#[derive(Clone, Copy)]
+enum GpglPhase {
+    FirmwareSent,
+    FirmwareRecv,
+    NameSent,
+    NameRecv,
+    StatusSent,
+    StatusRecv,
 }
 
 #[derive(Clone, Copy)]
@@ -245,6 +297,11 @@ impl ClientStatusSession {
                     rfid_try_second: false,
                 }
             }
+            Protocol::Gpgl => Kind::Gpgl {
+                phase: gpgl_bootstrap_phase(&context),
+                firmware: context.cached_gpgl_firmware.clone(),
+                device_name: context.cached_gpgl_device_name.clone(),
+            },
             other => Kind::SingleShot { protocol: other },
         };
 
@@ -293,6 +350,9 @@ impl ClientStatusSession {
                     "dymo status session bootstrap in unexpected phase".into(),
                 )),
             },
+            Kind::Gpgl { phase, .. } => Ok(vec![StatusAction::Send {
+                bytes: gpgl_query_bytes(*phase),
+            }]),
             Kind::Niimbot {
                 phase,
                 is_b1,
@@ -341,6 +401,24 @@ impl ClientStatusSession {
                     match_cmds: Vec::new(),
                 }])
             }
+            Kind::Gpgl { phase, .. } => {
+                let (next, timeout_ms) = match *phase {
+                    GpglPhase::FirmwareSent => (GpglPhase::FirmwareRecv, GPGL_FIRMWARE_TIMEOUT_MS),
+                    GpglPhase::NameSent => (GpglPhase::NameRecv, GPGL_NAME_TIMEOUT_MS),
+                    GpglPhase::StatusSent => (GpglPhase::StatusRecv, STATUS_IO_TIMEOUT_MS),
+                    _ => {
+                        return Err(StatusSessionError::Usage(
+                            "gpgl status send in unexpected phase".into(),
+                        ))
+                    }
+                };
+                *phase = next;
+                Ok(vec![StatusAction::Recv {
+                    min_len: 1,
+                    timeout_ms,
+                    match_cmds: Vec::new(),
+                }])
+            }
             Kind::Niimbot {
                 phase,
                 is_b1,
@@ -379,7 +457,7 @@ impl ClientStatusSession {
                 let status = parse_single(*protocol, bytes)?;
                 Ok(vec![StatusAction::Done {
                     status: Box::new(status),
-                    context: StatusSessionContextView::from(&self.context),
+                    context: Box::new(StatusSessionContextView::from(&self.context)),
                 }])
             }
             Kind::Dymo {
@@ -425,7 +503,7 @@ impl ClientStatusSession {
                     } else {
                         Ok(vec![StatusAction::Done {
                             status: Box::new(PrintStatus::DymoLw(status.to_view())),
-                            context: StatusSessionContextView::from(&self.context),
+                            context: Box::new(StatusSessionContextView::from(&self.context)),
                         }])
                     }
                 }
@@ -444,14 +522,96 @@ impl ClientStatusSession {
                     }
                     Ok(vec![StatusAction::Done {
                         status: Box::new(PrintStatus::DymoLw(status.to_view())),
-                        context: StatusSessionContextView::from(&self.context),
+                        context: Box::new(StatusSessionContextView::from(&self.context)),
                     }])
                 }
                 _ => Err(StatusSessionError::Usage(
                     "dymo status rx in unexpected phase".into(),
                 )),
             },
+            Kind::Gpgl { .. } => self.advance_gpgl_rx(bytes),
             Kind::Niimbot { .. } => self.advance_niimbot_rx(bytes),
+        }
+    }
+
+    fn advance_gpgl_rx(&mut self, bytes: &[u8]) -> Result<Vec<StatusAction>, StatusSessionError> {
+        let Kind::Gpgl {
+            phase,
+            firmware,
+            device_name,
+        } = &mut self.kind
+        else {
+            return Err(StatusSessionError::Usage(
+                "gpgl rx called without gpgl kind".into(),
+            ));
+        };
+
+        match *phase {
+            GpglPhase::FirmwareRecv => {
+                match lbl_driver_gpgl::parse_identity_reply(bytes) {
+                    Some(v) => {
+                        *firmware = Some(v.clone());
+                        self.context.cached_gpgl_firmware = Some(v);
+                        self.context.skip_gpgl_firmware = false;
+                    }
+                    None => {
+                        self.context.skip_gpgl_firmware = true;
+                    }
+                }
+                if self.context.cached_gpgl_device_name.is_some()
+                    || self.context.skip_gpgl_device_name
+                {
+                    *phase = GpglPhase::StatusSent;
+                    Ok(vec![StatusAction::Send {
+                        bytes: lbl_driver_gpgl::STATUS_QUERY.to_vec(),
+                    }])
+                } else {
+                    *phase = GpglPhase::NameSent;
+                    Ok(vec![StatusAction::Send {
+                        bytes: lbl_driver_gpgl::device_name_query(),
+                    }])
+                }
+            }
+            GpglPhase::NameRecv => {
+                match lbl_driver_gpgl::parse_identity_reply(bytes) {
+                    Some(v) => {
+                        *device_name = Some(v.clone());
+                        self.context.cached_gpgl_device_name = Some(v);
+                        self.context.skip_gpgl_device_name = false;
+                    }
+                    None => {
+                        self.context.skip_gpgl_device_name = true;
+                    }
+                }
+                *phase = GpglPhase::StatusSent;
+                Ok(vec![StatusAction::Send {
+                    bytes: lbl_driver_gpgl::STATUS_QUERY.to_vec(),
+                }])
+            }
+            GpglPhase::StatusRecv => {
+                if bytes.is_empty() {
+                    return Ok(vec![StatusAction::Error {
+                        message: "gpgl status reply timed out".into(),
+                    }]);
+                }
+                let state = lbl_driver_gpgl::parse_status(bytes).ok_or_else(|| {
+                    StatusError::Parse("unrecognized GPGL status response".into())
+                })?;
+                let host = crate::GpglHostStatus::from(state);
+                let view = crate::GpglStatusView {
+                    state: host,
+                    readiness: host.readiness(),
+                    firmware_version: firmware.clone(),
+                    device_name: device_name.clone(),
+                };
+                Ok(vec![StatusAction::Done {
+                    status: Box::new(PrintStatus::Gpgl(view)),
+                    context: Box::new(StatusSessionContextView::from(&self.context)),
+                }])
+            }
+            _ => Err(StatusSessionError::Usage(
+                "gpgl status rx in unexpected phase".into(),
+            )),
         }
     }
 
@@ -567,7 +727,7 @@ impl ClientStatusSession {
                 );
                 return Ok(vec![StatusAction::Done {
                     status: Box::new(PrintStatus::Niimbot(live.into())),
-                    context: StatusSessionContextView::from(&self.context),
+                    context: Box::new(StatusSessionContextView::from(&self.context)),
                 }]);
             }
             _ => {
@@ -623,6 +783,25 @@ impl ClientStatusSession {
             }
         };
         action
+    }
+}
+
+fn gpgl_bootstrap_phase(context: &StatusSessionContext) -> GpglPhase {
+    if context.cached_gpgl_firmware.is_none() && !context.skip_gpgl_firmware {
+        GpglPhase::FirmwareSent
+    } else if context.cached_gpgl_device_name.is_none() && !context.skip_gpgl_device_name {
+        GpglPhase::NameSent
+    } else {
+        GpglPhase::StatusSent
+    }
+}
+
+fn gpgl_query_bytes(phase: GpglPhase) -> Vec<u8> {
+    match phase {
+        GpglPhase::FirmwareSent => lbl_driver_gpgl::firmware_query(),
+        GpglPhase::NameSent => lbl_driver_gpgl::device_name_query(),
+        GpglPhase::StatusSent => lbl_driver_gpgl::STATUS_QUERY.to_vec(),
+        _ => lbl_driver_gpgl::STATUS_QUERY.to_vec(),
     }
 }
 
@@ -684,8 +863,7 @@ fn parse_single(protocol: Protocol, bytes: &[u8]) -> Result<PrintStatus, StatusS
         Protocol::BrotherQl => Ok(PrintStatus::BrotherQl(parse_brother_ql_status(bytes)?)),
         Protocol::BrotherPt => Ok(PrintStatus::BrotherPt(parse_brother_pt_status(bytes)?)),
         Protocol::Zpl => Ok(PrintStatus::Zpl(parse_zpl_host_status(bytes)?)),
-        Protocol::Gpgl => parse_status(protocol, bytes).map_err(Into::into),
-        Protocol::DymoLw | Protocol::Niimbot => Err(StatusSessionError::Usage(
+        Protocol::DymoLw | Protocol::Niimbot | Protocol::Gpgl => Err(StatusSessionError::Usage(
             "multi-probe protocol reached single-shot parser".into(),
         )),
         other => Err(StatusError::Parse(format!(
@@ -753,6 +931,132 @@ mod tests {
         match action {
             StatusAction::Done { status, .. } => {
                 assert!(matches!(*status, PrintStatus::DymoLw(_)));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gpgl_probes_identity_then_status() {
+        let (mut session, action) =
+            ClientStatusSession::start(Protocol::Gpgl, StatusSessionContext::default()).unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, b"FG\x03"),
+            other => panic!("unexpected {other:?}"),
+        }
+        let action = session.on_send_complete().unwrap();
+        assert!(matches!(
+            action,
+            StatusAction::Recv {
+                timeout_ms: GPGL_FIRMWARE_TIMEOUT_MS,
+                ..
+            }
+        ));
+        let action = session.feed_rx(b"CAMEO V1.10 \x03").unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, b"TI\x03"),
+            other => panic!("unexpected {other:?}"),
+        }
+        let action = session.on_send_complete().unwrap();
+        assert!(matches!(
+            action,
+            StatusAction::Recv {
+                timeout_ms: GPGL_NAME_TIMEOUT_MS,
+                ..
+            }
+        ));
+        let action = session.feed_rx(b"Cameo 4\x03").unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, lbl_driver_gpgl::STATUS_QUERY),
+            other => panic!("unexpected {other:?}"),
+        }
+        let action = session.on_send_complete().unwrap();
+        assert!(matches!(
+            action,
+            StatusAction::Recv {
+                timeout_ms: STATUS_IO_TIMEOUT_MS,
+                ..
+            }
+        ));
+        let action = session.feed_rx(b"0\x03").unwrap();
+        match action {
+            StatusAction::Done { status, context } => {
+                match *status {
+                    PrintStatus::Gpgl(st) => {
+                        assert_eq!(st.state, crate::GpglHostStatus::Ready);
+                        assert_eq!(st.firmware_version.as_deref(), Some("CAMEO V1.10"));
+                        assert_eq!(st.device_name.as_deref(), Some("Cameo 4"));
+                    }
+                    other => panic!("unexpected {other:?}"),
+                }
+                assert_eq!(context.gpgl_firmware.as_deref(), Some("CAMEO V1.10"));
+                assert_eq!(context.gpgl_device_name.as_deref(), Some("Cameo 4"));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gpgl_cached_identity_jumps_to_status() {
+        let (mut session, action) = ClientStatusSession::start(
+            Protocol::Gpgl,
+            StatusSessionContext {
+                cached_gpgl_firmware: Some("CAMEO V1.10".into()),
+                cached_gpgl_device_name: Some("Cameo 4".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, lbl_driver_gpgl::STATUS_QUERY),
+            other => panic!("unexpected {other:?}"),
+        }
+        let _ = session.on_send_complete().unwrap();
+        let action = session.feed_rx(b"0\x03").unwrap();
+        match action {
+            StatusAction::Done { status, .. } => match *status {
+                PrintStatus::Gpgl(st) => {
+                    assert_eq!(st.firmware_version.as_deref(), Some("CAMEO V1.10"));
+                    assert_eq!(st.device_name.as_deref(), Some("Cameo 4"));
+                }
+                other => panic!("unexpected {other:?}"),
+            },
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gpgl_silent_identity_still_reads_status() {
+        let (mut session, _action) =
+            ClientStatusSession::start(Protocol::Gpgl, StatusSessionContext::default()).unwrap();
+        let _ = session.on_send_complete().unwrap();
+        // Silent FG → skip, probe TI.
+        let action = session.feed_rx(&[]).unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, b"TI\x03"),
+            other => panic!("unexpected {other:?}"),
+        }
+        let _ = session.on_send_complete().unwrap();
+        // Silent TI → skip, probe ESC E.
+        let action = session.feed_rx(&[]).unwrap();
+        match action {
+            StatusAction::Send { bytes } => assert_eq!(bytes, lbl_driver_gpgl::STATUS_QUERY),
+            other => panic!("unexpected {other:?}"),
+        }
+        let _ = session.on_send_complete().unwrap();
+        let action = session.feed_rx(b"2\x03").unwrap();
+        match action {
+            StatusAction::Done { status, context } => {
+                match *status {
+                    PrintStatus::Gpgl(st) => {
+                        assert_eq!(st.state, crate::GpglHostStatus::Unloaded);
+                        assert!(st.firmware_version.is_none());
+                        assert!(st.device_name.is_none());
+                    }
+                    other => panic!("unexpected {other:?}"),
+                }
+                assert!(context.skip_gpgl_firmware);
+                assert!(context.skip_gpgl_device_name);
             }
             other => panic!("unexpected {other:?}"),
         }
