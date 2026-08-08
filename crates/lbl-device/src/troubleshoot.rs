@@ -24,7 +24,7 @@ struct Style {
 impl Style {
     fn stderr() -> Self {
         Self {
-            color: io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+            color: lbl_cli::color_for_tty(io::stderr().is_terminal()),
         }
     }
 

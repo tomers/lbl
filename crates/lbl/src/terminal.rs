@@ -11,7 +11,9 @@
 //!
 //! Raster art is produced by [`lbl_driver_console::render_terminal`] so the
 //! preview matches `--protocol console` exactly. Color (ANSI) is used only when
-//! the destination stream is a TTY and `NO_COLOR` is unset.
+//! the destination stream is a TTY, `NO_COLOR` is unset, and the host console
+//! can interpret ANSI (Windows needs virtual-terminal mode; see
+//! [`lbl_cli::color_for_tty`]).
 
 use std::io::{self, IsTerminal, Write};
 
@@ -36,9 +38,12 @@ const VAL: &str = "\x1b[38;5;114m"; // green
 const PUNCT: &str = "\x1b[38;5;245m"; // gray
 const COMMENT: &str = "\x1b[38;5;102m"; // dim gray
 
-/// Whether to emit ANSI color, given a stream's TTY status. Honors `NO_COLOR`.
+/// Whether to emit ANSI color, given a stream's TTY status.
+///
+/// Honors `NO_COLOR` and enables Windows virtual-terminal processing so color
+/// half-block art is not printed as raw escape text on classic `conhost`.
 pub fn color_for(is_tty: bool) -> bool {
-    is_tty && std::env::var_os("NO_COLOR").is_none()
+    lbl_cli::color_for_tty(is_tty)
 }
 
 /// Whether stdout should be colorized.

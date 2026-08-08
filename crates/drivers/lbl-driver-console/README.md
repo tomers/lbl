@@ -22,6 +22,11 @@ each character cell.
 Wide rasters are box-downsampled to `max_width` columns (aspect-preserving);
 narrow rasters are never upscaled.
 
+On Windows, color mode only works when the console has virtual-terminal
+processing enabled (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`). `lbl` does this
+automatically via `lbl_cli::color_for_tty` before emitting ANSI; without that
+flag classic `conhost` would print the escape sequences as literal characters.
+
 ## Where it is used
 
 The same `render_terminal` function backs three `lbl` features so they all

@@ -10,3 +10,5 @@ rust-version.workspace = true
 
 [dependencies]
 clap-cargo = { workspace = true }
+# Windows: ENABLE_VIRTUAL_TERMINAL_PROCESSING (same path clap/anstream uses).
+anstyle-query = "1"

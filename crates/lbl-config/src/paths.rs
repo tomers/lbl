@@ -10,9 +10,9 @@ const DIM: &str = "\x1b[2m";
 const OK: &str = "\x1b[38;5;114m";
 const MISSING: &str = "\x1b[31m";
 
-/// Whether stdout should be colorized. Honors `NO_COLOR`.
+/// Whether stdout should be colorized. Honors `NO_COLOR` (and Windows VT mode).
 pub fn stdout_color() -> bool {
-    std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+    lbl_cli::color_for_tty(std::io::stdout().is_terminal())
 }
 
 /// One line in a `config paths` report.

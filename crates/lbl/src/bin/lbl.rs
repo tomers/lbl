@@ -5,7 +5,7 @@
 //! `catalog`, `device`) expose each step, mirroring the standalone `lbl-*`
 //! binaries.
 
-use std::io::Read;
+use std::io::{IsTerminal, Read};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -2162,7 +2162,11 @@ fn read_stdin_string() -> Result<String> {
 }
 
 fn main() -> Result<()> {
+    // Enable Windows virtual-terminal processing before any colorized write
+    // (console half-block previews, clap help, debug dumps).
+    let ansi = lbl_cli::color_for_tty(std::io::stderr().is_terminal());
     tracing_subscriber::fmt()
+        .with_ansi(ansi)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
